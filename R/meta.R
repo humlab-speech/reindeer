@@ -1,8 +1,53 @@
 
-
-
-
-get_metadata <- function(dbhandle,add.metadata=c("Session.DateTime","Speaker.ID"),overwrite=FALSE,session=".*"){
+#' This function gathers metata for bundles in an emuR database.
+#'
+#' Metadata of a file is stored in 'meta_json' files. This function goes through all
+#' bundles, parses the JSON data and collects everything into a data fram which is
+#' returned. The structure of the metadata does not have to be consistent across
+#' meta_json files. New columns are added to the data.frame as new fields are detected.
+#' And the used may specify addidional columns that should be added to the data frame
+#' regardless of them being present in any fo the 'meta_json' files.
+#'
+#' The user may also give the name of an Excel file to which the metadata table should be
+#' exported. The session and bundle columns of this file will be locked to make it
+#' easier to edit the metadata. The two file columns are also hidden.
+#'
+#' @param dbhandle The database handle of an emuR database.
+#' @param Excelfile The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.
+#' @param add.metadata A vector of column names that the function should make sure
+#' that they are present in the output.
+#' @param overwrite The default behaviour is that an Excel file should not be
+#' overwritten if it is present already. If this parameter is \code{TRUE} then the file will be overwritten.
+#' @param session A session pattern. Used for editing only the metadata of bundles in a
+#' specific  session.
+#'
+#'
+#' @return A data frame containing inforamtion about the 'meta_json' files found
+#' \describe{
+#'   \item{session}{The name of the session.}
+#'   \item{bundle}{The bundle name}
+#'   \item{file}{The file name of the meta_json file found in the database}
+#'   \item{absolute_file_path}{The full absolute path to the 'meta_json' file.}
+#' }
+#' In addition, the \code{\link[base]{data.frame}} will contain one column for every
+#' type of information given in any of the 'meta_json' files.
+#' @export
+#'
+#' @examples
+#' \donotrun{
+#' create_ae_db() -> ae
+#' make_dummy_metafiles(ae)
+#' get_metadata(ae)
+#' ## Some cleanup code
+#' unlink_emuRDemoDir()
+#' rm(ae)
+#' }
+#'
+get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTime","Speaker.ID"),overwrite=FALSE,session=".*"){
+  #Start with checking consistency regarding output file
+  if(! overwrite && !is.null(Excelfile) && file.exists(Excelfile)){
+    stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
+  }
   emuR:::check_emuDBhandle(dbhandle)
   bundles <- list_bundles(dbhandle,session=session)
   metafiles <- list_files(dbhandle,fileExtension = "meta_json",sessionPattern=session)
@@ -23,9 +68,17 @@ get_metadata <- function(dbhandle,add.metadata=c("Session.DateTime","Speaker.ID"
       metafiles[metafiles$absolute_file_path == currFile,col] <- jsonmeta[[col]]
      }
   }
+  if(!is.null(Excelfile)){
+    wb <- openxlsx::createWorkbook(paste(dbhandle$dbName,"metadata"))
+    openxlsx::addWorksheet(wb,"metadata")
+    openxlsx::writeDataTable(wb,"metadata",x=metafiles,keepNA = FALSE,withFilter=FALSE)
+    openxlsx::freezePane(wb,"metadata",firstActiveCol = 5)
+    openxlsx::setColWidths(wb,"metadata",cols=3:4,hidden=TRUE)
+    openxlsx::setColWidths(wb,"metadata",cols=5:30,widths = 18)
+    openxlsx::saveWorkbook(wb,file=Excelfile,overwrite=overwrite)
+  }
 
   return(metafiles)
-
 
 }
 
