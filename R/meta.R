@@ -82,4 +82,77 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
 
 }
 
-##jsonlite::toJSON(as.data.frame(meta),raw="base64",na="string",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")
+#' A function for importing metadata from an Excel file
+#'
+#' This function takes an Excel file (in .xlsx format) and extracts metadata from it.
+#' The file should begin with the folowing columns:
+#' \itemize{
+#' \item session
+#' \item bundle
+#' \item file
+#' \item absolute_file_path
+#' }
+#' and then go on to have some columns which contains the meta data. Each row in the
+#' data contains the information and metadata for a bundle (in a specific session).
+#' The simples way to get such a file is to create one from a database using the
+#' \code{\link{get_metadata}} function. The fields \code{file} and
+#' \code{absolute_file_path} will be hidden in this file to fascilitate editing of the
+#' metadata.
+#'
+#' Please be aware that bundles that are speficied in the Excel file will have
+#' their metadata files (ending with '.meta_json') overwritten when using the
+#' \code{import_metadata}. So, please make sure to remove rows of bundles that should
+#' not be altered from the Excel file before importing the metadata from it.
+#'
+#'
+#' @param dbhandle The emuR database handle of the database.
+#' @param Excelfile The path to a properly formated Excel (.xlsx) file.
+#' @param ignore.columns Columns in the Excel file (other than \code{session},\code{bundle},
+#' \code{file} and \code{absolute_file_path}) that should not be considered to contain metadata.
+#'
+#' @return
+#' @export
+#'
+#' @examples
+import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
+  if(!file.exists(Excelfile)){
+    stop("Unable to open the metadata Excel file.\nThe file ",filename," does not exist!")
+  }
+  openxlsx::read.xlsx(Excelfile) -> meta
+  if(!is.null(ignore.columns) && ! ignore.columns %in% names(meta)){
+    miss <- setdiff(ignore.columns,names(meta))
+    warning("The columns ",paste(miss,collapse = ",")," are not present in teh Excel file.")
+  }
+
+  #Here we just remove the columns named by the user which exists in the metadata file
+  if(!is.null(ignore.columns)){
+    meta <- meta %>% select(setdiff(names(meta),ignore.columns))
+  }
+  #Make sure we have an output file
+  meta <- meta %>%
+    select(-absolute_file_path,-file) %>%
+    mutate(metadatafile=file.path(dbhandle$basePath,
+                                  paste0(session,"_ses"),
+                                  paste0(bundle,"_bndl"),paste0(bundle,".meta_json"))) %>%
+    select(-session,-bundle)
+  #Now to the main business of the function
+  jsondat <- meta %>%
+    select(-metadatafile)
+  json <- jsondat %>%
+    mutate(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
+    select(json)
+
+  towrite <- meta %>%
+    bind_cols(json) %>%
+    select(metadatafile,json)
+  #Write the  data
+  for(r in 1:nrow(towrite)){
+    fileConn <- file(towrite[r,"metadatafile"])
+    writeLines(towrite[r,"json"], fileConn)
+    close(fileConn)
+  }
+  out <- gsub(paste0(dbhandle$basePath,"/"),"",towrite[["metadatafile"]])
+  return(out)
+}
+
+
