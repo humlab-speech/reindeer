@@ -110,10 +110,9 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
 #' @param ignore.columns Columns in the Excel file (other than \code{session},\code{bundle},
 #' \code{file} and \code{absolute_file_path}) that should not be considered to contain metadata.
 #'
-#' @return
+#' @return A vector of 'meta_json' files updated by the call. The path for each file is given relative to the base of the emuR database.
 #' @export
 #'
-#' @examples
 import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
   if(!file.exists(Excelfile)){
     stop("Unable to open the metadata Excel file.\nThe file ",filename," does not exist!")
@@ -155,4 +154,41 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
   return(out)
 }
 
+#' Title
+#'
+#' @param dbhandle
+#' @param sessionPattern
+#' @param bundlePattern
+#' @param algorithm
+#'
+#' @return
+#' @export
+#'
+#' @examples
+add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
+  wavs <- list_files(dbhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
+  for(inFile in wavs[["absolute_file_path"]]){
+    tuneR::readWave(inFile) -> w
+    options(digits=15)
+    (length(w@left) / w@samp.rate)[[1]] *1000 -> duration
+    rm(w)
+    digest::digest(inFile,file=TRUE,algo=algorithm) -> checksum
+    #Now insert the information into the meta_json file
+    outFile <- gsub(".wav$",".meta_json",inFile)
+    if(file.exists(outFile)){
+      json <- jsonlite::read_json(outFile,simplifyVector = TRUE)
+      json["Session.Duration"] <- duration
+    }else{
+      #just create a JSON structure then
+      json <- data.frame("Session.Duration"=duration)
+    }
+    json[paste(algorithm,"checksum",sep="_")] <- checksum
 
+    #Convert back to a JSON string
+    outJson <- jsonlite::toJSON(json,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")
+    #Write to file
+    fileConn <- file(outFile)
+    writeLines(outJson, fileConn)
+    close(fileConn)
+  }
+}
