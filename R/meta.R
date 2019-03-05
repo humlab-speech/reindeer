@@ -154,17 +154,31 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
   return(out)
 }
 
-#' Title
+#' Add identifying information based on the content of the wave file to the metadata information for the bundle.
 #'
-#' @param dbhandle
-#' @param sessionPattern
-#' @param bundlePattern
-#' @param algorithm
+#' This function will extract information from the wav file associated with a bundle, and add it to the set of metadata
+#' for the bundle. This information can later be used to verify that the file has not been altered later on, or to deidentify
+#' wav files in a reversable manner for use outside of the emuR framework. Deidentified files are sometimes useful for blinded randomized
+#' perceptual testing, and the ability to reverse the procedure is then essential to link the results of the evaluation back to the original
+#' recording extracted from the emuR data base.
 #'
-#' @return
+#' @param dbhandle The handle for the emuR database.
+#' @param sessionPattern A regexp pattern that allows you to limit which sessions should be affected by the manibpulation.
+#' @param bundlePattern A regexp pattern that allows you to limit which bundles to include.
+#' @param algorithm The name of the hashing algorithm, according to the \code{\link[digest]{digest}} function.
+#'
+#'
 #' @export
 #'
 #' @examples
+#' \dontrun{
+#' create_ae_db() -> ae
+#' add_digest(ae)
+#' get_metadata(ae,Excelfile = NULL) -> res
+#' print(res)
+#' unlink_emuRDemoDir()
+#' }
+#'
 add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
   wavs <- list_files(dbhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
   for(inFile in wavs[["absolute_file_path"]]){
