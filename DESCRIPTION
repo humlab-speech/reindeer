@@ -1,0 +1,22 @@
+Package: emuRextensions
+Type: Package
+Title: Auxilliary functions for the emuR DBMS.
+Version: 0.1.0
+Authors@R: person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se",
+  role = c("aut", "cre"))
+Description: This package adds utility functions that are useful for me when working 
+    with emuR databases the way I need them to work. The functions have been developed separately from what is planned for the 
+    emuR project and may break at any moment.  
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Suggests: 
+    testthat
+Imports: 
+    emuR,
+    digest,
+    wrassp,
+    jsonlite,
+    openxlsx,
+    sqldf
+RoxygenNote: 6.1.1
