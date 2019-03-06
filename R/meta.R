@@ -120,7 +120,7 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
   openxlsx::read.xlsx(Excelfile) -> meta
   if(!is.null(ignore.columns) && ! ignore.columns %in% names(meta)){
     miss <- setdiff(ignore.columns,names(meta))
-    warning("The columns ",paste(miss,collapse = ",")," are not present in teh Excel file.")
+    warning("The columns ",paste(miss,collapse = ",")," are not present in the Excel file.")
   }
 
   #Here we just remove the columns named by the user which exists in the metadata file
@@ -173,7 +173,7 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
 #' @examples
 #' \dontrun{
 #' create_ae_db() -> ae
-#' add_digest(ae)
+#' add_digests(ae)
 #' get_metadata(ae,Excelfile = NULL) -> res
 #' print(res)
 #' unlink_emuRDemoDir()
@@ -182,21 +182,24 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
 add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
   wavs <- list_files(dbhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
   for(inFile in wavs[["absolute_file_path"]]){
-    tuneR::readWave(inFile) -> w
+
+    wrassp::read.AsspDataObj(inFile) -> w
     options(digits=15)
-    (length(w@left) / w@samp.rate)[[1]] *1000 -> duration
+    attr(w,"sampleRate") -> sr
+    attr(w,"endRecord") - attr(w,"startRecord") +1 -> samples
+    samples / sr *1000 -> duration
     rm(w)
     digest::digest(inFile,file=TRUE,algo=algorithm) -> checksum
     #Now insert the information into the meta_json file
     outFile <- gsub(".wav$",".meta_json",inFile)
     if(file.exists(outFile)){
       json <- jsonlite::read_json(outFile,simplifyVector = TRUE)
-      json["Session.Duration"] <- duration
+      json["Bundle.Duration"] <- duration
     }else{
       #just create a JSON structure then
-      json <- data.frame("Session.Duration"=duration)
+      json <- data.frame("Bundle.Duration"=duration)
     }
-    json[paste(algorithm,"checksum",sep="_")] <- checksum
+    json[paste0("Bundle.",algorithm,"_checksum")] <- checksum
 
     #Convert back to a JSON string
     outJson <- jsonlite::toJSON(json,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")
