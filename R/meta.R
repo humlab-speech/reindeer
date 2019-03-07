@@ -1,4 +1,8 @@
 
+## Some constants
+metadata.extension = "meta_json"
+
+
 #' This function gathers metata for bundles in an emuR database.
 #'
 #' Metadata of a file is stored in 'meta_json' files. This function goes through all
@@ -50,7 +54,7 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
   }
   emuR:::check_emuDBhandle(dbhandle)
   bundles <- list_bundles(dbhandle,session=session)
-  metafiles <- list_files(dbhandle,fileExtension = "meta_json",sessionPattern=session)
+  metafiles <- list_files(dbhandle,fileExtension = metadata.extension,sessionPattern=session)
   #Use the bundle list as a scaffold for a data fram to hold the content of all metadata files
 #  metacontent <- metafiles[c("bundle","absolute_file_path")]
   for(currFile in na.omit(metafiles$absolute_file_path)){
@@ -68,6 +72,10 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
       metafiles[metafiles$absolute_file_path == currFile,col] <- jsonmeta[[col]]
      }
   }
+  # Include the possibility of having default meta data for a session in the
+  # _ses folder
+
+
   if(!is.null(Excelfile)){
     wb <- openxlsx::createWorkbook(paste(dbhandle$dbName,"metadata"))
     openxlsx::addWorksheet(wb,"metadata")

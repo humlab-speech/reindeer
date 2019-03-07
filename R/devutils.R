@@ -22,7 +22,7 @@ unlink_emuRDemoDir <- function(){
 make_dummy_metafiles <- function(db,metafile="test.meta"){
   outMetaFiles <- list_files(db,"wav") %>%
     select(absolute_file_path) %>%
-    mutate(absolute_file_path=gsub("wav$","meta_json",absolute_file_path))
+    mutate(absolute_file_path=gsub("wav$",metadata.extension,absolute_file_path))
 
   res <- file.copy(from=metafile,to=outMetaFiles[[1]])
   return(res)
