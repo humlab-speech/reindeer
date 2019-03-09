@@ -5,23 +5,23 @@ metadata.extension = "meta_json"
 
 #' This function gathers metata for bundles in an emuR database.
 #'
-#' Metadata of a file is stored in 'meta_json' files. This function goes through all
-#' bundles, parses the JSON data and collects everything into a data fram which is
+#' Metadata of a recording is stored in 'meta_json' files. This function goes through all
+#' bundles, parses the JSON data and collects everything into a dataframe which is
 #' returned. The structure of the metadata does not have to be consistent across
 #' meta_json files. New columns are added to the data.frame as new fields are detected.
-#' And the used may specify addidional columns that should be added to the data frame
-#' regardless of them being present in any fo the 'meta_json' files.
+#' And the user may specify additional columns that should be added to the data frame
+#' regardless of them being present in any of the 'meta_json' files.
 #'
 #' The user may also give the name of an Excel file to which the metadata table should be
-#' exported. The session and bundle columns of this file will be locked to make it
-#' easier to edit the metadata. The two file columns are also hidden.
+#' exported. The session and bundle columns of this file will be locked and hidden to make it
+#' easier to edit the metadata without making it difficult to use effectivelly afterwards.
 #'
 #' @param dbhandle The database handle of an emuR database.
 #' @param Excelfile The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.
 #' @param add.metadata A vector of column names that the function should make sure
 #' that they are present in the output.
 #' @param overwrite The default behaviour is that an Excel file should not be
-#' overwritten if it is present already. If this parameter is \code{TRUE} then the file will be overwritten.
+#' overwritten if it exists already. If this parameter is \code{TRUE} then the file will be overwritten.
 #' @param session A session pattern. Used for editing only the metadata of bundles in a
 #' specific  session.
 #'
@@ -72,6 +72,20 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
       metafiles[metafiles$absolute_file_path == currFile,col] <- jsonmeta[[col]]
      }
   }
+
+  #Prepare an Excel workbook, if one should be written
+  if(!is.null(Excelfile)){
+    wb <- openxlsx::createWorkbook(paste(dbhandle$dbName,"bundle"))
+    openxlsx::addWorksheet(wb,"bundles")
+    openxlsx::writeDataTable(wb,"bundles",x=metafiles,keepNA = FALSE,withFilter=FALSE)
+    openxlsx::freezePane(wb,"bundles",firstActiveCol = 5)
+    openxlsx::setColWidths(wb,"bundles",cols=3:4,hidden=TRUE)
+    openxlsx::setColWidths(wb,"bundles",cols=5:30,widths = 18)
+  }
+
+
+
+
   # Include the possibility of having default meta data for a sessions (in a _ses folder)
    sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
    # Remove meta files associated with bundles
@@ -98,22 +112,39 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
        }
      }
 
+     #Add session meta data to the workbook
+     if(!is.null(Excelfile)){
+       openxlsx::addWorksheet(wb,"sessions")
+       openxlsx::writeDataTable(wb,"sessions",x=sessJSONFilesDF,keepNA = FALSE,withFilter=FALSE)
+       openxlsx::freezePane(wb,"sessions",firstActiveCol = 3)
+       openxlsx::setColWidths(wb,"sessions",cols=2,hidden=TRUE)
+       openxlsx::setColWidths(wb,"sessions",cols=3:30,widths = 18)
+     }
+
      metafiles %>%
        left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
        select(-session_metadata_file) -> metafiles
+
+     # Now, it could be that the Session metadata and bundle metadata contain the same
+     # pieces of information. Then, Session metadata should overwrite bundle metadata only
+     # when bundle metadata is NA.
+     duplicates <- grep("_sessionmetadatafile",names(metafiles),value=TRUE)
+     for(dupl in duplicates){
+       bundleoriginal <- gsub("_sessionmetadatafile","",dupl)
+       #metafiles[is.na(metafiles[bundleoriginal]),bundleoriginal] <- metafiles[is.na(metafiles[bundleoriginal]),dupl]
+       metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
+                                                 metafiles[[bundleoriginal]],
+                                                 metafiles[[dupl]])
+       metafiles[dupl] <- NULL
+     }
+
    }
 
+   # We do not need to check owrwriting here as that is handled by saveWorkbook
+   if(!is.null(Excelfile)){
+     openxlsx::saveWorkbook(wb,file=Excelfile,overwrite=overwrite)
+   }
 
-
-  if(!is.null(Excelfile)){
-    wb <- openxlsx::createWorkbook(paste(dbhandle$dbName,"metadata"))
-    openxlsx::addWorksheet(wb,"metadata")
-    openxlsx::writeDataTable(wb,"metadata",x=metafiles,keepNA = FALSE,withFilter=FALSE)
-    openxlsx::freezePane(wb,"metadata",firstActiveCol = 5)
-    openxlsx::setColWidths(wb,"metadata",cols=3:4,hidden=TRUE)
-    openxlsx::setColWidths(wb,"metadata",cols=5:30,widths = 18)
-    openxlsx::saveWorkbook(wb,file=Excelfile,overwrite=overwrite)
-  }
 
   return(metafiles)
 
@@ -134,7 +165,7 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
 #' The simples way to get such a file is to create one from a database using the
 #' \code{\link{get_metadata}} function. The fields \code{file} and
 #' \code{absolute_file_path} will be hidden in this file to fascilitate editing of the
-#' metadata.
+#' metadata without the user breaking anything.
 #'
 #' Please be aware that bundles that are speficied in the Excel file will have
 #' their metadata files (ending with '.meta_json') overwritten when using the
@@ -193,15 +224,15 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
 
 #' Add identifying information based on the content of the wave file to the metadata information for the bundle.
 #'
-#' This function will extract information from the wav file associated with a bundle, and add it to the set of metadata
+#' This function will extract information (lenght of recording and a checksum) from the wav file associated with a bundle, and add it to the set of metadata
 #' for the bundle. This information can later be used to verify that the file has not been altered later on, or to deidentify
 #' wav files in a reversable manner for use outside of the emuR framework. Deidentified files are sometimes useful for blinded randomized
 #' perceptual testing, and the ability to reverse the procedure is then essential to link the results of the evaluation back to the original
-#' recording extracted from the emuR data base.
+#' recording extracted from the emuR data base. The user may create checksums by multiple algorithms by running the function again with different \code{algorithm} arguments.
 #'
 #' @param dbhandle The handle for the emuR database.
-#' @param sessionPattern A regexp pattern that allows you to limit which sessions should be affected by the manibpulation.
-#' @param bundlePattern A regexp pattern that allows you to limit which bundles to include.
+#' @param sessionPattern A regexp pattern that allows the user to limit which sessions should be affected by the manipulation.
+#' @param bundlePattern A regexp pattern that allows the user to limit which bundles to include.
 #' @param algorithm The name of the hashing algorithm, according to the \code{\link[digest]{digest}} function.
 #'
 #'
