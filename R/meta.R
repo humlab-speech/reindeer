@@ -72,8 +72,37 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
       metafiles[metafiles$absolute_file_path == currFile,col] <- jsonmeta[[col]]
      }
   }
-  # Include the possibility of having default meta data for a session in the
-  # _ses folder
+  # Include the possibility of having default meta data for a sessions (in a _ses folder)
+   sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
+   # Remove meta files associated with bundles
+   sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) & grepl(emuR:::session.suffix,sessJSONFiles)]
+   # Run only if there are session metadata files
+   if(length(sessJSONFiles) > 0){
+     sessJSONFilesDF <- data.frame(str_split(sessJSONFiles,pattern = .Platform$file.sep,simplify = TRUE),stringsAsFactors=FALSE)
+     names(sessJSONFilesDF) <- c("session","session_metadata_file")
+     # The session needs to be without suffix so that metadata may be joinded by session later
+     sessJSONFilesDF$session <- gsub(paste0(emuR:::session.suffix,"$"),"",sessJSONFilesDF$session)
+     sessJSONFilesDF <- na.omit(sessJSONFilesDF)
+
+
+     for(row in nrow(sessJSONFilesDF)){
+       currFile <- as.vector(sessJSONFilesDF[[row,"session_metadata_file"]])
+       currSession <- as.vector(sessJSONFilesDF[[row,"session"]])
+       currSessionDir <- paste0(currSession,emuR:::session.suffix)
+
+       jsonmeta <- jsonlite::read_json(file.path(dbhandle$basePath,currSessionDir,currFile),simplifyVector = TRUE)
+
+       # Now start inserting data from the session metadata file
+       for(col in names(jsonmeta)){
+         sessJSONFilesDF[sessJSONFilesDF$session == currSession,col] <- jsonmeta[[col]]
+       }
+     }
+
+     metafiles %>%
+       left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
+       select(-session_metadata_file) -> metafiles
+   }
+
 
 
   if(!is.null(Excelfile)){
