@@ -19,11 +19,13 @@ unlink_emuRDemoDir <- function(){
 }
 
 
-make_dummy_metafiles <- function(db,metafile="test.meta"){
+make_dummy_metafiles <- function(db,metafile="test.meta",sessionmetafile="0000.meta_json"){
   outMetaFiles <- list_files(db,"wav") %>%
     select(absolute_file_path) %>%
     mutate(absolute_file_path=gsub("wav$",metadata.extension,absolute_file_path))
 
   res <- file.copy(from=metafile,to=outMetaFiles[[1]])
+  sess <- file.copy(from=sessionmetafile,to=file.path(db$basePath,"0000_ses",sessionmetafile))
+  res <- c(sess,res)
   return(res)
 }
