@@ -92,7 +92,7 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
    sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) & grepl(emuR:::session.suffix,sessJSONFiles)]
    # Run only if there are session metadata files
    if(length(sessJSONFiles) > 0){
-     sessJSONFilesDF <- data.frame(str_split(sessJSONFiles,pattern = .Platform$file.sep,simplify = TRUE),stringsAsFactors=FALSE)
+     sessJSONFilesDF <- data.frame(stringr::str_split(sessJSONFiles,pattern = .Platform$file.sep,simplify = TRUE),stringsAsFactors=FALSE)
      names(sessJSONFilesDF) <- c("session","session_metadata_file")
      # The session needs to be without suffix so that metadata may be joinded by session later
      sessJSONFilesDF$session <- gsub(paste0(emuR:::session.suffix,"$"),"",sessJSONFilesDF$session)
@@ -276,4 +276,49 @@ add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorith
     writeLines(outJson, fileConn)
     close(fileConn)
   }
+}
+
+
+
+#' Create a biography of the labels in a list of segments in a tidy manner
+#'
+#' @param segs_tbl The \code[dplyr]{\link{tibble}} that is the result \code{\link[emuR]{query}} call.
+#' @param emudb_hdl A \code{\link{emuR}} database handle.
+#' @param compute_digests Should information that describes the recorded sound files be computed so that is is definitelly part of the
+#' added metadata information.
+#' @param algorithm The checksum algorithm that should be used when computing sound file information.
+#'
+#' @return a \code{\link[dplyr]{tibble}}
+#' @export
+#'
+#' @examples
+#' \notrun{
+#' ## This code just sets up a new emuR database and inserts some
+#' ## fake metadata into it.
+#' create_ae_db() -> ae_test
+#' make_dummy_metafiles(ae_test)
+#' # Get all the 'n' segments in the database
+#' query(ae_test,"Phonetic = n",resultType = "tibble") -> ae_nt
+#' # Add information related to the nature the recording sessions
+#' # e.g. the speaker ID, the date of the recording
+#' ae_nt %>% biographize(ae_test)
+#' # This code does the same as the above, but it will also compute new
+#' # information that is strictly  aimed at identifying the recording
+#' # (length of recording and a a sha1 digest of the wav file).
+#' ae_nt %>% biographize(ae_test,compute_digests=TRUE,algorithm="sha1")
+#' }
+#'
+biographize <- function(segs_tbl,emudb_hdl,compute_digests=FALSE,algorithm="sha1") {
+  #make sure that the first argument is a segment list, and that
+  # it contains "session" and "bundle" columns.
+  if(! is.data.frame(segs_tbl) || !c("session", "bundle") %in% names(segs_tbl)){
+    out <- paste("The input to the",match.call()[[1]], "has to be a 'tibble' or a 'data.frame'.")
+    stop(out)
+  }
+  if(compute_digests==TRUE){
+    add_digests(emudb_hdl,algorithm = algorithm)
+  }
+   mdata <- get_metadata(emudb_hdl,session = ".*",Excelfile=NULL,overwrite = FALSE)
+   out <- segs_tbl %>% left_join(mdata,by = c("session", "bundle"))
+   return(out)
 }
