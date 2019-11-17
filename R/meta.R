@@ -5,16 +5,18 @@ metadata.extension = "meta_json"
 
 #' This function gathers metata for bundles in an emuR database.
 #'
-#' Metadata of a recording is stored in 'meta_json' files. This function goes through all
-#' bundles, parses the JSON data and collects everything into a dataframe which is
-#' returned. The structure of the metadata does not have to be consistent across
-#' meta_json files. New columns are added to the data.frame as new fields are detected.
-#' And the user may specify additional columns that should be added to the data frame
+#' Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.
+#' This function goes through the database metadata file, session metadata files and metadata files associated with each bundle,
+#' parses the JSON data and collects everything into an Excel file which is written to a specificed file.
+#' The data is also returned as a tibble. The structure of the metadata does not have to be consistent across
+#' meta_json files. New columns are added to the as new fields are detected, and the user is then
+#' expected to make sure that the Excel file output is edited manually to fix inconsistencies.
+#' The user may additionally specify additional columns that should be added to the data frame
 #' regardless of them being present in any of the 'meta_json' files.
 #'
-#' The user may also give the name of an Excel file to which the metadata table should be
-#' exported. The session and bundle columns of this file will be locked and hidden to make it
+#' The Excel file output will contain "session" and "bundle" columns of this file will be locked and hidden to make it
 #' easier to edit the metadata without making it difficult to use effectivelly afterwards.
+#' The user should refrain from editing or removing these hidden columns.
 #'
 #' @param dbhandle The database handle of an emuR database.
 #' @param Excelfile The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.
@@ -35,19 +37,19 @@ metadata.extension = "meta_json"
 #' }
 #' In addition, the \code{\link[base]{data.frame}} will contain one column for every
 #' type of information given in any of the 'meta_json' files.
-#' @export
+#'
 #'
 #' @examples
 #' \donotrun{
 #' create_ae_db() -> ae
 #' make_dummy_metafiles(ae)
-#' get_metadata(ae)
+#' export_metadata(ae)
 #' ## Some cleanup code
 #' unlink_emuRDemoDir()
 #' rm(ae)
 #' }
 #'
-get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTime","Speaker.ID"),overwrite=FALSE,session=".*"){
+export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTime","Speaker.ID"),overwrite=FALSE,session=".*"){
   #Start with checking consistency regarding output file
   if(! overwrite && !is.null(Excelfile) && file.exists(Excelfile)){
     stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
@@ -163,7 +165,7 @@ get_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTim
 #' and then go on to have some columns which contains the meta data. Each row in the
 #' data contains the information and metadata for a bundle (in a specific session).
 #' The simples way to get such a file is to create one from a database using the
-#' \code{\link{get_metadata}} function. The fields \code{file} and
+#' \code{\link{export_metadata}} function. The fields \code{file} and
 #' \code{absolute_file_path} will be hidden in this file to fascilitate editing of the
 #' metadata without the user breaking anything.
 #'
@@ -242,7 +244,7 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
 #' \dontrun{
 #' create_ae_db() -> ae
 #' add_digests(ae)
-#' get_metadata(ae,Excelfile = NULL) -> res
+#' export_metadata(ae,Excelfile = NULL) -> res
 #' print(res)
 #' unlink_emuRDemoDir()
 #' }
@@ -318,7 +320,8 @@ biographize <- function(segs_tbl,emudb_hdl,compute_digests=FALSE,algorithm="sha1
   if(compute_digests==TRUE){
     add_digests(emudb_hdl,algorithm = algorithm)
   }
-   mdata <- get_metadata(emudb_hdl,session = ".*",Excelfile=NULL,overwrite = FALSE)
+  #Here we use the special mode of export_medatata to get a data structure rather than an Excel file.
+   mdata <- export_metadata(emudb_hdl,session = ".*",Excelfile=NULL,overwrite = FALSE)
    out <- segs_tbl %>% left_join(mdata,by = c("session", "bundle"))
    return(out)
 }
