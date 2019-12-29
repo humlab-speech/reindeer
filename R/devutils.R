@@ -19,13 +19,21 @@ unlink_emuRDemoDir <- function(){
 }
 
 
-make_dummy_metafiles <- function(db,metafile="test.meta",sessionmetafile="0000.meta_json"){
+make_dummy_metafiles <- function(db,metafile="bundle.meta",sessionmetafile="0000.meta_json"){
   outMetaFiles <- list_files(db,"wav") %>%
     select(absolute_file_path) %>%
-    mutate(absolute_file_path=gsub("wav$",metadata.extension,absolute_file_path))
+    mutate(absolute_file_path=gsub("wav$",metadata.extension,absolute_file_path)) %>%
+    slice(-1) ## One file should be missing so that we may test bundle and session defaults
 
-  res <- file.copy(from=metafile,to=outMetaFiles[[1]])
+  res <- file.copy(from=file.path("tests",metafile),to=outMetaFiles[[1]])
   sess <- file.copy(from=sessionmetafile,to=file.path(db$basePath,"0000_ses",sessionmetafile))
   res <- c(sess,res)
+  # store database wide default values
+  emuR:::load_DBconfig(db) -> dbCfg
+  dbCfg$metadataDefaults <- jsonlite::read_json(file.path("tests","db.meta"),simplifyVector = FALSE) ## Keep the list strucure since this is going directly to json
+  emuR:::store_DBconfig(db,dbConfig = dbCfg)
+
   return(res)
 }
+
+
