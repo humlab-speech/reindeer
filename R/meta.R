@@ -49,7 +49,7 @@ metadata.extension = "meta_json"
 #' rm(ae)
 #' }
 #'
-export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.DateTime","Speaker.ID"),overwrite=FALSE,session=".*"){
+export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date","Participant.ID"),overwrite=FALSE,session=".*"){
   #Start with checking consistency regarding output file
   if(! overwrite && !is.null(Excelfile) && file.exists(Excelfile)){
     stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
@@ -61,9 +61,9 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 #  metacontent <- metafiles[c("bundle","absolute_file_path")]
   for(currFile in na.omit(metafiles$absolute_file_path)){
     jsonmeta <- jsonlite::read_json(currFile,simplifyVector = TRUE)
-    if( any(add.metadata %in% names(jsonmeta)) ){
-      stop("Cannot add metadata columns that already has a value in a metadata file.")
-    }
+    # if( any(add.metadata %in% names(jsonmeta)) ){
+    #   stop("Cannot add metadata columns that already has a value in a metadata file.")
+    # }
     # See if we should add some columns
     toappend <- setdiff(add.metadata,names(jsonmeta))
     if(!is.null(toappend) | length(toappend ) > 0){
@@ -84,9 +84,6 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
     openxlsx::setColWidths(wb,"bundles",cols=3:4,hidden=TRUE)
     openxlsx::setColWidths(wb,"bundles",cols=5:30,widths = 18)
   }
-
-
-
 
   # Include the possibility of having default meta data for a sessions (in a _ses folder)
    sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
@@ -127,7 +124,7 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
        left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
        select(-session_metadata_file) -> metafiles
 
-     # Now, it could be that the Session metadata and bundle metadata contain the same
+     # Now, it could be that the Session metadata and bundle metadata contain
      # pieces of information. Then, Session metadata should overwrite bundle metadata only
      # when bundle metadata is NA.
      duplicates <- grep("_sessionmetadatafile",names(metafiles),value=TRUE)
@@ -140,7 +137,42 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
        metafiles[dupl] <- NULL
      }
 
+
    }
+
+   #Add database meta data to the workbook
+   if(!is.null(Excelfile)){
+     openxlsx::addWorksheet(wb,"database")
+   }
+
+   # Now check for metadata set at the database level
+   emuR:::load_DBconfig(dbhandle) -> dbCfg
+   if(!is.null(dbCfg$metadataDefaults)){
+      dbDefaults <- as.data.frame(dbCfg$metadataDefaults,stringsAsFactors=FALSE)
+      if(length(dbDefaults) > 0){
+        #This means that the field is not just empty
+        # Repeat the rows so that the columns may be merged
+        dbMeta <- as.data.frame(c(meta["file"],dbDefaults))  %>%
+          mutate_if(is.factor,as.character)
+        metafiles <- metafiles %>%
+          mutate_if(is.factor,as.character)%>%
+          left_join(dbMeta,by="file",suffix=c("","_database"))
+        duplicates <- grep("_database",names(metafiles),value=TRUE)
+        for(dupl in duplicates){
+          bundleoriginal <- gsub("_database","",dupl)
+          metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
+                                              metafiles[[bundleoriginal]],
+                                              metafiles[[dupl]])
+          metafiles[dupl] <- NULL
+        }
+
+        if(!is.null(Excelfile)){
+          openxlsx::writeDataTable(wb,"database",x=dbDefaults,keepNA = FALSE,withFilter=FALSE)
+        }
+
+      }
+   }
+
 
    # We do not need to check owrwriting here as that is handled by saveWorkbook
    if(!is.null(Excelfile)){
@@ -148,7 +180,7 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
    }
 
 
-  return(metafiles)
+   return(metafiles)
 
 }
 
