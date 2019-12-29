@@ -16,7 +16,7 @@ A vector of bundle names
 Find untranscribed bundles
 }
 \examples{
-\\donotrun{
+\donotrun{
 ae <- create_ae_db()
 # Make a test case for this particular function
 currFile <- file.path(ae$basePath,"0000_ses","msajc012_bndl","msajc012_annot.json")

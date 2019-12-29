@@ -29,9 +29,9 @@ The file should begin with the folowing columns:
 and then go on to have some columns which contains the meta data. Each row in the
 data contains the information and metadata for a bundle (in a specific session).
 The simples way to get such a file is to create one from a database using the
-\code{\link{get_metadata}} function. The fields \code{file} and
+\code{\link{export_metadata}} function. The fields \code{file} and
 \code{absolute_file_path} will be hidden in this file to fascilitate editing of the
-metadata.
+metadata without the user breaking anything.
 }
 \details{
 Please be aware that bundles that are speficied in the Excel file will have
