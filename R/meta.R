@@ -246,18 +246,17 @@ import_metadata <- function(dbhandle,Excelfile){
   if(!file.exists(Excelfile)){
     stop("Unable to open the metadata Excel file.\nThe file ",filename," does not exist!")
   }
-  openxlsx::read.xlsx(Excelfile) -> meta
+  openxlsx::read.xlsx(Excelfile,sheet="bundles") -> meta
 
   #Make sure we have an output file
   meta <- meta %>%
     mutate(metadatafile=file.path(dbhandle$basePath,
                                   paste0(session,emuR:::session.suffix),
-                                  paste0(bundle,emuR:::bundle.dir.suffix),paste0(bundle,".",metadata.extension))) %>%
-    select(-session,-bundle)
+                                  paste0(bundle,emuR:::bundle.dir.suffix),paste0(bundle,".",metadata.extension)))
   #Now to the main business of the function
-  jsondat <- meta %>%
-    select(-metadatafile)
-  json <- jsondat %>%
+
+  json <- meta %>%
+    select(-session,-bundle,-metadatafile) %>% #These are removed as they should not me enoded in the metadata file
     mutate(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
     select(json)
 
