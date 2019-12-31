@@ -3,20 +3,29 @@
 metadata.extension = "meta_json"
 
 
-#' This function gathers metata for bundles in an emuR database.
+#' Functions for gathering metata specified for recordings in an emuR database.
 #'
 #' Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.
-#' This function goes through the database metadata file, session metadata files and metadata files associated with each bundle,
-#' parses the JSON data and collects everything into an Excel file which is written to a specificed file.
-#' The data is also returned as a tibble. The structure of the metadata does not have to be consistent across
-#' meta_json files. New columns are added to the as new fields are detected, and the user is then
-#' expected to make sure that the Excel file output is edited manually to fix inconsistencies.
-#' The user may additionally specify additional columns that should be added to the data frame
+#' The functions goes through the database metadata file, session metadata files and metadata files associated with
+#' each bundle, parses the JSON data and collects everything into a returned \code{\link[dplyr]{tibble}}. Database
+#' default values are supressed by metadata set in a session metadata file, and session level data are in turn
+#' surpressed by data given at the bundle level. The structure of the metadata does not have to be consistent across
+#' meta_json files. New columns are added to the as new fields are detected.
+#'
+#' The function \code{export_metadata} outputs metadata supplied at the bundle, session and database level in separate
+#' tabs of an Excel file. The metadata in the Excel file do not include information inherinted from session or database
+#' defaults.The user may additionally specify additional columns that should be added to the data frame
 #' regardless of them being present in any of the 'meta_json' files.
 #'
-#' The Excel file output will contain "session" and "bundle" columns of this file will be locked and hidden to make it
-#' easier to edit the metadata without making it difficult to use effectivelly afterwards.
-#' The user should refrain from editing or removing these hidden columns.
+#' The user is expected to use the functions \code{export_metadata} and \code{import_metadata} to fix
+#' accedental inconsistencies in the metadata speficications across sessions and bundles by exporting all
+#' information to an Excel file using \code{export_metadata},  edit columns and values (including moving inconsistently
+#' spelled metadata items into a single column with the intended name) using Excel or another editor that complies with
+#' the OOXML Workbook ISO/IEC 29500:2008 standard.
+#'
+#' The user should note that the Excel file result of \code{export_metadata} will contain hidden colums that are
+#' stored to fascilitate re-importation of the data.
+#' The user should refrain from editing or removing these hidden columns
 #'
 #' @param dbhandle The database handle of an emuR database.
 #' @param Excelfile The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.
@@ -24,9 +33,9 @@ metadata.extension = "meta_json"
 #' that they are present in the output.
 #' @param overwrite The default behaviour is that an Excel file should not be
 #' overwritten if it exists already. If this parameter is \code{TRUE} then the file will be overwritten.
-#' @param session A session pattern. Used for editing only the metadata of bundles in a
-#' specific  session.
 #'
+#' @rdname export_metadata
+#' @export
 #'
 #' @return A data frame containing inforamtion about the 'meta_json' files found
 #' \describe{
@@ -35,30 +44,42 @@ metadata.extension = "meta_json"
 #'   \item{file}{The file name of the meta_json file found in the database}
 #'   \item{absolute_file_path}{The full absolute path to the 'meta_json' file.}
 #' }
-#' In addition, the \code{\link[base]{data.frame}} will contain one column for every
-#' type of information given in any of the 'meta_json' files.
+#' In addition, the \code{\link[dplyr]{tibble}} will contain one column for every type of information given in any of the 'meta_json' files.
 #'
 #'
 #' @examples
-#' \donotrun{
+#' \dontrun{
 #' create_ae_db() -> ae
 #' make_dummy_metafiles(ae)
-#' export_metadata(ae)
+#' get_metadata(ae)
 #' ## Some cleanup code
 #' unlink_emuRDemoDir()
 #' rm(ae)
 #' }
 #'
-export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date","Participant.ID"),overwrite=FALSE,session=".*"){
+
+get_metadata <- function(dbhandle,add.metadata=c("Session.Date","Participant.ID"),overwrite=FALSE,session=".*"){
+  res <- export_metadata(dbhandle=dbhandle,add.metadata=add.metadata,overwrite=overwrite)
+  return(res)
+}
+
+
+#'
+#' @rdname export_metadata
+#' @export
+#'
+
+export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date","Participant.ID"),overwrite=FALSE){
   #Start with checking consistency regarding output file
   if(! overwrite && !is.null(Excelfile) && file.exists(Excelfile)){
     stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
   }
   emuR:::check_emuDBhandle(dbhandle)
-  bundles <- list_bundles(dbhandle,session=session)
-  metafiles <- list_files(dbhandle,fileExtension = metadata.extension,sessionPattern=session)
+  bundles <- list_bundles(dbhandle) %>%
+    rename(bundle=name)
+  metafiles <- list_files(dbhandle,fileExtension = metadata.extension)
   #Use the bundle list as a scaffold for a data fram to hold the content of all metadata files
-#  metacontent <- metafiles[c("bundle","absolute_file_path")]
+  #  metacontent <- metafiles[c("bundle","absolute_file_path")]
   for(currFile in na.omit(metafiles$absolute_file_path)){
     jsonmeta <- jsonlite::read_json(currFile,simplifyVector = TRUE)
     # if( any(add.metadata %in% names(jsonmeta)) ){
@@ -72,8 +93,12 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
     # Now start inserting data from the metafiles
     for(col in names(jsonmeta)){
       metafiles[metafiles$absolute_file_path == currFile,col] <- jsonmeta[[col]]
-     }
+    }
   }
+  # Now make sure that all bundles have a row
+  metafiles <- bundles %>%
+    left_join(metafiles,by=c("session","bundle")) %>%
+    select(-file,-absolute_file_path)
 
   #Prepare an Excel workbook, if one should be written
   if(!is.null(Excelfile)){
@@ -81,106 +106,110 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
     openxlsx::addWorksheet(wb,"bundles")
     openxlsx::writeDataTable(wb,"bundles",x=metafiles,keepNA = FALSE,withFilter=FALSE)
     openxlsx::freezePane(wb,"bundles",firstActiveCol = 5)
-    openxlsx::setColWidths(wb,"bundles",cols=3:4,hidden=TRUE)
+#    openxlsx::setColWidths(wb,"bundles",cols=3:4,hidden=TRUE)
     openxlsx::setColWidths(wb,"bundles",cols=5:30,widths = 18)
   }
 
   # Include the possibility of having default meta data for a sessions (in a _ses folder)
-   sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
-   # Remove meta files associated with bundles
-   sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) & grepl(emuR:::session.suffix,sessJSONFiles)]
-   # Run only if there are session metadata files
-   if(length(sessJSONFiles) > 0){
-     sessJSONFilesDF <- data.frame(stringr::str_split(sessJSONFiles,pattern = .Platform$file.sep,simplify = TRUE),stringsAsFactors=FALSE)
-     names(sessJSONFilesDF) <- c("session","session_metadata_file")
-     # The session needs to be without suffix so that metadata may be joinded by session later
-     sessJSONFilesDF$session <- gsub(paste0(emuR:::session.suffix,"$"),"",sessJSONFilesDF$session)
-     sessJSONFilesDF <- na.omit(sessJSONFilesDF)
+  sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
+  # Remove meta files associated with bundles
+  sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) & grepl(emuR:::session.suffix,sessJSONFiles)]
+  # Run only if there are session metadata files
+  if(length(sessJSONFiles) > 0){
+    sessJSONFilesDF <- data.frame(stringr::str_split(sessJSONFiles,pattern = .Platform$file.sep,simplify = TRUE),stringsAsFactors=FALSE)
+    names(sessJSONFilesDF) <- c("session","session_metadata_file")
+    # The session needs to be without suffix so that metadata may be joinded by session later
+    sessJSONFilesDF$session <- gsub(paste0(emuR:::session.suffix,"$"),"",sessJSONFilesDF$session)
+    sessJSONFilesDF <- na.omit(sessJSONFilesDF)
 
 
-     for(row in nrow(sessJSONFilesDF)){
-       currFile <- as.vector(sessJSONFilesDF[[row,"session_metadata_file"]])
-       currSession <- as.vector(sessJSONFilesDF[[row,"session"]])
-       currSessionDir <- paste0(currSession,emuR:::session.suffix)
+    for(row in 1:nrow(sessJSONFilesDF)){
+      currFile <- as.vector(sessJSONFilesDF[[row,"session_metadata_file"]])
+      currSession <- as.vector(sessJSONFilesDF[[row,"session"]])
+      currSessionDir <- paste0(currSession,emuR:::session.suffix)
 
-       jsonmeta <- jsonlite::read_json(file.path(dbhandle$basePath,currSessionDir,currFile),simplifyVector = TRUE)
+      jsonmeta <- jsonlite::read_json(file.path(dbhandle$basePath,currSessionDir,currFile),simplifyVector = TRUE)
 
-       # Now start inserting data from the session metadata file
-       for(col in names(jsonmeta)){
-         sessJSONFilesDF[sessJSONFilesDF$session == currSession,col] <- jsonmeta[[col]]
-       }
-     }
-
-     #Add session meta data to the workbook
-     if(!is.null(Excelfile)){
-       openxlsx::addWorksheet(wb,"sessions")
-       openxlsx::writeDataTable(wb,"sessions",x=sessJSONFilesDF,keepNA = FALSE,withFilter=FALSE)
-       openxlsx::freezePane(wb,"sessions",firstActiveCol = 3)
-       openxlsx::setColWidths(wb,"sessions",cols=2,hidden=TRUE)
-       openxlsx::setColWidths(wb,"sessions",cols=3:30,widths = 18)
-     }
-
-     metafiles %>%
-       left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
-       select(-session_metadata_file) -> metafiles
-
-     # Now, it could be that the Session metadata and bundle metadata contain
-     # pieces of information. Then, Session metadata should overwrite bundle metadata only
-     # when bundle metadata is NA.
-     duplicates <- grep("_sessionmetadatafile",names(metafiles),value=TRUE)
-     for(dupl in duplicates){
-       bundleoriginal <- gsub("_sessionmetadatafile","",dupl)
-       #metafiles[is.na(metafiles[bundleoriginal]),bundleoriginal] <- metafiles[is.na(metafiles[bundleoriginal]),dupl]
-       metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
-                                                 metafiles[[bundleoriginal]],
-                                                 metafiles[[dupl]])
-       metafiles[dupl] <- NULL
-     }
-
-
-   }
-
-   #Add database meta data to the workbook
-   if(!is.null(Excelfile)){
-     openxlsx::addWorksheet(wb,"database")
-   }
-
-   # Now check for metadata set at the database level
-   emuR:::load_DBconfig(dbhandle) -> dbCfg
-   if(!is.null(dbCfg$metadataDefaults)){
-      dbDefaults <- as.data.frame(dbCfg$metadataDefaults,stringsAsFactors=FALSE)
-      if(length(dbDefaults) > 0){
-        #This means that the field is not just empty
-        # Repeat the rows so that the columns may be merged
-        dbMeta <- as.data.frame(c(meta["file"],dbDefaults))  %>%
-          mutate_if(is.factor,as.character)
-        metafiles <- metafiles %>%
-          mutate_if(is.factor,as.character)%>%
-          left_join(dbMeta,by="file",suffix=c("","_database"))
-        duplicates <- grep("_database",names(metafiles),value=TRUE)
-        for(dupl in duplicates){
-          bundleoriginal <- gsub("_database","",dupl)
-          metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
-                                              metafiles[[bundleoriginal]],
-                                              metafiles[[dupl]])
-          metafiles[dupl] <- NULL
-        }
-
-        if(!is.null(Excelfile)){
-          openxlsx::writeDataTable(wb,"database",x=dbDefaults,keepNA = FALSE,withFilter=FALSE)
-        }
-
+      # Now start inserting data from the session metadata file
+      for(col in names(jsonmeta)){
+        sessJSONFilesDF[sessJSONFilesDF$session == currSession,col] <- jsonmeta[[col]]
       }
-   }
+    }
+
+    #Add session meta data to the workbook
+    if(!is.null(Excelfile)){
+      openxlsx::addWorksheet(wb,"sessions")
+      openxlsx::writeDataTable(wb,"sessions",x=sessJSONFilesDF,keepNA = FALSE,withFilter=FALSE)
+      openxlsx::freezePane(wb,"sessions",firstActiveCol = 3)
+#     openxlsx::setColWidths(wb,"sessions",cols=2,hidden=TRUE)
+      openxlsx::setColWidths(wb,"sessions",cols=3:30,widths = 18)
+    }
+
+    metafiles %>%
+      left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
+      select(-session_metadata_file) -> metafiles
+
+    # Now, it could be that the Session metadata and bundle metadata contain
+    # pieces of information. Then, Session metadata should overwrite bundle metadata only
+    # when bundle metadata is NA.
+    duplicates <- grep("_sessionmetadatafile",names(metafiles),value=TRUE)
+    for(dupl in duplicates){
+      bundleoriginal <- gsub("_sessionmetadatafile","",dupl)
+      #metafiles[is.na(metafiles[bundleoriginal]),bundleoriginal] <- metafiles[is.na(metafiles[bundleoriginal]),dupl]
+      metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
+                                          metafiles[[bundleoriginal]],
+                                          metafiles[[dupl]])
+      metafiles[dupl] <- NULL
+    }
 
 
-   # We do not need to check owrwriting here as that is handled by saveWorkbook
-   if(!is.null(Excelfile)){
-     openxlsx::saveWorkbook(wb,file=Excelfile,overwrite=overwrite)
-   }
+  }
+
+  #Add database meta data to the workbook
+  if(!is.null(Excelfile)){
+    openxlsx::addWorksheet(wb,"database")
+  }
+
+  # Now check for metadata set at the database level
+  emuR:::load_DBconfig(dbhandle) -> dbCfg
+  if(!is.null(dbCfg$metadataDefaults)){
+    dbDefaults <- as.data.frame(dbCfg$metadataDefaults,stringsAsFactors=FALSE)
+    if(length(dbDefaults) > 0){
+      #This means that the field is not just empty
+      # Repeat the rows so that the columns may be merged
+      dbMeta <- as.data.frame(c(metafiles["bundle"],dbDefaults))  %>%
+        mutate_if(is.factor,as.character)
+      metafiles <- metafiles %>%
+        mutate_if(is.factor,as.character)%>%
+        left_join(dbMeta,by="bundle",suffix=c("","_database")) %>%
+        distinct() ## This is needed since duplicate rows are introduced by the join by dbMeta
 
 
-   return(metafiles)
+      duplicates <- grep("_database",names(metafiles),value=TRUE)
+
+      for(dupl in duplicates){
+        bundleoriginal <- gsub("_database","",dupl)
+        metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
+                                            metafiles[[bundleoriginal]],
+                                            metafiles[[dupl]])
+        metafiles[dupl] <- NULL
+      }
+
+      if(!is.null(Excelfile)){
+        openxlsx::writeDataTable(wb,"database",x=dbDefaults,keepNA = FALSE,withFilter=FALSE)
+      }
+
+    }
+  }
+
+
+  # We do not need to check owrwriting here as that is handled by saveWorkbook
+  if(!is.null(Excelfile)){
+    openxlsx::saveWorkbook(wb,file=Excelfile,overwrite=overwrite)
+  }
+
+
+  return(metafiles)
 
 }
 
@@ -231,10 +260,9 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
   }
   #Make sure we have an output file
   meta <- meta %>%
-    select(-absolute_file_path,-file) %>%
     mutate(metadatafile=file.path(dbhandle$basePath,
-                                  paste0(session,"_ses"),
-                                  paste0(bundle,"_bndl"),paste0(bundle,".meta_json"))) %>%
+                                  paste0(session,emuR:::session.suffix),
+                                  paste0(bundle,emuR:::bundle.dir.suffix),paste0(bundle,".",metadata.extension))) %>%
     select(-session,-bundle)
   #Now to the main business of the function
   jsondat <- meta %>%
@@ -246,14 +274,45 @@ import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
   towrite <- meta %>%
     bind_cols(json) %>%
     select(metadatafile,json)
-  #Write the  data
+  #Write the bundle metadata files
   for(r in 1:nrow(towrite)){
     fileConn <- file(towrite[r,"metadatafile"])
     writeLines(towrite[r,"json"], fileConn)
     close(fileConn)
   }
-  out <- gsub(paste0(dbhandle$basePath,"/"),"",towrite[["metadatafile"]])
-  return(out)
+  bFiles <- gsub(paste0(dbhandle$basePath,"/"),"",towrite[["metadatafile"]])
+
+  ## Now process session metadata files
+
+  openxlsx::read.xlsx(Excelfile,sheet="sessions") -> sessionMeta
+  sessjsondat <- sessionMeta %>%
+    select(-session,-session_metadata_file)
+  json <- sessjsondat %>%
+    mutate(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
+    select(json)
+
+  towriteSess <- sessionMeta %>%
+    bind_cols(json) %>%
+    select(session,session_metadata_file,json)
+  #Write the bundle metadata files
+  for(r in 1:nrow(towriteSess)){
+    outFile <- file.path(dbhandle$basePath,
+                         paste0(towriteSess[r,"session"],emuR:::session.suffix),
+                         towriteSess[r,"session_metadata_file"])
+    fileConn <- file(outFile)
+    writeLines(towrite[r,"json"], fileConn)
+    close(fileConn)
+    outFile <- gsub(paste0(dbhandle$basePath,"/"),"",outFile)
+    sFiles <- ifelse(exists("sFiles"),c(sFiles,outFile),c(outFile))
+  }
+
+  # Now inject database wide metadata
+  emuR:::load_DBconfig(dbhandle) -> dbCfg
+  openxlsx::read.xlsx(Excelfile,sheet="database") -> dbMeta
+  dbCfg$metadataDefaults <- as.list(dbMeta)
+  emuR:::store_DBconfig(dbhandle,dbCfg)
+
+  return(c(sFiles,bFiles))
 }
 
 #' Add identifying information based on the content of the wave file to the metadata information for the bundle.
@@ -316,17 +375,17 @@ add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorith
 
 #' Create a biography of the labels in a list of segments in a tidy manner
 #'
-#' @param segs_tbl The \code[dplyr]{\link{tibble}} that is the result \code{\link[emuR]{query}} call.
+#' @param segs_tbl The \code{\link[dplyr]{tibble}} that is the result \code{\link[emuR]{query}} call.
 #' @param emudb_hdl A \code{\link{emuR}} database handle.
 #' @param compute_digests Should information that describes the recorded sound files be computed so that is is definitelly part of the
 #' added metadata information.
 #' @param algorithm The checksum algorithm that should be used when computing sound file information.
 #'
-#' @return a \code{\link[dplyr]{tibble}}
+#' @return A \code{\link[dplyr]{tibble}}
 #' @export
 #'
 #' @examples
-#' \notrun{
+#' \dontrun{
 #' ## This code just sets up a new emuR database and inserts some
 #' ## fake metadata into it.
 #' create_ae_db() -> ae_test
@@ -353,7 +412,7 @@ biographize <- function(segs_tbl,emudb_hdl,compute_digests=FALSE,algorithm="sha1
     add_digests(emudb_hdl,algorithm = algorithm)
   }
   #Here we use the special mode of export_medatata to get a data structure rather than an Excel file.
-   mdata <- export_metadata(emudb_hdl,session = ".*",Excelfile=NULL,overwrite = FALSE)
-   out <- segs_tbl %>% left_join(mdata,by = c("session", "bundle"))
-   return(out)
+  mdata <- export_metadata(emudb_hdl,session = ".*",Excelfile=NULL,overwrite = FALSE)
+  out <- segs_tbl %>% left_join(mdata,by = c("session", "bundle"))
+  return(out)
 }
