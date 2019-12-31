@@ -238,26 +238,16 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 #'
 #' @param dbhandle The emuR database handle of the database.
 #' @param Excelfile The path to a properly formated Excel (.xlsx) file.
-#' @param ignore.columns Columns in the Excel file (other than \code{session},\code{bundle},
-#' \code{file} and \code{absolute_file_path}) that should not be considered to contain metadata.
 #'
 #' @return A vector of 'meta_json' files updated by the call. The path for each file is given relative to the base of the emuR database.
 #' @export
 #'
-import_metadata <- function(dbhandle,Excelfile,ignore.columns=NULL){
+import_metadata <- function(dbhandle,Excelfile){
   if(!file.exists(Excelfile)){
     stop("Unable to open the metadata Excel file.\nThe file ",filename," does not exist!")
   }
   openxlsx::read.xlsx(Excelfile) -> meta
-  if(!is.null(ignore.columns) && ! ignore.columns %in% names(meta)){
-    miss <- setdiff(ignore.columns,names(meta))
-    warning("The columns ",paste(miss,collapse = ",")," are not present in the Excel file.")
-  }
 
-  #Here we just remove the columns named by the user which exists in the metadata file
-  if(!is.null(ignore.columns)){
-    meta <- meta %>% select(setdiff(names(meta),ignore.columns))
-  }
   #Make sure we have an output file
   meta <- meta %>%
     mutate(metadatafile=file.path(dbhandle$basePath,
