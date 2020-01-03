@@ -112,8 +112,12 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 
   # Include the possibility of having default meta data for a sessions (in a _ses folder)
   sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
+
   # Remove meta files associated with bundles
   sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) & grepl(emuR:::session.suffix,sessJSONFiles)]
+  sessions <- list_sessions(dbhandle) %>%
+    rename(session=name)
+
   # Run only if there are session metadata files
   if(length(sessJSONFiles) > 0){
     sessJSONFilesDF <- data.frame(stringr::str_split(sessJSONFiles,pattern = .Platform$file.sep,simplify = TRUE),stringsAsFactors=FALSE)
@@ -136,15 +140,6 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
       }
     }
 
-    #Add session meta data to the workbook
-    if(!is.null(Excelfile)){
-      openxlsx::addWorksheet(wb,"sessions")
-      openxlsx::writeDataTable(wb,"sessions",x=sessJSONFilesDF,keepNA = FALSE,withFilter=FALSE)
-      openxlsx::freezePane(wb,"sessions",firstActiveCol = 3)
-#     openxlsx::setColWidths(wb,"sessions",cols=2,hidden=TRUE)
-      openxlsx::setColWidths(wb,"sessions",cols=3:30,widths = 18)
-    }
-
     metafiles %>%
       left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
       select(-session_metadata_file) -> metafiles
@@ -164,6 +159,22 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 
 
   }
+
+  #Add session meta data to the workbook,
+  #or just empty sessions speficiations if there are no session metadata files
+  sessJSONFilesDF <- sessions %>%
+    left_join(sessJSONFilesDF,by="session") %>%
+    select(-session_metadata_file)
+
+  if(!is.null(Excelfile)){
+    openxlsx::addWorksheet(wb,"sessions")
+    openxlsx::writeDataTable(wb,"sessions",x=sessJSONFilesDF,keepNA = FALSE,withFilter=FALSE)
+    openxlsx::freezePane(wb,"sessions",firstActiveCol = 3)
+    #     openxlsx::setColWidths(wb,"sessions",cols=2,hidden=TRUE)
+    openxlsx::setColWidths(wb,"sessions",cols=3:30,widths = 18)
+  }
+
+
 
   #Add database meta data to the workbook
   if(!is.null(Excelfile)){
@@ -220,15 +231,11 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 #' \itemize{
 #' \item session
 #' \item bundle
-#' \item file
-#' \item absolute_file_path
 #' }
 #' and then go on to have some columns which contains the meta data. Each row in the
 #' data contains the information and metadata for a bundle (in a specific session).
 #' The simples way to get such a file is to create one from a database using the
-#' \code{\link{export_metadata}} function. The fields \code{file} and
-#' \code{absolute_file_path} will be hidden in this file to fascilitate editing of the
-#' metadata without the user breaking anything.
+#' \code{\link{export_metadata}} function.
 #'
 #' Please be aware that bundles that are speficied in the Excel file will have
 #' their metadata files (ending with '.meta_json') overwritten when using the
@@ -259,10 +266,23 @@ import_metadata <- function(dbhandle,Excelfile){
     select(-session,-bundle,-metadatafile) %>% #These are removed as they should not me enoded in the metadata file
     mutate(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
     select(json)
+  json <- c()
+  for(r in 1:nrow(meta)){
+    meta %>%
+      slice(r) %>%
+      select(-session,-bundle,-metadatafile) %>%
+      select_if(function(x) !is.na(x)) -> jsondat
+      currJSON <- ifelse(length(jsondat) > 0,
+                         jsonlite::toJSON(jsondat,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows"),
+                         "[{}]" #Just an empty JSON vector
+                         )
+      json <- c(json, currJSON)
+  }
 
+    return(json)
   towrite <- meta %>%
     bind_cols(json) %>%
-    select(metadatafile,json)
+    select(json)
   #Write the bundle metadata files
   for(r in 1:nrow(towrite)){
     fileConn <- file(towrite[r,"metadatafile"])
@@ -277,12 +297,15 @@ import_metadata <- function(dbhandle,Excelfile){
   sessjsondat <- sessionMeta %>%
     select(-session,-session_metadata_file)
   json <- sessjsondat %>%
-    mutate(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
-    select(json)
+    rowwise() %>%
+    do(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
+    unlist()
+  return(json)
 
   towriteSess <- sessionMeta %>%
     bind_cols(json) %>%
     select(session,session_metadata_file,json)
+
   #Write the bundle metadata files
   for(r in 1:nrow(towriteSess)){
     outFile <- file.path(dbhandle$basePath,
