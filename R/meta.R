@@ -201,7 +201,6 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
     # This works since you can always remove a column without an error message (even non-existing ones)
     metafiles[sessColName] <- NULL
     metafiles[dbColName] <- NULL
-
   }
 
   #Prepare an Excel workbook, if one should be written
