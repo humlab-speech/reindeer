@@ -2,6 +2,17 @@
 ## Some constants
 metadata.extension = "meta_json"
 
+## I will need this function until 0.9.0 of dplyr is released,
+#possibly fixing the issue with all NA columns supplied to coalesce
+# The implementation comes from https://stackoverflow.com/a/19254510
+coalesce <- function(...) {
+  Reduce(function(x, y) {
+    i <- which(is.na(x))
+    x[i] <- y[i]
+    x},
+    list(...))
+}
+
 
 #' Functions for gathering metata specified for recordings in an emuR database.
 #'
@@ -100,15 +111,6 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
     left_join(metafiles,by=c("session","bundle")) %>%
     select(-file,-absolute_file_path)
 
-  #Prepare an Excel workbook, if one should be written
-  if(!is.null(Excelfile)){
-    wb <- openxlsx::createWorkbook(paste(dbhandle$dbName,"bundle"))
-    openxlsx::addWorksheet(wb,"bundles")
-    openxlsx::writeDataTable(wb,"bundles",x=metafiles,keepNA = FALSE,withFilter=FALSE)
-    openxlsx::freezePane(wb,"bundles",firstActiveCol = 5)
-#    openxlsx::setColWidths(wb,"bundles",cols=3:4,hidden=TRUE)
-    openxlsx::setColWidths(wb,"bundles",cols=5:30,widths = 18)
-  }
 
   # Include the possibility of having default meta data for a sessions (in a _ses folder)
   sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
@@ -140,50 +142,24 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
       }
     }
 
+    #Add session meta data to the workbook,
+    #or just empty sessions speficiations if there are no session metadata files
+
+    sessJSONFilesDF <- sessions %>%
+      left_join(sessJSONFilesDF,by="session")
+
+    # Make the merger with bundle files to make the final output tibble
     metafiles %>%
       left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
       select(-session_metadata_file) -> metafiles
 
-    # Now, it could be that the Session metadata and bundle metadata contain
-    # pieces of information. Then, Session metadata should overwrite bundle metadata only
-    # when bundle metadata is NA.
-    duplicates <- grep("_sessionmetadatafile",names(metafiles),value=TRUE)
-    for(dupl in duplicates){
-      bundleoriginal <- gsub("_sessionmetadatafile","",dupl)
-      #metafiles[is.na(metafiles[bundleoriginal]),bundleoriginal] <- metafiles[is.na(metafiles[bundleoriginal]),dupl]
-      metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
-                                          metafiles[[bundleoriginal]],
-                                          metafiles[[dupl]])
-      metafiles[dupl] <- NULL
-    }
-
-
   }
 
-  #Add session meta data to the workbook,
-  #or just empty sessions speficiations if there are no session metadata files
-  sessJSONFilesDF <- sessions %>%
-    left_join(sessJSONFilesDF,by="session") %>%
-    select(-session_metadata_file)
-
-  if(!is.null(Excelfile)){
-    openxlsx::addWorksheet(wb,"sessions")
-    openxlsx::writeDataTable(wb,"sessions",x=sessJSONFilesDF,keepNA = FALSE,withFilter=FALSE)
-    openxlsx::freezePane(wb,"sessions",firstActiveCol = 3)
-    #     openxlsx::setColWidths(wb,"sessions",cols=2,hidden=TRUE)
-    openxlsx::setColWidths(wb,"sessions",cols=3:30,widths = 18)
-  }
-
-
-
-  #Add database meta data to the workbook
-  if(!is.null(Excelfile)){
-    openxlsx::addWorksheet(wb,"database")
-  }
-
-  # Now check for metadata set at the database level
+  # Now check and load metadata set at the database level
   emuR:::load_DBconfig(dbhandle) -> dbCfg
-  if(!is.null(dbCfg$metadataDefaults)){
+  if(is.null(dbCfg$metadataDefaults)){
+    dbDefaults <- data.frame()
+  }else{
     dbDefaults <- as.data.frame(dbCfg$metadataDefaults,stringsAsFactors=FALSE)
     if(length(dbDefaults) > 0){
       #This means that the field is not just empty
@@ -195,30 +171,59 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
         left_join(dbMeta,by="bundle",suffix=c("","_database")) %>%
         distinct() ## This is needed since duplicate rows are introduced by the join by dbMeta
 
-
-      duplicates <- grep("_database",names(metafiles),value=TRUE)
-
-      for(dupl in duplicates){
-        bundleoriginal <- gsub("_database","",dupl)
-        metafiles[bundleoriginal] <- ifelse(is.na(metafiles[[dupl]]),
-                                            metafiles[[bundleoriginal]],
-                                            metafiles[[dupl]])
-        metafiles[dupl] <- NULL
-      }
-
-      if(!is.null(Excelfile)){
-        openxlsx::writeDataTable(wb,"database",x=dbDefaults,keepNA = FALSE,withFilter=FALSE)
-      }
-
     }
   }
 
+  #Now, there may be a metadata X column set at the bundle level, an X_sessionmetadatafile
+  # column set at the session level, and an X_database column for the whole database.
+  # These need to be reconsiled
 
-  # We do not need to check owrwriting here as that is handled by saveWorkbook
-  if(!is.null(Excelfile)){
-    openxlsx::saveWorkbook(wb,file=Excelfile,overwrite=overwrite)
+
+  cols <- names(metafiles)
+  duplicates <- grep("_(database|sessionmetadatafile)$",cols,value=TRUE)
+  duplicated <- unique(gsub("_(database|sessionmetadatafile)$","",cols))
+
+
+  for(bundleoriginal in duplicated){
+
+    sessColName <- paste0(bundleoriginal,"_sessionmetadatafile")
+    sessVec <- ifelse(exists(sessColName,metafiles),metafiles[,sessColName],NA)
+    dbColName <- paste0(bundleoriginal,"_database")
+    dbVec <- ifelse(exists(dbColName,metafiles),metafiles[,dbColName],NA)
+    ## This seems odd, but it makes sure that NAs are repeated for the length of vectors.
+    tempDF <- data.frame(metafiles[[bundleoriginal]],
+                         sessVec,
+                         dbVec,stringsAsFactors = FALSE) %>%
+        mutate_if(is.factor,as.character)
+    names(tempDF) <- c("bundle","session","database")
+    # Here the result is the first non-NA value for each row (or NA if the row in tempDF contains only NAs)
+    metafiles[bundleoriginal] <- with(tempDF,coalesce(bundle,session,database))
+    # This works since you can always remove a column without an error message (even non-existing ones)
+    metafiles[sessColName] <- NULL
+    metafiles[dbColName] <- NULL
+
   }
 
+  #Prepare an Excel workbook, if one should be written
+  if(!is.null(Excelfile)){
+    wb <- openxlsx::createWorkbook(paste(dbhandle$dbName,"bundle"))
+    openxlsx::addWorksheet(wb,"bundles")
+    openxlsx::writeDataTable(wb,"bundles",x=metafiles,keepNA = FALSE,withFilter=FALSE)
+    openxlsx::freezePane(wb,"bundles",firstActiveCol = 5)
+    openxlsx::setColWidths(wb,"bundles",cols=5:30,widths = 18)
+
+    # session information
+
+    openxlsx::addWorksheet(wb,"sessions")
+    openxlsx::writeDataTable(wb,"sessions",x=sessJSONFilesDF,keepNA = FALSE,withFilter=FALSE)
+    openxlsx::freezePane(wb,"sessions",firstActiveCol = 3)
+    openxlsx::setColWidths(wb,"sessions",cols=3:30,widths = 18)
+    #database defaults
+    openxlsx::addWorksheet(wb,"database")
+    openxlsx::writeDataTable(wb,"database",x=dbDefaults,keepNA = FALSE,withFilter=FALSE)
+    # We do not need to check owrwriting here as that is handled by saveWorkbook
+    openxlsx::saveWorkbook(wb,file=Excelfile,overwrite=overwrite)
+  }
 
   return(metafiles)
 
@@ -279,7 +284,6 @@ import_metadata <- function(dbhandle,Excelfile){
       json <- c(json, currJSON)
   }
 
-    return(json)
   towrite <- meta %>%
     bind_cols(json) %>%
     select(json)
