@@ -1,4 +1,5 @@
 library(testthat)
-library(emuRextensions)
-
-test_check("emuRextensions")
+##library(emuRextensions)
+library(emuR)
+library(dplyr)
+test_check("articulator")
