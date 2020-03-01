@@ -10,13 +10,7 @@ create_ae_db <- function(){
     create_emuRdemoData()
   }
   db <- load_emuDB(file.path(demodir,"ae_emuDB"))
-  return(db)
-}
 
-
-
-
-make_dummy_metafiles <- function(db){
   # We need two copies of the session, which in R requires som manual intervention
   dirs <- list.dirs(file.path(db$basePath,"0000_ses"))
   dirs <- gsub("0000_ses","0001_ses",dirs)
@@ -27,6 +21,19 @@ make_dummy_metafiles <- function(db){
   inFiles <- list.files(file.path(db$basePath,"0000_ses"),full.names = TRUE,recursive = TRUE,include.dirs = FALSE)
   outFiles <- gsub("0000_ses","0001_ses",inFiles)
   file.copy(from=inFiles,to=outFiles,recursive = FALSE)
+  return(db)
+}
+
+unlink_emuRDemoDir <- function(){
+  demodir <- file.path(tempdir(),"emuR_demoData")
+  res <- unlink(demodir,recursive = TRUE)
+  binRes <- c(TRUE,FALSE)[res+1]
+  return(binRes)
+}
+
+
+make_dummy_metafiles <- function(db){
+
 
   sess1 <- file.copy(from=file.path("..","session.meta"),to=file.path(db$basePath,"0000_ses","0000.meta_json"))
 
@@ -34,7 +41,11 @@ make_dummy_metafiles <- function(db){
   outMetaFiles <- list_files(db,"wav") %>%
     select(absolute_file_path) %>%
     mutate(absolute_file_path=gsub("wav$",metadata.extension,absolute_file_path)) %>%
-    slice(-2,-9) ## One file per session should be missing so that we may test bundle and session defaults
+    arrange(absolute_file_path) %>%
+    slice(-1,-11) ## One file per session should be missing so that we may test bundle and session defaults
+    # "ae_emuDB/0000_ses/msajc003_bndl/msajc003.meta_json"
+    # "ae_emuDB/0001_ses/msajc015_bndl/msajc015.meta_json"
+    # should be missing.
 
   res <- file.copy(from=file.path("..","bundle.meta"),to=outMetaFiles[[1]])
 
@@ -50,7 +61,7 @@ make_dummy_metafiles <- function(db){
 
 
 
-unlink_emuRDemoDir()
+
 create_ae_db() -> ae_test
-make_dummy_metafiles(ae_test)
+
 
