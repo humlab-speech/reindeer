@@ -229,18 +229,20 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 
 }
 
-#' A function for importing metadata from an Excel file
+#' Functions to import or add metadata information to database bundles.
 #'
-#' This function takes an Excel file (in .xlsx format) and extracts metadata from it.
-#' The file should begin with the folowing columns:
+#' The function \code{import_metadata} takes an appropriately structured Excel file and uses the
+#' gathered information to set metadata for bundles.
+#'
+#' The first sheet ("bundles") in the Excel file should begin with the folowing two columns:
 #' \itemize{
 #' \item session
 #' \item bundle
 #' }
-#' and then go on to have some columns which contains the meta data. Each row in the
+#' and then go on to have some columns which contains the metadata. Each row in the
 #' data contains the information and metadata for a bundle (in a specific session).
-#' The simples way to get such a file is to create one from a database using the
-#' \code{\link{export_metadata}} function.
+#' The simples way to get an appropriately structed Excel file is to create one from a database using the
+#' \code{\link{export_metadata}} function on an existing database and given an output file.
 #'
 #' Please be aware that bundles that are speficied in the Excel file will have
 #' their metadata files (ending with '.meta_json') overwritten when using the
@@ -251,26 +253,24 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 #' @param dbhandle The emuR database handle of the database.
 #' @param Excelfile The path to a properly formated Excel (.xlsx) file.
 #'
-#' @return A vector of 'meta_json' files updated by the call. The path for each file is given relative to the base of the emuR database.
+#' @return A vector of .meta_json files updated by the call. The path for each file is given relative to the base of the EmuR database.
 #' @export
 #'
 import_metadata <- function(dbhandle,Excelfile){
   if(!file.exists(Excelfile)){
-    stop("Unable to open the metadata Excel file.\nThe file ",filename," does not exist!")
+    stop("Unable to open the metadata Excel file.\nThe file ",Excelfile," does not exist!")
   }
   openxlsx::read.xlsx(Excelfile,sheet="bundles") -> meta
 
-  #Make sure we have an output file
+  #Make sure we have an output file with full path
   meta <- meta %>%
     mutate(metadatafile=file.path(dbhandle$basePath,
                                   paste0(session,emuR:::session.suffix),
-                                  paste0(bundle,emuR:::bundle.dir.suffix),paste0(bundle,".",metadata.extension)))
+                                  paste0(bundle,emuR:::bundle.dir.suffix),
+                                  paste0(bundle,".",metadata.extension))
+           )
   #Now to the main business of the function
 
-  json <- meta %>%
-    select(-session,-bundle,-metadatafile) %>% #These are removed as they should not me enoded in the metadata file
-    mutate(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
-    select(json)
   json <- c()
   for(r in 1:nrow(meta)){
     meta %>%
@@ -283,10 +283,12 @@ import_metadata <- function(dbhandle,Excelfile){
                          )
       json <- c(json, currJSON)
   }
-
+  json <- data.frame("json"=json)
   towrite <- meta %>%
     bind_cols(json) %>%
-    select(json)
+    mutate(json=as.character(json)) %>%
+    select(json,metadatafile)
+
   #Write the bundle metadata files
   for(r in 1:nrow(towrite)){
     fileConn <- file(towrite[r,"metadatafile"])
@@ -299,24 +301,25 @@ import_metadata <- function(dbhandle,Excelfile){
 
   openxlsx::read.xlsx(Excelfile,sheet="sessions") -> sessionMeta
   sessjsondat <- sessionMeta %>%
-    select(-session,-session_metadata_file)
+    select(-session)
   json <- sessjsondat %>%
     rowwise() %>%
     do(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
     unlist()
-  return(json)
+  json <- data.frame("json"=as.vector(json))
 
   towriteSess <- sessionMeta %>%
+    mutate(session_metadata_file=paste0(session,".",metadata.extension)) %>%
     bind_cols(json) %>%
     select(session,session_metadata_file,json)
-
+  ## Här finns inte session_metadata_file
   #Write the bundle metadata files
   for(r in 1:nrow(towriteSess)){
     outFile <- file.path(dbhandle$basePath,
                          paste0(towriteSess[r,"session"],emuR:::session.suffix),
                          towriteSess[r,"session_metadata_file"])
     fileConn <- file(outFile)
-    writeLines(towrite[r,"json"], fileConn)
+    writeLines(as.character(towriteSess[r,"json"]), fileConn)
     close(fileConn)
     outFile <- gsub(paste0(dbhandle$basePath,"/"),"",outFile)
     sFiles <- ifelse(exists("sFiles"),c(sFiles,outFile),c(outFile))
