@@ -52,20 +52,19 @@ coalesce <- function(...) {
 #' \describe{
 #'   \item{session}{The name of the session.}
 #'   \item{bundle}{The bundle name}
-#'   \item{file}{The file name of the meta_json file found in the database}
-#'   \item{absolute_file_path}{The full absolute path to the 'meta_json' file.}
 #' }
 #' In addition, the \code{\link[dplyr]{tibble}} will contain one column for every type of information given in any of the 'meta_json' files.
 #'
 #'
 #' @examples
 #' \dontrun{
-#' create_ae_db() -> ae
-#' make_dummy_metafiles(ae)
+#' demodir <- file.path(tempdir(),"emuR_demoData")
+#
+#' create_emuRdemoData()
+#'
+#' ae <- load_emuDB(file.path(demodir,"ae_emuDB"))
+#' articulator:::make_dummy_metafiles(ae)
 #' get_metadata(ae)
-#' ## Some cleanup code
-#' unlink_emuRDemoDir()
-#' rm(ae)
 #' }
 #'
 
@@ -93,10 +92,6 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
   #  metacontent <- metafiles[c("bundle","absolute_file_path")]
   for(currFile in na.omit(metafiles$absolute_file_path)){
     jsonmeta <- jsonlite::read_json(currFile,simplifyVector = TRUE)
-    # if( any(add.metadata %in% names(jsonmeta)) ){
-    #   stop("Cannot add metadata columns that already has a value in a metadata file.")
-    # }
-    # See if we should add some columns
     toappend <- setdiff(add.metadata,names(jsonmeta))
     if(!is.null(toappend) | length(toappend ) > 0){
       jsonmeta[,toappend] <- NA
@@ -201,7 +196,6 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
     # This works since you can always remove a column without an error message (even non-existing ones)
     metafiles[sessColName] <- NULL
     metafiles[dbColName] <- NULL
-
   }
 
   #Prepare an Excel workbook, if one should be written
@@ -332,6 +326,95 @@ import_metadata <- function(dbhandle,Excelfile){
   emuR:::store_DBconfig(dbhandle,dbCfg)
 
   return(c(sFiles,bFiles))
+}
+
+
+
+#' A utility function used for setting metadata for a bundle, at for a session or for an entire database.
+#'
+#' The function takes a list and a specification of where the metadata should be set. The default behaviour is to
+#' keep already set metadata, and overwrite only the values that are names  in the list. The user may change this
+#' behaviour by setting \code{reset.before.add=TRUE}, in which case all previous metadata will be replaced with the
+#' data given in the list.
+#'
+#' If bundle name and a \code{session} name is provided, the metadata will be inserted only for that fully speficied \code{bundle}.
+#' If only a \code{bundle} name is provided, the function will add the metadata for the bundle only if there is just one session
+#' in the database. If there are multiple \code{session}s, the function will given an error.
+#'
+#' If no \code{session} or \code{bundle} names are provided, the metadata will be inserted as default values for the entire database.
+#'
+#' @param dbhandle An Emu database handle
+#' @param metadataList A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user.
+#' @param bundle An optional name of a bundle
+#' @param session An optional name of a session
+#' @param reset.before.add If set to TRUE, the function will ignore previously set metadata and simply add the metadata supplied in the list.
+#'
+#' @return
+#' @export
+#'
+#'
+add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.before.add=FALSE){
+
+  if(is.null(bundle) & is.null(session)){
+    #Database wide injection
+    emuR:::load_DBconfig(dbhandle) -> dbCfg
+    if(reset.before.add){
+      dbCfg$metadataDefaults <- as.list(metadataList)
+    } else {
+      #Append data
+      prev <- dbCfg$metadataDefaults
+      prev[names(metadataList)] <- metadataList
+      dbCfg$metadataDefaults <- prev
+    }
+
+    emuR:::store_DBconfig(dbhandle,dbCfg)
+  } else {
+    # Here we store metadata in either session wide or bundle speficit metadata files
+    # Since these files use the same structure, the business here is to set the correct metadatafile filename.
+
+    if(! is.null(session) & is.null(bundle)){
+      #Session level metadata
+
+      metadatafile <- file.path(dbhandle$basePath,
+                           paste0(session,emuR:::session.suffix),
+                           paste0(session,".",metadata.extension))
+    }
+
+
+    if(! is.null(bundle)){
+      #Bundle  metadata
+      if(is.null(session)){
+        ses <- list_sessions(ae_test)
+        if(nrow(ses) == 1){
+          #use the name of the only available session
+          session <- ses[[1]]
+        }else{
+          stop("If you provide a bundle name you need to provide a session name if there are more than one sessions in the database.")
+        }
+
+      }
+
+      metadatafile <- file.path(dbhandle$basePath,
+                                paste0(session,emuR:::session.suffix),
+                                paste0(bundle,emuR:::bundle.dir.suffix),
+                                paste0(bundle,".",metadata.extension))
+
+
+    }
+    if(reset.before.add | ! file.exists(metadatafile) ){
+      #Start fresh / overwrite previous values
+      jsonmetaList <- list()
+    }else{
+
+      #Read in previous values
+      jsonmetaList <- as.list(jsonlite::read_json(metadatafile,simplifyVector = TRUE))
+
+    }
+    #set / overwrite metadata from list
+    jsonmetaList[names(metadataList)] <- metadataList
+
+    jsonlite::write_json(jsonmetaList,metadatafile)
+  }
 }
 
 #' Add identifying information based on the content of the wave file to the metadata information for the bundle.

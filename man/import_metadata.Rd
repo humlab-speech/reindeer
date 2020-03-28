@@ -2,38 +2,33 @@
 % Please edit documentation in R/meta.R
 \name{import_metadata}
 \alias{import_metadata}
-\title{A function for importing metadata from an Excel file}
+\title{Functions to import or add metadata information to database bundles.}
 \usage{
-import_metadata(dbhandle, Excelfile, ignore.columns = NULL)
+import_metadata(dbhandle, Excelfile)
 }
 \arguments{
 \item{dbhandle}{The emuR database handle of the database.}
 
 \item{Excelfile}{The path to a properly formated Excel (.xlsx) file.}
-
-\item{ignore.columns}{Columns in the Excel file (other than \code{session},\code{bundle},
-\code{file} and \code{absolute_file_path}) that should not be considered to contain metadata.}
 }
 \value{
-A vector of 'meta_json' files updated by the call. The path for each file is given relative to the base of the emuR database.
+A vector of .meta_json files updated by the call. The path for each file is given relative to the base of the EmuR database.
 }
 \description{
-This function takes an Excel file (in .xlsx format) and extracts metadata from it.
-The file should begin with the folowing columns:
+The function \code{import_metadata} takes an appropriately structured Excel file and uses the
+gathered information to set metadata for bundles.
+}
+\details{
+The first sheet ("bundles") in the Excel file should begin with the folowing two columns:
 \itemize{
 \item session
 \item bundle
-\item file
-\item absolute_file_path
 }
-and then go on to have some columns which contains the meta data. Each row in the
+and then go on to have some columns which contains the metadata. Each row in the
 data contains the information and metadata for a bundle (in a specific session).
-The simples way to get such a file is to create one from a database using the
-\code{\link{export_metadata}} function. The fields \code{file} and
-\code{absolute_file_path} will be hidden in this file to fascilitate editing of the
-metadata without the user breaking anything.
-}
-\details{
+The simples way to get an appropriately structed Excel file is to create one from a database using the
+\code{\link{export_metadata}} function on an existing database and given an output file.
+
 Please be aware that bundles that are speficied in the Excel file will have
 their metadata files (ending with '.meta_json') overwritten when using the
 \code{import_metadata}. So, please make sure to remove rows of bundles that should
