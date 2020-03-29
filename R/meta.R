@@ -467,7 +467,7 @@ add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorith
 #' Create a biography of the labels in a list of segments in a tidy manner
 #'
 #' @param segs_tbl The \code{\link[dplyr]{tibble}} that is the result \code{\link[emuR]{query}} call.
-#' @param emudb_hdl A \code{\link{emuR}} database handle.
+#' @param emuDBhandle A \code{\link{emuR}} database handle.
 #' @param compute_digests Should information that describes the recorded sound files be computed so that is is definitelly part of the
 #' added metadata information.
 #' @param algorithm The checksum algorithm that should be used when computing sound file information.
@@ -488,11 +488,11 @@ add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorith
 #' ae_nt %>% biographize(ae_test)
 #' # This code does the same as the above, but it will also compute new
 #' # information that is strictly  aimed at identifying the recording
-#' # (length of recording and a a sha1 digest of the wav file).
+#' # (length of recording (in ms) and a sha1 digest of the wav file).
 #' ae_nt %>% biographize(ae_test,compute_digests=TRUE,algorithm="sha1")
 #' }
 #'
-biographize <- function(segs_tbl,emudb_hdl,compute_digests=FALSE,algorithm="sha1") {
+biographize <- function(segs_tbl,emuDBhandle,compute_digests=FALSE,algorithm="sha1") {
   #make sure that the first argument is a segment list, and that
   # it contains "session" and "bundle" columns.
   if(! is.data.frame(segs_tbl) || !c("session", "bundle") %in% names(segs_tbl)){
@@ -500,10 +500,10 @@ biographize <- function(segs_tbl,emudb_hdl,compute_digests=FALSE,algorithm="sha1
     stop(out)
   }
   if(compute_digests==TRUE){
-    add_digests(emudb_hdl,algorithm = algorithm)
+    add_digests(emuDBhandle,algorithm = algorithm)
   }
   #Here we use the special mode of export_medatata to get a data structure rather than an Excel file.
-  mdata <- export_metadata(emudb_hdl,session = ".*",Excelfile=NULL,overwrite = FALSE)
+  mdata <- get_metadata(emuDBhandle,session = ".*")
   out <- segs_tbl %>% left_join(mdata,by = c("session", "bundle"))
   return(out)
 }
