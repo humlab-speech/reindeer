@@ -57,8 +57,6 @@ test_that("Test of the digest adding function",{
 
   expect_false(all(is.na(md[c("Bundle.Duration.ms","Bundle.md5_checksum","Bundle.sha512_checksum")])))
 }
-
-
 )
 
 
