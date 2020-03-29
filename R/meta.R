@@ -18,30 +18,28 @@ coalesce <- function(...) {
 #'
 #' Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.
 #' The functions goes through the database metadata file, session metadata files and metadata files associated with
-#' each bundle, parses the JSON data and collects everything into a returned \code{\link[dplyr]{tibble}}. Database
-#' default values are supressed by metadata set in a session metadata file, and session level data are in turn
-#' surpressed by data given at the bundle level. The structure of the metadata does not have to be consistent across
-#' meta_json files. New columns are added to the as new fields are detected.
+#' each bundle, parses the JSON data and returns \code{\link[dplyr]{tibble}} with one row per bundle in the database.
+#' Database default values are supressed by information set in a session metadata file, and session level data are in
+#' turn surpressed by data given at the bundle level.
+#' The structure of the metadata does not have to be consistent across meta_json files.
+#' New columns are added to the as new fields are detected.
 #'
-#' The function \code{export_metadata} outputs metadata supplied at the bundle, session and database level in separate
-#' tabs of an Excel file. The metadata in the Excel file do not include information inherinted from session or database
-#' defaults.The user may additionally specify additional columns that should be added to the data frame
-#' regardless of them being present in any of the 'meta_json' files.
+#' The function \code{export_metadata} outputs the metadata as an Excel file instead, with bundle, session and database
+#' tabs. The "bundle" tab gives the complete set of all the metadata that are active for each bundle, regardness where
+#' it was set (for the bundle directly, or as a session / database default value).
 #'
 #' The user is expected to use the functions \code{export_metadata} and \code{import_metadata} to fix
-#' accedental inconsistencies in the metadata speficications across sessions and bundles by exporting all
-#' information to an Excel file using \code{export_metadata},  edit columns and values (including moving inconsistently
-#' spelled metadata items into a single column with the intended name) using Excel or another editor that complies with
-#' the OOXML Workbook ISO/IEC 29500:2008 standard.
+#' accedental inconsistencies in the metadata of a database across bundles by exporting all
+#' information to an Excel file using \code{export_metadata}, edit columns and values (including moving inconsistently
+#' spelled metadata fields into a single column with the intended name) using Excel or another editor that complies with
+#' the OOXML Workbook ISO/IEC 29500:2008 standard. The user is also expected to keep the indented structure of the Excel
+#' file (one row per bundle or session, and each column except for those indicating session and bundle names containing
+#' metadata), otherwise it is possible that the file may not be read in again by \code{\link{import_metadata}} to set
+#' updated values.
 #'
-#' The user should note that the Excel file result of \code{export_metadata} will contain hidden colums that are
-#' stored to fascilitate re-importation of the data.
-#' The user should refrain from editing or removing these hidden columns
 #'
 #' @param dbhandle The database handle of an emuR database.
 #' @param Excelfile The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.
-#' @param add.metadata A vector of column names that the function should make sure
-#' that they are present in the output.
 #' @param overwrite The default behaviour is that an Excel file should not be
 #' overwritten if it exists already. If this parameter is \code{TRUE} then the file will be overwritten.
 #'
@@ -69,8 +67,8 @@ coalesce <- function(...) {
 #' }
 #'
 
-get_metadata <- function(dbhandle,add.metadata=c("Session.Date","Participant.ID"),overwrite=FALSE,session=".*"){
-  res <- export_metadata(dbhandle=dbhandle,add.metadata=add.metadata,overwrite=overwrite)
+get_metadata <- function(dbhandle,overwrite=FALSE,session=".*"){
+  res <- export_metadata(dbhandle=dbhandle,overwrite=overwrite)
   return(res)
 }
 
@@ -80,7 +78,7 @@ get_metadata <- function(dbhandle,add.metadata=c("Session.Date","Participant.ID"
 #' @export
 #'
 
-export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date","Participant.ID"),overwrite=FALSE){
+export_metadata <- function(dbhandle,Excelfile=NULL,overwrite=FALSE){
   #Start with checking consistency regarding output file
   if(! overwrite && !is.null(Excelfile) && file.exists(Excelfile)){
     stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
@@ -93,14 +91,6 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
   #  metacontent <- metafiles[c("bundle","absolute_file_path")]
   for(currFile in na.omit(metafiles$absolute_file_path)){
     jsonmeta <- jsonlite::read_json(currFile,simplifyVector = TRUE)
-    # if( any(add.metadata %in% names(jsonmeta)) ){
-    #   stop("Cannot add metadata columns that already has a value in a metadata file.")
-    # }
-    # See if we should add some columns
-    toappend <- setdiff(add.metadata,names(jsonmeta))
-    if(!is.null(toappend) | length(toappend ) > 0){
-      jsonmeta[,toappend] <- NA
-    }
     # Now start inserting data from the metafiles
     for(col in names(jsonmeta)){
       metafiles[metafiles$absolute_file_path == currFile,col] <- jsonmeta[[col]]
@@ -230,8 +220,8 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 
 #' Functions to import or add metadata information to database bundles.
 #'
-#' The function \code{import_metadata} takes an appropriately structured Excel file and uses the
-#' gathered information to set metadata for bundles.
+#' The function takes an appropriately structured Excel file and uses the
+#' information to set metadata for bundles.
 #'
 #' The first sheet ("bundles") in the Excel file should begin with the folowing two columns:
 #' \itemize{
@@ -239,15 +229,18 @@ export_metadata <- function(dbhandle,Excelfile=NULL,add.metadata=c("Session.Date
 #' \item bundle
 #' }
 #' and then go on to have some columns which contains the metadata. Each row in the
-#' data contains the information and metadata for a bundle (in a specific session).
+#' data contains the information and metadata for a bundle (in the specific session).
 #' The simples way to get an appropriately structed Excel file is to create one from a database using the
 #' \code{\link{export_metadata}} function on an existing database and given an output file.
 #'
 #' Please be aware that bundles that are speficied in the Excel file will have
 #' their metadata files (ending with '.meta_json') overwritten when using the
-#' \code{import_metadata}. So, please make sure to remove rows of bundles that should
-#' not be altered from the Excel file before importing the metadata from it.
+#' \code{import_metadata}. So, please make sure to remove the rows of bundles that should
+#' not be altered from the Excel file before importing the metadata from it using this function.
 #'
+#' Date and time fields are assumed to follow the ISO8601 specification, and an attempt to convert them to the
+#' approprite JSON representation will be made. The user should be aware that this conversion is made however, and
+#' watch out unexpected results in advanced cases.
 #'
 #' @param dbhandle The emuR database handle of the database.
 #' @param Excelfile The path to a properly formated Excel (.xlsx) file.
@@ -259,7 +252,7 @@ import_metadata <- function(dbhandle,Excelfile){
   if(!file.exists(Excelfile)){
     stop("Unable to open the metadata Excel file.\nThe file ",Excelfile," does not exist!")
   }
-  openxlsx::read.xlsx(Excelfile,sheet="bundles") -> meta
+  openxlsx::read.xlsx(Excelfile,sheet="bundles",detectDates=TRUE) -> meta
 
   #Make sure we have an output file with full path
   meta <- meta %>%
@@ -331,6 +324,95 @@ import_metadata <- function(dbhandle,Excelfile){
   emuR:::store_DBconfig(dbhandle,dbCfg)
 
   return(c(sFiles,bFiles))
+}
+
+
+
+#' A utility function used for programatically setting metadata for a bundle, or default values for a session or an entire database.
+#'
+#' The function takes a list and a specification of where the metadata should be set. The default behaviour is to
+#' keep already set metadata, and overwrite only the values that are named in the list. The user may change this
+#' behaviour by setting \code{reset.before.add=TRUE}, in which case all previous  bundle, session
+#' or database level metadata will be replaced with the contents of the list.
+#'
+#' If a bundle name and a \code{session} name is provided, the metadata will be inserted only for that fully speficied \code{bundle}.
+#' If only a \code{bundle} name is provided, the function will add the metadata for the bundle only if there is just
+#' one session in the database. If there are multiple \code{session}s, the function will given an error.
+#'
+#' If no \code{session} or \code{bundle} names are provided, the metadata will be inserted as default values for the entire database.
+#'
+#' @param dbhandle An Emu database handle
+#' @param metadataList A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user.
+#' @param bundle An optional name of a bundle
+#' @param session An optional name of a session
+#' @param reset.before.add If set to TRUE, the function will ignore previously set metadata and simply add the metadata supplied in the list.
+#'
+#' @return
+#' @export
+#'
+#'
+add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.before.add=FALSE){
+
+  if(is.null(bundle) & is.null(session)){
+    #Database wide injection
+    emuR:::load_DBconfig(dbhandle) -> dbCfg
+    if(reset.before.add){
+      dbCfg$metadataDefaults <- as.list(metadataList)
+    } else {
+      #Append data
+      prev <- dbCfg$metadataDefaults
+      prev[names(metadataList)] <- metadataList
+      dbCfg$metadataDefaults <- prev
+    }
+
+    emuR:::store_DBconfig(dbhandle,dbCfg)
+  } else {
+    # Here we store metadata in either session wide or bundle speficit metadata files
+    # Since these files use the same structure, the business here is to set the correct metadatafile filename.
+
+    if(! is.null(session) & is.null(bundle)){
+      #Session level metadata
+
+      metadatafile <- file.path(dbhandle$basePath,
+                           paste0(session,emuR:::session.suffix),
+                           paste0(session,".",metadata.extension))
+    }
+
+
+    if(! is.null(bundle)){
+      #Bundle  metadata
+      if(is.null(session)){
+        ses <- list_sessions(ae_test)
+        if(nrow(ses) == 1){
+          #use the name of the only available session
+          session <- ses[[1]]
+        }else{
+          stop("If you provide a bundle name you need to provide a session name if there are more than one sessions in the database.")
+        }
+
+      }
+
+      metadatafile <- file.path(dbhandle$basePath,
+                                paste0(session,emuR:::session.suffix),
+                                paste0(bundle,emuR:::bundle.dir.suffix),
+                                paste0(bundle,".",metadata.extension))
+
+
+    }
+    if(reset.before.add | ! file.exists(metadatafile) ){
+      #Start fresh / overwrite previous values
+      jsonmetaList <- list()
+    }else{
+
+      #Read in previous values
+      jsonmetaList <- as.list(jsonlite::read_json(metadatafile,simplifyVector = TRUE))
+
+    }
+    #set / overwrite metadata from list
+    jsonmetaList[names(metadataList)] <- metadataList
+
+    jsonlite::write_json(jsonmetaList,metadatafile)
+  }
 }
 
 #' Add identifying information based on the content of the wave file to the metadata information for the bundle.
