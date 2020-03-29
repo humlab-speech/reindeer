@@ -38,7 +38,7 @@ coalesce <- function(...) {
 #' updated values.
 #'
 #'
-#' @param dbhandle The database handle of an emuR database.
+#' @param emuDBhandle The database handle of an emuR database.
 #' @param Excelfile The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.
 #' @param overwrite The default behaviour is that an Excel file should not be
 #' overwritten if it exists already. If this parameter is \code{TRUE} then the file will be overwritten.
@@ -67,8 +67,8 @@ coalesce <- function(...) {
 #' }
 #'
 
-get_metadata <- function(dbhandle,overwrite=FALSE,session=".*"){
-  res <- export_metadata(dbhandle=dbhandle,overwrite=overwrite)
+get_metadata <- function(emuDBhandle,overwrite=FALSE,session=".*"){
+  res <- export_metadata(emuDBhandle=emuDBhandle,overwrite=overwrite)
   return(res)
 }
 
@@ -78,15 +78,15 @@ get_metadata <- function(dbhandle,overwrite=FALSE,session=".*"){
 #' @export
 #'
 
-export_metadata <- function(dbhandle,Excelfile=NULL,overwrite=FALSE){
+export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
   #Start with checking consistency regarding output file
   if(! overwrite && !is.null(Excelfile) && file.exists(Excelfile)){
     stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
   }
-  emuR:::check_emuDBhandle(dbhandle)
-  bundles <- list_bundles(dbhandle) %>%
+  emuR:::check_emuDBhandle(emuDBhandle)
+  bundles <- list_bundles(emuDBhandle) %>%
     rename(bundle=name)
-  metafiles <- list_files(dbhandle,fileExtension = metadata.extension)
+  metafiles <- list_files(emuDBhandle,fileExtension = metadata.extension)
   #Use the bundle list as a scaffold for a data fram to hold the content of all metadata files
   #  metacontent <- metafiles[c("bundle","absolute_file_path")]
   for(currFile in na.omit(metafiles$absolute_file_path)){
@@ -103,11 +103,11 @@ export_metadata <- function(dbhandle,Excelfile=NULL,overwrite=FALSE){
 
 
   # Include the possibility of having default meta data for a sessions (in a _ses folder)
-  sessJSONFiles <- list.files(file.path(dbhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
+  sessJSONFiles <- list.files(file.path(emuDBhandle$basePath),pattern=paste0(".*.",metadata.extension),recursive = TRUE,full.names = FALSE)
 
   # Remove meta files associated with bundles
   sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) & grepl(emuR:::session.suffix,sessJSONFiles)]
-  sessions <- list_sessions(dbhandle) %>%
+  sessions <- list_sessions(emuDBhandle) %>%
     rename(session=name)
 
   # Run only if there are session metadata files
@@ -124,7 +124,7 @@ export_metadata <- function(dbhandle,Excelfile=NULL,overwrite=FALSE){
       currSession <- as.vector(sessJSONFilesDF[[row,"session"]])
       currSessionDir <- paste0(currSession,emuR:::session.suffix)
 
-      jsonmeta <- jsonlite::read_json(file.path(dbhandle$basePath,currSessionDir,currFile),simplifyVector = TRUE)
+      jsonmeta <- jsonlite::read_json(file.path(emuDBhandle$basePath,currSessionDir,currFile),simplifyVector = TRUE)
 
       # Now start inserting data from the session metadata file
       for(col in names(jsonmeta)){
@@ -146,7 +146,7 @@ export_metadata <- function(dbhandle,Excelfile=NULL,overwrite=FALSE){
   }
 
   # Now check and load metadata set at the database level
-  emuR:::load_DBconfig(dbhandle) -> dbCfg
+  emuR:::load_DBconfig(emuDBhandle) -> dbCfg
   if(is.null(dbCfg$metadataDefaults)){
     dbDefaults <- data.frame()
   }else{
@@ -195,7 +195,7 @@ export_metadata <- function(dbhandle,Excelfile=NULL,overwrite=FALSE){
 
   #Prepare an Excel workbook, if one should be written
   if(!is.null(Excelfile)){
-    wb <- openxlsx::createWorkbook(paste(dbhandle$dbName,"bundle"))
+    wb <- openxlsx::createWorkbook(paste(emuDBhandle$dbName,"bundle"))
     openxlsx::addWorksheet(wb,"bundles")
     openxlsx::writeDataTable(wb,"bundles",x=metafiles,keepNA = FALSE,withFilter=FALSE)
     openxlsx::freezePane(wb,"bundles",firstActiveCol = 5)
@@ -242,13 +242,13 @@ export_metadata <- function(dbhandle,Excelfile=NULL,overwrite=FALSE){
 #' approprite JSON representation will be made. The user should be aware that this conversion is made however, and
 #' watch out unexpected results in advanced cases.
 #'
-#' @param dbhandle The emuR database handle of the database.
+#' @param emuDBhandle The emuR database handle of the database.
 #' @param Excelfile The path to a properly formated Excel (.xlsx) file.
 #'
 #' @return A vector of .meta_json files updated by the call. The path for each file is given relative to the base of the EmuR database.
 #' @export
 #'
-import_metadata <- function(dbhandle,Excelfile){
+import_metadata <- function(emuDBhandle,Excelfile){
   if(!file.exists(Excelfile)){
     stop("Unable to open the metadata Excel file.\nThe file ",Excelfile," does not exist!")
   }
@@ -256,7 +256,7 @@ import_metadata <- function(dbhandle,Excelfile){
 
   #Make sure we have an output file with full path
   meta <- meta %>%
-    mutate(metadatafile=file.path(dbhandle$basePath,
+    mutate(metadatafile=file.path(emuDBhandle$basePath,
                                   paste0(session,emuR:::session.suffix),
                                   paste0(bundle,emuR:::bundle.dir.suffix),
                                   paste0(bundle,".",metadata.extension))
@@ -287,7 +287,7 @@ import_metadata <- function(dbhandle,Excelfile){
     writeLines(towrite[r,"json"], fileConn)
     close(fileConn)
   }
-  bFiles <- gsub(paste0(dbhandle$basePath,"/"),"",towrite[["metadatafile"]])
+  bFiles <- gsub(paste0(emuDBhandle$basePath,"/"),"",towrite[["metadatafile"]])
 
   ## Now process session metadata files
 
@@ -307,21 +307,21 @@ import_metadata <- function(dbhandle,Excelfile){
   ## Här finns inte session_metadata_file
   #Write the bundle metadata files
   for(r in 1:nrow(towriteSess)){
-    outFile <- file.path(dbhandle$basePath,
+    outFile <- file.path(emuDBhandle$basePath,
                          paste0(towriteSess[r,"session"],emuR:::session.suffix),
                          towriteSess[r,"session_metadata_file"])
     fileConn <- file(outFile)
     writeLines(as.character(towriteSess[r,"json"]), fileConn)
     close(fileConn)
-    outFile <- gsub(paste0(dbhandle$basePath,"/"),"",outFile)
+    outFile <- gsub(paste0(emuDBhandle$basePath,"/"),"",outFile)
     sFiles <- ifelse(exists("sFiles"),c(sFiles,outFile),c(outFile))
   }
 
   # Now inject database wide metadata
-  emuR:::load_DBconfig(dbhandle) -> dbCfg
+  emuR:::load_DBconfig(emuDBhandle) -> dbCfg
   openxlsx::read.xlsx(Excelfile,sheet="database") -> dbMeta
   dbCfg$metadataDefaults <- as.list(dbMeta)
-  emuR:::store_DBconfig(dbhandle,dbCfg)
+  emuR:::store_DBconfig(emuDBhandle,dbCfg)
 
   return(c(sFiles,bFiles))
 }
@@ -341,7 +341,7 @@ import_metadata <- function(dbhandle,Excelfile){
 #'
 #' If no \code{session} or \code{bundle} names are provided, the metadata will be inserted as default values for the entire database.
 #'
-#' @param dbhandle An Emu database handle
+#' @param emuDBhandle An Emu database handle
 #' @param metadataList A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user.
 #' @param bundle An optional name of a bundle
 #' @param session An optional name of a session
@@ -351,11 +351,11 @@ import_metadata <- function(dbhandle,Excelfile){
 #' @export
 #'
 #'
-add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.before.add=FALSE){
+add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, reset.before.add=FALSE){
 
   if(is.null(bundle) & is.null(session)){
     #Database wide injection
-    emuR:::load_DBconfig(dbhandle) -> dbCfg
+    emuR:::load_DBconfig(emuDBhandle) -> dbCfg
     if(reset.before.add){
       dbCfg$metadataDefaults <- as.list(metadataList)
     } else {
@@ -365,7 +365,7 @@ add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.b
       dbCfg$metadataDefaults <- prev
     }
 
-    emuR:::store_DBconfig(dbhandle,dbCfg)
+    emuR:::store_DBconfig(emuDBhandle,dbCfg)
   } else {
     # Here we store metadata in either session wide or bundle speficit metadata files
     # Since these files use the same structure, the business here is to set the correct metadatafile filename.
@@ -373,7 +373,7 @@ add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.b
     if(! is.null(session) & is.null(bundle)){
       #Session level metadata
 
-      metadatafile <- file.path(dbhandle$basePath,
+      metadatafile <- file.path(emuDBhandle$basePath,
                            paste0(session,emuR:::session.suffix),
                            paste0(session,".",metadata.extension))
     }
@@ -392,7 +392,7 @@ add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.b
 
       }
 
-      metadatafile <- file.path(dbhandle$basePath,
+      metadatafile <- file.path(emuDBhandle$basePath,
                                 paste0(session,emuR:::session.suffix),
                                 paste0(bundle,emuR:::bundle.dir.suffix),
                                 paste0(bundle,".",metadata.extension))
@@ -423,7 +423,7 @@ add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.b
 #' perceptual testing, and the ability to reverse the procedure is then essential to link the results of the evaluation back to the original
 #' recording extracted from the emuR data base. The user may create checksums by multiple algorithms by running the function again with different \code{algorithm} arguments.
 #'
-#' @param dbhandle The handle for the emuR database.
+#' @param emuDBhandle The handle for the emuR database.
 #' @param sessionPattern A regexp pattern that allows the user to limit which sessions should be affected by the manipulation.
 #' @param bundlePattern A regexp pattern that allows the user to limit which bundles to include.
 #' @param algorithm The name of the hashing algorithm, according to the \code{\link[digest]{digest}} function.
@@ -440,8 +440,8 @@ add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.b
 #' unlink_emuRDemoDir()
 #' }
 #'
-add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
-  wavs <- list_files(dbhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
+add_digests <- function(emuDBhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
+  wavs <- list_files(emuDBhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
   for(f in 1:nrow(wavs)){
     inFile <- unlist(wavs[f,"absolute_file_path"],use.names = FALSE)
     session <- unlist(wavs[f,"session"],use.names = FALSE)
@@ -457,7 +457,7 @@ add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorith
     metadata <- list("Bundle.Duration.ms"=duration)
     metadata[paste0("Bundle.",algorithm,"_checksum")] <- checksum
 
-    add_metadata(dbhandle,metadata,session=session,bundle=bundle)
+    add_metadata(emuDBhandle,metadata,session=session,bundle=bundle)
 
   }
 }
