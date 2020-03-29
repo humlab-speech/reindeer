@@ -442,7 +442,10 @@ add_metadata <- function(dbhandle,metadataList,bundle=NULL,session=NULL, reset.b
 #'
 add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
   wavs <- list_files(dbhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
-  for(inFile in wavs[["absolute_file_path"]]){
+  for(f in 1:nrow(wavs)){
+    inFile <- unlist(wavs[f,"absolute_file_path"],use.names = FALSE)
+    session <- unlist(wavs[f,"session"],use.names = FALSE)
+    bundle <-  unlist(wavs[f,"bundle"],use.names = FALSE)
 
     wrassp::read.AsspDataObj(inFile) -> w
     options(digits=15)
@@ -451,23 +454,11 @@ add_digests <- function(dbhandle,sessionPattern=".*",bundlePattern=".*",algorith
     samples / sr *1000 -> duration
     rm(w)
     digest::digest(inFile,file=TRUE,algo=algorithm) -> checksum
-    #Now insert the information into the meta_json file
-    outFile <- gsub(".wav$",".meta_json",inFile)
-    if(file.exists(outFile)){
-      json <- jsonlite::read_json(outFile,simplifyVector = TRUE)
-      json["Bundle.Duration"] <- duration
-    }else{
-      #just create a JSON structure then
-      json <- data.frame("Bundle.Duration"=duration)
-    }
-    json[paste0("Bundle.",algorithm,"_checksum")] <- checksum
+    metadata <- list("Bundle.Duration.ms"=duration)
+    metadata[paste0("Bundle.",algorithm,"_checksum")] <- checksum
 
-    #Convert back to a JSON string
-    outJson <- jsonlite::toJSON(json,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")
-    #Write to file
-    fileConn <- file(outFile)
-    writeLines(outJson, fileConn)
-    close(fileConn)
+    add_metadata(dbhandle,metadata,session=session,bundle=bundle)
+
   }
 }
 
