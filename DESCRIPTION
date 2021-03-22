@@ -1,10 +1,13 @@
-Package: articulator
+Package: reindeeR
 Type: Package
-Title: A tidy interface to speech data
-Version: 0.2.0
+Title: This package extends the capabilities of emuR to work with speech data.
+Version: 0.0.1
 Authors@R: person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se",
   role = c("aut", "cre"))
-Description: This package presents a tidy interface to the core functionality of the emuR package, and adds additional functionality that fascilitates working with clinical speech data.
+Description: This package extends the capabilities of emuR to work with speech 
+  data and includes the fascilities for working with metadata, for working with 
+  computationally intensive and sparse measurement data. 
+  The package also provides functions for setting up Emu web app with signal track overlays.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
@@ -16,5 +19,6 @@ Imports:
     wrassp,
     jsonlite,
     openxlsx,
-    sqldf
-RoxygenNote: 6.1.1
+    sqldf,
+    dplyr
+RoxygenNote: 7.1.1
