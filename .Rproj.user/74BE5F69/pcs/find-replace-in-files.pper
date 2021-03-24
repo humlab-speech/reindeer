@@ -1,0 +1,14 @@
+{
+    "dialog-state": {
+        "query": "reindeeR",
+        "path": "",
+        "regex": false,
+        "caseSensitive": true,
+        "filePatterns": [],
+        "excludeFilePatterns": [],
+        "resultsCount": 15,
+        "errorCount": 0,
+        "replaceErrors": "",
+        "projectRelative": true
+    }
+}
