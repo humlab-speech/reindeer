@@ -1,14 +1,15 @@
-Package: reindeeR
+Package: reindeer
 Type: Package
-Title: This package extends the capabilities of emuR to work with speech data.
+Title: This package extends the capabilities of emuR to work with speech data in a nordic climate
 Version: 0.0.1
-Authors@R: person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se",
-  role = c("aut", "cre"))
+Authors@R:
+    person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se", role = c("aut", "cre"))
+Maintainer: Fredrik Karlsson <fredrik.k.karlsson@umu.se>
 Description: This package extends the capabilities of emuR to work with speech 
   data and includes the fascilities for working with metadata, for working with 
   computationally intensive and sparse measurement data. 
   The package also provides functions for setting up Emu web app with signal track overlays.
-License: What license is it under?
+License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
 Suggests: 
@@ -20,5 +21,7 @@ Imports:
     jsonlite,
     openxlsx,
     sqldf,
-    dplyr
+    dplyr,
+    stats
+Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1

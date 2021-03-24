@@ -14,13 +14,13 @@ coalesce <- function(...) {
 }
 
 
-#' Functions for gathering metata specified for recordings in an emuR database.
+#' Functions for gathering metadata specified for recordings in an emuR database.
 #'
 #' Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.
 #' The functions goes through the database metadata file, session metadata files and metadata files associated with
 #' each bundle, parses the JSON data and returns \code{\link[dplyr]{tibble}} with one row per bundle in the database.
-#' Database default values are supressed by information set in a session metadata file, and session level data are in
-#' turn surpressed by data given at the bundle level.
+#' Database default values are suppressed by information set in a session metadata file, and session level data are in
+#' turn suppressed by data given at the bundle level.
 #' The structure of the metadata does not have to be consistent across meta_json files.
 #' New columns are added to the as new fields are detected.
 #'
@@ -58,8 +58,17 @@ coalesce <- function(...) {
 #'
 #' @examples
 #' \dontrun{
+<<<<<<< HEAD:R/meta.R
 #' create_ae_db() -> ae
 #' make_dummy_metafiles(ae)
+=======
+#' demodir <- file.path(tempdir(),"emuR_demoData")
+#
+#' create_emuRdemoData()
+#'
+#' ae <- load_emuDB(file.path(demodir,"ae_emuDB"))
+#' reindeer:::make_dummy_metafiles(ae)
+>>>>>>> Move to master on github:R/reindeeR_metadata.R
 #' get_metadata(ae)
 #' ## Some cleanup code
 #' unlink_emuRDemoDir()
@@ -67,7 +76,7 @@ coalesce <- function(...) {
 #' }
 #'
 
-get_metadata <- function(emuDBhandle,overwrite=FALSE,session=".*"){
+get_metadata <- function(emuDBhandle,overwrite=FALSE){
   res <- export_metadata(emuDBhandle=emuDBhandle,overwrite=overwrite)
   return(res)
 }
@@ -84,12 +93,12 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
     stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
   }
   emuR:::check_emuDBhandle(emuDBhandle)
-  bundles <- list_bundles(emuDBhandle) %>%
-    rename(bundle=name)
-  metafiles <- list_files(emuDBhandle,fileExtension = metadata.extension)
+  bundles <- emuR::list_bundles(emuDBhandle) %>%
+    dplyr::rename(bundle=name)
+  metafiles <- emuR::list_files(emuDBhandle,fileExtension = metadata.extension)
   #Use the bundle list as a scaffold for a data fram to hold the content of all metadata files
   #  metacontent <- metafiles[c("bundle","absolute_file_path")]
-  for(currFile in na.omit(metafiles$absolute_file_path)){
+  for(currFile in stats::na.omit(metafiles$absolute_file_path)){
     jsonmeta <- jsonlite::read_json(currFile,simplifyVector = TRUE)
     # Now start inserting data from the metafiles
     for(col in names(jsonmeta)){
@@ -98,8 +107,8 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
   }
   # Now make sure that all bundles have a row
   metafiles <- bundles %>%
-    left_join(metafiles,by=c("session","bundle")) %>%
-    select(-file,-absolute_file_path)
+    dplyr::left_join(metafiles,by=c("session","bundle")) %>%
+    dplyr::select(-file,-absolute_file_path)
 
 
   # Include the possibility of having default meta data for a sessions (in a _ses folder)
@@ -107,8 +116,8 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
 
   # Remove meta files associated with bundles
   sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) & grepl(emuR:::session.suffix,sessJSONFiles)]
-  sessions <- list_sessions(emuDBhandle) %>%
-    rename(session=name)
+  sessions <- emuR::list_sessions(emuDBhandle) %>%
+    dplyr::rename(session=name)
 
   # Run only if there are session metadata files
   if(length(sessJSONFiles) > 0){
@@ -116,7 +125,7 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
     names(sessJSONFilesDF) <- c("session","session_metadata_file")
     # The session needs to be without suffix so that metadata may be joinded by session later
     sessJSONFilesDF$session <- gsub(paste0(emuR:::session.suffix,"$"),"",sessJSONFilesDF$session)
-    sessJSONFilesDF <- na.omit(sessJSONFilesDF)
+    sessJSONFilesDF <- stats::na.omit(sessJSONFilesDF)
 
 
     for(row in 1:nrow(sessJSONFilesDF)){
@@ -136,12 +145,12 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
     #or just empty sessions speficiations if there are no session metadata files
 
     sessJSONFilesDF <- sessions %>%
-      left_join(sessJSONFilesDF,by="session")
+      dplyr::left_join(sessJSONFilesDF,by="session")
 
     # Make the merger with bundle files to make the final output tibble
     metafiles %>%
-      left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
-      select(-session_metadata_file) -> metafiles
+      dplyr::left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) %>%
+      dplyr::select(-session_metadata_file) -> metafiles
 
   }
 
@@ -155,11 +164,12 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
       #This means that the field is not just empty
       # Repeat the rows so that the columns may be merged
       dbMeta <- as.data.frame(c(metafiles["bundle"],dbDefaults))  %>%
-        mutate_if(is.factor,as.character)
+        dplyr::mutate_if(is.factor,as.character)
+
       metafiles <- metafiles %>%
-        mutate_if(is.factor,as.character)%>%
-        left_join(dbMeta,by="bundle",suffix=c("","_database")) %>%
-        distinct() ## This is needed since duplicate rows are introduced by the join by dbMeta
+        dplyr::mutate_if(is.factor,as.character)%>%
+        dplyr::left_join(dbMeta,by="bundle",suffix=c("","_database")) %>%
+        dplyr::distinct() ## This is needed since duplicate rows are introduced by the join by dbMeta
 
     }
   }
@@ -184,7 +194,7 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
     tempDF <- data.frame(metafiles[[bundleoriginal]],
                          sessVec,
                          dbVec,stringsAsFactors = FALSE) %>%
-        mutate_if(is.factor,as.character)
+        dplyr::mutate_if(is.factor,as.character)
     names(tempDF) <- c("bundle","session","database")
     # Here the result is the first non-NA value for each row (or NA if the row in tempDF contains only NAs)
     metafiles[bundleoriginal] <- with(tempDF,coalesce(bundle,session,database))
@@ -256,7 +266,7 @@ import_metadata <- function(emuDBhandle,Excelfile){
 
   #Make sure we have an output file with full path
   meta <- meta %>%
-    mutate(metadatafile=file.path(emuDBhandle$basePath,
+    dplyr::mutate(metadatafile=file.path(emuDBhandle$basePath,
                                   paste0(session,emuR:::session.suffix),
                                   paste0(bundle,emuR:::bundle.dir.suffix),
                                   paste0(bundle,".",metadata.extension))
@@ -266,9 +276,9 @@ import_metadata <- function(emuDBhandle,Excelfile){
   json <- c()
   for(r in 1:nrow(meta)){
     meta %>%
-      slice(r) %>%
-      select(-session,-bundle,-metadatafile) %>%
-      select_if(function(x) !is.na(x)) -> jsondat
+      dplyr::slice(r) %>%
+      dplyr::select(-session,-bundle,-metadatafile) %>%
+      dplyr::select_if(function(x) !is.na(x)) -> jsondat
       currJSON <- ifelse(length(jsondat) > 0,
                          jsonlite::toJSON(jsondat,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows"),
                          "[{}]" #Just an empty JSON vector
@@ -277,9 +287,9 @@ import_metadata <- function(emuDBhandle,Excelfile){
   }
   json <- data.frame("json"=json)
   towrite <- meta %>%
-    bind_cols(json) %>%
-    mutate(json=as.character(json)) %>%
-    select(json,metadatafile)
+    dplyr::bind_cols(json) %>%
+    dplyr::mutate(json=as.character(json)) %>%
+    dplyr::select(json,metadatafile)
 
   #Write the bundle metadata files
   for(r in 1:nrow(towrite)){
@@ -293,17 +303,17 @@ import_metadata <- function(emuDBhandle,Excelfile){
 
   openxlsx::read.xlsx(Excelfile,sheet="sessions") -> sessionMeta
   sessjsondat <- sessionMeta %>%
-    select(-session)
+    dplyr::select(-session)
   json <- sessjsondat %>%
-    rowwise() %>%
-    do(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
+    dplyr::rowwise() %>%
+    dplyr::do(json=jsonlite::toJSON(.,raw="base64",na="null",complex="string",factor="string",POSIXt="ISO8601",Date="ISO8601",null="null",dataframe = "rows")) %>%
     unlist()
   json <- data.frame("json"=as.vector(json))
 
   towriteSess <- sessionMeta %>%
-    mutate(session_metadata_file=paste0(session,".",metadata.extension)) %>%
-    bind_cols(json) %>%
-    select(session,session_metadata_file,json)
+    dplyr::mutate(session_metadata_file=paste0(session,".",metadata.extension)) %>%
+    dplyr::bind_cols(json) %>%
+    dplyr::select(session,session_metadata_file,json)
   ## Här finns inte session_metadata_file
   #Write the bundle metadata files
   for(r in 1:nrow(towriteSess)){
@@ -350,6 +360,7 @@ import_metadata <- function(emuDBhandle,Excelfile){
 #' @return
 #' @export
 #'
+#' @importFrom dplyr "%>%"
 #'
 add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, reset.before.add=FALSE){
 
@@ -382,7 +393,7 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
     if(! is.null(bundle)){
       #Bundle  metadata
       if(is.null(session)){
-        ses <- list_sessions(ae_test)
+        ses <- emuR::list_sessions(emuDBhandle)
         if(nrow(ses) == 1){
           #use the name of the only available session
           session <- ses[[1]]
@@ -441,7 +452,7 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
 #' }
 #'
 add_digests <- function(emuDBhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
-  wavs <- list_files(emuDBhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
+  wavs <- emuR::list_files(emuDBhandle,fileExtension = "*.wav",sessionPattern=sessionPattern,bundlePattern=bundlePattern)
   for(f in 1:nrow(wavs)){
     inFile <- unlist(wavs[f,"absolute_file_path"],use.names = FALSE)
     session <- unlist(wavs[f,"session"],use.names = FALSE)
@@ -504,6 +515,7 @@ biographize <- function(segs_tbl,emuDBhandle,compute_digests=FALSE,algorithm="sh
   }
   #Here we use the special mode of export_medatata to get a data structure rather than an Excel file.
   mdata <- get_metadata(emuDBhandle,session = ".*")
-  out <- segs_tbl %>% left_join(mdata,by = c("session", "bundle"))
+  out <- segs_tbl %>%
+    dplyr::left_join(mdata,by = c("session", "bundle"))
   return(out)
 }
