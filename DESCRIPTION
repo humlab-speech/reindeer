@@ -17,7 +17,7 @@ Suggests:
 Imports: 
     emuR (>= 2.0.2),
     digest,
-    wrassp,
+    superassp,
     jsonlite,
     openxlsx,
     sqldf,
