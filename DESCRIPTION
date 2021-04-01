@@ -6,9 +6,10 @@ Authors@R:
     person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se", role = c("aut", "cre"))
 Maintainer: Fredrik Karlsson <fredrik.k.karlsson@umu.se>
 Description: This package extends the capabilities of emuR to work with speech 
-  data and includes the fascilities for working with metadata, for working with 
+  data and includes the fascilities for working with metadata, and for working with 
   computationally intensive and sparse measurement data. 
   The package also provides functions for setting up Emu web app with signal track overlays.
+  When loaded, it also loads many functions from the emuR package, and makes them available for the user.
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
