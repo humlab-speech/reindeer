@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{add_ssffTrackDefinition}
 \alias{add_ssffTrackDefinition}
-\title{Define an SSFF track for the emuDB (from emuR)}
+\title{Define an SSFF track for the emuDB. (A copy of the emuR function)}
 \usage{
 add_ssffTrackDefinition(
   emuDBhandle,

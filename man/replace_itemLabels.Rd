@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{replace_itemLabels}
 \alias{replace_itemLabels}
-\title{Replace item labels (from emuR)}
+\title{Replace item labels. (A copy of the emuR function)}
 \usage{
 replace_itemLabels(
   emuDBhandle,

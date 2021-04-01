@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{rename_bundles}
 \alias{rename_bundles}
-\title{Rename bundles in emuDB (from emuR)}
+\title{Rename bundles in emuDB. (A copy of the emuR function)}
 \usage{
 rename_bundles(emuDBhandle, bundles)
 }

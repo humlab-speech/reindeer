@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{add_attributeDefinition}
 \alias{add_attributeDefinition}
-\title{Define a new attribute for a level (from emuR)}
+\title{Define a new attribute for a level. (A copy of the emuR function)}
 \usage{
 add_attributeDefinition(
   emuDBhandle,

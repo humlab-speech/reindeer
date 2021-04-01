@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{query}
 \alias{query}
-\title{Query an emuDB (from emuR)}
+\title{Query an emuDB. (A copy of the emuR function)}
 \usage{
 query(
   emuDBhandle,

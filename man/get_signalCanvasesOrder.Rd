@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{get_signalCanvasesOrder}
 \alias{get_signalCanvasesOrder}
-\title{Get which signals are displayed in a perspective, and in which order (from emuR)}
+\title{Get which signals are displayed in a perspective, and in which order. (A copy of the emuR function)}
 \usage{
 get_signalCanvasesOrder(emuDBhandle, perspectiveName)
 }

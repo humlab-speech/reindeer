@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_sessions}
 \alias{list_sessions}
-\title{Re-exported function from emuR list sessions in an emuDB (from emuR)}
+\title{Re-exported function from emuR list sessions in an emuDB. (A copy of the emuR function)}
 \usage{
 list_sessions(emuDBhandle)
 }

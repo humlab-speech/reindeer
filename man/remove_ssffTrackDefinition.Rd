@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{remove_ssffTrackDefinition}
 \alias{remove_ssffTrackDefinition}
-\title{Remove an SSFF track from the emuDB (from emuR)}
+\title{Remove an SSFF track from the emuDB. (A copy of the emuR function)}
 \usage{
 remove_ssffTrackDefinition(emuDBhandle, name, deleteFiles = FALSE)
 }

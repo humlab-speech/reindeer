@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{read_bundleList}
 \alias{read_bundleList}
-\title{Read a bundleList (from emuR)}
+\title{Read a bundleList. (A copy of the emuR function)}
 \usage{
 read_bundleList(emuDBhandle, name)
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{delete_itemsInLevel}
 \alias{delete_itemsInLevel}
-\title{Delete items programmatically (from emuR)}
+\title{Delete items programmatically. (A copy of the emuR function)}
 \usage{
 delete_itemsInLevel(
   emuDBhandle,

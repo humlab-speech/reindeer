@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{add_levelDefinition}
 \alias{add_levelDefinition}
-\title{Add a level definition (from emuR)}
+\title{Add a level definition. (A copy of the emuR function)}
 \usage{
 add_levelDefinition(
   emuDBhandle,

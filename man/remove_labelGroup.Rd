@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{remove_labelGroup}
 \alias{remove_labelGroup}
-\title{Remove a global label group (from emuR)}
+\title{Remove a global label group. (A copy of the emuR function)}
 \usage{
 remove_labelGroup(emuDBhandle, name)
 }

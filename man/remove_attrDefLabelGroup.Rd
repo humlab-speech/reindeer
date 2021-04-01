@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{remove_attrDefLabelGroup}
 \alias{remove_attrDefLabelGroup}
-\title{Remove a label group from an attribute definition (from emuR)}
+\title{Remove a label group from an attribute definition. (A copy of the emuR function)}
 \usage{
 remove_attrDefLabelGroup(
   emuDBhandle,

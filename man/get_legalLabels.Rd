@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{get_legalLabels}
 \alias{get_legalLabels}
-\title{Get which labels are legal for an attribute of a level (from emuR)}
+\title{Get which labels are legal for an attribute of a level. (A copy of the emuR function)}
 \usage{
 get_legalLabels(emuDBhandle, levelName, attributeDefinitionName)
 }

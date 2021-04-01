@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{add_perspective}
 \alias{add_perspective}
-\title{Add a new perspective to an emuDB (from emuR)}
+\title{Add a new perspective to an emuDB. (A copy of the emuR function)}
 \usage{
 add_perspective(emuDBhandle, name)
 }

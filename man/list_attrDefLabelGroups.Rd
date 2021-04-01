@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_attrDefLabelGroups}
 \alias{list_attrDefLabelGroups}
-\title{List label groups defined for an attribute definition (from emuR)}
+\title{List label groups defined for an attribute definition. (A copy of the emuR function)}
 \usage{
 list_attrDefLabelGroups(emuDBhandle, levelName, attributeDefinitionName)
 }

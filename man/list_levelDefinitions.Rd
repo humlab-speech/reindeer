@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_levelDefinitions}
 \alias{list_levelDefinitions}
-\title{List level definitions (from emuR)}
+\title{List level definitions. (A copy of the emuR function)}
 \usage{
 list_levelDefinitions(emuDBhandle)
 }

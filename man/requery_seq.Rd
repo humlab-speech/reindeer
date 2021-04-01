@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{requery_seq}
 \alias{requery_seq}
-\title{Requery the sequential context of a segment list (from emuR)}
+\title{Requery the sequential context of a segment list. (A copy of the emuR function)}
 \usage{
 requery_seq(
   emuDBhandle,

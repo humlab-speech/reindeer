@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_labelGroups}
 \alias{list_labelGroups}
-\title{List global label groups (from emuR)}
+\title{List global label groups. (A copy of the emuR function)}
 \usage{
 list_labelGroups(emuDBhandle)
 }

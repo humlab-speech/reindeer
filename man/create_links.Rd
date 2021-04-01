@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{create_links}
 \alias{create_links}
-\title{Create links between items (from emuR)}
+\title{Create links between items. (A copy of the emuR function)}
 \usage{
 create_links(emuDBhandle, links, rewriteAllAnnots = TRUE, verbose = TRUE)
 }

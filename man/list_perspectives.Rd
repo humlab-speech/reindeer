@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_perspectives}
 \alias{list_perspectives}
-\title{List which perspectives are defined for an emuDB (from emuR)}
+\title{List which perspectives are defined for an emuDB. (A copy of the emuR function)}
 \usage{
 list_perspectives(emuDBhandle)
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{remove_perspective}
 \alias{remove_perspective}
-\title{Remove a  perspective from an emuDB (from emuR)}
+\title{Remove a  perspective from an emuDB. (A copy of the emuR function)}
 \usage{
 remove_perspective(emuDBhandle, name)
 }

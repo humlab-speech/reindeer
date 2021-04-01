@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{get_levelCanvasesOrder}
 \alias{get_levelCanvasesOrder}
-\title{Get the level order of a perspective (from emuR)}
+\title{Get the level order of a perspective. (A copy of the emuR function)}
 \usage{
 get_levelCanvasesOrder(emuDBhandle, perspectiveName)
 }

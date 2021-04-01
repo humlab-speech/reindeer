@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{get_trackdata}
 \alias{get_trackdata}
-\title{Get track data beloning to a segment list (from emuR)}
+\title{Get track data beloning to a segment list. (A copy of the emuR function)}
 \usage{
 get_trackdata(
   emuDBhandle,

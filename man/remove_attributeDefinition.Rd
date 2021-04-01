@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{remove_attributeDefinition}
 \alias{remove_attributeDefinition}
-\title{Remove an attribute from a level (from emuR)}
+\title{Remove an attribute from a level. (A copy of the emuR function)}
 \usage{
 remove_attributeDefinition(
   emuDBhandle,

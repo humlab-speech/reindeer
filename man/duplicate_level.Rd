@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{duplicate_level}
 \alias{duplicate_level}
-\title{Duplicate a level (from emuR)}
+\title{Duplicate a level. (A copy of the emuR function)}
 \usage{
 duplicate_level(
   emuDBhandle,

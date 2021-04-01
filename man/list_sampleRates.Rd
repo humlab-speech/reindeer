@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_sampleRates}
 \alias{list_sampleRates}
-\title{List sample rates of media and annotation (_annot.json) files (from emuR)}
+\title{List sample rates of media and annotation (_annot.json) files. (A copy of the emuR function)}
 \usage{
 list_sampleRates(emuDBhandle, sessionPattern = ".*", bundlePattern = ".*")
 }

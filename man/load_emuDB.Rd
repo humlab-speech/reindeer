@@ -2,69 +2,28 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{load_emuDB}
 \alias{load_emuDB}
-\title{Load an emuDB (from emuR)}
+\title{Load an emuDB. (A copy of the emuR function)}
 \usage{
 load_emuDB(
-  emuDBhandle,
-  sessionPattern = ".*",
-  bundlePattern = ".*",
-  seglist = NULL,
-  bundleListName = NULL,
-  host = "127.0.0.1",
-  port = 17890,
-  autoOpenURL = "https://ips-lmu.github.io/EMU-webApp/?autoConnect=true",
-  browser = getOption("browser"),
-  useViewer = TRUE,
-  debug = FALSE,
-  debugLevel = 0
-)
-
-load_emuDB(
-  emuDBhandle,
-  sessionPattern = ".*",
-  bundlePattern = ".*",
-  seglist = NULL,
-  bundleListName = NULL,
-  host = "127.0.0.1",
-  port = 17890,
-  autoOpenURL = "https://ips-lmu.github.io/EMU-webApp/?autoConnect=true",
-  browser = getOption("browser"),
-  useViewer = TRUE,
-  debug = FALSE,
-  debugLevel = 0
+  databaseDir,
+  inMemoryCache = FALSE,
+  connection = NULL,
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
-\item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
+\item{databaseDir}{directory of the emuDB}
 
-\item{sessionPattern}{A regular expression pattern matching session names to be served}
+\item{inMemoryCache}{cache the loaded DB in memory}
 
-\item{bundlePattern}{A regular expression pattern matching bundle names to be served}
+\item{connection}{pass in DBI connection to SQL database if you want to override the default which is to 
+use an SQLite database either in memory (\code{inMemoryCache = TRUE}) or in the emuDB folder. This is intended
+for expert use only!}
 
-\item{seglist}{segment list to use for times anchors and session + bundle restriction (type: \link[emuR]{emuRsegs})}
+\item{verbose}{be verbose}
 
-\item{bundleListName}{name of bundleList stored in emuDB/bundleLists subdir to send to EMU-webApp}
-
-\item{host}{host IP to listen to (default: 127.0.0.1  (localhost))}
-
-\item{port}{the port number to listen on (default: 17890)}
-
-\item{autoOpenURL}{URL passed to \code{\link{browseURL}} function. If NULL or an empty string are passed in
-\code{\link{browseURL}} will not be invoked.}
-
-\item{browser}{argument passed on to \code{browser} argument of \code{\link{browseURL}} (see 
-it's documentation for details )}
-
-\item{useViewer}{Use the viewer provided by \code{getOption("viewer")} (the viewer pane when using RStudio) 
-and host a local version of the EMU-webApp in it. This will clone the current 
-EMU-webApp build (\url{https://github.com/IPS-LMU/EMU-webApp/tree/gh-pages/}) into the directory provided by 
-\code{\link{tempdir}} and serve this local version. A clone will 
-only be performed if no \code{file.path(tempdir(), "EMU-webApp")} directory is present. An alternative
-directory can be also set: \code{options(emuR.emuWebApp.dir="path/to/EMU-webApp")} (use if offline functionality is required).}
-
-\item{debug}{TRUE to enable debugging (default: no debugging messages)}
-
-\item{debugLevel}{integer higher values generate more detailed debug output}
+\item{...}{additional parameters}
 }
 \value{
 emuDB handle object
@@ -87,6 +46,4 @@ therefore the loading is then much faster. For this to work the user needs write
 }
 \seealso{
 \link[emuR:load_emuDB]{emuR::load_emuDB}
-
-\link[emuR:serve]{emuR::serve}
 }

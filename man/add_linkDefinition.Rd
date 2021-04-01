@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{add_linkDefinition}
 \alias{add_linkDefinition}
-\title{Add a level definition (from emuR)}
+\title{Add a level definition. (A copy of the emuR function)}
 \usage{
 add_linkDefinition(emuDBhandle, type, superlevelName, sublevelName)
 }

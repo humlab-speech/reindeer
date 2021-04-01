@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_bundles}
 \alias{list_bundles}
-\title{List sessions in an emuDB (from emuR)}
+\title{List sessions in an emuDB. (A copy of the emuR function)}
 \usage{
 list_bundles(emuDBhandle, session = NULL)
 }

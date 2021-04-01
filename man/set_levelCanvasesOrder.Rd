@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{set_levelCanvasesOrder}
 \alias{set_levelCanvasesOrder}
-\title{Set the order of displayed levels for a perspective (from emuR)}
+\title{Set the order of displayed levels for a perspective. (A copy of the emuR function)}
 \usage{
 set_levelCanvasesOrder(emuDBhandle, perspectiveName, order)
 }

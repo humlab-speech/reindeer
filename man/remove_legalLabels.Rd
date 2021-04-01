@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{remove_legalLabels}
 \alias{remove_legalLabels}
-\title{Remove the definition of which labels are legal for an attribute of a level (from emuR)}
+\title{Remove the definition of which labels are legal for an attribute of a level. (A copy of the emuR function)}
 \usage{
 remove_legalLabels(emuDBhandle, levelName, attributeDefinitionName)
 }

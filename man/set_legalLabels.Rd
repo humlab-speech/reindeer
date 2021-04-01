@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{set_legalLabels}
 \alias{set_legalLabels}
-\title{Define which labels are legal for an attribute of a level (from emuR)}
+\title{Define which labels are legal for an attribute of a level. (A copy of the emuR function)}
 \usage{
 set_legalLabels(emuDBhandle, levelName, attributeDefinitionName, legalLabels)
 }

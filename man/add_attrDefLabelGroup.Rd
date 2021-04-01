@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{add_attrDefLabelGroup}
 \alias{add_attrDefLabelGroup}
-\title{Define a label group for an attribute definition (from emuR)}
+\title{Define a label group for an attribute definition. (A copy of the emuR function)}
 \usage{
 add_attrDefLabelGroup(
   emuDBhandle,

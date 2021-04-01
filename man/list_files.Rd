@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_files}
 \alias{list_files}
-\title{Re-exported function from emuR list the files of an emuDB (from emuR)}
+\title{Re-exported function from emuR list the files of an emuDB. (A copy of the emuR function)}
 \usage{
 list_files(
   emuDBhandle,

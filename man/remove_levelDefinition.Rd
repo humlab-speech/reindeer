@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{remove_levelDefinition}
 \alias{remove_levelDefinition}
-\title{Remove a level definition (from emuR)}
+\title{Remove a level definition. (A copy of the emuR function)}
 \usage{
 remove_levelDefinition(
   emuDBhandle,

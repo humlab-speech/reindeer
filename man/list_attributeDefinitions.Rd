@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{list_attributeDefinitions}
 \alias{list_attributeDefinitions}
-\title{List attributes defined for a level (from emuR)}
+\title{List attributes defined for a level. (A copy of the emuR function)}
 \usage{
 list_attributeDefinitions(emuDBhandle, levelName)
 }

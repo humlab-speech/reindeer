@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_emuR_re-export.R
 \name{rename_emuDB}
 \alias{rename_emuDB}
-\title{Rename an emuDB}
+\title{Rename an emuDB (A copy of the emuR function)}
 \usage{
 rename_emuDB(databaseDir, newName)
 }
