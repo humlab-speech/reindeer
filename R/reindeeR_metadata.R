@@ -58,17 +58,8 @@ coalesce <- function(...) {
 #'
 #' @examples
 #' \dontrun{
-<<<<<<< HEAD:R/meta.R
 #' create_ae_db() -> ae
 #' make_dummy_metafiles(ae)
-=======
-#' demodir <- file.path(tempdir(),"emuR_demoData")
-#
-#' create_emuRdemoData()
-#'
-#' ae <- load_emuDB(file.path(demodir,"ae_emuDB"))
-#' reindeer:::make_dummy_metafiles(ae)
->>>>>>> Move to master on github:R/reindeeR_metadata.R
 #' get_metadata(ae)
 #' ## Some cleanup code
 #' unlink_emuRDemoDir()
@@ -514,7 +505,7 @@ biographize <- function(segs_tbl,emuDBhandle,compute_digests=FALSE,algorithm="sh
     add_digests(emuDBhandle,algorithm = algorithm)
   }
   #Here we use the special mode of export_medatata to get a data structure rather than an Excel file.
-  mdata <- get_metadata(emuDBhandle,session = ".*")
+  mdata <- get_metadata(emuDBhandle)
   out <- segs_tbl %>%
     dplyr::left_join(mdata,by = c("session", "bundle"))
   return(out)
