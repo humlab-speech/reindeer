@@ -6,7 +6,7 @@ Authors@R:
     person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se", role = c("aut", "cre"))
 Maintainer: Fredrik Karlsson <fredrik.k.karlsson@umu.se>
 Description: This package extends the capabilities of emuR to work with speech 
-  data and includes the fascilities for working with metadata, and for working with 
+  data and includes the facilities for working with metadata, and for working with 
   computationally intensive and sparse measurement data. 
   The package also provides functions for setting up Emu web app with signal track overlays.
   When loaded, it also loads many functions from the emuR package, and makes them available for the user.
@@ -23,6 +23,10 @@ Imports:
     openxlsx,
     sqldf,
     dplyr,
-    stats
+    stats,
+    Rdpack
+RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
+Depends: 
+    R (>= 2.10)
