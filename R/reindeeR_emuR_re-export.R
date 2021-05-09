@@ -331,3 +331,23 @@ rename_bundles = emuR::rename_bundles
 #' @seealso [emuR::replace_itemLabels]
 replace_itemLabels = emuR::replace_itemLabels
 
+#' List files of an emuDB (A copy of the emuR function)
+#' @export
+#' @inheritParams emuR::list_files
+#' @inherit emuR::list_files return references description details sections seealso
+#' @seealso [emuR::list_files]
+list_files = emuR::list_files
+
+#' Convert Hz to the Mel scale (A copy of the emuR function)
+#' @export
+#' @inheritParams emuR::mel
+#' @inherit emuR::mel return references description details sections seealso
+#' @seealso [emuR::mel]
+mel = emuR::mel
+
+#' Convert Hz to the Bark scale (A copy of the emuR function)
+#' @export
+#' @inheritParams emuR::bark
+#' @inherit emuR::bark return references description details sections seealso
+#' @seealso [emuR::bark]
+bark = emuR::bark
