@@ -27,3 +27,35 @@ st <- function(x,ref=32.703){
   return(out)
 }
 
+
+
+
+#' Convert an Hz frequency to number of
+#'
+#' Convert physical frequencies (in Hz) to number of Equivalent rectangular
+#' bandwidth (ERB) below the frequency. The ERB is  an approximation computed
+#' from the bandwidths of filters in human hearing, as modelled by rectangular
+#' band-pass filters.
+#'
+#' The formula for Number of ERBs given in
+#' \incertCite{Moore:1982ha}{reindeer} is used
+#' in the caluclations.
+#'
+#' @param x A vector of frequency values (in Hz)
+#'
+#' @return A vector of ERB values
+#' @export
+#'
+#' @examples
+f <- seq(1,10000,10)
+plot(f,erb(f))
+## Compare with the bark scale
+plot(erb(f),emuR::bark(f),lty=2,ylab="Zwicker et al. Bark scale")
+abline(a = 0, b=1,col="blue")
+
+erb <- function(f,praat=FALSE){
+
+    nerb <- 11.17 * log( (f + 0.312 ) / (f + 14.675))  + 43
+
+  return(nerb)
+}
