@@ -5,13 +5,13 @@ metadata.extension = "meta_json"
 ## I will need this function until 0.9.0 of dplyr is released,
 #possibly fixing the issue with all NA columns supplied to coalesce
 # The implementation comes from https://stackoverflow.com/a/19254510
-coalesce <- function(...) {
-  Reduce(function(x, y) {
-    i <- which(is.na(x))
-    x[i] <- y[i]
-    x},
-    list(...))
-}
+# coalesce <- function(...) {
+#   Reduce(function(x, y) {
+#     i <- which(is.na(x))
+#     x[i] <- y[i]
+#     x},
+#     list(...))
+# }
 
 
 #' Functions for gathering metadata specified for recordings in an emuR database.
@@ -67,8 +67,8 @@ coalesce <- function(...) {
 #' }
 #'
 
-get_metadata <- function(emuDBhandle,overwrite=FALSE){
-  res <- export_metadata(emuDBhandle=emuDBhandle,overwrite=overwrite)
+get_metadata <- function(emuDBhandle){
+  res <- export_metadata(emuDBhandle=emuDBhandle)
   return(res)
 }
 
@@ -188,7 +188,8 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
         dplyr::mutate_if(is.factor,as.character)
     names(tempDF) <- c("bundle","session","database")
     # Here the result is the first non-NA value for each row (or NA if the row in tempDF contains only NAs)
-    metafiles[bundleoriginal] <- with(tempDF,coalesce(bundle,session,database))
+    metafiles[bundleoriginal] <- with(tempDF,
+                                      dplyr::coalesce(bundle,session,database))
     # This works since you can always remove a column without an error message (even non-existing ones)
     metafiles[sessColName] <- NULL
     metafiles[dbColName] <- NULL
