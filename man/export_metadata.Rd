@@ -22,6 +22,8 @@ A data frame containing inforamtion about the 'meta_json' files found
 \describe{
 \item{session}{The name of the session.}
 \item{bundle}{The bundle name}
+\item{file}{The file name of the meta_json file found in the database}
+\item{absolute_file_path}{The full absolute path to the 'meta_json' file.}
 }
 In addition, the \code{\link[dplyr]{tibble}} will contain one column for every type of information given in any of the 'meta_json' files.
 }
@@ -50,12 +52,12 @@ updated values.
 }
 \examples{
 \dontrun{
-demodir <- file.path(tempdir(),"emuR_demoData")
-create_emuRdemoData()
-
-ae <- load_emuDB(file.path(demodir,"ae_emuDB"))
-reindeer:::make_dummy_metafiles(ae)
+create_ae_db() -> ae
+make_dummy_metafiles(ae)
 get_metadata(ae)
+## Some cleanup code
+unlink_emuRDemoDir()
+rm(ae)
 }
 
 }
