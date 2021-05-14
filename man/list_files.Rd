@@ -10,6 +10,13 @@ list_files(
   sessionPattern = ".*",
   bundlePattern = ".*"
 )
+
+list_files(
+  emuDBhandle,
+  fileExtension = ".*",
+  sessionPattern = ".*",
+  bundlePattern = ".*"
+)
 }
 \arguments{
 \item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
@@ -29,5 +36,7 @@ more information on the structural elements of an emuDB
 see \code{vignette{emuDB}}.
 }
 \seealso{
+\link[emuR:list_files]{emuR::list_files}
+
 \link[emuR:list_files]{emuR::list_files}
 }
