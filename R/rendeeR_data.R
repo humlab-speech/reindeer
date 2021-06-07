@@ -40,16 +40,16 @@
 #'
 #'
 #' @format A [tibble::tibble] with three columns
-#'  \item{Gender}{Three
-#'   values are defined here : Male, Female and `NA`. `NA` row settings will be
+#' \describe{
+#'  \item{Gender}{The three values that should be used are : Male, Female and `NA`. `NA` row settings will be
 #'   applied if Gender is not defined in the metadata for a speaker. }
-#'   \item{Parameter}{The name of the parameter of the signal processing
+#'   \item{Parameter}{The name of the parameter that should be supplied to the signal processing
 #'   function}
 #'   \item{Setting}{Defines the default setting for the parameter.
 #'   Since some signal processing functions take character arguments, this
 #'   column is defined as a character vector. The parameter values will however
 #'   be converted to numeric if possible before applying them.}
-#'
+#' }
 #' @references
 #' \insertAllCited{}
 #'
