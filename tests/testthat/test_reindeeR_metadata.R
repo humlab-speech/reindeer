@@ -1,15 +1,16 @@
 context("Bundle (session and database) metadata")
 
 ## Setup
-create_ae_test_db() -> ae_test
+reindeer:::create_ae_db() -> ae_test
 #
 teardown({
-  reindeer:::detach_demo_db(ae_test)
+
+  reindeer:::unlink_emuRDemoDir()
 })
 
 
 test_that("Metadata is collected correctly by get_metadata",{
-  make_dummy_test_metafiles(ae_test)
+  reindeer:::make_dummy_test_metafiles(ae_test)
 
   res <- reindeer::get_metadata(ae_test)
   resnames <- names(as.data.frame(res))
@@ -26,8 +27,8 @@ test_that("Metadata is collected correctly by get_metadata",{
 
 test_that("Import of metadata from an Excel file produces an exected result",{
   unlink_emuRDemoDir()
-  create_ae_test_db() -> ae_test
-  make_dummy_test_metafiles(ae_test)
+  reindeer:::create_ae_db() -> ae_test
+  reindeer:::make_dummy_metafiles(ae_test)
   dummyRes <- reindeer::get_metadata(ae_test)
 
   reindeer:::detach_demo_db(ae_test)
