@@ -10,8 +10,10 @@ add_trackDefinition(
   columnName = NULL,
   fileExtension = NULL,
   onTheFlyFunctionName = NULL,
-  onTheFlyParams = NULL,
+  onTheFlyParams = list(),
   onTheFlyOptLogFilePath = NULL,
+  inputTrackExtension = NULL,
+  package = "superassp",
   verbose = TRUE,
   interactive = TRUE
 )
@@ -75,7 +77,6 @@ SSFF track definitions in the database using \link[emuR:AddListRemoveSsffTrackDe
 }
 \examples{
 require(superassp)
-require(emuR)
 reindeer:::create_ae_db() -> ae
 emuR::list_ssffTrackDefinitions(ae)
 ?praat_formant_burg
