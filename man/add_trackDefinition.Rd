@@ -13,7 +13,8 @@ add_trackDefinition(
   onTheFlyParams = list(),
   onTheFlyOptLogFilePath = NULL,
   inputTrackExtension = NULL,
-  overwrite = FALSE,
+  defaultAge = 35,
+  overwriteFiles = FALSE,
   package = "superassp",
   verbose = TRUE,
   interactive = TRUE
