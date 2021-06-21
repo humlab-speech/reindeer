@@ -29,7 +29,7 @@ set_osciOverlay <- function(emuDBhandle,perspective,trackname){
   if(! trackname %in% trackNames) {stop("In order to enable an overlay on the oscillogram the track must be defined in the database !")}
 
   which(grepl(perspective,perspectiveNames)) -> perspid
-  dbConfig = emuR:::load_DBconfig(ae)
+  dbConfig = emuR:::load_DBconfig(emuDBhandle)
 
   dbConfig$EMUwebAppConfig$perspectives[[perspid]]$signalCanvases$assign[[1]] <- list("signalCanvasName"="OSCI","ssffTrackName"=trackname)
   res <- emuR:::store_DBconfig(emuDBhandle,dbConfig = dbConfig)
