@@ -37,6 +37,7 @@
 #' newDSPP2 <- get_parameters()
 #'
 get_parameters <- function(file=NULL){
+
   if(is.null(file)){
     if(!exists("DSPP")) data(DSPP)
 
@@ -118,10 +119,21 @@ add_trackDefinition <- function(
   onTheFlyOptLogFilePath = NULL,
   inputTrackExtension=NULL,
   defaultAge=35,
-  overwrite=FALSE,
+  overwriteFiles=FALSE,
   package="superassp",
   verbose = TRUE,
   interactive = TRUE){
+
+  existingDefExists = FALSE
+  #Check if the track has not already been defined
+  if( name %in% list_ssffTrackDefinitions(emuDBhandle )$name){
+    existingDefExists = TRUE
+    # This is ok if the columnName and fileExtension is also identical
+    r <- which(list_ssffTrackDefinitions(emuDBhandle )$name == name)
+    if(!all(list_ssffTrackDefinitions(emuDBhandle )[r,] == c(name,columnName,fileExtension))){
+      stop("A track named '",name,"' is already defined, but with a differend columnName and fileExtension, and this function can therefore not define the SSFF track you as requested.")
+    }
+  }
 
   logger::log_threshold(WARN)
   if(!is.null(onTheFlyFunctionName)){
@@ -165,7 +177,7 @@ add_trackDefinition <- function(
       dsp <- get_parameters()
 
 
-      currFunc <- getFromNamespace(onTheFlyFunctionName,package)
+      currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
       funcFormals = formals(currFunc)
       #Compute which formal arguments we also have a Gender and Age aware default setting for
       names(funcFormals) -> fp
@@ -176,13 +188,15 @@ add_trackDefinition <- function(
       fl %>%
         dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
         dplyr::mutate(Age=ifelse(is.na(Age),defaultAge,Age) )  %>%
-        dplyr::full_join(dsp %>%
-                           dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender")) %>%
+        dplyr::left_join(dsp %>%
+                           dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender"))  %>%
         dplyr::filter(!is.na(bundle),!is.na(session)) %>%
+        dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
+                      Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
         dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
         dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
-        dplyr::arrange(session,bundle,Parameter,AgeRange) %>%
-        dplyr::group_by(session,bundle,Parameter) %>%
+        dplyr::arrange(session,bundle,file,absolute_file_path,Parameter,AgeRange) %>%
+        dplyr::group_by(session,bundle,file,absolute_file_path,Parameter) %>%
         dplyr::slice_head(n=1) %>%
         dplyr::ungroup() %>%
         dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting) %>%
@@ -210,57 +224,75 @@ add_trackDefinition <- function(
         onTheFlyParams$verbose = verbose
       }
 
-
-      #Now we are ready to do call the onTheFlyFunctionName function for each media file
-
-      if(verbose && overwrite){
-        message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n")
-      }
-      if(verbose && ! overwrite){
-        message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,") for which a signal track file (.",fileExtension,") does not exist.\n")
-      }
-
-
       if(verbose){
+
         pb <- utils::txtProgressBar(max=ngi, style = 3,title=)
+
+        #Now we are ready to do call the onTheFlyFunctionName function for each media file
+        if(overwriteFiles){
+          message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n")
+        }else {
+          message("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n")
+        }
+
       }
 
       fl_meta_settings %>%
+        dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
         dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
       #return(fl_meta_settings)
       for(currFileGroup in 1:ngi){
-
-
-        purrr::flatten(utils::modifyList(dspParList[currFileGroup][1],onTheFlyParams)) -> argLst
-        #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
-        #we need to convert strings like "11" to proper 11 values.
-        argLst <- lapply(argLst,
-                         utils::type.convert,as.is=TRUE)
-        argLst$listOfFiles <- unique(group_split(fl_meta_settings)[[currFileGroup]]$absolute_file_path)
-
-        # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
-        for(an in names(argLst)){
-          argLst[an] = ifelse(class(argLst[[an]]) =="integer",as.numeric(argLst[[an]]),argLst[[an]])
-        }
-
+        currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
+        currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
+        outFile <- file.path(emuDBhandle$basePath,
+                             paste0(currSession,emuR:::session.suffix),
+                             paste0(currBundle,emuR:::bundle.dir.suffix),
+                             paste0(currBundle,".",fileExtension))
+        #message(outFile)
         if(verbose){
           utils::setTxtProgressBar(pb,currFileGroup)
         }
+        if(overwriteFiles || ! file.exists(outFile)){
+          purrr::flatten(utils::modifyList(dspParList[currFileGroup][1],onTheFlyParams)) -> argLst
+          #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
+          #we need to convert strings like "11" to proper 11 values.
+          argLst <- lapply(argLst,
+                           utils::type.convert,as.is=TRUE)
 
-        #If we want to create a log of what is going on
-        #toLog <- paste0("",deparse(argLst))
-        logger::log_formatter(logger::formatter_glue)
-        logger::log_layout(logger::layout_json())
-        logger::log_info("Arguments to '{onTheFlyFunctionName}' : {jsonlite::toJSON(argLst)}")
+          argLst$listOfFiles <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$absolute_file_path)
 
-        do.call(currFunc, argLst)
+
+
+          # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
+          if(length(argLst) > 0 ){
+            for(an in names(argLst)){
+              argLst[an] = ifelse(class(argLst[[an]]) =="integer",as.numeric(argLst[[an]]),argLst[[an]])
+            }
+          }
+
+
+
+          #If we want to create a log of what is going on
+          #toLog <- paste0("",deparse(argLst))
+          logger::log_formatter(logger::formatter_glue)
+          logger::log_layout(logger::layout_json(c("level","msg")))
+          logger::log_info("Arguments to '{onTheFlyFunctionName}' : {jsonlite::toJSON(argLst)}")
+
+          do.call(currFunc, argLst)
+
+        }
       }
-      close(pb)
-
+      if(verbose){
+        close(pb)
+      }
     }
 
   }
-  emuR::add_ssffTrackDefinition(emuDBhandle,name=name,columnName = columnName,fileExtension = ext)
+
+  if(! existingDefExists){
+
+    emuR::add_ssffTrackDefinition(emuDBhandle,name=name,columnName = columnName,fileExtension = ext)
+  }
 
 
 }
@@ -279,9 +311,20 @@ add_trackDefinition <- function(
  # unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
  # get_metadata(emuDBhandle) -> md
  # dsp <- get_parameters()
+ # #
+ # add_trackDefinition(emuDBhandle,name="acf",columnName = "acf",fileExtension = "acf",onTheFlyFunctionName = "rfcana",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test")
  #
- # add_trackDefinition(emuDBhandle,name="f0",columnName = "F0",fileExtension = "f0",onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test") -> out
-
+ # unlink(emuR::list_files(emuDBhandle,"f0")[2,"absolute_file_path"][[1]])
+ # add_trackDefinition(emuDBhandle,name="f0",columnName = "F0",fileExtension = "f0",onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test") -> out2
 
 # add_trackDefinition(emuDBhandle,"fm","fm","fm",onTheFlyFunctionName = "praat_formant_burg",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test")
 # list_files(emuDBhandle,"rms2")
+
+# for(fun in names(wrasspOutputInfos)){
+#   ext <- wrasspOutputInfos[[fun]][["ext"]]
+#   tracks <- wrasspOutputInfos[[fun]][["tracks"]]
+#   for(tr in tracks){
+#     add_trackDefinition(emuDBhandle,name=tr,columnName = tr,fileExtension = ext,onTheFlyFunctionName = fun)
+#   }
+#
+# }
