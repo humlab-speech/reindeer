@@ -60,7 +60,5 @@ export(set_levelCanvasesOrder)
 export(set_signalCanvasesOrder)
 export(set_specOverlay)
 export(st)
-importFrom(Rdpack,reprompt)
-importFrom(dplyr,"%>%")
 importFrom("logger",WARN)
-
+importFrom(Rdpack,reprompt)

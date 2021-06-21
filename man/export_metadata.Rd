@@ -22,8 +22,6 @@ A data frame containing inforamtion about the 'meta_json' files found
 \describe{
 \item{session}{The name of the session.}
 \item{bundle}{The bundle name}
-\item{file}{The file name of the meta_json file found in the database}
-\item{absolute_file_path}{The full absolute path to the 'meta_json' file.}
 }
 In addition, the \code{\link[dplyr]{tibble}} will contain one column for every type of information given in any of the 'meta_json' files.
 }
@@ -52,14 +50,17 @@ updated values.
 }
 \examples{
 \dontrun{
+create_emuRdemoData()
+ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 
-create_ae_db() -> ae
-make_dummy_metafiles(ae)
-get_metadata(ae)
-## Some cleanup code
-unlink_emuRDemoDir()
+# Database-wide default information
+add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+#Bundle specific information
+add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+get_metadata(ae) -> res
+print(res)
 rm(ae)
-
+unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 }
 
 }
