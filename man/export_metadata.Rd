@@ -3,27 +3,25 @@
 \name{get_metadata}
 \alias{get_metadata}
 \alias{export_metadata}
-\title{Functions for gathering metadata specified for recordings in an emuR database.}
+\title{Functions for gathering metata specified for recordings in an emuR database.}
 \usage{
-get_metadata(emuDBhandle)
+get_metadata(emuDBhandle, overwrite = FALSE, session = ".*")
 
 export_metadata(emuDBhandle, Excelfile = NULL, overwrite = FALSE)
 }
 \arguments{
 \item{emuDBhandle}{The database handle of an emuR database.}
 
-\item{Excelfile}{The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.}
-
 \item{overwrite}{The default behaviour is that an Excel file should not be
 overwritten if it exists already. If this parameter is \code{TRUE} then the file will be overwritten.}
+
+\item{Excelfile}{The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.}
 }
 \value{
 A data frame containing inforamtion about the 'meta_json' files found
 \describe{
 \item{session}{The name of the session.}
 \item{bundle}{The bundle name}
-\item{file}{The file name of the meta_json file found in the database}
-\item{absolute_file_path}{The full absolute path to the 'meta_json' file.}
 }
 In addition, the \code{\link[dplyr]{tibble}} will contain one column for every type of information given in any of the 'meta_json' files.
 }
@@ -31,8 +29,8 @@ In addition, the \code{\link[dplyr]{tibble}} will contain one column for every t
 Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.
 The functions goes through the database metadata file, session metadata files and metadata files associated with
 each bundle, parses the JSON data and returns \code{\link[dplyr]{tibble}} with one row per bundle in the database.
-Database default values are suppressed by information set in a session metadata file, and session level data are in
-turn suppressed by data given at the bundle level.
+Database default values are supressed by information set in a session metadata file, and session level data are in
+turn surpressed by data given at the bundle level.
 The structure of the metadata does not have to be consistent across meta_json files.
 New columns are added to the as new fields are detected.
 }
@@ -52,12 +50,17 @@ updated values.
 }
 \examples{
 \dontrun{
-create_ae_db() -> ae
-make_dummy_metafiles(ae)
-get_metadata(ae)
-## Some cleanup code
-unlink_emuRDemoDir()
+create_emuRdemoData()
+ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+
+# Database-wide default information
+add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+#Bundle specific information
+add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+get_metadata(ae) -> res
+print(res)
 rm(ae)
+unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 }
 
 }

@@ -24,19 +24,27 @@ Create a biography of the labels in a list of segments in a tidy manner
 }
 \examples{
 \dontrun{
-## This code just sets up a new emuR database and inserts some
-## fake metadata into it.
-create_ae_db() -> ae_test
-make_dummy_metafiles(ae_test)
+create_emuRdemoData()
+ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+
+# Database-wide default information
+add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+#Bundle specific information
+add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+
 # Get all the 'n' segments in the database
 query(ae_test,"Phonetic = n",resultType = "tibble") -> ae_nt
 # Add information related to the nature the recording sessions
 # e.g. the speaker ID, the date of the recording
-ae_nt \%>\% biographize(ae_test)
+ae_nt \%>\% biographize(ae_test) \%>\% glimpse()
 # This code does the same as the above, but it will also compute new
 # information that is strictly  aimed at identifying the recording
 # (length of recording (in ms) and a sha1 digest of the wav file).
-ae_nt \%>\% biographize(ae_test,compute_digests=TRUE,algorithm="sha1")
+ae_nt \%>\%
+   biographize(ae_test,compute_digests=TRUE,algorithm="sha1") \%>\%
+   glimpse()
+rm(ae)
+unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 }
 
 }
