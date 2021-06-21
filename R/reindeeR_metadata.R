@@ -87,7 +87,7 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
     stop("Could not write output file ",Excelfile,": File exists but should not be overwritten.")
   }
 
-  check_emuDBhandle(emuDBhandle)
+  emuR:::check_emuDBhandle(emuDBhandle)
 
   bundles <- list_bundles(emuDBhandle) %>%
     dplyr::rename(bundle=name)
@@ -113,7 +113,8 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
 
   # Remove meta files associated with bundles
 
-  sessJSONFiles <- sessJSONFiles[! grepl(bundle.dir.suffix,sessJSONFiles) & grepl(session.suffix,sessJSONFiles)]
+  sessJSONFiles <- sessJSONFiles[! grepl(emuR:::bundle.dir.suffix,sessJSONFiles) &
+                                   grepl(emuR:::session.suffix,sessJSONFiles)]
 
   sessions <- list_sessions(emuDBhandle) %>%
     dplyr::rename(session=name)
@@ -124,7 +125,7 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
     names(sessJSONFilesDF) <- c("session","session_metadata_file")
     # The session needs to be without suffix so that metadata may be joinded by session later
 
-    sessJSONFilesDF$session <- gsub(paste0(session.suffix,"$"),"",sessJSONFilesDF$session)
+    sessJSONFilesDF$session <- gsub(paste0(emuR:::session.suffix,"$"),"",sessJSONFilesDF$session)
 
     sessJSONFilesDF <- na.omit(sessJSONFilesDF)
 
@@ -133,7 +134,7 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
       currFile <- as.vector(sessJSONFilesDF[[row,"session_metadata_file"]])
       currSession <- as.vector(sessJSONFilesDF[[row,"session"]])
 
-      currSessionDir <- paste0(currSession,session.suffix)
+      currSessionDir <- paste0(currSession,emuR:::session.suffix)
 
 
       jsonmeta <- jsonlite::read_json(file.path(emuDBhandle$basePath,currSessionDir,currFile),simplifyVector = TRUE)
@@ -159,7 +160,7 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE){
 
   # Now check and load metadata set at the database level
 
-  load_DBconfig(emuDBhandle) -> dbCfg
+  emuR:::load_DBconfig(emuDBhandle) -> dbCfg
 
   if(is.null(dbCfg$metadataDefaults)){
     dbDefaults <- data.frame()
@@ -276,8 +277,8 @@ import_metadata <- function(emuDBhandle,Excelfile){
   meta <- meta %>%
 
     dplyr::mutate(metadatafile=file.path(emuDBhandle$basePath,
-                                         paste0(session,session.suffix),
-                                         paste0(bundle,bundle.dir.suffix),
+                                         paste0(session,emuR:::session.suffix),
+                                         paste0(bundle,emuR:::bundle.dir.suffix),
                                          paste0(bundle,".",metadata.extension))
     )
   #Now to the main business of the function
@@ -329,7 +330,7 @@ import_metadata <- function(emuDBhandle,Excelfile){
   #Write the bundle metadata files
   for(r in 1:nrow(towriteSess)){
     outFile <- file.path(emuDBhandle$basePath,
-                         paste0(towriteSess[r,"session"],session.suffix),
+                         paste0(towriteSess[r,"session"],emuR:::session.suffix),
                          towriteSess[r,"session_metadata_file"])
     fileConn <- file(outFile)
     writeLines(as.character(towriteSess[r,"json"]), fileConn)
@@ -340,7 +341,7 @@ import_metadata <- function(emuDBhandle,Excelfile){
 
   # Now inject database wide metadata
 
-  load_DBconfig(emuDBhandle) -> dbCfg
+  emuR:::load_DBconfig(emuDBhandle) -> dbCfg
   openxlsx::read.xlsx(Excelfile,sheet="database") -> dbMeta
   dbCfg$metadataDefaults <- as.list(dbMeta)
   store_DBconfig(emuDBhandle,dbCfg)
@@ -392,7 +393,7 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
   if(is.null(bundle) & is.null(session)){
     #Database wide injection
 
-    load_DBconfig(emuDBhandle) -> dbCfg
+    emuR:::load_DBconfig(emuDBhandle) -> dbCfg
 
     if(reset.before.add){
       dbCfg$metadataDefaults <- as.list(metadataList)
@@ -414,7 +415,7 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
       #Session level metadata
 
       metadatafile <- file.path(emuDBhandle$basePath,
-                                paste0(session,session.suffix),
+                                paste0(session,emuR:::session.suffix),
                                 paste0(session,".",metadata.extension))
     }
 
@@ -433,8 +434,8 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
       }
 
       metadatafile <- file.path(emuDBhandle$basePath,
-                                paste0(session,session.suffix),
-                                paste0(bundle,bundle.dir.suffix),
+                                paste0(session,emuR:::session.suffix),
+                                paste0(bundle,emuR:::bundle.dir.suffix),
                                 paste0(bundle,".",metadata.extension))
 
 
