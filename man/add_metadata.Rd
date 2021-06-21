@@ -39,3 +39,19 @@ one session in the database. If there are multiple \code{session}s, the function
 
 If no \code{session} or \code{bundle} names are provided, the metadata will be inserted as default values for the entire database.
 }
+\examples{
+\dontrun{
+create_emuRdemoData()
+ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+
+# Database-wide default information
+add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+#Bundle specific information
+add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+get_metadata(ae) -> res
+print(res)
+rm(ae)
+unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
+}
+
+}

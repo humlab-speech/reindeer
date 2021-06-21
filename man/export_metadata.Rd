@@ -3,9 +3,9 @@
 \name{get_metadata}
 \alias{get_metadata}
 \alias{export_metadata}
-\title{Functions for gathering metadata specified for recordings in an emuR database.}
+\title{Functions for gathering metata specified for recordings in an emuR database.}
 \usage{
-get_metadata(emuDBhandle, overwrite = FALSE)
+get_metadata(emuDBhandle, overwrite = FALSE, session = ".*")
 
 export_metadata(emuDBhandle, Excelfile = NULL, overwrite = FALSE)
 }
@@ -31,8 +31,8 @@ In addition, the \code{\link[dplyr]{tibble}} will contain one column for every t
 Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.
 The functions goes through the database metadata file, session metadata files and metadata files associated with
 each bundle, parses the JSON data and returns \code{\link[dplyr]{tibble}} with one row per bundle in the database.
-Database default values are suppressed by information set in a session metadata file, and session level data are in
-turn suppressed by data given at the bundle level.
+Database default values are supressed by information set in a session metadata file, and session level data are in
+turn surpressed by data given at the bundle level.
 The structure of the metadata does not have to be consistent across meta_json files.
 New columns are added to the as new fields are detected.
 }
@@ -52,12 +52,14 @@ updated values.
 }
 \examples{
 \dontrun{
+
 create_ae_db() -> ae
 make_dummy_metafiles(ae)
 get_metadata(ae)
 ## Some cleanup code
 unlink_emuRDemoDir()
 rm(ae)
+
 }
 
 }

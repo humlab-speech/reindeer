@@ -1,0 +1,56 @@
+#' The set of Default Signal Processing Parameters
+#'
+#' This data frame provides default parameters for signal processing functions
+#' that may depend on speaker metadata. Currently, only Gender is considered.
+#' The default settings defined in this collection is based on the
+#' recommendations found in the literature for the signal processing functions
+#' defined in [superassp] (and by extension [wrassp]).
+#'
+#' If the user defines their own signal processing function, it may be
+#' advantageous to take advantage of the naming convention set here so that the
+#' `DSPP` data set may simply be reused for the new function. For instance, it
+#' is likely that a newly created f0 detection algorithm will still want some
+#' guidance on the most probable frequency range for a particular speaker
+#' knowing their gender, and naming this parameter `minF` and `maxF` will likely
+#' simplify usage of the functions in this package as the `DSPP` may then be
+#' used unaltered.
+#'
+#' The default settings contained within `DSPP` is collected directly from, or
+#' estimated from, a number of sources. The age independent but gender dependent
+#' parameters are generally found in the Praat or [wrassp] manuals. Nominal F1,
+#' F2 and F3 for young and adolescent male and female speakers were estimated as
+#' the mid point of the age dependent range published by
+#' \insertCite{Kent.2018.10.1016/j.jcomdis.2018.05.004}{reindeer}. The f0 ranges
+#' for young persons (5-10 years) were collected from
+#' \insertCite{Brockmann-Bauser.2015.10.1016/j.ijporl.2015.09.005}{reindeer}.
+#'
+#' By default, the DSPP settings will ask formant tracking functions to find
+#' five (5) formants within the frequence range of 50-`maxhzformant` Hz. The
+#' default setting for the `maxhzformant` parameter follows the Praat manual
+#' (that is, its set to 5000 Hz for male speakers and 5500 Hz for female
+#' speakers). Some additional information age specific values for the
+#' `maxhzformant` parameter has been obtained from
+#' \insertCite{Escudero.2009.10.1121/1.3180321}{reindeer} for participants aged
+#' 20-30 years.
+#'
+#' The user should be aware that the `numFormants` and `maxhzformant` interact,
+#' so the user should take care when chaning either one of them as adjustment
+#' also of the other will then be necessary.
+#'
+#'
+#'
+#' @format A [tibble::tibble] with three columns
+#' \describe{
+#'  \item{Gender}{The three values that should be used are : Male, Female and `NA`. `NA` row settings will be
+#'   applied if Gender is not defined in the metadata for a speaker. }
+#'   \item{Parameter}{The name of the parameter that should be supplied to the signal processing
+#'   function}
+#'   \item{Setting}{Defines the default setting for the parameter.
+#'   Since some signal processing functions take character arguments, this
+#'   column is defined as a character vector. The parameter values will however
+#'   be converted to numeric if possible before applying them.}
+#' }
+#' @references
+#' \insertAllCited{}
+#'
+"DSPP"

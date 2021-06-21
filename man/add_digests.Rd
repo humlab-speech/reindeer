@@ -29,11 +29,18 @@ recording extracted from the emuR data base. The user may create checksums by mu
 }
 \examples{
 \dontrun{
-create_ae_db() -> ae
-add_digests(ae)
-export_metadata(ae,Excelfile = NULL) -> res
+create_emuRdemoData()
+ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+
+#Add a md5 digest to the metadata of all bundles
+add_digests(ae,algorithm = "md5")
+
+#Add a "sha1" checksum (the default) to some bundles
+add_digests(ae,bundlePattern = "msajc0.*")
+get_metadata(ae) -> res
 print(res)
-unlink_emuRDemoDir()
+rm(ae)
+unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 }
 
 }

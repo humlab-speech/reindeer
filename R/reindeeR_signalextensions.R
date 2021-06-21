@@ -1,4 +1,64 @@
+#' Provides the user with speaker dependent signal processing parameters
+#'
+#' The source of the default signal processing parameters may be a spreadsheet
+#' file in the OOXML Workbook ISO/IEC 29500:2008 standard format.The simplest
+#' way to obtain such a file is to provide this function with a file name that
+#' does not exist. This function will then write the [DSPP] set to the file, and
+#' the user may then edit the file by hand using Microsoft Excel, Libreoffice
+#' Calc or some other standard compliant software. Once edited, this function
+#' may be used to read in the spreadsheet file to a tibble that may be used for
+#' signal processing purposes.
+#'
+#' Alternatively, the user may use this function to just get the defaults stored
+#' in [DSPP] returned directly by not supplying a file name.
+#'
+#' @importFrom "logger" WARN
+#'
+#' @param file If the file exists, the settings stored in the file are read in and returned. If it does not exist, one will be created and teh [DSPP] parameters inserted into it for the user to edit. If \code{NULL}, the [DSPP] structure will be returned directly
+#'
+#' @return A [tibble:tibble] containing some mandatory columns
+#'  \item{Gender}{Either "Male", "Female", or \code{NA}. \code{NA} parameters will be used in cases where the gender of a speaker is not known}
+#'  \item{Parameter}{The name of the parameter written exactly as expected by the called function}
+#'  \item{Default}{The value that should be given to functions that take the parameter indicated in the `Parameter` column. Most often, this will be a number, but in rare cases a single character is also possible. The whole column is therefore formated as a `character` list, although the value will likely be converted to a numeric before use.}
+#'
+#'
+#' @export
+#'
+#' @examples
+#' xlsf <- tempfile(fileext = ".xlsx")
+#' #Use the function to write out the default parameters DSPP to the temp file
+#' get_parameters(xlsf)
+#'
+#' #Now the user may modify the default settings to their liking using a spreadsheet program
+#' # and then read the settings in again to a data frame using the same command again, and get a
+#' # data frame that may be used by functions in this package.
+#' #Just get the DSPP structure directly
+#' data(DSPP)
+#' newDSPP2 <- get_parameters()
+#'
+get_parameters <- function(file=NULL){
 
+  if(is.null(file)){
+    if(!exists("DSPP")) data(DSPP)
+
+    return(DSPP)
+  }
+  if(!file.exists(file)){
+    openxlsx::write.xlsx(DSPP,file = file)
+  }
+
+  openxlsx::read.xlsx(file,na.strings = "NA") %>%
+    dplyr::distinct() -> f
+
+  #Check manditory columns
+  if(! c("Gender","Parameter","Default") %in% names(f)){
+    warning("Malformed settings file. The Gender, Parameter, and Default columns are mandatory. Returning the default DSPP collection of settings instead.")
+    return(DSPP)
+  }else{
+    return(f)
+
+  }
+}
 
 #' Call any function to compute an EmuR SSFF track definition.
 #'
@@ -28,12 +88,11 @@
 #'
 #'
 #' @inheritParams emuR::add_ssffTrackDefinition
-
+#'
 #' @export
 #'
 #' @examples
 #' require(superassp)
-#' require(emuR)
 #' reindeer:::create_ae_db() -> ae
 #' emuR::list_ssffTrackDefinitions(ae)
 #' ?praat_formant_burg
@@ -56,55 +115,216 @@ add_trackDefinition <- function(
   columnName = NULL,
   fileExtension = NULL,
   onTheFlyFunctionName = NULL,
-  onTheFlyParams = NULL,
+  onTheFlyParams = list(),
   onTheFlyOptLogFilePath = NULL,
+  inputTrackExtension=NULL,
+  defaultAge=35,
+  overwriteFiles=FALSE,
+  package="superassp",
   verbose = TRUE,
   interactive = TRUE){
 
-  # If a function name is not provided , or the function extists in wrassp, just
-  # call emuR::add_ssffTrackDefinition like normal
-  if( is.null(onTheFlyFunctionName) || !is.null(wrassp::wrasspOutputInfos[[onTheFlyFunctionName]])){
-    emuR::add_ssffTrackDefinition(emuDBhandle=emuDBhandle,
-                                  name=name,
-                                  columnName = columnName,
-                                  fileExtension = fileExtension,
-                                  onTheFlyFunctionName = onTheFlyFunctionName,
-                                  onTheFlyParams = onTheFlyParams,
-                                  onTheFlyOptLogFilePath = onTheFlyOptLogFilePath,
-                                  verbose = verbose,
-                                  interactive = interactive)
-
-  }else{
-
-    # Check that the function extists
-    if(exists(onTheFlyFunctionName) & is.function(get(onTheFlyFunctionName))){
-
-      fun <- get(onTheFlyFunctionName)
-      #Check that the function has been prepared for use with this function by
-      # giving it the the required additional attributes "ext" and "tracks"
-      if(!is.null(attr(fun,"ext")) & !is.null(attr(fun,"tracks")) ){
-        #Set the default file extension to the one set as an attribute, if missing in the arguments
-        ext <- ifelse(!is.null(fileExtension),fileExtension,attr(fun,"ext"))
-        if(!columnName %in% attr(fun,"tracks") ) stop("The track ",columnName, " is not a defined output track name of the function ",onTheFlyFunctionName)
-        columnName <- ifelse(!is.null(columnName),columnName,attr(fun,"tracks")[[1]])
-
-      }else{
-        stop("The function ",onTheFlyFunctionName," is not defined correctly. Please provide it with the attributes \"ext\" and \"tracks\".\n See ?attr for details, as well as attributes(praat_formant_burg) for an example." )
-      }
-      dbConfig = emuR:::load_DBconfig(emuDBhandle)
-      funcFormals = formals(onTheFlyFunctionName)
-      funcFormals[names(onTheFlyParams)] = onTheFlyParams
-      funcFormals$optLogFilePath = onTheFlyOptLogFilePath
-      fp = emuR::list_files(emuDBhandle, dbConfig$mediafileExtension)
-      funcFormals$listOfFiles = paste(emuDBhandle$basePath, paste0(fp$session, emuR:::session.suffix), paste0(fp$bundle, emuR:::bundle.dir.suffix), fp$file, sep = .Platform$file.sep)
-      funcFormals$explicitExt = fileExtension
-      funcFormals$verbose = verbose
-      do.call(onTheFlyFunctionName, funcFormals)
-      #add the definition
-      emuR::add_ssffTrackDefinition(emuDBhandle,name=name,columnName = columnName,fileExtension = ext)
-    }else{
-
-      stop("Could not find a definition of the function ",onTheFlyFunctionName,"." )
+  existingDefExists = FALSE
+  #Check if the track has not already been defined
+  if( name %in% list_ssffTrackDefinitions(emuDBhandle )$name){
+    existingDefExists = TRUE
+    # This is ok if the columnName and fileExtension is also identical
+    r <- which(list_ssffTrackDefinitions(emuDBhandle )$name == name)
+    if(!all(list_ssffTrackDefinitions(emuDBhandle )[r,] == c(name,columnName,fileExtension))){
+      stop("A track named '",name,"' is already defined, but with a differend columnName and fileExtension, and this function can therefore not define the SSFF track you as requested.")
     }
   }
+
+  logger::log_threshold(WARN)
+  if(!is.null(onTheFlyFunctionName)){
+    defTracks <- superassp::get_definedtracks(onTheFlyFunctionName)
+    defExt <- superassp::get_extension(onTheFlyFunctionName)
+
+    columnName <- ifelse(!is.null(columnName) & length(defTracks) > 0 ,columnName,defTracks[[1]])
+
+    if(! columnName %in% defTracks ) {
+      stop("The track ",columnName, " is not a defined output track name of the function ",onTheFlyFunctionName)
+    }
+    #Set the default file extension to the one set as an attribute, if missing in the arguments
+    ext <- ifelse(!is.null(fileExtension),fileExtension,defExt)
+
+    if(is.null(inputTrackExtension)){
+      #We need to get the default media file extension from the database definition if it not defined
+      dbConfig = emuR:::load_DBconfig(emuDBhandle)
+      inputTrackExtension <- dbConfig$mediafileExtension
+    }
+
+
+    if(!is.null(onTheFlyFunctionName)){
+      #logCon = NULL
+      #Make a log name if required
+      if(!is.null(onTheFlyOptLogFilePath) ) {
+         if(!dir.exists(onTheFlyOptLogFilePath)){
+           stop("The logging directory '",onTheFlyOptLogFilePath,"'does not exists. Please create it first")
+         }else{
+           #we have a logging output directory
+           #logName <- file.path(onTheFlyOptLogFilePath,
+           #  paste0(paste(onTheFlyFunctionName,format(Sys.time(), "%Y-%m-%d_%H:%M:%S"),sep="_"),".log")
+           #)
+           #logCon <- file(logName,open="at")
+           logName <- file.path(onTheFlyOptLogFilePath,paste0(onTheFlyFunctionName,".log"))
+           logger::log_appender(logger::appender_file(logName))
+           logger::log_threshold(INFO)
+         }
+      }
+      fl = emuR::list_files(emuDBhandle, inputTrackExtension)
+      meta <- get_metadata(emuDBhandle)
+      dsp <- get_parameters()
+
+
+      currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+      funcFormals = formals(currFunc)
+      #Compute which formal arguments we also have a Gender and Age aware default setting for
+      names(funcFormals) -> fp
+      unique(dsp$Parameter) -> pp
+      intersect(pp,fp) -> fparam
+
+      assertthat::assert_that(all(c("Age","Gender") %in% names(meta)))
+      fl %>%
+        dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
+        dplyr::mutate(Age=ifelse(is.na(Age),defaultAge,Age) )  %>%
+        dplyr::left_join(dsp %>%
+                           dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender"))  %>%
+        dplyr::filter(!is.na(bundle),!is.na(session)) %>%
+        dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
+                      Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
+        dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
+        dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
+        dplyr::arrange(session,bundle,file,absolute_file_path,Parameter,AgeRange) %>%
+        dplyr::group_by(session,bundle,file,absolute_file_path,Parameter) %>%
+        dplyr::slice_head(n=1) %>%
+        dplyr::ungroup() %>%
+        dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting) %>%
+        dplyr::group_by(session, bundle, file, absolute_file_path) -> fl_meta_settings
+
+
+      #return(fl_meta_settings)
+
+
+      #We have already made per file grouping of the tibble, so we may use that to extract file information
+      ng <- dplyr::n_groups(fl_meta_settings)
+      ngi <- as.integer(as.vector(ng))
+
+      assertthat::assert_that(nrow(fl) == ngi, msg=paste0("Not all sounds files were assigned metadata ", nrow(fl)," ==> ",ng))
+
+
+      #Copy arguments given to this function over the list of general arguments given to the called function
+      if("optLogFilePath" %in% fp ){
+        onTheFlyParams$optLogFilePath = onTheFlyOptLogFilePath
+      }
+      if("explicitExt" %in% fp ){
+        onTheFlyParams$explicitExt = fileExtension
+      }
+      if("verbose" %in% fp ){
+        onTheFlyParams$verbose = verbose
+      }
+
+      if(verbose){
+
+        pb <- utils::txtProgressBar(max=ngi, style = 3,title=)
+
+        #Now we are ready to do call the onTheFlyFunctionName function for each media file
+        if(overwriteFiles){
+          message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n")
+        }else {
+          message("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n")
+        }
+
+      }
+
+      fl_meta_settings %>%
+        dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
+        dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
+      #return(fl_meta_settings)
+      for(currFileGroup in 1:ngi){
+        currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
+        currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
+        outFile <- file.path(emuDBhandle$basePath,
+                             paste0(currSession,emuR:::session.suffix),
+                             paste0(currBundle,emuR:::bundle.dir.suffix),
+                             paste0(currBundle,".",fileExtension))
+        #message(outFile)
+        if(verbose){
+          utils::setTxtProgressBar(pb,currFileGroup)
+        }
+        if(overwriteFiles || ! file.exists(outFile)){
+          purrr::flatten(utils::modifyList(dspParList[currFileGroup][1],onTheFlyParams)) -> argLst
+          #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
+          #we need to convert strings like "11" to proper 11 values.
+          argLst <- lapply(argLst,
+                           utils::type.convert,as.is=TRUE)
+
+          argLst$listOfFiles <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$absolute_file_path)
+
+
+
+          # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
+          if(length(argLst) > 0 ){
+            for(an in names(argLst)){
+              argLst[an] = ifelse(class(argLst[[an]]) =="integer",as.numeric(argLst[[an]]),argLst[[an]])
+            }
+          }
+
+
+
+          #If we want to create a log of what is going on
+          #toLog <- paste0("",deparse(argLst))
+          logger::log_formatter(logger::formatter_glue)
+          logger::log_layout(logger::layout_json(c("level","msg")))
+          logger::log_info("Arguments to '{onTheFlyFunctionName}' : {jsonlite::toJSON(argLst)}")
+
+          do.call(currFunc, argLst)
+
+        }
+      }
+      if(verbose){
+        close(pb)
+      }
+    }
+
+  }
+
+  if(! existingDefExists){
+
+    emuR::add_ssffTrackDefinition(emuDBhandle,name=name,columnName = columnName,fileExtension = ext)
+  }
+
+
 }
+
+
+
+
+
+### For interactive testing
+#
+ # library(wrassp)
+ # reindeer:::unlink_emuRDemoDir()
+ # reindeer:::create_ae_db() -> emuDBhandle
+ # reindeer:::make_dummy_metafiles(emuDBhandle)
+ # fl = emuR::list_files(emuDBhandle,"wav")
+ # unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
+ # get_metadata(emuDBhandle) -> md
+ # dsp <- get_parameters()
+ # #
+ # add_trackDefinition(emuDBhandle,name="acf",columnName = "acf",fileExtension = "acf",onTheFlyFunctionName = "rfcana",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test")
+ #
+ # unlink(emuR::list_files(emuDBhandle,"f0")[2,"absolute_file_path"][[1]])
+ # add_trackDefinition(emuDBhandle,name="f0",columnName = "F0",fileExtension = "f0",onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test") -> out2
+
+# add_trackDefinition(emuDBhandle,"fm","fm","fm",onTheFlyFunctionName = "praat_formant_burg",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test")
+# list_files(emuDBhandle,"rms2")
+
+# for(fun in names(wrasspOutputInfos)){
+#   ext <- wrasspOutputInfos[[fun]][["ext"]]
+#   tracks <- wrasspOutputInfos[[fun]][["tracks"]]
+#   for(tr in tracks){
+#     add_trackDefinition(emuDBhandle,name=tr,columnName = tr,fileExtension = ext,onTheFlyFunctionName = fun)
+#   }
+#
+# }
