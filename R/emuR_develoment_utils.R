@@ -28,9 +28,8 @@ make_dummy_metafiles <- function(db,metafile="bundle.meta"){
   outMetaFiles <- emuR::list_files(db,"wav") %>%
     dplyr::select(absolute_file_path) %>%
     dplyr::mutate(absolute_file_path=gsub("wav$","meta_json",absolute_file_path))
-
   for(i in seq_along(outMetaFiles[[1]])){
-    cat("[{\"Participant_ID\":",i,",\"Gender\":\"Male\",\"Age\":",i*10,",\"Recording_Date\":\"2019-01-01\",\"Recording_Time\":\"09:43:54\"}]",
+    cat("[{\"Participant_ID\":",i,",\"Gender\":\"",rep(c("Male","Female"),4)[i],"\",\"Age\":",i*10,",\"Recording_Date\":\"2019-01-01\",\"Recording_Time\":\"09:43:54\"}]",sep="",
         file=outMetaFiles[[1]][i])
 
   }
