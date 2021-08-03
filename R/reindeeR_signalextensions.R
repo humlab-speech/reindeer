@@ -134,8 +134,9 @@ add_trackDefinition <- function(
       stop("A track named '",name,"' is already defined, but with a differend columnName and fileExtension, and this function can therefore not define the SSFF track you as requested.")
     }
   }
+  logger::log_threshold(logger::INFO)
 
-  logger::log_threshold(WARN)
+
   if(!is.null(onTheFlyFunctionName)){
     defTracks <- superassp::get_definedtracks(onTheFlyFunctionName)
     defExt <- superassp::get_extension(onTheFlyFunctionName)
@@ -168,8 +169,9 @@ add_trackDefinition <- function(
            #)
            #logCon <- file(logName,open="at")
            logName <- file.path(onTheFlyOptLogFilePath,paste0(onTheFlyFunctionName,".log"))
+           logger::log_threshold(logger::DEBUG)
            logger::log_appender(logger::appender_file(logName))
-           logger::log_threshold(INFO)
+
          }
       }
       fl = emuR::list_files(emuDBhandle, inputTrackExtension)
@@ -204,13 +206,29 @@ add_trackDefinition <- function(
         dplyr::group_by(session,bundle,file,absolute_file_path,Parameter) %>%
         dplyr::slice_head(n=1) %>%
         dplyr::ungroup() %>%
-        dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting) %>%
+
         dplyr::group_by(session, bundle, file, absolute_file_path) -> fl_meta_settings
 
-
+      #Overwrite default by manually specified parameters when present
+      # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
+      if(any(fparam %in% names(fl_meta_settings))) {
+        manualParameters <- base::intersect(fparam,names(fl_meta_settings))
+        for(currParam in manualParameters){
+          #We can now set up two logical vectors, which
+          # 1) identify which rows identify a parameter for which there is a column
+          paramRow <- fl_meta_settings$Parameter == currParam
+          # 2) and which rows where a default value has been set
+          manualValueSet <- !is.na(fl_meta_settings[,currParam])
+          # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
+          rowToSwap <- paramRow & manualValueSet
+          fl_meta_settings[rowToSwap,"Setting"] <- as.character(fl_meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
+        }
+      }
 
       #return(fl_meta_settings)
-
+      #Do some cleanup
+      fl_meta_settings <- fl_meta_settings %>%
+        dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting)
 
       #We have already made per file grouping of the tibble, so we may use that to extract file information
       ng <- dplyr::n_groups(fl_meta_settings)
@@ -232,14 +250,14 @@ add_trackDefinition <- function(
 
       if(verbose){
 
-        pb <- utils::txtProgressBar(max=ngi, style = 3,title=)
-
         #Now we are ready to do call the onTheFlyFunctionName function for each media file
         if(overwriteFiles){
           message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n")
         }else {
           message("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n")
         }
+
+        pb <- utils::txtProgressBar(max=ngi, style = 3,title=)
 
       }
 
@@ -281,8 +299,8 @@ add_trackDefinition <- function(
           #If we want to create a log of what is going on
           #toLog <- paste0("",deparse(argLst))
           logger::log_formatter(logger::formatter_glue)
-          logger::log_layout(logger::layout_json(c("level","msg")))
-          logger::log_info("Arguments to '{onTheFlyFunctionName}' : {jsonlite::toJSON(argLst)}")
+          logger::log_layout(logger::layout_json(c("level","info")))
+          logger::log_trace("Arguments to '{onTheFlyFunctionName}' : {jsonlite::toJSON(argLst)}")
 
           do.call(currFunc, argLst)
 
@@ -310,23 +328,23 @@ add_trackDefinition <- function(
 ### For interactive testing
 #
 
-library(wrassp)
+# library(wrassp)
+#
+#  reindeer:::unlink_emuRDemoDir()
+#  reindeer:::create_ae_db() -> emuDBhandle
+# make_dummy_metafiles(emuDBhandle)
+# reindeer::add_metadata(emuDBhandle,list(windowSize=23),session = "0000",bundle="msajc023")
+# reindeer::add_metadata(emuDBhandle,list(maxF=223),session = "0000",bundle="msajc057")
+# get_metadata(emuDBhandle)
+# #rstudioapi::navigateToFile(list_files(emuDBhandle,"meta_json")[1,4][[1]])
+#
+#  fl = emuR::list_files(emuDBhandle,"wav")
+#  unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
+#  get_metadata(emuDBhandle) -> md
+#  dsp <- get_parameters()
+#  #
+#  add_trackDefinition(emuDBhandle,name="fms",columnName = "fm",fileExtension = "fms",onTheFlyFunctionName = "forest",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test") -> out
 
- reindeer:::unlink_emuRDemoDir()
- reindeer:::create_ae_db() -> emuDBhandle
-make_dummy_metafiles(emuDBhandle)
-reindeer::add_metadata(emuDBhandle,list(windowSize=23),session = "0000",bundle="msajc023")
-reindeer::add_metadata(emuDBhandle,list(maxF=223),session = "0000",bundle="msajc057")
-get_metadata(emuDBhandle)
-rstudioapi::navigateToFile(list_files(emuDBhandle,"meta_json")[1,4][[1]])
-
- # fl = emuR::list_files(emuDBhandle,"wav")
- # unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
- # get_metadata(emuDBhandle) -> md
- # dsp <- get_parameters()
- # #
- # add_trackDefinition(emuDBhandle,name="acf",columnName = "acf",fileExtension = "acf",onTheFlyFunctionName = "rfcana",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test")
- #
  # unlink(emuR::list_files(emuDBhandle,"f0")[2,"absolute_file_path"][[1]])
  # add_trackDefinition(emuDBhandle,name="f0",columnName = "F0",fileExtension = "f0",onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test") -> out2
 
