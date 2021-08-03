@@ -185,6 +185,11 @@ add_trackDefinition <- function(
       intersect(pp,fp) -> fparam
 
       assertthat::assert_that(all(c("Age","Gender") %in% names(meta)))
+
+      #This is the real meat of this function. Here we get default values for parameters required by the
+      # signal processing functions from the DSPP set. The best match is determined to be the match with is applicable
+      # to the smallest age span.
+
       fl %>%
         dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
         dplyr::mutate(Age=ifelse(is.na(Age),defaultAge,Age) )  %>%
@@ -201,6 +206,7 @@ add_trackDefinition <- function(
         dplyr::ungroup() %>%
         dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting) %>%
         dplyr::group_by(session, bundle, file, absolute_file_path) -> fl_meta_settings
+
 
 
       #return(fl_meta_settings)
@@ -240,7 +246,7 @@ add_trackDefinition <- function(
       fl_meta_settings %>%
         dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
         dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
-      #return(fl_meta_settings)
+
       for(currFileGroup in 1:ngi){
         currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
         currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
@@ -303,10 +309,17 @@ add_trackDefinition <- function(
 
 ### For interactive testing
 #
- # library(wrassp)
- # reindeer:::unlink_emuRDemoDir()
- # reindeer:::create_ae_db() -> emuDBhandle
- # reindeer:::make_dummy_metafiles(emuDBhandle)
+
+library(wrassp)
+
+ reindeer:::unlink_emuRDemoDir()
+ reindeer:::create_ae_db() -> emuDBhandle
+make_dummy_metafiles(emuDBhandle)
+reindeer::add_metadata(emuDBhandle,list(windowSize=23),session = "0000",bundle="msajc023")
+reindeer::add_metadata(emuDBhandle,list(maxF=223),session = "0000",bundle="msajc057")
+get_metadata(emuDBhandle)
+rstudioapi::navigateToFile(list_files(emuDBhandle,"meta_json")[1,4][[1]])
+
  # fl = emuR::list_files(emuDBhandle,"wav")
  # unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
  # get_metadata(emuDBhandle) -> md
