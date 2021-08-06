@@ -14,7 +14,7 @@
 #'
 #' @importFrom "logger" WARN
 #'
-#' @param file If the file exists, the settings stored in the file are read in and returned. If it does not exist, one will be created and teh [DSPP] parameters inserted into it for the user to edit. If \code{NULL}, the [DSPP] structure will be returned directly
+#' @param file If the file exists, the settings stored in the file are read in and returned. If it does not exist, one will be created and the [DSPP] parameters inserted into it for the user to edit. If \code{NULL}, the [DSPP] structure will be returned directly
 #'
 #' @return A [tibble:tibble] containing some mandatory columns
 #'  \item{Gender}{Either "Male", "Female", or \code{NA}. \code{NA} parameters will be used in cases where the gender of a speaker is not known}
@@ -86,7 +86,7 @@ get_parameters <- function(file=NULL){
 #' If found, the [add_trackDefinition] function will apply the signal generating function to all media files, and record the new tracks as
 #' SSFF track definitions in the database using [emuR::add_ssffTrackDefinition] in order to ensure compitability
 #'
-#'
+#' @importFrom "dplyr" "%>%"
 #' @inheritParams emuR::add_ssffTrackDefinition
 #'
 #' @export
