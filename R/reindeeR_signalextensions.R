@@ -134,7 +134,7 @@ add_trackDefinition <- function(
       stop("A track named '",name,"' is already defined, but with a differend columnName and fileExtension, and this function can therefore not define the SSFF track you as requested.")
     }
   }
-  logger::log_threshold(logger::INFO)
+
 
 
   if(!is.null(onTheFlyFunctionName)){
@@ -169,7 +169,6 @@ add_trackDefinition <- function(
            #)
            #logCon <- file(logName,open="at")
            logName <- file.path(onTheFlyOptLogFilePath,paste0(onTheFlyFunctionName,".log"))
-           logger::log_threshold(logger::DEBUG)
            logger::log_appender(logger::appender_file(logName))
 
          }
@@ -225,10 +224,12 @@ add_trackDefinition <- function(
         }
       }
 
-      #return(fl_meta_settings)
+
       #Do some cleanup
       fl_meta_settings <- fl_meta_settings %>%
         dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting)
+
+      #return(fl_meta_settings)
 
       #We have already made per file grouping of the tibble, so we may use that to extract file information
       ng <- dplyr::n_groups(fl_meta_settings)
@@ -298,9 +299,9 @@ add_trackDefinition <- function(
 
           #If we want to create a log of what is going on
           #toLog <- paste0("",deparse(argLst))
-          logger::log_formatter(logger::formatter_glue)
-          logger::log_layout(logger::layout_json(c("level","info")))
-          logger::log_trace("Arguments to '{onTheFlyFunctionName}' : {jsonlite::toJSON(argLst)}")
+          logger::log_formatter(logger::formatter_logging)
+          #logger::log_layout(logger::layout_json(c("level","info","msg")))
+          logger::log_debug(argLst)
 
           do.call(currFunc, argLst)
 
@@ -311,6 +312,13 @@ add_trackDefinition <- function(
       }
     }
 
+  }
+
+  #Commit created files if the database is a repository
+  if(git2r::in_repository(emuDBhandle$basePath)){
+    created_files <- emuR::list_files(emuDBhandle,ext)
+    git2r::add(repo=emuDBhandle$basePath,path = created_files$absolute_file_path)
+    git2r::commit(repo=emuDBhandle$basePath,message=paste0("Adding signal files with an '",ext,"' extension"))
   }
 
   if(! existingDefExists){
@@ -327,35 +335,14 @@ add_trackDefinition <- function(
 
 ### For interactive testing
 #
-
+#
 # library(wrassp)
-#
-#  reindeer:::unlink_emuRDemoDir()
-#  reindeer:::create_ae_db() -> emuDBhandle
-# make_dummy_metafiles(emuDBhandle)
-# reindeer::add_metadata(emuDBhandle,list(windowSize=23),session = "0000",bundle="msajc023")
-# reindeer::add_metadata(emuDBhandle,list(maxF=223),session = "0000",bundle="msajc057")
-# get_metadata(emuDBhandle)
-# #rstudioapi::navigateToFile(list_files(emuDBhandle,"meta_json")[1,4][[1]])
-#
-#  fl = emuR::list_files(emuDBhandle,"wav")
-#  unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
-#  get_metadata(emuDBhandle) -> md
-#  dsp <- get_parameters()
-#  #
-#  add_trackDefinition(emuDBhandle,name="fms",columnName = "fm",fileExtension = "fms",onTheFlyFunctionName = "forest",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test") -> out
+# library(reindeer)
+# reindeer:::unlink_emuRDemoDir()
+# reindeer:::create_ae_db() -> emuDBhandle
+# reindeer:::make_dummy_metafiles(emuDBhandle)
+# git2r::init(emuDBhandle$basePath)
+# add_trackDefinition(emuDBhandle,"f0","F0",onTheFlyFunctionName = "ksvF0")
 
- # unlink(emuR::list_files(emuDBhandle,"f0")[2,"absolute_file_path"][[1]])
- # add_trackDefinition(emuDBhandle,name="f0",columnName = "F0",fileExtension = "f0",onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test") -> out2
 
-# add_trackDefinition(emuDBhandle,"fm","fm","fm",onTheFlyFunctionName = "praat_formant_burg",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test")
-# list_files(emuDBhandle,"rms2")
 
-# for(fun in names(wrasspOutputInfos)){
-#   ext <- wrasspOutputInfos[[fun]][["ext"]]
-#   tracks <- wrasspOutputInfos[[fun]][["tracks"]]
-#   for(tr in tracks){
-#     add_trackDefinition(emuDBhandle,name=tr,columnName = tr,fileExtension = ext,onTheFlyFunctionName = fun)
-#   }
-#
-# }
