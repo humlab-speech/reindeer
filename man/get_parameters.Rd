@@ -7,7 +7,7 @@
 get_parameters(file = NULL)
 }
 \arguments{
-\item{file}{If the file exists, the settings stored in the file are read in and returned. If it does not exist, one will be created and teh \link{DSPP} parameters inserted into it for the user to edit. If \code{NULL}, the \link{DSPP} structure will be returned directly}
+\item{file}{If the file exists, the settings stored in the file are read in and returned. If it does not exist, one will be created and the \link{DSPP} parameters inserted into it for the user to edit. If \code{NULL}, the \link{DSPP} structure will be returned directly}
 }
 \value{
 A \link{tibble:tibble} containing some mandatory columns
