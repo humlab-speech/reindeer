@@ -12,43 +12,37 @@ add_trackDefinition(
   onTheFlyFunctionName = NULL,
   onTheFlyParams = list(),
   onTheFlyOptLogFilePath = NULL,
-  inputTrackExtension = NULL,
+  inputTrackExtension = "wav",
   defaultAge = 35,
   overwriteFiles = FALSE,
   package = "superassp",
-  verbose = TRUE,
-  interactive = TRUE
+  verbose = TRUE
 )
 }
 \arguments{
-\item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
+\item{emuDBhandle}{The database handle.}
 
-\item{name}{name of ssffTrackDefinition}
+\item{name}{The name of the SSFF track to list in the database.}
 
-\item{columnName}{columnName of ssffTrackDefinition.
-If the \code{onTheFlyFunctionName} parameter is set and columnName isn't, the
-\code{columnName} will default to the first entry in \code{wrasspOutputInfos[[onTheFlyFunctionName]]$tracks}.}
+\item{columnName}{The name of the column in the SSFF file to associate with the track.}
 
-\item{fileExtension}{fileExtension of ssffTrackDefinitions.
-If the \code{onTheFlyFunctionName} parameter is set and fileExtension isn't, the
-\code{fileExtension} will default to the first entry in \code{wrasspOutputInfos[[onTheFlyFunctionName]]$ext}.}
+\item{fileExtension}{The file extension of the created or already existing SSFF file.}
 
-\item{onTheFlyFunctionName}{name of wrassp function to do on-the-fly calculation. If set to the name of a wrassp 
-signal processing function, not only the emuDB schema is extended by the ssffTrackDefintion but also 
-the track itself is calculated from the signal file and stored in the emuDB. See \code{names(wrasspOutputInfos)}
-for a list of all the signal processing functions provided by the wrassp package.}
+\item{onTheFlyFunctionName}{The name of the function to apply to the input signal to produce the output track. This function must have attributes "ext" and "tracks" defined to give information on what output may be expected from using them. Alternatively, the function may be defined in the package \link{wrassp} and therefore well known. The function also has state, via an attribute  \code{outputType}, that it will create an SSFF track.}
 
-\item{onTheFlyParams}{a list of parameters that will be given to the function 
-passed in by the onTheFlyFunctionName parameter. This list can easily be 
-generated using the \code{\link{formals}} function on the according signal processing function 
-provided by the wrassp package and then setting the
-parameter one wishes to change.}
+\item{onTheFlyParams}{An optional list of arguments to the \code{onTheFlyFunctionName} function. Default arguments will be derived from Age and Gender metadata too, so this parameter should mainly be used for arguments that should be applied identically to all input files.}
 
-\item{onTheFlyOptLogFilePath}{path to optional log file for on-the-fly function}
+\item{onTheFlyOptLogFilePath}{The logging output directory.}
 
-\item{verbose}{Show progress bars and further information}
+\item{inputTrackExtension}{The file extension of the input file. If \code{NULL}, the '"mediafileExtension' set in the database template file (defaults to "wav") will be used.}
 
-\item{interactive}{ask user for confirmation}
+\item{defaultAge}{The default age to use when the user has not set a speaker "Age" metadata for the bundle or session. The user is \emph{strongly} encouraged to set the age of the speaker explicitly as metadata, and not to rely on this default setting.}
+
+\item{overwriteFiles}{If set to \code{TRUE}, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is \code{FALSE} which means that only only bundles which do not have an track file with the indicated output extension will be written.}
+
+\item{package}{The name of the package in which tbe funciton \code{onTheFlyFunctionName} is defined.}
+
+\item{verbose}{The mode of information provided to the user while processing input files.}
 }
 \description{
 This function behaves like \link[emuR:AddListRemoveSsffTrackDefinition]{emuR::add_ssffTrackDefinition}, but
@@ -75,7 +69,7 @@ the functions defined in \code{wrassp} is handled transparently, or
 }
 
 If found, the \link{add_trackDefinition} function will apply the signal generating function to all media files, and record the new tracks as
-SSFF track definitions in the database using \link[emuR:AddListRemoveSsffTrackDefinition]{emuR::add_ssffTrackDefinition} in order to ensure compitability
+SSFF track definitions in the database using \link[emuR:AddListRemoveSsffTrackDefinition]{emuR::add_ssffTrackDefinition} in order to ensure compatibility
 }
 \examples{
 require(superassp)

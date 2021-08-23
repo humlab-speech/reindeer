@@ -84,11 +84,23 @@ get_parameters <- function(file=NULL){
 #'   2. the contents of the attributes "ext" and "tracks" set on the function.
 #'
 #' If found, the [add_trackDefinition] function will apply the signal generating function to all media files, and record the new tracks as
-#' SSFF track definitions in the database using [emuR::add_ssffTrackDefinition] in order to ensure compitability
+#' SSFF track definitions in the database using [emuR::add_ssffTrackDefinition] in order to ensure compatibility
+#'
+#' @param emuDBhandle The database handle.
+#' @param name The name of the SSFF track to list in the database.
+#' @param columnName The name of the column in the SSFF file to associate with the track.
+#' @param fileExtension The file extension of the created or already existing SSFF file.
+#' @param onTheFlyFunctionName The name of the function to apply to the input signal to produce the output track. This function must have attributes "ext" and "tracks" defined to give information on what output may be expected from using them. Alternatively, the function may be defined in the package [wrassp] and therefore well known. The function also has state, via an attribute `outputType`, that it will create an SSFF track.
+#' @param onTheFlyParams An optional list of arguments to the `onTheFlyFunctionName` function. Default arguments will be derived from Age and Gender metadata too, so this parameter should mainly be used for arguments that should be applied identically to all input files.
+#' @param onTheFlyOptLogFilePath The logging output directory.
+#' @param inputTrackExtension The file extension of the input file. If `NULL`, the '"mediafileExtension' set in the database template file (defaults to "wav") will be used.
+#' @param defaultAge The default age to use when the user has not set a speaker "Age" metadata for the bundle or session. The user is *strongly* encouraged to set the age of the speaker explicitly as metadata, and not to rely on this default setting.
+#' @param overwriteFiles If set to `TRUE`, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is `FALSE` which means that only only bundles which do not have an track file with the indicated output extension will be written.
+#' @param package The name of the package in which tbe funciton `onTheFlyFunctionName` is defined.
+#' @param verbose The mode of information provided to the user while processing input files.
 #'
 #' @importFrom "dplyr" "%>%"
-#' @inheritParams emuR::add_ssffTrackDefinition
-#'
+#
 #' @export
 #'
 #' @examples
@@ -117,12 +129,11 @@ add_trackDefinition <- function(
   onTheFlyFunctionName = NULL,
   onTheFlyParams = list(),
   onTheFlyOptLogFilePath = NULL,
-  inputTrackExtension=NULL,
+  inputTrackExtension="wav",
   defaultAge=35,
   overwriteFiles=FALSE,
   package="superassp",
-  verbose = TRUE,
-  interactive = TRUE){
+  verbose = TRUE){
 
   existingDefExists = FALSE
   #Check if the track has not already been defined
@@ -173,6 +184,7 @@ add_trackDefinition <- function(
 
          }
       }
+
       fl = emuR::list_files(emuDBhandle, inputTrackExtension)
       meta <- get_metadata(emuDBhandle)
       dsp <- get_parameters()
@@ -286,8 +298,6 @@ add_trackDefinition <- function(
 
           argLst$listOfFiles <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$absolute_file_path)
 
-
-
           # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
           if(length(argLst) > 0 ){
             for(an in names(argLst)){
@@ -295,13 +305,11 @@ add_trackDefinition <- function(
             }
           }
 
-
-
           #If we want to create a log of what is going on
           #toLog <- paste0("",deparse(argLst))
           logger::log_formatter(logger::formatter_logging)
           #logger::log_layout(logger::layout_json(c("level","info","msg")))
-          logger::log_debug(argLst)
+          logger::log_debug(deparse(argLst))
 
           do.call(currFunc, argLst)
 
@@ -342,7 +350,7 @@ add_trackDefinition <- function(
 # reindeer:::create_ae_db() -> emuDBhandle
 # reindeer:::make_dummy_metafiles(emuDBhandle)
 # git2r::init(emuDBhandle$basePath)
-# add_trackDefinition(emuDBhandle,"f0","F0",onTheFlyFunctionName = "ksvF0")
+# add_trackDefinition(emuDBhandle,"f0","F0",onTheFlyFunctionName = "ksvF0") -> outLst
 
 
 
