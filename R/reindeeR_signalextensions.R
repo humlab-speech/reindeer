@@ -182,6 +182,8 @@ add_trackDefinition <- function(
          logger::log_appender(logger::appender_file(logName))
          logger::log_threshold(logger::INFO)
        }
+    }else{
+      logger::log_threshold(logger::WARN)
     }
 
     fl = emuR::list_files(emuDBhandle, inputTrackExtension)
@@ -339,13 +341,13 @@ add_trackDefinition <- function(
 ### For interactive testing
 #
 #
-library(wrassp)
-library(reindeer)
-reindeer:::unlink_emuRDemoDir()
-reindeer:::create_ae_db() -> emuDBhandle
-reindeer:::make_dummy_metafiles(emuDBhandle)
-git2r::init(emuDBhandle$basePath)
-add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0",onTheFlyOptLogFilePath = "~/Desktop/test/")
+# library(wrassp)
+# library(reindeer)
+# reindeer:::unlink_emuRDemoDir()
+# reindeer:::create_ae_db() -> emuDBhandle
+# reindeer:::make_dummy_metafiles(emuDBhandle)
+# git2r::init(emuDBhandle$basePath)
+# add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0",onTheFlyOptLogFilePath = "~/Desktop/test/")
 
 
 
