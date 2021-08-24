@@ -97,7 +97,6 @@ get_parameters <- function(file=NULL){
 #' @param defaultAge The default age to use when the user has not set a speaker "Age" metadata for the bundle or session. The user is *strongly* encouraged to set the age of the speaker explicitly as metadata, and not to rely on this default setting.
 #' @param overwriteFiles If set to `TRUE`, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is `FALSE` which means that only only bundles which do not have an track file with the indicated output extension will be written.
 #' @param package The name of the package in which tbe funciton `onTheFlyFunctionName` is defined.
-#' @param verbose The mode of information provided to the user while processing input files.
 #'
 #' @importFrom "dplyr" "%>%"
 #
@@ -132,8 +131,7 @@ add_trackDefinition <- function(
   inputTrackExtension="wav",
   defaultAge=35,
   overwriteFiles=FALSE,
-  package="superassp",
-  verbose = TRUE){
+  package="superassp"){
 
   existingDefExists = FALSE
   #Check if the track has not already been defined
@@ -146,7 +144,8 @@ add_trackDefinition <- function(
     }
   }
 
-
+  # Just make sure that "ext" is always defined (while it may be reset later in the following section)
+  ext <- fileExtension
 
   if(!is.null(onTheFlyFunctionName)){
     # --------- From here we deduce how to apply the function -----------------------
@@ -257,28 +256,28 @@ add_trackDefinition <- function(
     if("explicitExt" %in% fp ){
       onTheFlyParams$explicitExt = fileExtension
     }
-    if("verbose" %in% fp ){
-      onTheFlyParams$verbose = verbose
-    }
 
-    if(verbose){
-
-      #Now we are ready to do call the onTheFlyFunctionName function for each media file
-      if(overwriteFiles){
-        message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n")
-      }else {
-        message("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n")
-      }
-
-      pb <- utils::txtProgressBar(max=ngi, style = 3,title=)
-
-    }
 
     fl_meta_settings %>%
       dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
       dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
 
+
+    if(overwriteFiles){
+      message(paste0("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n"))
+    }else {
+      message(paste0("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n"))
+    }
+
+
+
+
+    pb <- utils::txtProgressBar(min=0, max=ngi, style = 3)
+
     for(currFileGroup in 1:ngi){
+
+      setTxtProgressBar(pb, currFileGroup)
+
       currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
       currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
       outFile <- file.path(emuDBhandle$basePath,
@@ -286,9 +285,6 @@ add_trackDefinition <- function(
                            paste0(currBundle,emuR:::bundle.dir.suffix),
                            paste0(currBundle,".",fileExtension))
 
-      if(verbose){
-        utils::setTxtProgressBar(pb,currFileGroup)
-      }
       if(overwriteFiles || ! file.exists(outFile)){
         purrr::flatten(utils::modifyList(dspParList[currFileGroup][1],onTheFlyParams)) -> argLst
         #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
@@ -316,13 +312,10 @@ add_trackDefinition <- function(
         do.call(currFunc, argLst)
 
       }
+
     }
-    if(verbose){
-      close(pb)
-    }
+    close(pb)
   }
-
-
 
   #Commit created files if the database is a repository
   if(git2r::in_repository(emuDBhandle$basePath)){
