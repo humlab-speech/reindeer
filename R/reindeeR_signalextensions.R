@@ -149,6 +149,8 @@ add_trackDefinition <- function(
 
 
   if(!is.null(onTheFlyFunctionName)){
+    # --------- From here we deduce how to apply the function -----------------------
+
     defTracks <- superassp::get_definedtracks(onTheFlyFunctionName)
     defExt <- superassp::get_extension(onTheFlyFunctionName)
 
@@ -167,160 +169,160 @@ add_trackDefinition <- function(
     }
 
 
-    if(!is.null(onTheFlyFunctionName)){
-      #logCon = NULL
-      #Make a log name if required
-      if(!is.null(onTheFlyOptLogFilePath) ) {
-         if(!dir.exists(onTheFlyOptLogFilePath)){
-           stop("The logging directory '",onTheFlyOptLogFilePath,"'does not exists. Please create it first")
-         }else{
-           #we have a logging output directory
-           #logName <- file.path(onTheFlyOptLogFilePath,
-           #  paste0(paste(onTheFlyFunctionName,format(Sys.time(), "%Y-%m-%d_%H:%M:%S"),sep="_"),".log")
-           #)
-           #logCon <- file(logName,open="at")
-           logName <- file.path(onTheFlyOptLogFilePath,paste0(onTheFlyFunctionName,".log"))
-           logger::log_appender(logger::appender_file(logName))
 
-         }
-      }
+    if(!is.null(onTheFlyOptLogFilePath) ) {
+       if(!dir.exists(onTheFlyOptLogFilePath)){
+         stop("The logging directory '",onTheFlyOptLogFilePath,"'does not exists. Please create it first")
+       }else{
+         #we have a logging output directory
+         #logName <- file.path(onTheFlyOptLogFilePath,
+         #  paste0(paste(onTheFlyFunctionName,format(Sys.time(), "%Y-%m-%d_%H:%M:%S"),sep="_"),".log")
+         #)
+         #logCon <- file(logName,open="at")
+         logName <- file.path(onTheFlyOptLogFilePath,paste0(onTheFlyFunctionName,".log"))
+         logger::log_appender(logger::appender_file(logName))
+         logger::log_threshold(logger::INFO)
+       }
+    }
 
-      fl = emuR::list_files(emuDBhandle, inputTrackExtension)
-      meta <- get_metadata(emuDBhandle)
-      dsp <- get_parameters()
+    fl = emuR::list_files(emuDBhandle, inputTrackExtension)
+    meta <- get_metadata(emuDBhandle)
+    dsp <- get_parameters()
 
 
-      currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
-      funcFormals = formals(currFunc)
-      #Compute which formal arguments we also have a Gender and Age aware default setting for
-      names(funcFormals) -> fp
-      unique(dsp$Parameter) -> pp
-      intersect(pp,fp) -> fparam
+    currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+    funcFormals = formals(currFunc)
+    #Compute which formal arguments we also have a Gender and Age aware default setting for
+    names(funcFormals) -> fp
+    unique(dsp$Parameter) -> pp
+    intersect(pp,fp) -> fparam
 
-      assertthat::assert_that(all(c("Age","Gender") %in% names(meta)))
+    assertthat::assert_that(all(c("Age","Gender") %in% names(meta)))
 
-      #This is the real meat of this function. Here we get default values for parameters required by the
-      # signal processing functions from the DSPP set. The best match is determined to be the match with is applicable
-      # to the smallest age span.
+    #This is the real meat of this function. Here we get default values for parameters required by the
+    # signal processing functions from the DSPP set. The best match is determined to be the match with is applicable
+    # to the smallest age span.
 
-      fl %>%
-        dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
-        dplyr::mutate(Age=ifelse(is.na(Age),defaultAge,Age) )  %>%
-        dplyr::left_join(dsp %>%
-                           dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender"))  %>%
-        dplyr::filter(!is.na(bundle),!is.na(session)) %>%
-        dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
-                      Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
-        dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
-        dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
-        dplyr::arrange(session,bundle,file,absolute_file_path,Parameter,AgeRange) %>%
-        dplyr::group_by(session,bundle,file,absolute_file_path,Parameter) %>%
-        dplyr::slice_head(n=1) %>%
-        dplyr::ungroup() %>%
+    fl %>%
+      dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
+      dplyr::mutate(Age=ifelse(is.na(Age),defaultAge,Age) )  %>%
+      dplyr::left_join(dsp %>%
+                         dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender"))  %>%
+      dplyr::filter(!is.na(bundle),!is.na(session)) %>%
+      dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
+                    Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
+      dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
+      dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
+      dplyr::arrange(session,bundle,file,absolute_file_path,Parameter,AgeRange) %>%
+      dplyr::group_by(session,bundle,file,absolute_file_path,Parameter) %>%
+      dplyr::slice_head(n=1) %>%
+      dplyr::ungroup() %>%
 
-        dplyr::group_by(session, bundle, file, absolute_file_path) -> fl_meta_settings
+      dplyr::group_by(session, bundle, file, absolute_file_path) -> fl_meta_settings
 
-      #Overwrite default by manually specified parameters when present
-      # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
-      if(any(fparam %in% names(fl_meta_settings))) {
-        manualParameters <- base::intersect(fparam,names(fl_meta_settings))
-        for(currParam in manualParameters){
-          #We can now set up two logical vectors, which
-          # 1) identify which rows identify a parameter for which there is a column
-          paramRow <- fl_meta_settings$Parameter == currParam
-          # 2) and which rows where a default value has been set
-          manualValueSet <- !is.na(fl_meta_settings[,currParam])
-          # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
-          rowToSwap <- paramRow & manualValueSet
-          fl_meta_settings[rowToSwap,"Setting"] <- as.character(fl_meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
-        }
-      }
-
-
-      #Do some cleanup
-      fl_meta_settings <- fl_meta_settings %>%
-        dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting)
-
-      #return(fl_meta_settings)
-
-      #We have already made per file grouping of the tibble, so we may use that to extract file information
-      ng <- dplyr::n_groups(fl_meta_settings)
-      ngi <- as.integer(as.vector(ng))
-
-      assertthat::assert_that(nrow(fl) == ngi, msg=paste0("Not all sounds files were assigned metadata ", nrow(fl)," ==> ",ng))
-
-
-      #Copy arguments given to this function over the list of general arguments given to the called function
-      if("optLogFilePath" %in% fp ){
-        onTheFlyParams$optLogFilePath = onTheFlyOptLogFilePath
-      }
-      if("explicitExt" %in% fp ){
-        onTheFlyParams$explicitExt = fileExtension
-      }
-      if("verbose" %in% fp ){
-        onTheFlyParams$verbose = verbose
-      }
-
-      if(verbose){
-
-        #Now we are ready to do call the onTheFlyFunctionName function for each media file
-        if(overwriteFiles){
-          message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n")
-        }else {
-          message("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n")
-        }
-
-        pb <- utils::txtProgressBar(max=ngi, style = 3,title=)
-
-      }
-
-      fl_meta_settings %>%
-        dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
-        dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
-
-      for(currFileGroup in 1:ngi){
-        currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
-        currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
-        outFile <- file.path(emuDBhandle$basePath,
-                             paste0(currSession,emuR:::session.suffix),
-                             paste0(currBundle,emuR:::bundle.dir.suffix),
-                             paste0(currBundle,".",fileExtension))
-        #message(outFile)
-        if(verbose){
-          utils::setTxtProgressBar(pb,currFileGroup)
-        }
-        if(overwriteFiles || ! file.exists(outFile)){
-          purrr::flatten(utils::modifyList(dspParList[currFileGroup][1],onTheFlyParams)) -> argLst
-          #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
-          #we need to convert strings like "11" to proper 11 values.
-          argLst <- lapply(argLst,
-                           utils::type.convert,as.is=TRUE)
-
-          argLst$listOfFiles <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$absolute_file_path)
-
-          # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
-          if(length(argLst) > 0 ){
-            for(an in names(argLst)){
-              argLst[an] = ifelse(class(argLst[[an]]) =="integer",as.numeric(argLst[[an]]),argLst[[an]])
-            }
-          }
-
-          #If we want to create a log of what is going on
-          #toLog <- paste0("",deparse(argLst))
-          logger::log_formatter(logger::formatter_logging)
-          #logger::log_layout(logger::layout_json(c("level","info","msg")))
-          logger::log_debug(deparse(argLst))
-
-          do.call(currFunc, argLst)
-
-        }
-      }
-      if(verbose){
-        close(pb)
+    #Overwrite default by manually specified parameters when present
+    # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
+    if(any(fparam %in% names(fl_meta_settings))) {
+      manualParameters <- base::intersect(fparam,names(fl_meta_settings))
+      for(currParam in manualParameters){
+        #We can now set up two logical vectors, which
+        # 1) identify which rows identify a parameter for which there is a column
+        paramRow <- fl_meta_settings$Parameter == currParam
+        # 2) and which rows where a default value has been set
+        manualValueSet <- !is.na(fl_meta_settings[,currParam])
+        # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
+        rowToSwap <- paramRow & manualValueSet
+        fl_meta_settings[rowToSwap,"Setting"] <- as.character(fl_meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
       }
     }
 
+
+    #Do some cleanup
+    fl_meta_settings <- fl_meta_settings %>%
+      dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting)
+
+    #return(fl_meta_settings)
+
+    #We have already made per file grouping of the tibble, so we may use that to extract file information
+    ng <- dplyr::n_groups(fl_meta_settings)
+    ngi <- as.integer(as.vector(ng))
+
+    assertthat::assert_that(nrow(fl) == ngi, msg=paste0("Not all sounds files were assigned metadata ", nrow(fl)," ==> ",ng))
+
+
+    #Copy arguments given to this function over the list of general arguments given to the called function
+    if("optLogFilePath" %in% fp ){
+      onTheFlyParams$optLogFilePath = onTheFlyOptLogFilePath
+    }
+    if("explicitExt" %in% fp ){
+      onTheFlyParams$explicitExt = fileExtension
+    }
+    if("verbose" %in% fp ){
+      onTheFlyParams$verbose = verbose
+    }
+
+    if(verbose){
+
+      #Now we are ready to do call the onTheFlyFunctionName function for each media file
+      if(overwriteFiles){
+        message("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n")
+      }else {
+        message("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n")
+      }
+
+      pb <- utils::txtProgressBar(max=ngi, style = 3,title=)
+
+    }
+
+    fl_meta_settings %>%
+      dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
+      dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
+
+    for(currFileGroup in 1:ngi){
+      currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
+      currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
+      outFile <- file.path(emuDBhandle$basePath,
+                           paste0(currSession,emuR:::session.suffix),
+                           paste0(currBundle,emuR:::bundle.dir.suffix),
+                           paste0(currBundle,".",fileExtension))
+
+      if(verbose){
+        utils::setTxtProgressBar(pb,currFileGroup)
+      }
+      if(overwriteFiles || ! file.exists(outFile)){
+        purrr::flatten(utils::modifyList(dspParList[currFileGroup][1],onTheFlyParams)) -> argLst
+        #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
+        #we need to convert strings like "11" to proper 11 values.
+        argLst <- lapply(argLst,
+                         utils::type.convert,as.is=TRUE)
+
+        argLst$listOfFiles <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$absolute_file_path)
+
+        # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
+        if(length(argLst) > 0 ){
+          for(an in names(argLst)){
+            argLst[an] = ifelse(class(argLst[[an]]) =="integer",as.numeric(argLst[[an]]),argLst[[an]])
+          }
+        }
+
+        #If we want to create a log of what is going on
+        toLog <- sub(")$","",
+                         sub("list[(]","",paste(onTheFlyFunctionName,"args:",deparse(argLst))
+                             )
+                         )
+
+        logger::log_info(toLog)
+
+        do.call(currFunc, argLst)
+
+      }
+    }
+    if(verbose){
+      close(pb)
+    }
   }
+
+
 
   #Commit created files if the database is a repository
   if(git2r::in_repository(emuDBhandle$basePath)){
@@ -344,13 +346,13 @@ add_trackDefinition <- function(
 ### For interactive testing
 #
 #
-# library(wrassp)
-# library(reindeer)
-# reindeer:::unlink_emuRDemoDir()
-# reindeer:::create_ae_db() -> emuDBhandle
-# reindeer:::make_dummy_metafiles(emuDBhandle)
-# git2r::init(emuDBhandle$basePath)
-# add_trackDefinition(emuDBhandle,"f0","F0",onTheFlyFunctionName = "ksvF0") -> outLst
+library(wrassp)
+library(reindeer)
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db() -> emuDBhandle
+reindeer:::make_dummy_metafiles(emuDBhandle)
+git2r::init(emuDBhandle$basePath)
+add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0",onTheFlyOptLogFilePath = "~/Desktop/test/")
 
 
 
