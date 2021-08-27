@@ -15,8 +15,7 @@ add_trackDefinition(
   inputTrackExtension = "wav",
   defaultAge = 35,
   overwriteFiles = FALSE,
-  package = "superassp",
-  verbose = TRUE
+  package = "superassp"
 )
 }
 \arguments{
@@ -28,7 +27,7 @@ add_trackDefinition(
 
 \item{fileExtension}{The file extension of the created or already existing SSFF file.}
 
-\item{onTheFlyFunctionName}{The name of the function to apply to the input signal to produce the output track. This function must have attributes "ext" and "tracks" defined to give information on what output may be expected from using them. Alternatively, the function may be defined in the package \link{wrassp} and therefore well known. The function also has state, via an attribute  \code{outputType}, that it will create an SSFF track.}
+\item{onTheFlyFunctionName}{The name of the function to apply to the input signal to produce the output track. This function must have attributes "ext" and "tracks" defined to give information on what output may be expected from using them. Alternatively, the function may be defined in the package \link{wrassp} and therefore well known. The function also has state, via an attribute \code{outputType}, that it will create an SSFF track.}
 
 \item{onTheFlyParams}{An optional list of arguments to the \code{onTheFlyFunctionName} function. Default arguments will be derived from Age and Gender metadata too, so this parameter should mainly be used for arguments that should be applied identically to all input files.}
 
@@ -41,8 +40,6 @@ add_trackDefinition(
 \item{overwriteFiles}{If set to \code{TRUE}, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is \code{FALSE} which means that only only bundles which do not have an track file with the indicated output extension will be written.}
 
 \item{package}{The name of the package in which tbe funciton \code{onTheFlyFunctionName} is defined.}
-
-\item{verbose}{The mode of information provided to the user while processing input files.}
 }
 \description{
 This function behaves like \link[emuR:AddListRemoveSsffTrackDefinition]{emuR::add_ssffTrackDefinition}, but
