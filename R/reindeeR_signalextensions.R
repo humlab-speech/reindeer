@@ -318,13 +318,16 @@ add_trackDefinition <- function(
     }
     close(pb)
   }
-
-  #Commit created files if the database is a repository
-  if(git2r::in_repository(emuDBhandle$basePath)){
-    created_files <- emuR::list_files(emuDBhandle,ext)
-    git2r::add(repo=emuDBhandle$basePath,path = created_files$absolute_file_path)
-    git2r::commit(repo=emuDBhandle$basePath,message=paste0("Adding signal files with an '",ext,"' extension"))
+  #Only attempt to commit if the git2r package can be loaded.
+  if(require("git2r")){
+    #Commit created files if the database is a repository
+    if(git2r::in_repository(emuDBhandle$basePath)){
+      created_files <- emuR::list_files(emuDBhandle,ext)
+      git2r::add(repo=emuDBhandle$basePath,path = created_files$absolute_file_path)
+      git2r::commit(repo=emuDBhandle$basePath,message=paste0("Adding signal files with an '",ext,"' extension"))
+    }
   }
+
 
   if(! existingDefExists){
 
