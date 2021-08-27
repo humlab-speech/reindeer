@@ -57,16 +57,14 @@ coalesce <- function(...) {
 #' @examples
 #' \dontrun{
 #' create_emuRdemoData()
-#' ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+#' ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 #'
 #' # Database-wide default information
-#' add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+#' add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))
 #' #Bundle specific information
-#' add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
-#' get_metadata(ae) -> res
+#' add_metadata(ae_test,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+#' get_metadata(ae_test) -> res
 #' print(res)
-#' rm(ae)
-#' unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 #' }
 #'
 
@@ -376,16 +374,14 @@ import_metadata <- function(emuDBhandle,Excelfile){
 #' @examples
 #' \dontrun{
 #' create_emuRdemoData()
-#' ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+#' ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 #'
 #' # Database-wide default information
-#' add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+#' add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))
 #' #Bundle specific information
-#' add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
-#' get_metadata(ae) -> res
+#' add_metadata(ae_test,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+#' get_metadata(ae_test) -> res
 #' print(res)
-#' rm(ae)
-#' unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 #' }
 #'
 add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, reset.before.add=FALSE){
@@ -423,7 +419,7 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
     if(! is.null(bundle)){
       #Bundle  metadata
       if(is.null(session)){
-        ses <- list_sessions(ae_test)
+        ses <- list_sessions(emuDBhandle)
         if(nrow(ses) == 1){
           #use the name of the only available session
           session <- ses[[1]]
@@ -475,17 +471,15 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
 #' @examples
 #' \dontrun{
 #' create_emuRdemoData()
-#' ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+#' ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 #'
 #' #Add a md5 digest to the metadata of all bundles
-#' add_digests(ae,algorithm = "md5")
+#' add_digests(ae_test,algorithm = "md5")
 #'
 #' #Add a "sha1" checksum (the default) to some bundles
-#' add_digests(ae,bundlePattern = "msajc0.*")
-#' get_metadata(ae) -> res
+#' add_digests(ae_test,bundlePattern = "msajc0.*")
+#' get_metadata(ae_test) -> res
 #' print(res)
-#' rm(ae)
-#' unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 #' }
 #'
 add_digests <- function(emuDBhandle,sessionPattern=".*",bundlePattern=".*",algorithm="sha1"){
@@ -526,12 +520,12 @@ add_digests <- function(emuDBhandle,sessionPattern=".*",bundlePattern=".*",algor
 #' @examples
 #' \dontrun{
 #' create_emuRdemoData()
-#' ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+#' ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 #'
 #' # Database-wide default information
-#' add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+#' add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))
 #' #Bundle specific information
-#' add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+#' add_metadata(ae_test,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
 #'
 #' # Get all the 'n' segments in the database
 #' query(ae_test,"Phonetic = n",resultType = "tibble") -> ae_nt
@@ -544,8 +538,8 @@ add_digests <- function(emuDBhandle,sessionPattern=".*",bundlePattern=".*",algor
 #' ae_nt %>%
 #'    biographize(ae_test,compute_digests=TRUE,algorithm="sha1") %>%
 #'    glimpse()
-#' rm(ae)
-#' unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
+#' rm(ae_test)
+#'
 #' }
 #'
 biographize <- function(segs_tbl,emuDBhandle,compute_digests=FALSE,algorithm="sha1") {
