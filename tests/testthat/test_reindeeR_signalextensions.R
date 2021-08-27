@@ -9,7 +9,7 @@ reindeer:::make_dummy_metafiles(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
 unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
 
-#add_trackDefinition(emuDBhandle,"fm","fm","fm",onTheFlyFunctionName = "praat_formant_burg",onTheFlyOptLogFilePath = "/Users/frkkan96/Desktop/test")
+
 
 
 test_that("Check that we can get default signal processing parameters",{
@@ -22,7 +22,14 @@ test_that("Check that we can get default signal processing parameters",{
 
 })
 
- nonSSFFFunctions <-c("rfcana","afdiff","affilter")
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db() -> emuDBhandle
+reindeer:::make_dummy_metafiles(emuDBhandle)
+fl = emuR::list_files(emuDBhandle,"wav")
+unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
+
+
+nonSSFFFunctions <-c("rfcana","afdiff","affilter")
 
 for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
   test_that(paste0("Signals can be created using the wrassp::",fun," function"),{
@@ -50,10 +57,22 @@ for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
 
 
 test_that("Check that add_trackDefintion() can apply Praat functions",{
+  reindeer:::unlink_emuRDemoDir()
+  reindeer:::create_ae_db() -> emuDBhandle
+  reindeer:::make_dummy_metafiles(emuDBhandle)
+  fl = emuR::list_files(emuDBhandle,"wav")
+  unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
 
-  reindeer::add_trackDefinition(emuDBhandle,name="pfm",columnName = "fm",fileExtension = "pfms",onTheFlyFunctionName = "praat_formant_burg")
+  reindeer::add_trackDefinition(emuDBhandle,name="F",columnName = "F",fileExtension = "pfms",onTheFlyFunctionName = "praat_formant_burg")
 
-  testthat::expect_true("pfm" %in% list_ssffTrackDefinitions(emuDBhandle)$name )
+  testthat::expect_true("F" %in% list_ssffTrackDefinitions(emuDBhandle)$name )
+
+  reindeer:::unlink_emuRDemoDir()
+  reindeer:::create_ae_db() -> emuDBhandle
+  reindeer:::make_dummy_metafiles(emuDBhandle)
+  fl = emuR::list_files(emuDBhandle,"wav")
+  unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
+
 
   reindeer::add_trackDefinition(emuDBhandle,name="Hc",columnName = "Hc",fileExtension = "psa",onTheFlyFunctionName = "praat_sauce")
 
