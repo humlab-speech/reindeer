@@ -319,7 +319,10 @@ add_trackDefinition <- function(
     close(pb)
   }
   #Only attempt to commit if the git2r package can be loaded.
-  if(require("git2r")){
+  #This is very explicitly checked by making sure that the shared library file exists, and is readable
+  # * This is a hack aimed at resolving https://github.com/humlab-speech/visible-speech-deployment/issues/81
+  gitLibFile <- system.file(package="git2r","libs",paste0("git2r",.Platform$dynlib.ext))
+  if(file.exists(gitLibFile) &&  file.access(gitLibFile,4)){
     #Commit created files if the database is a repository
     if(git2r::in_repository(emuDBhandle$basePath)){
       created_files <- emuR::list_files(emuDBhandle,ext)
@@ -350,7 +353,9 @@ add_trackDefinition <- function(
 # reindeer:::create_ae_db() -> emuDBhandle
 # reindeer:::make_dummy_metafiles(emuDBhandle)
 # git2r::init(emuDBhandle$basePath)
-# add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0",onTheFlyOptLogFilePath = "~/Desktop/test/")
+# add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")
+# add_trackDefinition(emuDBhandle, name = "FORMANTS", onTheFlyFunctionName = "forest")
+# add_trackDefinition(emuDBhandle, name = "F0", onTheFlyFunctionName = "ksvF0")
 
 
 
