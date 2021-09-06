@@ -3,13 +3,14 @@
 library(reindeer)
 library(superassp)
 
+#Set up the base test database
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db() -> emuDBhandle
 reindeer:::make_dummy_metafiles(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
-unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
-
-
+#Clean up possibly conflicting tracks
+reindeer::remove_ssffTrackDefinition(emuDBhandle,name="fm",deleteFiles = TRUE)
+reindeer::remove_ssffTrackDefinition(emuDBhandle,name="dft",deleteFiles = TRUE)
 
 
 test_that("Check that we can get default signal processing parameters",{
@@ -49,38 +50,39 @@ for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
 
           flfu <- reindeer::list_files(emuDBhandle,ext)
           expect_equal(nrow(flfu),nrow(fl))
+          #Cleaup
+          emuR::remove_ssffTrackDefinition(emuDBhandle,name=tr, deleteFiles=TRUE)
         }
       }
    })
 
 }
 
+praatfuns <- c("praat_formant_burg","praat_sauce","praat_intensity","praat_moments")
 
-test_that("Check that add_trackDefintion() can apply Praat functions",{
-  reindeer:::unlink_emuRDemoDir()
-  reindeer:::create_ae_db() -> emuDBhandle
-  reindeer:::make_dummy_metafiles(emuDBhandle)
-  fl = emuR::list_files(emuDBhandle,"wav")
-  unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
-
-  reindeer::add_trackDefinition(emuDBhandle,name="F",columnName = "F",fileExtension = "pfms",onTheFlyFunctionName = "praat_formant_burg")
-
-  testthat::expect_true("F" %in% list_ssffTrackDefinitions(emuDBhandle)$name )
-
-  reindeer:::unlink_emuRDemoDir()
-  reindeer:::create_ae_db() -> emuDBhandle
-  reindeer:::make_dummy_metafiles(emuDBhandle)
-  fl = emuR::list_files(emuDBhandle,"wav")
-  unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
+for(currFun in praatfuns){
+  test_that(paste0("Check that add_trackDefintion() can create signals using the ",currFun," Praat function, and attach all tracks"),{
+    currExt <- superassp::get_extension(currFun)
+    tr <- superassp::get_definedtracks(currFun)
+    firstTrack <- head(tr,1)
+    attachTracks <- tail(tr,-1) #Everything but the first track
 
 
-  reindeer::add_trackDefinition(emuDBhandle,name="Hc",columnName = "Hc",fileExtension = "psa",onTheFlyFunctionName = "praat_sauce")
+    unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
 
-  for(tr in setdiff(superassp::get_definedtracks("praat_sauce"),"Hc")){
-    reindeer::add_trackDefinition(emuDBhandle,name=tr,columnName = tr,fileExtension = "psa")
-  }
-  #Check that we now have a track for each defined output of praat_sauce
-  testthat::expect_true(all(superassp::get_definedtracks("praat_sauce") %in% list_ssffTrackDefinitions(emuDBhandle)$name ))
+    #Make the file
+    reindeer::add_trackDefinition(emuDBhandle,name=firstTrack,columnName = firstTrack,fileExtension = currExt,onTheFlyFunctionName = currFun)
+    fe <- reindeer::list_ssffTrackDefinitions(emuDBhandle)$fileExtension
 
-
-})
+    expect_true(currExt %in% fe)
+    #Attach track definitions to the file
+    for(currTr in attachTracks){
+      reindeer::add_trackDefinition(emuDBhandle,name=currTr,columnName = currTr,fileExtension = currExt)
+      cn <- reindeer::list_ssffTrackDefinitions(emuDBhandle)$columnName
+      expect_true(currTr %in% cn)
+      reindeer::remove_ssffTrackDefinition(emuDBhandle,name=currTr)
+    }
+    #Cleanup the file too
+    reindeer::remove_ssffTrackDefinition(emuDBhandle,name=firstTrack,deleteFiles = TRUE)
+  })
+}
