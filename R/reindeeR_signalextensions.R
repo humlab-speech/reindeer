@@ -352,7 +352,41 @@ add_trackDefinition <- function(
 }
 
 
+#' Get the columns / fields defined in SSFF tracks with a given extension
+#'
+#' This function allows the user to specify an EmuR database handle and a
+#' file extension and get which columns or tracks are defined in the SSFF files.
+#'
+#' @param emuDBhandle The EmuR database handle.
+#' @param extension The file extension of the SSFF files to investigated.
+#'
+#' @return A vector containing SSFF field / column names within the SSFF file.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#'  ae <- reindeer:::create_ae_db()
+#'  reindeer::add_trackDefinition(ae,"A","A",onTheFlyFunctionName = "praat_sauce")
+#'  print(reindeer::get_trackColumns(ae,"psa"))
+#' }
+get_trackColumns <- function(emuDBhandle, extension ){
+  files <- emuR::list_files(emuDBhandle,extension)$absolute_file_path
+  if(length(files) == 0 ) stop("SSFF tracks with the extension ",extension," are not defined in the database.")
+  tocheck <- head(files,1)
 
+  if(file.exists(tocheck)){
+    curr <- tryCatch({
+      wrassp::read.AsspDataObj(tocheck)
+    },error = function(e) {stop("Unable to read file ",tocheck, " as an SSFF file.")})
+
+  }
+  out <- wrassp::tracks.AsspDataObj(curr)
+  return(out)
+}
+
+#' @aliases  get_trackColumns
+#' @export
+get_trackFields <- get_trackColumns
 
 ### For interactive testing
 #
