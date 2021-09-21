@@ -388,6 +388,40 @@ get_trackColumns <- function(emuDBhandle, extension ){
 #' @export
 get_trackFields <- get_trackColumns
 
+
+#' Allows the user to get an SSFF object directly from an Emu database
+#'
+#' The user gives a database handle, a file extension of files that are present
+#' in the Emu database directory (i.e. have been generated using
+#' [emuR::add_ssffTrackDefinition] or [reindeer::add_trackDefinition]) calls),
+#' an index and get the 'n'th track file with the file extension in the database
+#' as an SSFF object.
+#'
+#' @param emuDBhandle An Emu database handle.
+#' @param extension A file extension.
+#' @param n The index of the track file to be returned as an SSFF object.
+#'
+#' @return An SSFF track object
+#' @export
+#
+get_ssffObject <- function(emuDBhandle, extension, n ){
+  files <- emuR::list_files(emuDBhandle,extension)$absolute_file_path
+  if(length(files) == 0 ) stop("SSFF tracks with the extension ",extension," are not defined in the database.")
+  if(length(files) < n ) stop("The database contains only ",length(files), " track files with extension ",extension,"!" )
+  if(n < 0  ) stop("Please provide a positive index (n > 0) ." )
+  tocheck <- files[n]
+
+  if(file.exists(tocheck)){
+    curr <- tryCatch({
+      wrassp::read.AsspDataObj(tocheck)
+    },error = function(e) {stop("Unable to read file ",tocheck, " as an SSFF file.")})
+
+  }
+  return(curr)
+}
+
+
+
 ### For interactive testing
 #
 #
