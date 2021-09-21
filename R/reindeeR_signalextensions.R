@@ -96,6 +96,7 @@ get_parameters <- function(file=NULL){
 #' @param inputTrackExtension The file extension of the input file. If `NULL`, the '"mediafileExtension' set in the database template file (defaults to "wav") will be used.
 #' @param defaultAge The default age to use when the user has not set a speaker "Age" metadata for the bundle or session. The user is *strongly* encouraged to set the age of the speaker explicitly as metadata, and not to rely on this default setting.
 #' @param overwriteFiles If set to `TRUE`, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is `FALSE` which means that only only bundles which do not have an track file with the indicated output extension will be written.
+#' @param verbose Determines wheter the function should display output to the user. If `FALSE`, the function will run completely silent and only report error messages back to the user.
 #' @param package The name of the package in which tbe funciton `onTheFlyFunctionName` is defined.
 #'
 #' @importFrom "dplyr" "%>%"
@@ -131,6 +132,7 @@ add_trackDefinition <- function(
   inputTrackExtension="wav",
   defaultAge=35,
   overwriteFiles=FALSE,
+  verbose=TRUE,
   package="superassp"){
 
   existingDefExists = FALSE
@@ -264,21 +266,27 @@ add_trackDefinition <- function(
       dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
       dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
 
-
-    if(overwriteFiles){
-      message(paste0("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n"))
-    }else {
-      message(paste0("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n"))
+    if(verbose){
+      if(overwriteFiles){
+        message(paste0("Applying the function '",onTheFlyFunctionName, "' to all input tracks (.",inputTrackExtension,").\n"))
+      }else {
+        message(paste0("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n"))
+      }
     }
 
 
 
 
-    pb <- utils::txtProgressBar(min=0, max=ngi, style = 3)
 
+
+    if(verbose){
+      pb <- utils::txtProgressBar(min=0, max=ngi, style = 3)
+    }
     for(currFileGroup in 1:ngi){
 
-      setTxtProgressBar(pb, currFileGroup)
+      if(verbose){
+        setTxtProgressBar(pb, currFileGroup)
+      }
 
       currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
       currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
@@ -316,7 +324,10 @@ add_trackDefinition <- function(
       }
 
     }
-    close(pb)
+    if(verbose){
+      close(pb)
+    }
+
   }
   #Only attempt to commit if the git2r package can be loaded.
   #This is very explicitly checked by making sure that the shared library file exists, and is readable
@@ -339,7 +350,6 @@ add_trackDefinition <- function(
 
 
 }
-
 
 
 
