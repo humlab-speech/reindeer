@@ -14,7 +14,7 @@ coalesce <- function(...) {
 }
 
 
-#' Functions for gathering metata specified for recordings in an emuR database.
+#' Functions for gathering metadata specified for recordings in an emuR database.
 #'
 #' Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.
 #' The functions goes through the database metadata file, session metadata files and metadata files associated with
@@ -342,7 +342,7 @@ import_metadata <- function(emuDBhandle,Excelfile){
   emuR:::load_DBconfig(emuDBhandle) -> dbCfg
   openxlsx::read.xlsx(Excelfile,sheet="database") -> dbMeta
   dbCfg$metadataDefaults <- as.list(dbMeta)
-  store_DBconfig(emuDBhandle,dbCfg)
+  emuR:::store_DBconfig(emuDBhandle,dbCfg)
 
   return(c(sFiles,bFiles))
 }
@@ -401,7 +401,7 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
     }
 
 
-    store_DBconfig(emuDBhandle,dbCfg)
+    emuR:::store_DBconfig(emuDBhandle,dbCfg)
 
   } else {
     # Here we store metadata in either session wide or bundle specific metadata files
