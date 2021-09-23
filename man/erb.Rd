@@ -2,7 +2,7 @@
 % Please edit documentation in R/rendeeR_psychoacoustics.R
 \name{erb}
 \alias{erb}
-\title{Convert an Hz frequency to number of}
+\title{Convert Herz to Semitones Equivalent Rectangular Bandwidth (ERB)}
 \usage{
 erb(f)
 }

@@ -38,7 +38,7 @@ st <- function(x,ref=16.35160){
 
 
 
-#' Convert an Hz frequency to number of
+#' Convert Herz to Semitones Equivalent Rectangular Bandwidth (ERB)
 #'
 #' Convert physical frequencies (in Hz) to number of Equivalent rectangular
 #' bandwidth (ERB) below the frequency. The ERB is  an approximation computed
