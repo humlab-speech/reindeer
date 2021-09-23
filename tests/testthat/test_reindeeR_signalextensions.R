@@ -5,7 +5,7 @@ library(superassp)
 
 #Set up the base test database
 reindeer:::unlink_emuRDemoDir()
-reindeer:::create_ae_db() -> emuDBhandle
+reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
 reindeer:::make_dummy_metafiles(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
 #Clean up possibly conflicting tracks
@@ -43,7 +43,7 @@ for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
           if(tr == ""){
             tr <- paste0(ext,tr)
           }
-          add_trackDefinition(emuDBhandle,name=tr,columnName = tr,fileExtension = ext,onTheFlyFunctionName = fun)
+          reindeer::add_trackDefinition(emuDBhandle,name=tr,columnName = tr,fileExtension = ext,onTheFlyFunctionName = fun,verbose=FALSE)
           fe <- reindeer::list_ssffTrackDefinitions(emuDBhandle)$fileExtension
 
           expect_true(ext %in% fe)
@@ -71,13 +71,13 @@ for(currFun in praatfuns){
     unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
 
     #Make the file
-    reindeer::add_trackDefinition(emuDBhandle,name=firstTrack,columnName = firstTrack,fileExtension = currExt,onTheFlyFunctionName = currFun)
+    reindeer::add_trackDefinition(emuDBhandle,name=firstTrack,columnName = firstTrack,fileExtension = currExt,onTheFlyFunctionName = currFun,verbose=FALSE)
     fe <- reindeer::list_ssffTrackDefinitions(emuDBhandle)$fileExtension
 
     expect_true(currExt %in% fe)
     #Attach track definitions to the file
     for(currTr in attachTracks){
-      reindeer::add_trackDefinition(emuDBhandle,name=currTr,columnName = currTr,fileExtension = currExt)
+      reindeer::add_trackDefinition(emuDBhandle,name=currTr,columnName = currTr,fileExtension = currExt,verbose=FALSE)
       cn <- reindeer::list_ssffTrackDefinitions(emuDBhandle)$columnName
       expect_true(currTr %in% cn)
       reindeer::remove_ssffTrackDefinition(emuDBhandle,name=currTr)
