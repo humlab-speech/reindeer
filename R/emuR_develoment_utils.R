@@ -1,12 +1,12 @@
 
 
-create_ae_db <- function(){
+create_ae_db <- function(verbose=TRUE){
   demodir <- file.path(tempdir(),"emuR_demoData")
 
   if(!dir.exists(demodir)){
     emuR::create_emuRdemoData()
   }
-  db <- emuR::load_emuDB(file.path(demodir,"ae_emuDB"))
+  db <- emuR::load_emuDB(file.path(demodir,"ae_emuDB"),verbose=verbose)
   return(db)
 }
 
