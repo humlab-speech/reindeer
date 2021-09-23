@@ -15,6 +15,7 @@ add_trackDefinition(
   inputTrackExtension = "wav",
   defaultAge = 35,
   overwriteFiles = FALSE,
+  verbose = TRUE,
   package = "superassp"
 )
 }
@@ -38,6 +39,8 @@ add_trackDefinition(
 \item{defaultAge}{The default age to use when the user has not set a speaker "Age" metadata for the bundle or session. The user is \emph{strongly} encouraged to set the age of the speaker explicitly as metadata, and not to rely on this default setting.}
 
 \item{overwriteFiles}{If set to \code{TRUE}, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is \code{FALSE} which means that only only bundles which do not have an track file with the indicated output extension will be written.}
+
+\item{verbose}{Determines wheter the function should display output to the user. If \code{FALSE}, the function will run completely silent and only report error messages back to the user.}
 
 \item{package}{The name of the package in which tbe funciton \code{onTheFlyFunctionName} is defined.}
 }

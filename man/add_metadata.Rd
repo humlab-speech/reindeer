@@ -42,16 +42,14 @@ If no \code{session} or \code{bundle} names are provided, the metadata will be i
 \examples{
 \dontrun{
 create_emuRdemoData()
-ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 
 # Database-wide default information
-add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))
 #Bundle specific information
-add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
-get_metadata(ae) -> res
+add_metadata(ae_test,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+get_metadata(ae_test) -> res
 print(res)
-rm(ae)
-unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
 }
 
 }

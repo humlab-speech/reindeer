@@ -25,12 +25,12 @@ Create a biography of the labels in a list of segments in a tidy manner
 \examples{
 \dontrun{
 create_emuRdemoData()
-ae <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 
 # Database-wide default information
-add_metadata(ae,list("Accent"="Northern","Elicitation"="Scripted"))
+add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))
 #Bundle specific information
-add_metadata(ae,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
+add_metadata(ae_test,list("Speaker.Sex"="Male","Date"="2020-03-04"),session="0000",bundle="msajc003")
 
 # Get all the 'n' segments in the database
 query(ae_test,"Phonetic = n",resultType = "tibble") -> ae_nt
@@ -43,8 +43,8 @@ ae_nt \%>\% biographize(ae_test) \%>\% glimpse()
 ae_nt \%>\%
    biographize(ae_test,compute_digests=TRUE,algorithm="sha1") \%>\%
    glimpse()
-rm(ae)
-unlink(file.path(tempdir(),"emuR_demoData"),recursive=TRUE)
+rm(ae_test)
+
 }
 
 }
