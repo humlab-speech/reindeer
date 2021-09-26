@@ -28,9 +28,13 @@ make_dummy_metafiles <- function(db,metafile="bundle.meta"){
   outMetaFiles <- emuR::list_files(db,"wav") %>%
     dplyr::select(absolute_file_path) %>%
     dplyr::mutate(absolute_file_path=gsub("wav$","meta_json",absolute_file_path))
-  for(i in seq_along(outMetaFiles[[1]])){
-    cat("[{\"Participant_ID\":",i,",\"Gender\":\"",rep(c("Male","Female"),4)[i],"\",\"Age\":",i*10,",\"Recording_Date\":\"2019-01-01\",\"Recording_Time\":\"09:43:54\"}]",sep="",
+  for(i in 1:(nrow(outMetaFiles)-1)){
+    cat("{\"Participant_ID\":",i,",\"Gender\":\"",rep(c("Male","Female"),4)[i],"\",\"Age\":",i*10,",\"Recording_Date\":\"2019-01-01\",\"Recording_Time\":\"09:43:54\"}",sep="",
         file=outMetaFiles[[1]][i])
 
   }
+  #Inject some session wide defaults
+  ses <- list_sessions(db)[[1]]
+  sessFile <- file.path(db$basePath,paste0(ses,emuR:::session.suffix),paste(ses,"meta_json",sep="."))
+  cat('{"Gender":"Male","Age":35,"Shoe size":10,"Recording_Date":"2019-01-02"}',file=sessFile)
 }
