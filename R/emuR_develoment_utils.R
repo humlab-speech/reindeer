@@ -24,7 +24,7 @@ unlink_emuRDemoDir <- function(){
 }
 
 
-make_dummy_metafiles <- function(db,metafile="bundle.meta"){
+make_dummy_metafiles <- function(db,session=TRUE){
   outMetaFiles <- emuR::list_files(db,"wav") %>%
     dplyr::select(absolute_file_path) %>%
     dplyr::mutate(absolute_file_path=gsub("wav$","meta_json",absolute_file_path))
@@ -33,8 +33,11 @@ make_dummy_metafiles <- function(db,metafile="bundle.meta"){
         file=outMetaFiles[[1]][i])
 
   }
-  #Inject some session wide defaults
-  ses <- list_sessions(db)[[1]]
-  sessFile <- file.path(db$basePath,paste0(ses,emuR:::session.suffix),paste(ses,"meta_json",sep="."))
-  cat('{"Gender":"Male","Age":35,"Shoe size":10,"Recording_Date":"2019-01-02"}',file=sessFile)
+  if(session){
+    #Inject some session wide defaults
+    ses <- list_sessions(db)[[1]]
+    sessFile <- file.path(db$basePath,paste0(ses,emuR:::session.suffix),paste(ses,"meta_json",sep="."))
+    cat('{"Age":35,"Shoe size":10,"Recording_Date":"2019-01-02"}',file=sessFile)
+  }
+
 }
