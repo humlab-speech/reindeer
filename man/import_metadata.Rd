@@ -26,7 +26,7 @@ The first sheet ("bundles") in the Excel file should begin with the folowing two
 }
 and then go on to have some columns which contains the metadata. Each row in the
 data contains the information and metadata for a bundle (in the specific session).
-The simples way to get an appropriately structed Excel file is to create one from a database using the
+The simples way to get an appropriately structured Excel file is to create one from a database using the
 \code{\link{export_metadata}} function on an existing database and given an output file.
 
 Please be aware that bundles that are speficied in the Excel file will have

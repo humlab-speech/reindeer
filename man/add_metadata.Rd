@@ -41,8 +41,8 @@ If no \code{session} or \code{bundle} names are provided, the metadata will be i
 }
 \examples{
 \dontrun{
-create_emuRdemoData()
-ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+emuR::create_emuRdemoData()
+ae_test <- rload_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 
 # Database-wide default information
 add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))

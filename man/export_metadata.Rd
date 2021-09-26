@@ -5,17 +5,24 @@
 \alias{export_metadata}
 \title{Functions for gathering metadata specified for recordings in an emuR database.}
 \usage{
-get_metadata(emuDBhandle, overwrite = FALSE, session = ".*")
+get_metadata(emuDBhandle, session = ".*", manditory = c("Age", "Gender"))
 
-export_metadata(emuDBhandle, Excelfile = NULL, overwrite = FALSE)
+export_metadata(
+  emuDBhandle,
+  Excelfile = NULL,
+  overwrite = FALSE,
+  manditory = c("Age", "Gender")
+)
 }
 \arguments{
 \item{emuDBhandle}{The database handle of an emuR database.}
 
-\item{overwrite}{The default behaviour is that an Excel file should not be
-overwritten if it exists already. If this parameter is \code{TRUE} then the file will be overwritten.}
+\item{manditory}{A vector of column names which the function will ensure are present in both the bundle and session level metadata.}
 
 \item{Excelfile}{The full path and file name of the Excel file that the metadata should be written to. The function will not overwrite this file, unless \code{overwrite} is set to \code{TRUE}.}
+
+\item{overwrite}{The default behaviour is that an Excel file should not be
+overwritten if it exists already. If this parameter is \code{TRUE} then the file will be overwritten.}
 }
 \value{
 A data frame containing inforamtion about the 'meta_json' files found
@@ -23,7 +30,7 @@ A data frame containing inforamtion about the 'meta_json' files found
 \item{session}{The name of the session.}
 \item{bundle}{The bundle name}
 }
-In addition, the \code{\link[dplyr]{tibble}} will contain one column for every type of information given in any of the 'meta_json' files.
+In addition, the \link[dplyr:reexports]{dplyr::tibble} will contain one column for every type of information given in any of the 'meta_json' files.
 }
 \description{
 Metadata of a recording is stored in 'meta_json' files. Metadata may be set at the database, session and bundle level.

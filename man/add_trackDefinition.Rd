@@ -12,8 +12,8 @@ add_trackDefinition(
   onTheFlyFunctionName = NULL,
   onTheFlyParams = list(),
   onTheFlyOptLogFilePath = NULL,
-  inputTrackExtension = "wav",
-  defaultAge = 35,
+  inputTrackExtension = NULL,
+  metadata.defaults = list(Gender = NA, Age = 35),
   overwriteFiles = FALSE,
   verbose = TRUE,
   package = "superassp"
@@ -36,7 +36,7 @@ add_trackDefinition(
 
 \item{inputTrackExtension}{The file extension of the input file. If \code{NULL}, the '"mediafileExtension' set in the database template file (defaults to "wav") will be used.}
 
-\item{defaultAge}{The default age to use when the user has not set a speaker "Age" metadata for the bundle or session. The user is \emph{strongly} encouraged to set the age of the speaker explicitly as metadata, and not to rely on this default setting.}
+\item{metadata.defaults}{A list of default values for named columns. Since values will always be set for these columns, the user may also rely on them being set when deducing which default parameters to use when computing SSFF tracks using the \code{onTheFlyFunctionName} function.}
 
 \item{overwriteFiles}{If set to \code{TRUE}, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is \code{FALSE} which means that only only bundles which do not have an track file with the indicated output extension will be written.}
 

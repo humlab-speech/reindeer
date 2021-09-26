@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_trackUtilities.R
 \name{bin_time}
 \alias{bin_time}
-\title{A function to divide up a range of times into bins}
+\title{A function that may be used to divide up a range of times into bins}
 \usage{
 bin_time(x, bins = 10, percent = FALSE)
 }

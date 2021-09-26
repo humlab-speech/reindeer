@@ -94,7 +94,7 @@ get_parameters <- function(file=NULL){
 #' @param onTheFlyParams An optional list of arguments to the `onTheFlyFunctionName` function. Default arguments will be derived from Age and Gender metadata too, so this parameter should mainly be used for arguments that should be applied identically to all input files.
 #' @param onTheFlyOptLogFilePath The logging output directory.
 #' @param inputTrackExtension The file extension of the input file. If `NULL`, the '"mediafileExtension' set in the database template file (defaults to "wav") will be used.
-#' @param defaultAge The default age to use when the user has not set a speaker "Age" metadata for the bundle or session. The user is *strongly* encouraged to set the age of the speaker explicitly as metadata, and not to rely on this default setting.
+#' @param metadata.defaults A list of default values for named columns. Since values will always be set for these columns, the user may also rely on them being set when deducing which default parameters to use when computing SSFF tracks using the `onTheFlyFunctionName` function.
 #' @param overwriteFiles If set to `TRUE`, the function will calculate SSFF track files for ALL bundles and write them into the database, overwriting existing files. The default is `FALSE` which means that only only bundles which do not have an track file with the indicated output extension will be written.
 #' @param verbose Determines wheter the function should display output to the user. If `FALSE`, the function will run completely silent and only report error messages back to the user.
 #' @param package The name of the package in which tbe funciton `onTheFlyFunctionName` is defined.
@@ -129,8 +129,8 @@ add_trackDefinition <- function(
   onTheFlyFunctionName = NULL,
   onTheFlyParams = list(),
   onTheFlyOptLogFilePath = NULL,
-  inputTrackExtension="wav",
-  defaultAge=35,
+  inputTrackExtension=NULL,
+  metadata.defaults=list(Gender=NA,Age=35),
   overwriteFiles=FALSE,
   verbose=TRUE,
   package="superassp"){
@@ -146,22 +146,24 @@ add_trackDefinition <- function(
     }
   }
 
-  # Just make sure that "ext" is always defined (while it may be reset later in the following section)
-  ext <- fileExtension
-
   if(!is.null(onTheFlyFunctionName)){
     # --------- From here we deduce how to apply the function -----------------------
 
     defTracks <- superassp::get_definedtracks(onTheFlyFunctionName)
-    defExt <- superassp::get_extension(onTheFlyFunctionName)
+    #Set the default file extension to the one set as an attribute, if missing in the arguments
+    fileExtension <- ifelse(!is.null(fileExtension),
+                            fileExtension,
+                            superassp::get_extension(onTheFlyFunctionName))
 
-    columnName <- ifelse(!is.null(columnName) & length(defTracks) > 0 ,columnName,defTracks[[1]])
+
+    columnName <- ifelse(!is.null(columnName) & length(defTracks) > 0 ,
+                         columnName,
+                         defTracks[[1]])
 
     if(! columnName %in% defTracks ) {
       stop("The track ",columnName, " is not a defined output track name of the function ",onTheFlyFunctionName)
     }
-    #Set the default file extension to the one set as an attribute, if missing in the arguments
-    ext <- ifelse(!is.null(fileExtension),fileExtension,defExt)
+
 
     if(is.null(inputTrackExtension)){
       #We need to get the default media file extension from the database definition if it not defined
@@ -175,11 +177,6 @@ add_trackDefinition <- function(
        if(!dir.exists(onTheFlyOptLogFilePath)){
          stop("The logging directory '",onTheFlyOptLogFilePath,"'does not exists. Please create it first")
        }else{
-         #we have a logging output directory
-         #logName <- file.path(onTheFlyOptLogFilePath,
-         #  paste0(paste(onTheFlyFunctionName,format(Sys.time(), "%Y-%m-%d_%H:%M:%S"),sep="_"),".log")
-         #)
-         #logCon <- file(logName,open="at")
          logName <- file.path(onTheFlyOptLogFilePath,paste0(onTheFlyFunctionName,".log"))
          logger::log_appender(logger::appender_file(logName))
          logger::log_threshold(logger::INFO)
@@ -189,7 +186,7 @@ add_trackDefinition <- function(
     }
 
     fl = emuR::list_files(emuDBhandle, inputTrackExtension)
-    meta <- get_metadata(emuDBhandle)
+    meta <- get_metadata(emuDBhandle,manditory=names(metadata.defaults))
     dsp <- get_parameters()
 
 
@@ -200,7 +197,7 @@ add_trackDefinition <- function(
     unique(dsp$Parameter) -> pp
     intersect(pp,fp) -> fparam
 
-    assertthat::assert_that(all(c("Age","Gender") %in% names(meta)))
+    assertthat::assert_that(all(names(defaults) %in% names(meta)))
 
     #This is the real meat of this function. Here we get default values for parameters required by the
     # signal processing functions from the DSPP set. The best match is determined to be the match with is applicable
@@ -208,7 +205,9 @@ add_trackDefinition <- function(
 
     fl %>%
       dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
-      dplyr::mutate(Age=ifelse(is.na(Age),defaultAge,Age) )  %>%
+      tidyr::replace_na(replace=defaults)  -> out
+    return(out)
+    out %>%
       dplyr::left_join(dsp %>%
                          dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender"))  %>%
       dplyr::filter(!is.na(bundle),!is.na(session)) %>%
@@ -430,7 +429,7 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db() -> emuDBhandle
 # reindeer:::make_dummy_metafiles(emuDBhandle)
-# git2r::init(emuDBhandle$basePath)
+# # git2r::init(emuDBhandle$basePath)
 # add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")
 # add_trackDefinition(emuDBhandle, name = "FORMANTS", onTheFlyFunctionName = "forest")
 # add_trackDefinition(emuDBhandle, name = "F0", onTheFlyFunctionName = "ksvF0")

@@ -1,6 +1,6 @@
 
 
-#' A function to divide up a range of times into bins
+#' A function that may be used to divide up a range of times into bins
 #'
 #' This is a simple utility function to just create simple bins for a set of
 #' time indicators (vector). The user supplies the number of bins needed, and this function

@@ -29,7 +29,8 @@ Imports:
     testthat,
     assertthat,
     git2r,
-    glue
+    glue,
+    tidyr
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
