@@ -24,7 +24,7 @@ test_that("Check that we can get default signal processing parameters",{
 })
 
 reindeer:::unlink_emuRDemoDir()
-reindeer:::create_ae_db() -> emuDBhandle
+reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
 reindeer:::make_dummy_metafiles(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
 unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
