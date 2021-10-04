@@ -180,6 +180,7 @@ add_trackDefinition <- function(
          logName <- file.path(onTheFlyOptLogFilePath,paste0(onTheFlyFunctionName,".log"))
          logger::log_appender(logger::appender_file(logName))
          logger::log_threshold(logger::INFO)
+         logger::log_formatter(logger::formatter_json)
        }
     }else{
       logger::log_threshold(logger::WARN)
@@ -311,13 +312,15 @@ add_trackDefinition <- function(
         }
 
         #If we want to create a log of what is going on
-        toLog <- sub(")$","",
-                         sub("list[(]","",paste(onTheFlyFunctionName,"args:",deparse(argLst))
-                             )
-                         )
+        # toLog <- sub(")$","",
+        #                  sub("list[(]","",paste(onTheFlyFunctionName,"args:",deparse(argLst))
+        #                      )
+        #                  )
 
+        #logger::log_info(toLog)
+        toLog <- utils::modifyList(list("function"=onTheFlyFunctionName),argLst)
+        #logger::log_info(logger::deparse_to_one_line(toLog))
         logger::log_info(toLog)
-
         do.call(currFunc, argLst)
 
       }
@@ -438,7 +441,7 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 # # git2r::init(emuDBhandle$basePath)
 # add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")
 # add_trackDefinition(emuDBhandle, name = "FORMANTS", onTheFlyFunctionName = "forest")
-# add_trackDefinition(emuDBhandle, name = "F0", onTheFlyFunctionName = "ksvF0")
+#add_trackDefinition(emuDBhandle, name = "F0", onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath="~/Desktop/out/")
 
 
 
