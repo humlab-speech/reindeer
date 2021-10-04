@@ -98,7 +98,8 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE, manditor
 
     # Now start inserting data from the metafiles
     for(col in names(jsonmeta)){
-      metafiles[metafiles$absolute_file_path == currFile,col] <- jsonmeta[[col]]
+      #Assignment of NULL is problematic, so we need to make sure we never do that
+      metafiles[metafiles$absolute_file_path == currFile,col] <- ifelse(is.null(jsonmeta[[col]]),NA,jsonmeta[[col]])
     }
   }
   # Now make sure that all bundles have a row
@@ -128,7 +129,8 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE, manditor
 
     # Now start inserting data from the session metadata file
     for(col in names(jsonmeta)){
-      sessJSONFilesDF[row,col] <- jsonmeta[[col]]
+      #Assignment of NULL to a data.frame value is problematic, so we make sure we never do
+      sessJSONFilesDF[row,col] <- ifelse(is.null(jsonmeta[[col]]),NA,jsonmeta[[col]])
     }
   }
   #Make sure that all sessions have a row in the output

@@ -196,8 +196,8 @@ add_trackDefinition <- function(
     names(funcFormals) -> fp
     unique(dsp$Parameter) -> pp
     intersect(pp,fp) -> fparam
-
-    assertthat::assert_that(all(names(defaults) %in% names(meta)))
+    #IF metadata.defaults are manditory, they should be in the output
+    assertthat::assert_that(all(names(metadata.defaults) %in% names(meta)))
 
     #This is the real meat of this function. Here we get default values for parameters required by the
     # signal processing functions from the DSPP set. The best match is determined to be the match with is applicable
@@ -205,8 +205,8 @@ add_trackDefinition <- function(
 
     fl %>%
       dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
-      tidyr::replace_na(replace=defaults)  -> out
-    return(out)
+      tidyr::replace_na(replace=metadata.defaults)  -> out
+    #return(out)
     out %>%
       dplyr::left_join(dsp %>%
                          dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender"))  %>%
@@ -344,7 +344,7 @@ add_trackDefinition <- function(
 
   if(! existingDefExists){
 
-    emuR::add_ssffTrackDefinition(emuDBhandle,name=name,columnName = columnName,fileExtension = ext)
+    emuR::add_ssffTrackDefinition(emuDBhandle,name=name,columnName = columnName,fileExtension = fileExtension)
   }
 
 
@@ -368,7 +368,13 @@ add_trackDefinition <- function(
 #'  reindeer::add_trackDefinition(ae,"A","A",onTheFlyFunctionName = "praat_sauce")
 #'  print(reindeer::get_trackColumns(ae,"psa"))
 #' }
-get_trackColumns <- function(emuDBhandle, extension ){
+get_trackColumns <- function(emuDBhandle, extension=NULL){
+  if(! "emuDBhandle" %in% class(emuDBhandle)){
+    stop("The 'emuDBhandle' argument is not of class \"emuDBhandle\"")
+  }
+
+  if(is.null(extension)){stop("Please provide an 'extension' argument")}
+
   files <- emuR::list_files(emuDBhandle,extension)$absolute_file_path
   if(length(files) == 0 ) stop("SSFF tracks with the extension ",extension," are not defined in the database.")
   tocheck <- head(files,1)
