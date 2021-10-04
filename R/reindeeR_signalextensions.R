@@ -196,7 +196,7 @@ add_trackDefinition <- function(
     names(funcFormals) -> fp
     unique(dsp$Parameter) -> pp
     intersect(pp,fp) -> fparam
-    #IF metadata.defaults are manditory, they should be in the output
+    #IF metadata.defaults are mandatory, they should be in the output
     assertthat::assert_that(all(names(metadata.defaults) %in% names(meta)))
 
     #This is the real meat of this function. Here we get default values for parameters required by the
