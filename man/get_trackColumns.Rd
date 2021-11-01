@@ -4,7 +4,7 @@
 \alias{get_trackColumns}
 \title{Get the columns / fields defined in SSFF tracks with a given extension}
 \usage{
-get_trackColumns(emuDBhandle, extension)
+get_trackColumns(emuDBhandle, extension = NULL)
 }
 \arguments{
 \item{emuDBhandle}{The EmuR database handle.}

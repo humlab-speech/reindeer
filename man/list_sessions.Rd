@@ -4,13 +4,10 @@
 \alias{list_sessions}
 \title{Re-exported function from emuR list sessions in an emuDB. (A copy of the emuR function)}
 \usage{
-list_sessions(emuDBhandle, sessionPattern = ".*")
+list_sessions(emuDBhandle)
 }
 \arguments{
 \item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
-
-\item{sessionPattern}{A regular expression pattern matching session names to 
-be searched for in the database. Note: "_ses$" is appended to this RegEx automatically}
 }
 \value{
 data.frame object with session names

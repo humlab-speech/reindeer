@@ -4,23 +4,12 @@
 \alias{list_bundles}
 \title{List sessions in an emuDB. (A copy of the emuR function)}
 \usage{
-list_bundles(
-  emuDBhandle,
-  session = NULL,
-  sessionPattern = ".*",
-  bundlePattern = ".*"
-)
+list_bundles(emuDBhandle, session = NULL)
 }
 \arguments{
 \item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
 
-\item{session}{optional session (depricated!)}
-
-\item{sessionPattern}{A regular expression pattern matching session names to 
-be searched for in the database. Note: "_ses$" is appended to this RegEx automatically}
-
-\item{bundlePattern}{A regular expression pattern matching bundle names to 
-be searched for in the database. Note: "_bndl$" is appended to this RegEx automatically}
+\item{session}{optional session}
 }
 \value{
 data.frame object with columns session and name of bundles
