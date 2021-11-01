@@ -429,7 +429,6 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 }
 
 
-
 ### For interactive testing
 #
 #
