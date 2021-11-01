@@ -35,7 +35,6 @@
 #'
 #' @export
 #'
-#' @examples
 
 import_recording <- function (emuDBhandle, dir, targetSessionName = "0000", speech.channel=1,egg.channel=NULL, verbose = TRUE)
 {
