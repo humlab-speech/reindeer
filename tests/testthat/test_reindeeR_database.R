@@ -9,9 +9,9 @@ test_that("Importation of speech signal files works",{
   #prolonged <- "tests/signalfiles/prolonged_a/"
   expect_true(dir.exists(prolonged))
 
-  reindeer::import_recording(emuDBhandle,dir=prolonged,targetSessionName = "prolonged",verbose = FALSE)
+  reindeer::import_recordings(emuDBhandle,dir=prolonged,targetSessionName = "prolonged",verbose = FALSE)
 
-  expect_error(reindeer::import_recording(emuDBhandle,dir=prolonged,targetSessionName = "prolongedError",verbose = FALSE,speech.channel = 3))
+  expect_error(reindeer::import_recordings(emuDBhandle,dir=prolonged,targetSessionName = "prolongedError",verbose = FALSE,speech.channel = 3))
 
   pw <- list_files(emuDBhandle,sessionPattern = "prolonged",fileExtension = "wav")
 
@@ -35,7 +35,7 @@ test_that("Importation of EGG and speech signal files works",{
   #egg <- "tests/signalfiles/EGG/Session 1/"
   expect_true(dir.exists(egg))
 
-  reindeer::import_recording(emuDBhandle,dir=egg,targetSessionName="EGG", verbose = FALSE,egg.channel = 2)
+  reindeer::import_recordings(emuDBhandle,dir=egg,targetSessionName="EGG", verbose = FALSE,egg.channel = 2)
 
   pw <- list_files(emuDBhandle,sessionPattern = "EGG",fileExtension = "wav")
 

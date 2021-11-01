@@ -36,7 +36,7 @@
 #' @export
 #'
 
-import_recording <- function (emuDBhandle, dir, targetSessionName = "0000", speech.channel=1,egg.channel=NULL, verbose = TRUE)
+import_recordings <- function (emuDBhandle, dir, targetSessionName = "0000", speech.channel=1,egg.channel=NULL, verbose = TRUE)
 {
   emuR:::check_emuDBhandle(emuDBhandle)
   dbCfg = emuR:::load_DBconfig(emuDBhandle)
