@@ -147,7 +147,7 @@ add_trackDefinition <- function(
   }
 
   if(!is.null(onTheFlyFunctionName)){
-    # --------- From here we deduce how to apply the function -----------------------
+    # From here we deduce how to apply the function -----------------------
 
     defTracks <- superassp::get_definedtracks(onTheFlyFunctionName)
     #Set the default file extension to the one set as an attribute, if missing in the arguments
@@ -186,65 +186,18 @@ add_trackDefinition <- function(
       logger::log_threshold(logger::WARN)
     }
 
-    fl = emuR::list_files(emuDBhandle, inputTrackExtension)
-    meta <- get_metadata(emuDBhandle,manditory=names(metadata.defaults))
-    dsp <- get_parameters()
+    meta_settings <- match_parameters(emuDBhandle = emuDBhandle,
+                                         onTheFlyFunctionName = onTheFlyFunctionName,
+                                         metadata.defaults = metadata.defaults,
+                                         package = package)
 
+    fl <- list_files(emuDBhandle = emuDBhandle,fileExtension = inputTrackExtension) %>%
+      dplyr::select(-file)
 
-    currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
-    funcFormals = formals(currFunc)
-    #Compute which formal arguments we also have a Gender and Age aware default setting for
-    names(funcFormals) -> fp
-    unique(dsp$Parameter) -> pp
-    intersect(pp,fp) -> fparam
-    #IF metadata.defaults are mandatory, they should be in the output
-    assertthat::assert_that(all(names(metadata.defaults) %in% names(meta)))
-
-    #This is the real meat of this function. Here we get default values for parameters required by the
-    # signal processing functions from the DSPP set. The best match is determined to be the match with is applicable
-    # to the smallest age span.
-
-    fl %>%
-      dplyr::left_join(meta,na_matches = "na",by=c("session","bundle")) %>%
-      tidyr::replace_na(replace=metadata.defaults)  -> out
-    #return(out)
-    out %>%
-      dplyr::left_join(dsp %>%
-                         dplyr::filter(Parameter %in% fparam),na_matches = "na",by=c("Gender"))  %>%
-      dplyr::filter(!is.na(bundle),!is.na(session)) %>%
-      dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
-                    Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
-      dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
-      dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
-      dplyr::arrange(session,bundle,file,absolute_file_path,Parameter,AgeRange) %>%
-      dplyr::group_by(session,bundle,file,absolute_file_path,Parameter) %>%
-      dplyr::slice_head(n=1) %>%
+    fl_meta_settings <- fl %>%
+      dplyr::left_join(meta_settings,by = c("session","bundle")) %>%
       dplyr::ungroup() %>%
-
-      dplyr::group_by(session, bundle, file, absolute_file_path) -> fl_meta_settings
-
-    #Overwrite default by manually specified parameters when present
-    # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
-    if(any(fparam %in% names(fl_meta_settings))) {
-      manualParameters <- base::intersect(fparam,names(fl_meta_settings))
-      for(currParam in manualParameters){
-        #We can now set up two logical vectors, which
-        # 1) identify which rows identify a parameter for which there is a column
-        paramRow <- fl_meta_settings$Parameter == currParam
-        # 2) and which rows where a default value has been set
-        manualValueSet <- !is.na(fl_meta_settings[,currParam])
-        # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
-        rowToSwap <- paramRow & manualValueSet
-        fl_meta_settings[rowToSwap,"Setting"] <- as.character(fl_meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
-      }
-    }
-
-
-    #Do some cleanup
-    fl_meta_settings <- fl_meta_settings %>%
-      dplyr::select(session,bundle,file ,absolute_file_path, Parameter,Setting)
-
-    #return(fl_meta_settings)
+      dplyr::group_by(session,bundle)
 
     #We have already made per file grouping of the tibble, so we may use that to extract file information
     ng <- dplyr::n_groups(fl_meta_settings)
@@ -253,6 +206,10 @@ add_trackDefinition <- function(
     assertthat::assert_that(nrow(fl) == ngi, msg=paste0("Not all sounds files were assigned metadata ", nrow(fl)," ==> ",ng))
 
 
+    currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+    funcFormals = as.list(formals(currFunc))
+    names(funcFormals) -> fp
+
     #Copy arguments given to this function over the list of general arguments given to the called function
     if("optLogFilePath" %in% fp ){
       onTheFlyParams$optLogFilePath = onTheFlyOptLogFilePath
@@ -260,7 +217,6 @@ add_trackDefinition <- function(
     if("explicitExt" %in% fp ){
       onTheFlyParams$explicitExt = fileExtension
     }
-
 
     fl_meta_settings %>%
       dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
@@ -272,16 +228,10 @@ add_trackDefinition <- function(
       }else {
         message(paste0("Applying the function '",onTheFlyFunctionName, "' to all .",inputTrackExtension," files for which a signal track file (.",fileExtension,") does not exist.\n"))
       }
-    }
 
-
-
-
-
-
-    if(verbose){
       pb <- utils::txtProgressBar(min=0, max=ngi, style = 3)
     }
+
     for(currFileGroup in 1:ngi){
 
       if(verbose){
@@ -311,16 +261,12 @@ add_trackDefinition <- function(
           }
         }
 
-        #If we want to create a log of what is going on
-        # toLog <- sub(")$","",
-        #                  sub("list[(]","",paste(onTheFlyFunctionName,"args:",deparse(argLst))
-        #                      )
-        #                  )
-
         #logger::log_info(toLog)
         toLog <- utils::modifyList(list("function"=onTheFlyFunctionName),argLst)
         #logger::log_info(logger::deparse_to_one_line(toLog))
         logger::log_info(toLog)
+
+        #Now actually make the function call
         do.call(currFunc, argLst)
 
       }
@@ -429,6 +375,89 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 }
 
 
+
+#' Metadata-aware selection of DSP parameters
+#'
+#' This function deduces the appropriate parameters
+#' for a speech signal processing function based on the
+#' speaker Age and Gender metadata set for a bundle.
+#'
+#' @param emuDBhandle The database handle
+#' @param onTheFlyFunctionName The name of the function for which appropriate parameters should be deduced.
+#' @param metadata.defaults Default settings for metadata. This argument is primarily used for setting default Age and Gender for bundles with no such metadata already set.
+#' @param package The signal processing package where the `onTheFlyFunctionName` function may be found. Defaults to [superassp].
+#'
+#' @return
+#' A data frame with columns `session`, `bundle`, `Parameter`, and `Setting`, grouped by `session` and `bundle`.
+#'
+#' @examples
+#' \dontrun{
+#' reindeer:::unlink_emuRDemoDir()
+#' reindeer:::create_ae_db() -> emuDBhandle
+#' reindeer:::make_dummy_metafiles(emuDBhandle)
+#' print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest") )
+#' }
+
+
+match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=list(Gender=NA,Age=35),package="superassp"){
+
+  meta <- get_metadata(emuDBhandle,manditory=names(metadata.defaults))
+  dsp <- get_parameters()
+
+
+  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+  funcFormals = as.list(formals(currFunc))
+  names(funcFormals) -> fp
+  #IF metadata.defaults are mandatory, they should be in the output
+  assertthat::assert_that(all(names(metadata.defaults) %in% names(meta)))
+
+  meta %>%
+    tidyr::replace_na(replace=metadata.defaults)  -> out
+  #return(out)
+  out %>%
+    dplyr::left_join(dsp %>%
+                       dplyr::filter(Parameter %in% fp),na_matches = "na",by=c("Gender"))  %>%
+    dplyr::filter(!is.na(bundle),!is.na(session)) %>%
+    dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
+                  Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
+    dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
+    dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
+    dplyr::arrange(session,bundle,Parameter,AgeRange) %>%
+    dplyr::group_by(session,bundle,Parameter) %>%
+    dplyr::slice_head(n=1) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(session, bundle)  -> meta_settings
+
+  #Overwrite default by manually specified parameters when present
+  # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
+  if(any(fp %in% names(meta_settings))) {
+    manualParameters <- base::intersect(fp,names(meta_settings))
+    for(currParam in manualParameters){
+      #We can now set up two logical vectors, which
+      # 1) identify which rows identify a parameter for which there is a column
+      paramRow <- meta_settings$Parameter == currParam
+      # 2) and which rows where a default value has been set
+      manualValueSet <- !is.na(meta_settings[,currParam])
+      # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
+      rowToSwap <- paramRow & manualValueSet
+      meta_settings[rowToSwap,"Setting"] <- as.character(meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
+    }
+  }
+
+
+  #Do some cleanup
+  meta_settings <- meta_settings %>%
+    dplyr::select(session,bundle,Parameter,Setting) %>%
+    tidyr::pivot_wider(names_from = "Parameter",values_from = "Setting") %>% #To make replace_na work
+    tidyr::replace_na(replace=as.list(funcFormals)) %>%
+    tidyr::pivot_longer(! c(session,bundle),names_to = "Parameter",values_to="Setting" ) %>%
+    dplyr::group_by(session,bundle)
+
+
+  return(meta_settings)
+
+}
+
 ### For interactive testing
 #
 #
@@ -437,7 +466,10 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db() -> emuDBhandle
 # reindeer:::make_dummy_metafiles(emuDBhandle)
-# # git2r::init(emuDBhandle$basePath)
+# print(get_metadata(emuDBhandle))
+# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
+#
+# # # git2r::init(emuDBhandle$basePath)
 # add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")
 # add_trackDefinition(emuDBhandle, name = "FORMANTS", onTheFlyFunctionName = "forest")
 #add_trackDefinition(emuDBhandle, name = "F0", onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath="~/Desktop/out/")
