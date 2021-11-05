@@ -458,14 +458,71 @@ match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=
 
 }
 
+
+
+
+
+
+#' A utility function that builds a list of parameters to use in function call based on metadata
+#'
+#' This function takes a function and explicit argument list and builds a list of parameters for a function call considering the metadata of a bundle (in a session).
+#'
+#'
+#' @inheritParams match_parameters
+#' @param session Only consider this session.
+#' @param bundle  The bundle in the session to build an argument list for.
+#'
+#' @return A list which may be supplied to a `do.call` call.
+#'
+#' @seealso match_parameters
+#' @seealso do.call
+#'
+
+get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,onTheFlyParams=list(),metadata.defaults=list(Gender=NA,Age=35),package="superassp"){
+
+  currBundl <- bundle
+  currSess <- session
+  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+  funcFormals = as.list(formals(currFunc))
+  names(funcFormals) -> fp
+
+  dspParList <- match_parameters(emuDBhandle,onTheFlyFunctionName,metadata.defaults,package) %>%
+    dplyr::filter(!is.na(Parameter),!is.na(Setting) ) %>%
+    dplyr::filter(bundle == currBundl && session == currSess) %>%
+    dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter))
+
+  #return(dspParList)
+    purrr::flatten(utils::modifyList(purrr::flatten(dspParList),onTheFlyParams)) -> argLst
+  #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
+  #we need to convert strings like "11" to proper 11 values.
+  argLst <- lapply(argLst,
+                   utils::type.convert,as.is=TRUE)
+
+  # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
+  if(length(argLst) > 0 ){
+    for(an in names(argLst)){
+      argLst[an] = ifelse(class(argLst[[an]]) =="integer",as.numeric(argLst[[an]]),argLst[[an]])
+    }
+  }
+
+  return(argLst)
+}
+
+
+
+
+
 ### For interactive testing
 #
 #
 # library(wrassp)
 # library(reindeer)
 # reindeer:::unlink_emuRDemoDir()
-# reindeer:::create_ae_db() -> emuDBhandle
+# reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
 # reindeer:::make_dummy_metafiles(emuDBhandle)
+# #query(emuDBhandle,"Phonetic = s") -> sl
+#
+# out <- get_metaFuncFormals(emuDBhandle,session="0000",bundle="msajc010",onTheFlyFunctionName = "forest")
 # print(get_metadata(emuDBhandle))
 # print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
 #
