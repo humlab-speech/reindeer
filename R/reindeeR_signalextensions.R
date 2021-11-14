@@ -508,20 +508,341 @@ get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,
   return(argLst)
 }
 
+## This code works and could be used to make a new get_trackdata function
+# > f <- function(g,start,...) {return(list(g=g,a=c(start,start*2),b=c(start / 3,start**2)))}
+# > df %>% rowwise() %>% pmap_dfr(f)
 
+get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
+                            cut = NULL, npoints = NULL, onTheFlyFunctionName = NULL,
+                            onTheFlyParams = list(), onTheFlyOptLogFilePath = NULL, use.metadata=TRUE, package="superassp",verbose = TRUE)
+{
+
+  if(is.null(emuDBhandle)){
+    stop("You have to specify an Emu database handle.")
+  }
+
+  if(is.null(seglist)){
+    stop("You have to specify an segment list.")
+  }
+
+  if (!is.null(cut)) {
+    if (cut < 0 || cut > 1) {
+      stop("Bad value given for cut argument. Cut can only be a value between 0 and 1!")
+    }
+    if (sum(seglist$end) == 0) {
+      stop("Cut value should not be set if sum(seglist$end) == 0!")
+    }
+  }
+  if (!is.null(npoints)) {
+    if (is.null(cut) && emuR:::emusegs.type(seglist) != "event") {
+      stop(paste0("Cut argument has to be set or seglist has ",
+                  "to be of type event if npoints argument is used."))
+    }
+  }
+
+  # For the time being so that the old code works.
+  consistentOutputType <- TRUE
+
+  emuR:::check_emuDBhandle(emuDBhandle)
+  DBconfig = emuR:::load_DBconfig(emuDBhandle)
+  if ("tbl_df" %in% class(seglist)) {
+    seglist = seglist %>% dplyr::mutate_if(is.factor, as.character)
+  }
+
+  if(! is.null(onTheFlyFunctionName)){
+    onTheFlyFunction <- utils::getFromNamespace(onTheFlyFunctionName,package)
+    outputType <- superassp::get_outputType(onTheFlyFunctionName)
+  }else{
+    onTheFlyFunction <- NULL
+  }
+
+
+  if (!is.null(onTheFlyFunctionName) && is.null(ssffTrackName)) {
+    ssffTrackName = superassp::get_definedtracks(onTheFlyFunctionName)[1]
+
+  }
+
+  if (!is.null(onTheFlyOptLogFilePath) && is.null(onTheFlyFunctionName) ) {
+    stop("Log paths ('onTheFlyOptLogFilePath') may only be specified when also supplying an  function ('onTheFlyFunctionName').")
+  }
+
+
+  if (ssffTrackName %in% c("MEDIAFILE_SAMPLES")) {
+    trackDef = list()
+    trackDef[[1]] = list()
+    trackDef[[1]]$name = "MEDIAFILE_SAMPLES"
+    trackDef[[1]]$columnName = "audio"
+    trackDef[[1]]$fileExtension = DBconfig$mediafileExtension
+  }
+  else {
+    if (is.null(onTheFlyFunctionName)) {
+      trackDefFound = sapply(DBconfig$ssffTrackDefinitions,
+                             function(x) {
+                               x$name == ssffTrackName
+                             })
+      trackDef = DBconfig$ssffTrackDefinitions[trackDefFound]
+      if (length(trackDef) != 1) {
+        if (length(trackDef) < 1) {
+          stop("The emuDB object ", DBconfig$name, " does not have any ssffTrackDefinitions called ",
+               ssffTrackName)
+        }
+        else {
+          stop("The emuDB object ", DBconfig$name, " has multiple ssffTrackDefinitions called ",
+               ssffTrackName, "! This means the DB has an invalid _DBconfig.json")
+        }
+      }
+    }
+    else {
+      trackDef = list()
+      trackDef[[1]] = list()
+      trackDef[[1]]$name = ssffTrackName
+      trackDef[[1]]$columnName = ssffTrackName
+    }
+  }
+
+  uniqSessionBndls = dplyr::distinct(as.data.frame(seglist),
+                                     .data$bundle, .data$session)
+
+  DBI::dbExecute(emuDBhandle$connection, "CREATE TEMP TABLE uniq_session_bndls_tmp (session TEXT,bundle TEXT)")
+  DBI::dbWriteTable(emuDBhandle$connection, "uniq_session_bndls_tmp",
+                    uniqSessionBndls, append = T)
+  sesBndls = DBI::dbGetQuery(emuDBhandle$connection, paste0("SELECT ",
+                                                            " bundle.db_uuid, ", " bundle.session, ", " bundle.name, ",
+                                                            " bundle.annotates, ", " bundle.sample_rate, ", " bundle.md5_annot_json ",
+                                                            "FROM uniq_session_bndls_tmp, ", " bundle ", "WHERE uniq_session_bndls_tmp.session = bundle.session ",
+                                                            " AND uniq_session_bndls_tmp.bundle = bundle.name"))
+  DBI::dbExecute(emuDBhandle$connection, "DROP TABLE uniq_session_bndls_tmp")
+  sesBndls$db_uuid = NULL
+  sesBndls$MD5annotJSON = NULL
+  if (length(unique(sesBndls$sample_rate)) != 1) {
+    warning(paste0("The emusegs/emuRsegs object passed in refers to bundles with in-homogeneous sampling rates in their ",
+                   "audio files! Here is a list of all refered to bundles incl. their sampling rate: \n"),
+            paste(utils::capture.output(print(sesBndls)), collapse = "\n"))
+  }
+  index <- matrix(ncol = 2, nrow = nrow(seglist))
+  colnames(index) <- c("start", "end")
+  ftime <- matrix(ncol = 2, nrow = nrow(seglist))
+  colnames(ftime) <- c("start", "end")
+  data <- NULL
+  origFreq <- NULL
+
+  if (verbose) {
+
+    if(!is.null(onTheFlyFunction)){
+      cat("\n  INFO: applying", onTheFlyFunctionName,
+          "to", nrow(seglist), "segments/events\n")
+      pb <- utils::txtProgressBar(min = 0, max = nrow(seglist),
+                                  style = 3)
+    }else{
+
+      cat("\n  INFO: parsing", nrow(seglist), trackDef[[1]]$fileExtension,
+          "segments/events\n")
+      pb <- utils::txtProgressBar(min = 0, max = nrow(seglist),
+                                  style = 3)
+    }
+  }
+
+  prevUtt = ""
+  bndls = list_bundles(emuDBhandle)
+  curIndexStart = 1
+  data_list = list()
+  timeStampRowNames_list = list()
+  for (i in 1:nrow(seglist)) {
+
+    splUtt = c(seglist$session[i], seglist$bundle[i])
+    curUtt = paste(splUtt[1], ":", splUtt[2])
+
+    if (!any(bndls$session == splUtt[1] & bndls$name ==
+             splUtt[2])) {
+      stop("Following utts entry not found: ", seglist$utts[i])
+    }
+    fpath <- file.path(emuDBhandle$basePath, paste0(splUtt[1],
+                                                    session.suffix), paste0(splUtt[2], bundle.dir.suffix),
+                       paste0(splUtt[2], ".", trackDef[[1]]$fileExtension))
+    if (verbose) {
+      utils::setTxtProgressBar(pb, i)
+    }
+
+    if (!is.null(onTheFlyFunctionName)) {
+      if (outputType == "SSFF" && use.metadata == FALSE ) {
+        funcFormals = formals(onTheFlyFunction)
+        funcFormals[names(onTheFlyParams)] = onTheFlyParams
+        funcFormals$toFile = FALSE
+        funcFormals$optLogFilePath = onTheFlyOptLogFilePath
+
+      }
+
+      qr = DBI::dbGetQuery(emuDBhandle$connection,
+                           paste0("SELECT * ", "FROM bundle ", "WHERE db_uuid = '",
+                                  emuDBhandle$UUID, "' ", " AND session = '",
+                                  splUtt[1], "' ", " AND name='", splUtt[2],
+                                  "'"))
+      funcFormals$listOfFiles = file.path(emuDBhandle$basePath,
+                                          paste0(qr$session, session.suffix), paste0(qr$name,
+                                                                                     bundle.dir.suffix), qr$annotates)
+      if (curUtt != prevUtt) {
+        curDObj = do.call(onTheFlyFunctionName, funcFormals)
+      }
+    }
+    else {
+      curDObj <- wrassp::read.AsspDataObj(fpath)
+    }
+    origFreq <- attr(curDObj, "origFreq")
+    curStart <- seglist$start[i]
+
+    if (sum(seglist$end) == 0) {
+      curEnd <- seglist$start[i]
+    }else {
+      curEnd <- seglist$end[i]
+    }
+    fSampleRateInMS <- (1/attr(curDObj, "sampleRate")) * 1000
+
+    fStartTime <- attr(curDObj, "startTime") * 1000
+    if (sum(seglist$end) == 0) {
+      if (npoints == 1 || is.null(npoints)) {
+        timeStampSeq <- seq(fStartTime, curEnd + fSampleRateInMS,
+                            fSampleRateInMS)
+      }else {
+        timeStampSeq <- seq(fStartTime, curEnd + fSampleRateInMS *
+                              npoints, fSampleRateInMS)
+      }
+    }else {
+      if (npoints == 1 || is.null(npoints)) {
+        timeStampSeq <- seq(fStartTime, curEnd, fSampleRateInMS)
+      }else {
+        timeStampSeq <- seq(fStartTime, curEnd + fSampleRateInMS * npoints, fSampleRateInMS)
+      }
+    }
+    breakVal <- -1
+    for (j in 1:length(timeStampSeq)) {
+      if (timeStampSeq[j] >= curStart) {
+        breakVal <- j
+        break
+      }
+    }
+    if (breakVal == -1) {
+      stop("No track samples found belonging to sl_rowIdx: ", i, " with values: ", paste0(seglist[i, ],collapse = " "), "! This is probably due to a very short SEGMENT that doesn't contain any '", ssffTrackName, "' values.")
+    }
+    curStartDataIdx <- breakVal
+    curEndDataIdx <- length(timeStampSeq)
+    tmpData <- eval(parse(text = paste0("curDObj$", trackDef[[1]]$columnName)))
+
+    if (!is.null(cut) || sum(seglist$end) == 0) {
+      if (sum(seglist$end) == 0) {
+        cutTime = curStart
+        curEndDataIdx <- curStartDataIdx
+        curStartDataIdx = curStartDataIdx - 1
+      } else {
+        cutTime = curStart + (curEnd - curStart) *
+          cut
+      }
+      sampleTimes = timeStampSeq[curStartDataIdx:curEndDataIdx]
+      closestIdx = which.min(abs(sampleTimes - cutTime))
+      cutTimeSampleIdx = curStartDataIdx + closestIdx -
+        1
+      if (is.null(npoints) || npoints == 1) {
+        curStartDataIdx = curStartDataIdx + closestIdx -
+          1
+        curEndDataIdx = curStartDataIdx
+        curIndexEnd = curIndexStart
+      } else {
+        halfNpoints = (npoints - 1)/2
+        curStartDataIdx = cutTimeSampleIdx - floor(halfNpoints)
+        curEndDataIdx = cutTimeSampleIdx + ceiling(halfNpoints)
+        curIndexEnd = curIndexStart + npoints - 1
+      }
+    } else {
+      curIndexEnd <- curIndexStart + curEndDataIdx -
+        curStartDataIdx
+    }
+    index[i, ] <- c(curIndexStart, curIndexEnd)
+    ftime[i, ] <- c(timeStampSeq[curStartDataIdx], timeStampSeq[curEndDataIdx])
+    rowSeq <- seq(timeStampSeq[curStartDataIdx], timeStampSeq[curEndDataIdx], fSampleRateInMS)
+    curData <- matrix(ncol = ncol(tmpData), nrow = length(rowSeq))
+
+    if (curStartDataIdx > 0 && curEndDataIdx <= dim(tmpData)[1]) {
+      possibleError_a <- tryCatch(curData[, ] <- tmpData[curStartDataIdx:curEndDataIdx,
+      ], error = function(e) e)
+      if (inherits(possibleError_a, "error")) {
+        warning(paste0("The amount of data extracted doesn't match the \n",
+                       "expected segment length in segment list row ",
+                       i, ".\n", "This can be caused by slight rounding errors in \n",
+                       "sample rates and start times. Adapting to extracted \n",
+                       "sample length."))
+        rowSeq <- timeStampSeq[curStartDataIdx:curEndDataIdx]
+        curData <- matrix(ncol = ncol(tmpData), nrow = length(rowSeq))
+        tmp_len <- length(curStartDataIdx:curEndDataIdx) -
+          length(rowSeq)
+        tmp_range <- curStartDataIdx:curEndDataIdx
+        possibleError <- tryCatch(curData[, ] <- tmpData[curStartDataIdx:curEndDataIdx,
+        ], error = function(e) e)
+        if (inherits(possibleError, "error")) {
+          stop(paste0("Even after length adaptation an error occured. This shouldn't happen!\n",
+                      "Problematic segment list row: ", i))
+        }
+      }
+    } else {
+      entry = paste(seglist[i, ], collapse = " ")
+      stop("Can not extract data for the ", i, "th row of the segment list: ",
+           entry, " start and/or end times out of bounds")
+    }
+    curIndexStart <- curIndexEnd + 1
+    data_list[[i]] = curData
+    timeStampRowNames_list[[i]] = rowSeq
+    prevUtt = curUtt
+  }
+
+  data = do.call(rbind, data_list)
+  timeStampRowNames = unlist(timeStampRowNames_list)
+  if (!consistentOutputType &&
+      ((!is.null(cut) &&
+        (npoints ==  1 || is.null(npoints))) ||
+       (sum(seglist$end) == 0 && (npoints == 1 || is.null(npoints))))) {
+    resObj = as.data.frame(data)
+    colnames(resObj) = paste0(trackDef[[1]]$columnName, seq(1:ncol(resObj)))
+  } else {
+    rownames(data) <- timeStampRowNames
+    colnames(data) <- paste("T", 1:ncol(data), sep = "")
+    resObj <- as.trackdata(data, index = index, ftime, ssffTrackName)
+    if (any(trackDef[[1]]$columnName %in% c("dft", "css",
+                                            "lps", "cep"))) {
+      if (!is.null(origFreq)) {
+        if (verbose) {
+          cat("\n  INFO: adding fs attribute to trackdata$data fields")
+        }
+        attr(resObj$data, "fs") <- seq(0, origFreq/2,
+                                       length = ncol(resObj$data))
+        class(resObj$data) <- c(class(resObj$data),
+                                "spectral")
+      }
+      else {
+        stop("no origFreq entry in spectral data file!")
+      }
+    }
+  }
+  if (exists("pb")) {
+    close(pb)
+  }
+
+  resObj = tibble::as_tibble(create_emuRtrackdata(seglist,resObj))
+
+  return(resObj)
+}
 
 
 
 ### For interactive testing
 #
 #
-# library(wrassp)
-# library(reindeer)
-# reindeer:::unlink_emuRDemoDir()
-# reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-# reindeer:::make_dummy_metafiles(emuDBhandle)
-# #query(emuDBhandle,"Phonetic = s") -> sl
-#
+library(wrassp)
+library(reindeer)
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
+reindeer:::make_dummy_metafiles(emuDBhandle)
+query(emuDBhandle,"Phonetic = s") -> sl
+sl <- sl[1:3,]
+emuR::get_trackdata(emuDBhandle,seglist = sl,ssffTrackName = "fm") -> sld13
+
 # out <- get_metaFuncFormals(emuDBhandle,session="0000",bundle="msajc010",onTheFlyFunctionName = "forest")
 # print(get_metadata(emuDBhandle))
 # print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
