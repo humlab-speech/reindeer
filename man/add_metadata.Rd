@@ -15,7 +15,7 @@ add_metadata(
 \arguments{
 \item{emuDBhandle}{An Emu database handle}
 
-\item{metadataList}{A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user.}
+\item{metadataList}{A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user. The user may also clear (remove from the set of defined metadata) by setting the property to NULL.}
 
 \item{bundle}{An optional name of a bundle}
 
@@ -42,7 +42,7 @@ If no \code{session} or \code{bundle} names are provided, the metadata will be i
 \examples{
 \dontrun{
 emuR::create_emuRdemoData()
-ae_test <- rload_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 
 # Database-wide default information
 add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))

@@ -361,7 +361,7 @@ import_metadata <- function(emuDBhandle,Excelfile){
 #' If no \code{session} or \code{bundle} names are provided, the metadata will be inserted as default values for the entire database.
 #'
 #' @param emuDBhandle An Emu database handle
-#' @param metadataList A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user.
+#' @param metadataList A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user. The user may also clear (remove from the set of defined metadata) by setting the property to NULL.
 #' @param bundle An optional name of a bundle
 #' @param session An optional name of a session
 #' @param reset.before.add If set to TRUE, the function will ignore previously set metadata and simply add the metadata supplied in the list.
@@ -372,7 +372,7 @@ import_metadata <- function(emuDBhandle,Excelfile){
 #' @examples
 #' \dontrun{
 #' emuR::create_emuRdemoData()
-#' ae_test <- rload_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
+#' ae_test <- load_emuDB(file.path(tempdir(),"emuR_demoData","ae_emuDB"))
 #'
 #' # Database-wide default information
 #' add_metadata(ae_test,list("Accent"="Northern","Elicitation"="Scripted"))
@@ -444,8 +444,8 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
 
     }
     #set / overwrite metadata from list
-    jsonmetaList[names(metadataList)] <- metadataList
-
+    #jsonmetaList[names(metadataList)] <- metadataList
+    jsonmetaList <- utils::modifyList(jsonmetaList,metadataList,keep.null = FALSE)
     jsonlite::write_json(jsonmetaList,metadatafile,auto_unbox=TRUE)
   }
 }
@@ -564,11 +564,22 @@ biographize <- function(segs_tbl,emuDBhandle,compute_digests=FALSE,algorithm="sh
 
 ### INTERACTIVE testing
 
-# reindeer:::detach_demo_db(ae)
-# reindeer:::create_ae_db() -> ae
-# get_metadata(ae) -> out1
-# make_dummy_metafiles(ae,session=FALSE)
-# get_metadata(ae) -> out2
+# reindeer:::unlink_emuRDemoDir()
+# reindeer:::create_ae_db() -> emuDBhandle
+# add_metadata(emuDBhandle,session = "0000",bundle = "msajc003",metadataList = list(Gender=NA,Age=10))
+# add_metadata(emuDBhandle,session = "0000",bundle = "msajc003",metadataList = list(Gender=NULL,Age=20))
+#
+# dir.create(file.path(emuDBhandle$basePath,"temp"))
+# for(i in 1:11){
+#   file.copy(file.path(emuDBhandle$basePath,"0000_ses"),file.path(emuDBhandle$basePath,"temp"),recursive = TRUE)
+#   newName <- paste0(i,i,i,i,"_ses")
+#   file.rename(file.path(emuDBhandle$basePath,"temp","0000_ses"),file.path(emuDBhandle$basePath,"temp",newName))
+#   file.copy(file.path(emuDBhandle$basePath,"temp",newName),emuDBhandle$basePath,recursive = TRUE)
+#   unlink(file.path(emuDBhandle$basePath,"temp",newName),recursive = TRUE)
+# }
+
+
+
 #export_metadata(ae,Excelfile = "~/Desktop/out.xlsx",overwrite = TRUE)
-#rstudioapi::navigateToFile("/private/var/folders/vc/lhvg_40x50l3nb3rndb4kwbm0000gp/T/RtmplwbwIS/emuR_demoData/ae_emuDB/0000_ses/msajc057_bndl/msajc057.meta_json")
+#rstudioapi::navigateToFile(list_files(emuDBhandle,"meta_json")$absolute_file_path)
 #export_metadata(ae,Excelfile = "~/Desktop/out.xlsx")
