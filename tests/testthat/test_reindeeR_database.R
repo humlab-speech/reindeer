@@ -5,25 +5,32 @@ require(reindeer)
 test_that("Importation of speech signal files works",{
   reindeer:::unlink_emuRDemoDir()
   reindeer:::create_ae_db(verbose = FALSE) -> emuDBhandle
-  prolonged <- "../signalfiles/prolonged_a/"
-  #prolonged <- "tests/signalfiles/prolonged_a/"
-  expect_true(dir.exists(prolonged))
+  sounds <- file.path("..","signalfiles","generated")
 
-  reindeer::import_recordings(emuDBhandle,dir=prolonged,targetSessionName = "prolonged",verbose = FALSE)
+  expect_true(dir.exists(sounds))
 
-  expect_error(reindeer::import_recordings(emuDBhandle,dir=prolonged,targetSessionName = "prolongedError",verbose = FALSE,speech.channel = 3))
+  reindeer::import_recordings(emuDBhandle,dir=sounds,targetSessionName = "generated",verbose = FALSE)
 
-  pw <- list_files(emuDBhandle,sessionPattern = "prolonged",fileExtension = "wav")
+  expect_equal(nrow(list_sessions(emuDBhandle)) , 2  )
 
-  expect_true(nrow(pw) == 3)
+  expect_error(reindeer::import_recordings(emuDBhandle,dir=sounds,targetSessionName = "generated2",verbose = FALSE,speech.channel = 3))
 
-  expect_true(nrow(list_sessions(emuDBhandle)) == 3  )
+  pw <- list_files(emuDBhandle,sessionPattern = "generated",fileExtension = "wav")
 
-  expect_true(nrow(list_bundles(emuDBhandle,session = "prolonged")) == 3 )
+  expect_equal(nrow(pw),  4)
 
-  signalfile <- wrassp::read.AsspDataObj(pw$absolute_file_path[[1]])
+  expect_equal(nrow(list_bundles(emuDBhandle,session = "generated")) , 4 )
 
-  expect_true(ncol(signalfile$audio) == 1)
+  #Check that all files are mono sound files, and readable as such
+  for(i in 1:nrow(pw)){
+
+    signalfile <- wrassp::read.AsspDataObj(pw$absolute_file_path[[i]])
+
+    expect_equal(ncol(signalfile$audio) , 1)
+
+  }
+
+
 
 })
 
