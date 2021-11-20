@@ -8,6 +8,7 @@ match_parameters(
   emuDBhandle,
   onTheFlyFunctionName,
   metadata.defaults = list(Gender = NA, Age = 35),
+  wide.format = FALSE,
   package = "superassp"
 )
 }
@@ -17,6 +18,8 @@ match_parameters(
 \item{onTheFlyFunctionName}{The name of the function for which appropriate parameters should be deduced.}
 
 \item{metadata.defaults}{Default settings for metadata. This argument is primarily used for setting default Age and Gender for bundles with no such metadata already set.}
+
+\item{wide.format}{The default output format of this function is one row per parameter and value pair. If \code{TRUE}, this argument forces the function to instead return one row per bundle in the database, and with parameter values in separate columns instead.}
 
 \item{package}{The signal processing package where the \code{onTheFlyFunctionName} function may be found. Defaults to \link{superassp}.}
 }

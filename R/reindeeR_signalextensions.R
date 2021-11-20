@@ -384,6 +384,7 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 #'
 #' @param emuDBhandle The database handle
 #' @param onTheFlyFunctionName The name of the function for which appropriate parameters should be deduced.
+#' @param wide.format The default output format of this function is one row per parameter and value pair. If `TRUE`, this argument forces the function to instead return one row per bundle in the database, and with parameter values in separate columns instead.
 #' @param metadata.defaults Default settings for metadata. This argument is primarily used for setting default Age and Gender for bundles with no such metadata already set.
 #' @param package The signal processing package where the `onTheFlyFunctionName` function may be found. Defaults to [superassp].
 #'
@@ -399,7 +400,7 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 #' }
 
 
-match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=list(Gender=NA,Age=35),package="superassp"){
+match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=list(Gender=NA,Age=35),wide.format=FALSE,package="superassp"){
 
   meta <- get_metadata(emuDBhandle,manditory=names(metadata.defaults))
   dsp <- get_parameters()
@@ -449,9 +450,14 @@ match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=
   meta_settings <- meta_settings %>%
     dplyr::select(session,bundle,Parameter,Setting) %>%
     tidyr::pivot_wider(names_from = "Parameter",values_from = "Setting") %>% #To make replace_na work
-    tidyr::replace_na(replace=as.list(funcFormals)) %>%
-    tidyr::pivot_longer(! c(session,bundle),names_to = "Parameter",values_to="Setting" ) %>%
-    dplyr::group_by(session,bundle)
+    tidyr::replace_na(replace=as.list(funcFormals))
+
+  if(! wide.format){
+    meta_settings <- meta_settings %>%
+      tidyr::pivot_longer(! c(session,bundle),names_to = "Parameter",values_to="Setting" ) %>%
+      dplyr::group_by(session,bundle)
+  }
+
 
 
   return(meta_settings)
@@ -486,7 +492,7 @@ get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,
   funcFormals = as.list(formals(currFunc))
   names(funcFormals) -> fp
 
-  dspParList <- match_parameters(emuDBhandle,onTheFlyFunctionName,metadata.defaults,package) %>%
+  dspParList <- match_parameters(emuDBhandle,onTheFlyFunctionName = onTheFlyFunctionName,metadata.defaults = metadata.defaults,package = package, wide.format=FALSE) %>%
     dplyr::filter(!is.na(Parameter),!is.na(Setting) ) %>%
     dplyr::filter(bundle == currBundl && session == currSess) %>%
     dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter))
@@ -520,8 +526,8 @@ get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
 # reindeer:::make_dummy_metafiles(emuDBhandle)
-# #query(emuDBhandle,"Phonetic = s") -> sl
-#
+# query(emuDBhandle,"Phonetic = s") -> sl
+# #
 # out <- get_metaFuncFormals(emuDBhandle,session="0000",bundle="msajc010",onTheFlyFunctionName = "forest")
 # print(get_metadata(emuDBhandle))
 # print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
