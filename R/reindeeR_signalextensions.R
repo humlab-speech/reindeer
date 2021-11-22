@@ -515,9 +515,6 @@ get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,
 }
 
 
-
-
-
 ### For interactive testing
 #
 #
