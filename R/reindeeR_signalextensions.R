@@ -830,6 +830,27 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 }
 
 
+readTrack <- function(listOfFiles,beginTime,endTime,ssffTrackName="audio",...){
+
+  if(! file.exists(listOfFiles[1])){
+    stop("The file ",listOfFiles[1]," does not exists!")
+  }
+
+  outSSFF <- wrassp::read.AsspDataObj(fname=listOfFiles[1],begin=beginTime,end=endTime,sample=FALSE)
+
+  if(! ssffTrackName %in% names(outSSFF) ){
+    stop("The track ",ssffTrackName," does not exists in the track file ", listOfFiles[1])
+
+  }
+  track <- as.data.frame(outSSFF[ssffTrackName])
+  nTracks <- ifelse(is.null(ncol(track)),1,ncol(track))
+  names(track) <- paste0("T",1:nTracks)
+
+  return(track)
+
+}
+
+
 
 ### For interactive testing
 #
