@@ -508,9 +508,6 @@ get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,
   return(argLst)
 }
 
-## This code works and could be used to make a new get_trackdata function
-# > f <- function(g,start,...) {return(list(g=g,a=c(start,start*2),b=c(start / 3,start**2)))}
-# > df %>% rowwise() %>% pmap_dfr(f)
 
 get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
                             cut = NULL, npoints = NULL, onTheFlyFunctionName = NULL,
@@ -830,7 +827,7 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 }
 
 
-readTrack <- function(listOfFiles,beginTime,endTime,ssffTrackName="audio",...){
+readTrackData <- function(listOfFiles,beginTime=0.0,endTime=0.0,ssffTrackName="audio",...){
 
   if(! file.exists(listOfFiles[1])){
     stop("The file ",listOfFiles[1]," does not exists!")
@@ -843,13 +840,82 @@ readTrack <- function(listOfFiles,beginTime,endTime,ssffTrackName="audio",...){
 
   }
   track <- as.data.frame(outSSFF[ssffTrackName])
+  sr <- attr(outSSFF,"sampleRate")
+  nSamples <- nrow(track)
+  startRecord <- attr(outSSFF,"startRecord")
+  endRecord <- attr(outSSFF,"endRecord")
+  times <- startRecord:endRecord / sr
+
   nTracks <- ifelse(is.null(ncol(track)),1,ncol(track))
   names(track) <- paste0("T",1:nTracks)
+  track <- cbind(data.frame(time=times), track)
 
   return(track)
 
 }
 
+computeTrackData <- function(fun,filename, start, end, arguments,ssffTrackName=NULL){
+
+ if(!is.function(fun)){
+   stop("The argument 'fun' needs to be a function.")
+ }
+ type <- superassp::get_outputType(fun)
+
+ if("toFile" %in% names(formals(fun)) ){
+   arguments <- utils::modifyList(arguments,list(toFile=FALSE))
+ }
+
+ arguments <- utils::modifyList(arguments,list(beginTime=start,endTime=end))
+
+ if(toupper(type) == "SSFF"){
+
+   fNameCandidates <- c("filename","listOfFiles")
+
+   formalFileArg <- fNameCandidates[fNameCandidates %in% names(formals(fun))][[1]]
+   arguments[formalFileArg] <- filename
+
+   if(is.null(ssffTrackName)){
+     ssffTrackName <- superassp::get_definedtracks(fun)[[1]]
+     warning("A track name was not specified. Selecting the first track ('",ssffTrackName,"').")
+   }
+
+   outSSFF <- do.call(fun,arguments)
+
+   track <- as.data.frame(outSSFF[ssffTrackName])
+   sr <- attr(outSSFF,"sampleRate")
+   nSamples <- nrow(track)
+   startRecord <- attr(outSSFF,"startRecord")
+   endRecord <- attr(outSSFF,"endRecord")
+   times <- startRecord:endRecord / sr
+
+   nTracks <- ifelse(is.null(ncol(track)),1,ncol(track))
+   names(track) <- paste0("T",1:nTracks)
+   track <- as_tibble(cbind(data.frame(time=times), track))
+
+ }else{
+   if(tolower(type) == "list"){
+     # We want to make sure that the same calling convention may be used for
+     #SSFF tracks and list output (slice) functions
+     # The wrassp functions use listOfFiles as the file name input
+     # Slice functions use "filename", as it makes no sense to fool the user into thinking that multiple
+     # file names can be submitted.
+
+
+    arguments$filename <- filename
+    arguments$beginTime <- start
+    arguments$endTime <- end
+
+     outLIST <- do.call(fun,arguments)
+     track <- as_tibble(outLIST,col.names = names(outLIST))
+
+   }else{
+     stop("The supplied function is not defined correctly. Please use only functions with an 'outputType' attribute set.")
+   }
+ }
+
+ return(track)
+
+}
 
 
 ### For interactive testing
@@ -862,7 +928,10 @@ reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
 reindeer:::make_dummy_metafiles(emuDBhandle)
 query(emuDBhandle,"Phonetic = s") -> sl
 sl <- sl[1:3,]
-emuR::get_trackdata(emuDBhandle,seglist = sl,ssffTrackName = "fm") -> sld13
+
+computeTrackData(forest,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out1
+computeTrackData(praat_voice_report,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out2
+# emuR::get_trackdata(emuDBhandle,seglist = sl,ssffTrackName = "fm") -> sld13
 
 # out <- get_metaFuncFormals(emuDBhandle,session="0000",bundle="msajc010",onTheFlyFunctionName = "forest")
 # print(get_metadata(emuDBhandle))
