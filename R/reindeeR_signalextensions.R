@@ -827,16 +827,16 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 }
 
 
-readTrackData <- function(listOfFiles,beginTime=0.0,endTime=0.0,ssffTrackName="audio",...){
+readTrackData <- function(filename, start=0.0, end=0.0,ssffTrackName="audio",...){
 
-  if(! file.exists(listOfFiles[1])){
-    stop("The file ",listOfFiles[1]," does not exists!")
+  if(! file.exists(filename)){
+    stop("The file ",filename," does not exists!")
   }
 
-  outSSFF <- wrassp::read.AsspDataObj(fname=listOfFiles[1],begin=beginTime,end=endTime,sample=FALSE)
+  outSSFF <- wrassp::read.AsspDataObj(fname=filename,begin=start,end=end,sample=FALSE)
 
   if(! ssffTrackName %in% names(outSSFF) ){
-    stop("The track ",ssffTrackName," does not exists in the track file ", listOfFiles[1])
+    stop("The track ",ssffTrackName," does not exists in the track file ", filename)
 
   }
   track <- as.data.frame(outSSFF[ssffTrackName])
@@ -848,7 +848,7 @@ readTrackData <- function(listOfFiles,beginTime=0.0,endTime=0.0,ssffTrackName="a
 
   nTracks <- ifelse(is.null(ncol(track)),1,ncol(track))
   names(track) <- paste0("T",1:nTracks)
-  track <- cbind(data.frame(time=times), track)
+  track <- dplyr::as_tibble(cbind(data.frame(time=times), track))
 
   return(track)
 
@@ -890,7 +890,7 @@ computeTrackData <- function(fun,filename, start, end, arguments,ssffTrackName=N
 
    nTracks <- ifelse(is.null(ncol(track)),1,ncol(track))
    names(track) <- paste0("T",1:nTracks)
-   track <- as_tibble(cbind(data.frame(time=times), track))
+   track <- dplyr::as_tibble(cbind(data.frame(time=times), track))
 
  }else{
    if(tolower(type) == "list"){
@@ -906,7 +906,7 @@ computeTrackData <- function(fun,filename, start, end, arguments,ssffTrackName=N
     arguments$endTime <- end
 
      outLIST <- do.call(fun,arguments)
-     track <- as_tibble(outLIST,col.names = names(outLIST))
+     track <- dplyr::as_tibble(outLIST)
 
    }else{
      stop("The supplied function is not defined correctly. Please use only functions with an 'outputType' attribute set.")
@@ -929,6 +929,7 @@ reindeer:::make_dummy_metafiles(emuDBhandle)
 query(emuDBhandle,"Phonetic = s") -> sl
 sl <- sl[1:3,]
 
+readTrackData(filename="~/Desktop/aaa.wav",start=0.0,end=0.0) -> out
 computeTrackData(forest,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out1
 computeTrackData(praat_voice_report,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out2
 # emuR::get_trackdata(emuDBhandle,seglist = sl,ssffTrackName = "fm") -> sld13
