@@ -827,13 +827,13 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 }
 
 
-readTrackData <- function(filename, start=0.0, end=0.0,ssffTrackName="audio",...){
+readTrackData <- function(filename, sample_start=0.0, sample_end=0.0,cut=NULL,npoints=NULL,ssffTrackName="audio",...){
 
   if(! file.exists(filename)){
     stop("The file ",filename," does not exists!")
   }
 
-  outSSFF <- wrassp::read.AsspDataObj(fname=filename,begin=start,end=end,sample=FALSE)
+  outSSFF <- wrassp::read.AsspDataObj(fname=filename,begin=sample_start,end=sample_end,sample=TRUE)
 
   if(! ssffTrackName %in% names(outSSFF) ){
     stop("The track ",ssffTrackName," does not exists in the track file ", filename)
@@ -876,7 +876,7 @@ computeTrackData <- function(fun,filename, start, end, arguments,ssffTrackName=N
 
    if(is.null(ssffTrackName)){
      ssffTrackName <- superassp::get_definedtracks(fun)[[1]]
-     warning("A track name was not specified. Selecting the first track ('",ssffTrackName,"').")
+     logger::log_warn("A track name was not specified. Selecting the first track ('",ssffTrackName,"').")
    }
 
    outSSFF <- do.call(fun,arguments)
@@ -918,20 +918,91 @@ computeTrackData <- function(fun,filename, start, end, arguments,ssffTrackName=N
 }
 
 
+#' Produce a table of sample rates of all media and SSFF track files
+#'
+#' This function will access all defined SSFF track track files mentioned in an
+#' SSFF track definition as well as the speech signal files, and extract and
+#' list all sample rates. This function works from the actual track files and
+#' not cached information, and may be slow on large databases with many SSFF
+#' tracks defined, if stored on a media with slower file access speeds.
+#'
+#' @param emuDBhandle An Emu database handle.
+#'
+#' @seealso reindeer::load_emuDB, emuR::load_emuDB
+#' @return a tibble with columns "session" and "bundle", and then one column for each SSFF track defined.
+#'
+#' @export
+#'
+#' @examples
+#' reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
+#' samplerates(emuDBhandle)
+#' reindeer:::unlink_emuRDemoDir()
+#'
+sampleRates <- function(emuDBhandle){
+ dbConf <- emuR:::load_DBconfig(emuDBhandle)
+
+ if(is.null(dbConf$mediafileExtension) ){
+   warning("No media file extension set in the database. Using the 'wav' extension insted")
+   dbConf$mediafileExtension <- "wav"
+ }
+
+ fl  <- list_files(emuDBhandle,dbConf$mediafileExtension)
+ ssffDefs <- rbind(data.frame(name=dbConf$mediafileExtension ,columnName="audio",fileExtension=dbConf$mediafileExtension ),
+                   list_ssffTrackDefinitions(emuDBhandle))
+
+ for(f in 1:nrow(fl)){
+   for(s in 1:nrow(ssffDefs)){
+     ext <- ssffDefs[s,"fileExtension"]
+     name <- ssffDefs[s,"fileExtension"]
+     fileName <- paste0(tools::file_path_sans_ext(fl[f,"absolute_file_path"]),".",ext)
+
+     inSSFF <- wrassp::read.AsspDataObj(fname = fileName,begin = 0,end=1,samples = TRUE)
+     sr <- attr(inSSFF,"sampleRate")
+     fl[f,name] <- sr
+   }
+
+ }
+ return(fl[,-c(4,3)])
+}
+
+get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
+                            cut = NULL, npoints = NULL, onTheFlyFunctionName = NULL,
+                            onTheFlyParams = list(), onTheFlyOptLogFilePath = NULL, use.metadata=TRUE, package="superassp",verbose = TRUE)
+{
+
+  if(is.null(emuDBhandle)){
+    stop("You have to specify an Emu database handle.")
+  }
+
+  if(is.null(seglist)){
+    stop("You have to specify an segment list.")
+  }
+
+  if (!is.null(cut)) {
+    if (cut < 0 || cut > 1) {
+      stop("Bad value given for cut argument. Cut can only be a value between 0 and 1!")
+    }
+    if (sum(seglist$end) == 0) {
+      stop("Cut value should not be set if sum(seglist$end) == 0!")
+    }
+  }
+}
+
+
 ### For interactive testing
 #
 #
-library(wrassp)
-library(reindeer)
-reindeer:::unlink_emuRDemoDir()
-reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-reindeer:::make_dummy_metafiles(emuDBhandle)
-query(emuDBhandle,"Phonetic = s") -> sl
-sl <- sl[1:3,]
-
-readTrackData(filename="~/Desktop/aaa.wav",start=0.0,end=0.0) -> out
-computeTrackData(forest,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out1
-computeTrackData(praat_voice_report,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out2
+# library(superassp)
+# library(reindeer)
+# reindeer:::unlink_emuRDemoDir()
+# reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
+# reindeer:::make_dummy_metafiles(emuDBhandle)
+# query(emuDBhandle,"Phonetic = s") -> sl
+# sl <- sl[1:3,]
+#
+# readTrackData(filename="~/Desktop/aaa.wav") -> out
+# computeTrackData(forest,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out1
+# computeTrackData(praat_voice_report,filename="~/Desktop/aaa.wav",start=0.0,end=1.0,arguments=list()) -> out2
 # emuR::get_trackdata(emuDBhandle,seglist = sl,ssffTrackName = "fm") -> sld13
 
 # out <- get_metaFuncFormals(emuDBhandle,session="0000",bundle="msajc010",onTheFlyFunctionName = "forest")
