@@ -1,6 +1,6 @@
 #context("Bundle (session and database) metadata")
 library(testthat)
-library(wrassp)
+library(superassp)
 
 
 test_that("Metadata is collected correctly for a database",{
