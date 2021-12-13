@@ -598,6 +598,7 @@ readTrackData <- function(filename, sample_start=NULL, sample_end=NULL,cut=NULL,
 
   }
 
+
   if(! ssffTrackName %in% names(outSSFF) ){
     stop("The track ",ssffTrackName," does not exists in the track file ", filename)
 
