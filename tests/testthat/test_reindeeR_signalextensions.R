@@ -1,5 +1,5 @@
 #context("Code extending the signal handling abilities of emuR")
-
+library(testthat)
 library(reindeer)
 library(superassp)
 
@@ -15,7 +15,7 @@ reindeer::remove_ssffTrackDefinition(emuDBhandle,name="dft",deleteFiles = TRUE)
 
 test_that("Check that we can get default signal processing parameters",{
   data("DSPP")
-  message(nrow(DSPP))
+  #message(nrow(DSPP))
   reindeer::get_parameters() -> dsp
 
   testthat::expect_equal(nrow(DSPP),nrow(dsp))
@@ -86,3 +86,75 @@ for(currFun in praatfuns){
     reindeer::remove_ssffTrackDefinition(emuDBhandle,name=firstTrack,deleteFiles = TRUE)
   })
 }
+
+
+test_that("Cut points and npoints are handled properly",{
+  expect_equal(getSamples(512,522,cut=0.4,3),c(514,516))
+  expect_equal(getSamples(512,522,cut=0.4,2),c(515,516))
+  expect_equal(getSamples(512,525,cut=0.4,3),c(516,518))
+  expect_equal(getSamples(512,525,cut=0.4,2),c(517,518))
+  #Check boundaries
+  expect_equal(getSamples(1,525,cut=0,npoints=3),c(1,3))
+  expect_equal(getSamples(1,525,cut=1,npoints=3),c(524,526))
+  expect_equal(getSamples(1,525,cut=1,npoints=3,endOfTrack = 525),c(523,525))
+})
+
+
+test_that("Check that cut and npoints arguments result in the equivalent subsetting of read data",{
+  signalfile <- file.path("..","signalfiles","prolonged_a","a1.wav")
+  expect_equal(readTrackData(signalfile,cut=0,npoints = 5),readTrackData(signalfile)[1:5,] )
+  readTrackData(signalfile) -> ref
+
+  expect_equal(readTrackData(signalfile,cut=0.5,npoints = 5),ref[(nrow(ref)/2-2):(nrow(ref)/2+2), ])
+
+  expect_equal(readTrackData(signalfile,cut=0.25,npoints = 5),ref[(round(nrow(ref)/4)-2):(round(nrow(ref)/4)+2), ])
+
+  expect_equal(readTrackData(signalfile,cut=1,npoints = 5),tail(ref,n=5))
+})
+
+for( kind in c("","no ")){
+  test_that(paste0("We can add missing signal track files when ",kind,"metadata are present"),{
+    reindeer:::unlink_emuRDemoDir()
+    reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
+    if(kind == "no "){
+      reindeer:::make_dummy_metafiles(emuDBhandle)
+    }
+    reindeer::remove_ssffTrackDefinition(emuDBhandle,name="fm",deleteFiles = TRUE)
+    reindeer::remove_ssffTrackDefinition(emuDBhandle,name="dft",deleteFiles = TRUE)
+    #Check that we can make a track using defaults
+    reindeer::add_trackDefinition(emuDBhandle = emuDBhandle,name="FORMANTS",onTheFlyFunctionName = "forest",verbose = FALSE)
+
+    expect_true(!is.null(list_ssffTrackDefinitions(emuDBhandle)))
+    reindeer::remove_ssffTrackDefinition(emuDBhandle, name="FORMANTS",deleteFiles =TRUE)
+    expect_null(list_ssffTrackDefinitions(emuDBhandle))
+    #Check that we can make a track using specified inputs
+    reindeer::add_trackDefinition(emuDBhandle = emuDBhandle,name="FORMANTS",columnName = "fm",fileExtension = "for",onTheFlyFunctionName = "forest",verbose = FALSE)
+    before <- list_files(emuDBhandle = emuDBhandle,fileExtension = "for")$absolute_file_path
+    toRemove <-  before[1:2]
+    unlink(x=toRemove,recursive = FALSE)
+    after <- list_files(emuDBhandle = emuDBhandle,fileExtension = "for")$absolute_file_path
+
+    assertthat::assert_that(length(before) == 7,length(toRemove)== 2, length(after) == 5)
+    #
+    expect_error({
+      reindeer::add_trackDefinition(emuDBhandle = emuDBhandle,name="FORMANTS",fileExtension = "fms",onTheFlyFunctionName = "forest",verbose = FALSE)}
+      ,regexp= "A track .* is already defined.* file extension .*")
+
+    unlink(x=toRemove,recursive = FALSE)
+    expect_error(
+      reindeer::add_trackDefinition(emuDBhandle = emuDBhandle,name="FORMANTS",columnName = "fms",onTheFlyFunctionName = "forest",verbose = FALSE),
+      regexp= "A track .* is already defined.* column name .* "
+    )
+
+    reindeer::add_trackDefinition(emuDBhandle = emuDBhandle,name="FORMANTS",onTheFlyFunctionName = "forest",verbose = FALSE)
+    reinitialized <- list_files(emuDBhandle = emuDBhandle,fileExtension = "for")$absolute_file_path
+    expect_equal(sort(before),sort(reinitialized))
+
+    # Now regenerate another way
+    unlink(x=toRemove,recursive = FALSE)
+    reindeer::add_trackDefinition(emuDBhandle = emuDBhandle,name="FORMANTS",onTheFlyFunctionName = "forest",verbose = FALSE)
+    reinitialized <- list_files(emuDBhandle = emuDBhandle,fileExtension = "for")$absolute_file_path
+    expect_equal(sort(before),sort(reinitialized))
+  })
+}
+
