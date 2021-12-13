@@ -17,9 +17,9 @@ test_that("Importation of speech signal files works",{
 
   pw <- list_files(emuDBhandle,sessionPattern = "generated",fileExtension = "wav")
 
-  expect_equal(nrow(pw),  4)
+  expect_equal(nrow(pw),  3)
 
-  expect_equal(nrow(list_bundles(emuDBhandle,session = "generated")) , 4 )
+  expect_equal(nrow(list_bundles(emuDBhandle,session = "generated")) , 3 )
 
   #Check that all files are mono sound files, and readable as such
   for(i in 1:nrow(pw)){
