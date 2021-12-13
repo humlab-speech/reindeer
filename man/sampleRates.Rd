@@ -20,12 +20,9 @@ not cached information, and may be slow on large databases with many SSFF
 tracks defined, if stored on a media with slower file access speeds.
 }
 \examples{
-<<<<<<< HEAD
 reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
 samplerates(emuDBhandle)
 reindeer:::unlink_emuRDemoDir()
-=======
->>>>>>> 98a5fd528ecc2859ea4973b89c317978e7ec055c
 
 }
 \seealso{
