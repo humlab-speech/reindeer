@@ -65,11 +65,20 @@ make_dummy_metafiles <- function(db,session=TRUE){
 
 add_dummy_metadata <- function(emuDBhandle){
 
-  metagrid <- expand.grid(Age=seq(1,76,3),Gender=c("Male","Female",NA)) %>% dplyr::arrange(Age) %>% dplyr::slice(-1)
+  metagrid <- expand.grid(Age=seq(1,76,3),Gender=c("Male","Female",NA)) %>%
+    dplyr::arrange(Age) %>%
+    dplyr::mutate(windowSize=20,minF=40,maxF=800,nominalF1=600)  %>%
+    dplyr::slice(-1)
 
   bundles <- list_bundles(emuDBhandle)
   for(i in 1:nrow(bundles)){
-      add_metadata(emuDBhandle,list(Age=metagrid[i,"Age"],Gender=metagrid[i,"Gender"]),session=bundles[i,"session"],bundle=bundles[i,"name"])
+      add_metadata(emuDBhandle,list(Age=metagrid[i,"Age"],
+                                    Gender=metagrid[i,"Gender"],
+                                    windowSize=metagrid[i,"windowSize"],
+                                    minF=metagrid[i,"minF"],
+                                    maxF=metagrid[i,"maxF"],
+                                    nominalF1=metagrid[i,"nominalF1"]
+                                    ),session=bundles[i,"session"],bundle=bundles[i,"name"])
   }
 
   for(i in seq(1,nrow(bundles),1)){

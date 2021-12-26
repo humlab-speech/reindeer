@@ -2,11 +2,12 @@
 library(testthat)
 library(reindeer)
 library(superassp)
+library(dplyr)
 
 #Set up the base test database
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
-reindeer:::make_dummy_metafiles(emuDBhandle)
+reindeer:::add_dummy_metadata(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
 #Clean up possibly conflicting tracks
 reindeer::remove_ssffTrackDefinition(emuDBhandle,name="fm",deleteFiles = TRUE)
@@ -25,7 +26,7 @@ test_that("Check that we can get default signal processing parameters",{
 
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
-reindeer:::make_dummy_metafiles(emuDBhandle)
+reindeer:::add_dummy_metadata(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
 unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
 
@@ -117,7 +118,7 @@ for( kind in c("","no ")){
     reindeer:::unlink_emuRDemoDir()
     reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
     if(kind == "no "){
-      reindeer:::make_dummy_metafiles(emuDBhandle)
+      reindeer:::add_dummy_metadata(emuDBhandle)
     }
     reindeer::remove_ssffTrackDefinition(emuDBhandle,name="fm",deleteFiles = TRUE)
     reindeer::remove_ssffTrackDefinition(emuDBhandle,name="dft",deleteFiles = TRUE)

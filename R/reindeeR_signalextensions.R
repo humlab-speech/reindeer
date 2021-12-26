@@ -388,18 +388,60 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 
 #' Metadata-aware selection of DSP parameters
 #'
-#' This function deduces the appropriate parameters
-#' for a speech signal processing function based on the
-#' speaker Age and Gender metadata set for a bundle.
+#' This function deduces the appropriate parameters for a speech signal
+#' processing function based on the speaker Age and Gender metadata set for a
+#' bundle.
+#'
+#' The deduction of parameters will be done in four steps:
+#'
+#' 1.The user can specify metadata values for cases where for instance Age and
+#' Gender is not specified for a bundle. These will be injected into the stored
+#' metadata before extracting DSP parameters.
+#'
+#' 2. The function will use Age and Gender metadata for each bundle (or from the
+#' session) and consults the [DSPP] set of parameters to deduce function
+#' arguments. A Gender of NA means that an gender neutral, and therefore
+#' possibly very wide, settings will be applied. The procedure will select the
+#' appropriate age-dependent setting with the most specific (smallest) age
+#' range. As a result, one can have a set of specifications like these:
+#' {Gender=NA, Age_lower=0, Age_upper=200}, and then {Gender=NA, Age_lower=10,
+#' Age_upper=20} and the procedure will be able to select the second set for any
+#' 15 year old person for which a better setting is not found. For a Male 15
+#' year old speaker, these settings will also be applied, if there are no other
+#' set that is defined for, for instance, {Gender=Male, Age_lower=10,
+#' Age_upper=20}.
+#'
+#' 3. Missing function parameters for a bundle after having considered metadata
+#' and the DSP parameter sets will be completed from the formal default
+#' arguments of the `onTheFlyFunctionName` function.
+#'
+#' 4. If the user specifies a set of explicit function parameters in the
+#' `onTheFlyParams`, these will overwrite any parameter values deduced from the
+#' metadata.
 #'
 #' @param emuDBhandle The database handle
-#' @param onTheFlyFunctionName The name of the function for which appropriate parameters should be deduced.
-#' @param wide.format The default output format of this function is one row per parameter and value pair. If `TRUE`, this argument forces the function to instead return one row per bundle in the database, and with parameter values in separate columns instead.
-#' @param metadata.defaults Default settings for metadata. This argument is primarily used for setting default Age and Gender for bundles with no such metadata already set.
-#' @param package The signal processing package where the `onTheFlyFunctionName` function may be found. Defaults to [superassp].
+#' @param onTheFlyFunctionName The name of the function for which appropriate
+#'   parameters should be deduced.
+#' @param onTheFlyParams A list of explicit DSP function parameters.
+#' @param wide.format The default output format of this function is one row per
+#'   parameter and value pair. If `TRUE`, this argument forces the function to
+#'   instead return one row per bundle in the database, and with parameter
+#'   values in separate columns instead.
+#' @param metadata.defaults Default settings for metadata. This argument is
+#'   primarily used for setting default Age and Gender for bundles with no such
+#'   metadata already set.
+#' @param package The signal processing package where the `onTheFlyFunctionName`
+#'   function may be found. Defaults to [superassp].
+#' @param DSP.file The full path of an Excel file containig gender and age
+#'   specific DSP parameters. Please consult [get_parameters] for more
+#'   information. If `NULL`, the default `DSPP` data frame will be used to get
+#'   DSP parameters.
+#' @param wide.format If FALSE, the output will be in long format rather than
+#'   the default wide format.
 #'
-#' @return
-#' A data frame with columns `session`, `bundle`, `Parameter`, and `Setting`, grouped by `session` and `bundle`.
+#' @return A [tibble] with columns `session`, `bundle`, and then one column per
+#'   parameter value for the `onTheFlyFunctionName` function. The output is
+#'   grouped by `session` and `bundle`.
 #'
 #' @examples
 #' \dontrun{
@@ -410,64 +452,52 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 #' }
 
 
-match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=list(Gender=NA,Age=35),wide.format=FALSE,package="superassp"){
+metadata_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=NULL,metadata.defaults=list(Gender=NA,Age=35),package="superassp",DSP.file=NULL,wide.format=TRUE){
 
   meta <- get_metadata(emuDBhandle,manditory=names(metadata.defaults))
-  dsp <- get_parameters()
+  dsp <- get_parameters(file=DSP.file)
 
+  metadata.defaults <- utils::modifyList(list("Age_lower"=0,"Age_upper"=200),metadata.defaults)
 
-  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
-  funcFormals = as.list(formals(currFunc))
-  names(funcFormals) -> fp
-  #IF metadata.defaults are mandatory, they should be in the output
-  assertthat::assert_that(all(names(metadata.defaults) %in% names(meta)))
-
-  meta %>%
-    tidyr::replace_na(replace=metadata.defaults)  -> out
-  #return(out)
-  out %>%
-    dplyr::left_join(dsp %>%
-                       dplyr::filter(Parameter %in% fp),na_matches = "na",by=c("Gender"))  %>%
+  meta_settings <- meta %>%
+    dplyr::left_join(dsp,na_matches = "na",by=c("Gender"))  %>%
     dplyr::filter(!is.na(bundle),!is.na(session)) %>%
-    dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
-                  Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
     dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
     dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
     dplyr::arrange(session,bundle,Parameter,AgeRange) %>%
     dplyr::group_by(session,bundle,Parameter) %>%
     dplyr::slice_head(n=1) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(session, bundle)  -> meta_settings
-
-  #Overwrite default by manually specified parameters when present
-  # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
-  if(any(fp %in% names(meta_settings))) {
-    manualParameters <- base::intersect(fp,names(meta_settings))
-    for(currParam in manualParameters){
-      #We can now set up two logical vectors, which
-      # 1) identify which rows identify a parameter for which there is a column
-      paramRow <- meta_settings$Parameter == currParam
-      # 2) and which rows where a default value has been set
-      manualValueSet <- !is.na(meta_settings[,currParam])
-      # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
-      rowToSwap <- paramRow & manualValueSet
-      meta_settings[rowToSwap,"Setting"] <- as.character(meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
-    }
-  }
-
-
-  #Do some cleanup
-  meta_settings <- meta_settings %>%
+    dplyr::group_by(session, bundle) %>%
     dplyr::select(session,bundle,Parameter,Setting) %>%
     tidyr::pivot_wider(names_from = "Parameter",values_from = "Setting") %>% #To make replace_na work
-    tidyr::replace_na(replace=as.list(funcFormals))
+    tidyr::replace_na(replace=metadata.defaults)
+
+  # Now we apply the function-specific stuff
+  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+  funcFormals = as.list(formals(currFunc))
+  names(funcFormals) -> fp
+  toSetFp <- intersect(fp,names(meta_settings)) # Which metadata derived settings will be used by the function
+  functionDefaults <- funcFormals[toSetFp]
+
+  meta_settings <- meta_settings%>%
+    dplyr::select(toSetFp) %>%
+    tidyr::replace_na(functionDefaults) %>%
+    dplyr::mutate(across(everything() , ~ utils::type.convert(.,as.is=TRUE))) %>%
+    dplyr::mutate(across(where(is.integer), as.numeric)) %>%
+    dplyr::group_by(session,bundle)
+
+  if(! is.null(onTheFlyParams)){
+    #Now overwrite explicitly provided arguments
+    meta_settings <- meta_settings %>%
+      dplyr::mutate(as.data.frame(onTheFlyParams))
+  }
 
   if(! wide.format){
     meta_settings <- meta_settings %>%
-      tidyr::pivot_longer(! c(session,bundle),names_to = "Parameter",values_to="Setting" ) %>%
+      tidyr::pivot_longer(! c(session,bundle),names_to = "Parameter",values_to="Setting",values_transform=list(Setting=as.character)) %>%
       dplyr::group_by(session,bundle)
   }
-
 
 
   return(meta_settings)
@@ -476,7 +506,22 @@ match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=
 
 
 
-
+# return(meta_settings)
+# #Overwrite default by manually specified parameters when present
+# # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
+# if(any(fp %in% names(meta_settings))) {
+#   manualParameters <- base::intersect(fp,names(meta_settings))
+#   for(currParam in manualParameters){
+#     #We can now set up two logical vectors, which
+#     # 1) identify which rows identify a parameter for which there is a column
+#     paramRow <- meta_settings$Parameter == currParam
+#     # 2) and which rows where a default value has been set
+#     manualValueSet <- !is.na(meta_settings[,currParam])
+#     # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
+#     rowToSwap <- paramRow & manualValueSet
+#     meta_settings[rowToSwap,"Setting"] <- as.character(meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
+#   }
+# }
 
 
 #' A utility function that builds a list of parameters to use in function call based on metadata
@@ -498,11 +543,12 @@ get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,
 
   currBundl <- bundle
   currSess <- session
+
   currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
   funcFormals = as.list(formals(currFunc))
   names(funcFormals) -> fp
 
-  dspParList <- match_parameters(emuDBhandle,onTheFlyFunctionName = onTheFlyFunctionName,metadata.defaults = metadata.defaults,package = package, wide.format=FALSE) %>%
+  dspParList <- match_parameters(emuDBhandle,metadata.defaults = metadata.defaults, wide.format=FALSE) %>%
     dplyr::filter(!is.na(Parameter),!is.na(Setting) ) %>%
     dplyr::filter(bundle == currBundl && session == currSess) %>%
     dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter))
@@ -772,7 +818,11 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 # library(reindeer)
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-# reindeer:::make_dummy_metafiles(emuDBhandle)
+# reindeer:::add_dummy_metadata(emuDBhandle)
+# get_metadata(emuDBhandle) -> md
+# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest") -> mp)
+
+# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(te=2,ett=3,numFormants=9)) -> mp2)
 # query(emuDBhandle,"Phonetic = s") -> sl
 # sl <- sl[1:3,]
 #
