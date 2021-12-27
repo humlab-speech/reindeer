@@ -67,14 +67,13 @@ add_dummy_metadata <- function(emuDBhandle){
 
   metagrid <- expand.grid(Age=seq(1,76,3),Gender=c("Male","Female",NA)) %>%
     dplyr::arrange(Age) %>%
-    dplyr::mutate(windowSize=20,minF=40,maxF=800,nominalF1=600)  %>%
+    dplyr::mutate(minF=40,maxF=800,nominalF1=600)  %>%
     dplyr::slice(-1)
 
   bundles <- list_bundles(emuDBhandle)
   for(i in 1:nrow(bundles)){
       add_metadata(emuDBhandle,list(Age=metagrid[i,"Age"],
                                     Gender=metagrid[i,"Gender"],
-                                    windowSize=metagrid[i,"windowSize"],
                                     minF=metagrid[i,"minF"],
                                     maxF=metagrid[i,"maxF"],
                                     nominalF1=metagrid[i,"nominalF1"]

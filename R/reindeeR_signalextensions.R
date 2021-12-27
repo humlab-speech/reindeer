@@ -196,7 +196,7 @@ add_trackDefinition <- function(
       logger::log_threshold(logger::WARN)
     }
 
-    meta_settings <- match_parameters(emuDBhandle = emuDBhandle,
+    meta_settings <- metadata_parameters(emuDBhandle = emuDBhandle,
                                          onTheFlyFunctionName = onTheFlyFunctionName,
                                          metadata.defaults = metadata.defaults,
                                          package = package)
@@ -481,10 +481,11 @@ metadata_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=
   functionDefaults <- funcFormals[toSetFp]
 
   meta_settings <- meta_settings%>%
-    dplyr::select(toSetFp) %>%
+    dplyr::select(session, bundle, toSetFp) %>%
     tidyr::replace_na(functionDefaults) %>%
     dplyr::mutate(across(everything() , ~ utils::type.convert(.,as.is=TRUE))) %>%
     dplyr::mutate(across(where(is.integer), as.numeric)) %>%
+
     dplyr::group_by(session,bundle)
 
   if(! is.null(onTheFlyParams)){
@@ -495,8 +496,7 @@ metadata_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=
 
   if(! wide.format){
     meta_settings <- meta_settings %>%
-      tidyr::pivot_longer(! c(session,bundle),names_to = "Parameter",values_to="Setting",values_transform=list(Setting=as.character)) %>%
-      dplyr::group_by(session,bundle)
+      tidyr::pivot_longer(! c(session,bundle),names_to = "Parameter",values_to="Setting",values_transform=list(Setting=as.character))
   }
 
 
