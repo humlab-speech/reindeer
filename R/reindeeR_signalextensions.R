@@ -206,6 +206,9 @@ add_trackDefinition <- function(
                             fileExtension,
                             superassp::get_extension(onTheFlyFunctionName))
 
+    if("explicitExt" %in% formalArgs(currFunc)){
+      onTheFlyParams$explicitExt <- fileExtension
+    }
     ## Set up logging
 
     if(!is.null(onTheFlyOptLogFilePath) ) {
@@ -473,7 +476,7 @@ metadata_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=
 
   meta_settings <- meta %>%
     dplyr::left_join(dsp,na_matches = "na",by=c("Gender"))  %>%
-
+    tidyr::replace_na(replace=metadata.defaults) %>%
     dplyr::filter(!is.na(bundle),!is.na(session)) %>%
     dplyr::filter( Age <= Age_upper , Age >= Age_lower  ) %>%
     dplyr::mutate(AgeRange=Age_upper-Age_lower) %>%
@@ -483,8 +486,8 @@ metadata_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=
     dplyr::ungroup() %>%
     dplyr::group_by(session, bundle) %>%
     dplyr::select(session,bundle,Parameter,Setting) %>%
-    tidyr::pivot_wider(names_from = "Parameter",values_from = "Setting") %>% #To make replace_na work
-    tidyr::replace_na(replace=metadata.defaults)
+    tidyr::pivot_wider(names_from = "Parameter",values_from = "Setting") #To make replace_na work
+
 
   # Now we apply the function-specific stuff
   currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
@@ -494,14 +497,14 @@ metadata_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=
   functionDefaults <- funcFormals[toSetFp]
 
   meta_settings <- meta_settings%>%
-    dplyr::select(session, bundle, toSetFp) %>%
+    dplyr::select(session, bundle, all_of(toSetFp)) %>%
     tidyr::replace_na(functionDefaults) %>%
     dplyr::mutate(across(everything() , ~ utils::type.convert(.,as.is=TRUE))) %>%
     dplyr::mutate(across(where(is.integer), as.numeric)) %>%
 
     dplyr::group_by(session,bundle)
 
-  if(! is.null(onTheFlyParams)){
+  if(! is.null(onTheFlyParams) && length(onTheFlyParams) > 0){
     #Now overwrite explicitly provided arguments
     meta_settings <- meta_settings %>%
       dplyr::mutate(as.data.frame(onTheFlyParams))
@@ -831,8 +834,7 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 # library(reindeer)
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-
-#  reindeer:::add_dummy_metadata(emuDBhandle)
+# reindeer:::add_dummy_metadata(emuDBhandle)
 # add_trackDefinition(emuDBhandle,name="fms",onTheFlyFunctionName = "forest")
 
 # add_trackDefinition(emuDBhandle,"zcr",onTheFlyFunctionName = "zcrana")

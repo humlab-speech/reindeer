@@ -139,7 +139,7 @@ for( kind in c("","no ")){
   test_that(paste0("We can add missing signal track files when ",kind,"metadata are present"),{
     reindeer:::unlink_emuRDemoDir()
     reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
-    if(kind == "no "){
+    if(kind == ""){
       reindeer:::add_dummy_metadata(emuDBhandle)
     }
     reindeer::remove_ssffTrackDefinition(emuDBhandle,name="fm",deleteFiles = TRUE)
