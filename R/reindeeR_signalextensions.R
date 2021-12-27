@@ -100,6 +100,8 @@ get_parameters <- function(file=NULL){
 #' @param package The name of the package in which tbe funciton `onTheFlyFunctionName` is defined.
 #'
 #' @importFrom "dplyr" "%>%"
+#'
+#' @return A boolean value indicating whether creation signal files were sucessful or not.
 #
 #' @export
 #'
@@ -136,52 +138,75 @@ add_trackDefinition <- function(
   verbose=TRUE,
   package="superassp"){
 
+
   existingDefExists = FALSE
   #Check if the track has not already been defined
   existingDefinitions <- list_ssffTrackDefinitions(emuDBhandle)
   if(! is.null(existingDefinitions) && name %in% existingDefinitions$name){
     # In this case, we have an existing definition and need to make sure that it agrees
     # with what the user specified
-    currDef <- existingDefinitions[existingDefinitions$name == name , ]
-    if(! is.null(columnName) && currDef[[1,"columnName"]][[1]] != columnName){
-      stop("A track '",name,"' is already defined in the database but with a different column name specification ('",currDef$columnName,"') than the specified ('",columnName,"'). Please correct the column name, or use NULL.")
+    existingDefExists <- TRUE
+
+    currDef <- existingDefinitions[existingDefinitions$name == name,c("columnName","fileExtension")]
+    if(is.null(columnName)){
+      columnName <- currDef$columnName
+    } else {
+      #In this case we need to check that the specifications agree for the track
+      if(currDef$columnName != columnName){
+        #Wrong definition
+        stop("A track '",name,"' is already defined in the database but with a different column name specification ('",currDef$columnName,"') than what you specified ('",columnName,"').\n Please use the same column name, or use NULL.")
+      }
     }
 
-    if(! is.null(fileExtension) && currDef[[1,"fileExtension"]] != fileExtension){
-      stop("A track '",name,"' is already defined in the database but with a different file extension specification ('",currDef$fileExtension,"') than the specified ('",fileExtension,"'). Please correct the file extension, or use NULL.")
+    if(is.null(fileExtension)){
+      fileExtension <- currDef$fileExtension
+    } else {
+      #In this case we need to check that the specifications agree for the track
+      if(currDef$fileExtension != fileExtension){
+        #Wrong definition
+        stop("A track '",name,"' is already defined in the database but with a different file extension specification ('",currDef$fileExtension,"') than the specified ('",fileExtension,"').\n Please use the same file extension name, or use NULL.")
+      }
     }
-    #Amend the specifications from stored definition
-    fileExtension <- currDef$fileExtension
-    columnName <- currDef$columnName
-    existingDefExists <- TRUE
   }
+
+  if(is.null(inputTrackExtension)){
+    #We need to get the default media file extension from the database definition if it not defined
+    dbConfig = emuR:::load_DBconfig(emuDBhandle)
+    inputTrackExtension <- dbConfig$mediafileExtension
+  }
+
 
   if(!is.null(onTheFlyFunctionName)){
     # From here we deduce how to apply the function -----------------------
 
-    defTracks <- superassp::get_definedtracks(onTheFlyFunctionName)
+    #Initialize a return list
+    created <- list(created=c(),failed=c())
+
+    ## Fill in some defaults
+
+
+
+    # Fill defaults from the attributes of the applied function
+    currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+    defTracks <- superassp::get_definedtracks(currFunc)
+
+    #Make sure we have a track definition
+    if(is.null(columnName) && length(defTracks) > 0 ){
+      columnName <- defTracks[1]
+    }
+
+
+    if(! columnName %in% defTracks ) {
+      stop("The track ",columnName, " is not a defined output track name of the function ",onTheFlyFunctionName,". Valid values are ",paste(defTracks,collapse = ","))
+    }
+
+
     #Set the default file extension to the one set as an attribute, if missing in the arguments
     fileExtension <- ifelse(!is.null(fileExtension),
                             fileExtension,
                             superassp::get_extension(onTheFlyFunctionName))
 
-
-    columnName <- ifelse(!is.null(columnName) & length(defTracks) > 0 ,
-                         columnName,
-                         defTracks[[1]])
-
-    if(! columnName %in% defTracks ) {
-      stop("The track ",columnName, " is not a defined output track name of the function ",onTheFlyFunctionName)
-    }
-
-
-    if(is.null(inputTrackExtension)){
-      #We need to get the default media file extension from the database definition if it not defined
-      dbConfig = emuR:::load_DBconfig(emuDBhandle)
-      inputTrackExtension <- dbConfig$mediafileExtension
-    }
-
-
+    ## Set up logging
 
     if(!is.null(onTheFlyOptLogFilePath) ) {
        if(!dir.exists(onTheFlyOptLogFilePath)){
@@ -192,14 +217,21 @@ add_trackDefinition <- function(
          logger::log_threshold(logger::INFO)
          logger::log_formatter(logger::formatter_json)
        }
+      onTheFlyParams$optLogFilePath = onTheFlyOptLogFilePath
     }else{
       logger::log_threshold(logger::WARN)
     }
 
-    meta_settings <- match_parameters(emuDBhandle = emuDBhandle,
+
+    onTheFlyParams$explicitExt = fileExtension
+
+
+    meta_settings <- metadata_parameters(emuDBhandle = emuDBhandle,
                                          onTheFlyFunctionName = onTheFlyFunctionName,
+                                         onTheFlyParams = onTheFlyParams,
                                          metadata.defaults = metadata.defaults,
                                          package = package)
+
 
     fl <- list_files(emuDBhandle = emuDBhandle,fileExtension = inputTrackExtension) %>%
       dplyr::select(-file)
@@ -216,21 +248,9 @@ add_trackDefinition <- function(
     assertthat::assert_that(nrow(fl) == ngi, msg=paste0("Not all sounds files were assigned metadata ", nrow(fl)," ==> ",ng))
 
 
-    currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
-    funcFormals = as.list(formals(currFunc))
-    names(funcFormals) -> fp
-
-    #Copy arguments given to this function over the list of general arguments given to the called function
-    if("optLogFilePath" %in% fp ){
-      onTheFlyParams$optLogFilePath = onTheFlyOptLogFilePath
-    }
-    if("explicitExt" %in% fp ){
-      onTheFlyParams$explicitExt = fileExtension
-    }
-
     fl_meta_settings %>%
-      dplyr::filter(!is.na(Parameter),!is.na(Setting)) %>%
-      dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter)) -> dspParList
+      dplyr::rename(listOfFiles=absolute_file_path) %>%
+      dplyr::group_map( as.list) -> dspParList
 
     if(verbose){
       if(overwriteFiles){
@@ -242,6 +262,7 @@ add_trackDefinition <- function(
       pb <- utils::txtProgressBar(min=0, max=ngi, style = 3)
     }
 
+
     for(currFileGroup in 1:ngi){
 
       if(verbose){
@@ -250,35 +271,26 @@ add_trackDefinition <- function(
 
       currSession <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$session)
       currBundle <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$bundle)
-      outFile <- file.path(emuDBhandle$basePath,
-                           paste0(currSession,emuR:::session.suffix),
-                           paste0(currBundle,emuR:::bundle.dir.suffix),
-                           paste0(currBundle,".",fileExtension))
+
+      outFile <- paste(tools::file_path_sans_ext(dspParList[[currFileGroup]][["listOfFiles"]]),fileExtension,sep=".")
 
       if(overwriteFiles || ! file.exists(outFile)){
-        purrr::flatten(utils::modifyList(dspParList[currFileGroup][1],onTheFlyParams)) -> argLst
-        #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
-        #we need to convert strings like "11" to proper 11 values.
-        argLst <- lapply(argLst,
-                         utils::type.convert,as.is=TRUE)
 
-        argLst$listOfFiles <- unique(dplyr::group_split(fl_meta_settings)[[currFileGroup]]$absolute_file_path)
+        dspParList[[currFileGroup]] -> currArgLst
 
-        # Fix values of 'integer' class, since the wrassp functions expect 'numeric'
-        if(length(argLst) > 0 ){
-          for(an in names(argLst)){
-            argLst[an] = ifelse(class(argLst[[an]]) =="integer",as.numeric(argLst[[an]]),argLst[[an]])
-          }
-        }
 
         #logger::log_info(toLog)
-        toLog <- utils::modifyList(list("function"=onTheFlyFunctionName),argLst)
+        toLog <- utils::modifyList(list("function"=onTheFlyFunctionName),currArgLst)
         #logger::log_info(logger::deparse_to_one_line(toLog))
         logger::log_info(toLog)
 
         #Now actually make the function call
-        do.call(currFunc, argLst)
+        do.call(currFunc, currArgLst)
 
+        #Now check that the output file was actually created
+        if(!file.exists(outFile)){
+          logger::log_warn("Output file ",outFile," was not created")
+        }
       }
 
     }
@@ -307,6 +319,10 @@ add_trackDefinition <- function(
   }
 
 
+    return(
+      name %in% emuR::list_ssffTrackDefinitions(emuDBhandle)$name &&
+        length(list_files(emuDBhandle,fileExtension)) == length(list_files(emuDBhandle,fileExtension))
+    )
 }
 
 
@@ -416,18 +432,10 @@ match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=
   dsp <- get_parameters()
 
 
-  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
-  funcFormals = as.list(formals(currFunc))
-  names(funcFormals) -> fp
-  #IF metadata.defaults are mandatory, they should be in the output
-  assertthat::assert_that(all(names(metadata.defaults) %in% names(meta)))
+  meta_settings <- meta %>%
+    tidyr::replace_na(replace=metadata.defaults) %>%
+    dplyr::left_join(dsp,na_matches = "na",by=c("Gender"))  %>%
 
-  meta %>%
-    tidyr::replace_na(replace=metadata.defaults)  -> out
-  #return(out)
-  out %>%
-    dplyr::left_join(dsp %>%
-                       dplyr::filter(Parameter %in% fp),na_matches = "na",by=c("Gender"))  %>%
     dplyr::filter(!is.na(bundle),!is.na(session)) %>%
     dplyr::mutate(Age_lower=ifelse(is.na(Age_lower),0,Age_lower),
                   Age_upper=ifelse(is.na(Age_upper),200,Age_upper)) %>%
@@ -437,30 +445,32 @@ match_parameters <- function(emuDBhandle,onTheFlyFunctionName,metadata.defaults=
     dplyr::group_by(session,bundle,Parameter) %>%
     dplyr::slice_head(n=1) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(session, bundle)  -> meta_settings
-
-  #Overwrite default by manually specified parameters when present
-  # We do this after matching with DSPP defaults, as they would otherwise have to be matched by file early but applied last
-  if(any(fp %in% names(meta_settings))) {
-    manualParameters <- base::intersect(fp,names(meta_settings))
-    for(currParam in manualParameters){
-      #We can now set up two logical vectors, which
-      # 1) identify which rows identify a parameter for which there is a column
-      paramRow <- meta_settings$Parameter == currParam
-      # 2) and which rows where a default value has been set
-      manualValueSet <- !is.na(meta_settings[,currParam])
-      # Get the row which correspond both to a parameter setting set by DSPP and by a value set in a corresponding column
-      rowToSwap <- paramRow & manualValueSet
-      meta_settings[rowToSwap,"Setting"] <- as.character(meta_settings[rowToSwap,currParam]) # The conversion is required due to some settings being character
-    }
-  }
-
-
-  #Do some cleanup
-  meta_settings <- meta_settings %>%
+    dplyr::group_by(session, bundle) %>%
     dplyr::select(session,bundle,Parameter,Setting) %>%
-    tidyr::pivot_wider(names_from = "Parameter",values_from = "Setting") %>% #To make replace_na work
-    tidyr::replace_na(replace=as.list(funcFormals))
+    tidyr::pivot_wider(names_from = "Parameter",values_from = "Setting")  #To make replace_na work
+
+
+  # Now we apply the function-specific stuff
+  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+  funcFormals = as.list(formals(currFunc))
+  names(funcFormals) -> fp
+  toSetFp <- intersect(fp,names(meta_settings)) # Which metadata derived settings will be used by the function
+  functionDefaults <- funcFormals[toSetFp]
+
+  meta_settings <- meta_settings%>%
+    dplyr::select(session, bundle, all_of(toSetFp)) %>%
+    tidyr::replace_na(functionDefaults) %>%
+    dplyr::mutate(across(everything() , ~ utils::type.convert(.,as.is=TRUE))) %>%
+    dplyr::mutate(across(where(is.integer), as.numeric)) %>%
+
+
+  if(! is.null(onTheFlyParams)){
+    # extract only valid parameters
+    as.data.frame(onTheFlyParams[names(onTheFlyParams) %in% fp]) -> onTheFlyParamsDF
+    #Now overwrite explicitly provided arguments
+    meta_settings <- meta_settings %>%
+      dplyr::mutate(onTheFlyParamsDF)
+  }
 
   if(! wide.format){
     meta_settings <- meta_settings %>%
@@ -767,12 +777,19 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 
 ### For interactive testing
 #
-#
+
 # library(superassp)
 # library(reindeer)
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-# reindeer:::make_dummy_metafiles(emuDBhandle)
+#  reindeer:::add_dummy_metadata(emuDBhandle)
+# add_trackDefinition(emuDBhandle,name="fms",onTheFlyFunctionName = "forest")
+
+# add_trackDefinition(emuDBhandle,"zcr",onTheFlyFunctionName = "zcrana")
+#  get_metadata(emuDBhandle) -> md
+# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest") -> mp)
+
+# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(te=2,ett=3,numFormants=9)) -> mp2)
 # query(emuDBhandle,"Phonetic = s") -> sl
 # sl <- sl[1:3,]
 #
@@ -785,7 +802,7 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 # print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
 #
 # # # git2r::init(emuDBhandle$basePath)
-# add_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")
+#dd_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")
 # add_trackDefinition(emuDBhandle, name = "FORMANTS", onTheFlyFunctionName = "forest")
 #add_trackDefinition(emuDBhandle, name = "F0", onTheFlyFunctionName = "ksvF0",onTheFlyOptLogFilePath="~/Desktop/out/")
 
