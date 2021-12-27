@@ -7,7 +7,7 @@ test_that("Metadata is collected correctly for a database",{
 
   reindeer:::unlink_emuRDemoDir()
   reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
-  reindeer:::make_dummy_metafiles(emuDBhandle)
+  reindeer:::add_dummy_metadata(emuDBhandle)
   fl = emuR::list_files(emuDBhandle,"wav")
   md <- reindeer::get_metadata(emuDBhandle)
 
@@ -20,7 +20,7 @@ test_that("Metadata may be set to NA and signal processing still works",{
 
   reindeer:::unlink_emuRDemoDir()
   reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
-  reindeer:::make_dummy_metafiles(emuDBhandle)
+  reindeer:::add_dummy_metadata(emuDBhandle)
   fl = emuR::list_files(emuDBhandle,"wav")
   reindeer::add_metadata(emuDBhandle,list(Age=NA,Gender=NA),bundle="msajc003")
   md <- reindeer::get_metadata(emuDBhandle)

@@ -44,6 +44,9 @@ add_trackDefinition(
 
 \item{package}{The name of the package in which tbe funciton \code{onTheFlyFunctionName} is defined.}
 }
+\value{
+A boolean value indicating whether creation signal files were sucessful or not.
+}
 \description{
 This function behaves like \link[emuR:AddListRemoveSsffTrackDefinition]{emuR::add_ssffTrackDefinition}, but
 can also take a well defined function (see below) not defined in the

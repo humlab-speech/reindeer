@@ -2,16 +2,18 @@
 library(testthat)
 library(reindeer)
 library(superassp)
+library(dplyr)
 
 #Set up the base test database
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
-reindeer:::make_dummy_metafiles(emuDBhandle)
+reindeer:::add_dummy_metadata(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
 #Clean up possibly conflicting tracks
 reindeer::remove_ssffTrackDefinition(emuDBhandle,name="fm",deleteFiles = TRUE)
 reindeer::remove_ssffTrackDefinition(emuDBhandle,name="dft",deleteFiles = TRUE)
 
+nonSSFFFunctions <-c("rfcana","afdiff","affilter")
 
 test_that("Check that we can get default signal processing parameters",{
   data("DSPP")
@@ -23,27 +25,43 @@ test_that("Check that we can get default signal processing parameters",{
 
 })
 
+for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
+  test_that(paste0("[",fun,"] - Check that metadata_parameters handles missing metadata files correctly"),{
+    reindeer:::unlink_emuRDemoDir()
+    reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
+    reindeer:::add_dummy_metadata(emuDBhandle)
+    fl = emuR::list_files(emuDBhandle,"wav")
+    unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
+     md <- reindeer:::metadata_parameters(emuDBhandle,"forest")
+
+     testthat::expect_equal(nrow(md), nrow(fl))
+
+  })
+}
+
+
+
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
-reindeer:::make_dummy_metafiles(emuDBhandle)
+reindeer:::add_dummy_metadata(emuDBhandle)
 fl = emuR::list_files(emuDBhandle,"wav")
 unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
 
-
-nonSSFFFunctions <-c("rfcana","afdiff","affilter")
-
 for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
   test_that(paste0("Signals can be created using the wrassp::",fun," function"),{
-      ext <- wrassp::wrasspOutputInfos[[fun]][["ext"]]
-      tracks <- setdiff(wrassp::wrasspOutputInfos[[fun]][["tracks"]],"arf|lar|lpc|rfc")
-      outputType <- wrassp::wrasspOutputInfos[[fun]][["outputType"]]
+      ext <- superassp::get_extension(fun)
+      tracks <- setdiff(superassp::get_definedtracks(fun),c("arf|lar|lpc|rfc",""))
+      outputType <- superassp::get_outputType(fun)
       if(outputType == "SSFF"){
         for(tr in tracks){
 
-          if(tr == ""){
-            tr <- paste0(ext,tr)
-          }
-          reindeer::add_trackDefinition(emuDBhandle,name=tr,columnName = tr,fileExtension = ext,onTheFlyFunctionName = fun,verbose=FALSE)
+          reindeer::add_trackDefinition(emuDBhandle,
+                                        name=tr,
+                                        columnName = tr,
+                                        fileExtension = ext,
+                                        onTheFlyFunctionName = fun,verbose=FALSE)
+          #,onTheFlyOptLogFilePath = "~/Desktop/temp/"
+
           fe <- reindeer::list_ssffTrackDefinitions(emuDBhandle)$fileExtension
 
           expect_true(ext %in% fe)
@@ -55,8 +73,13 @@ for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
         }
       }
    })
-
 }
+
+#Set up the base test database
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
+reindeer:::add_dummy_metadata(emuDBhandle)
+reindeer::remove_ssffTrackDefinition(emuDBhandle,"fm",deleteFiles = TRUE)
 
 praatfuns <- c("praat_formant_burg","praat_sauce","praat_intensity","praat_moments")
 
@@ -117,7 +140,7 @@ for( kind in c("","no ")){
     reindeer:::unlink_emuRDemoDir()
     reindeer:::create_ae_db(verbose=FALSE) -> emuDBhandle
     if(kind == "no "){
-      reindeer:::make_dummy_metafiles(emuDBhandle)
+      reindeer:::add_dummy_metadata(emuDBhandle)
     }
     reindeer::remove_ssffTrackDefinition(emuDBhandle,name="fm",deleteFiles = TRUE)
     reindeer::remove_ssffTrackDefinition(emuDBhandle,name="dft",deleteFiles = TRUE)
