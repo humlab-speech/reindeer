@@ -35,8 +35,9 @@ endfor
 execute calculate_intsint_labels.praat temp Momel Intsint IntsintMomel .momel .intsint .wav .TextGrid .PitchTier
 ... no yes 5
 
-Read from file... 'textGrid_file$'
+
 Read Strings from raw text file... 'intsint_file$'
+Read from file... 'textGrid_file$'
 deleteFile(intsint_file$)
 deleteFile(momel_file$)
 deleteFile(pitchTier_file$)
