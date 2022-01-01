@@ -26,47 +26,44 @@ endform
 soundLst = Create Strings as file list: "soundList", "'input_Directory$'/*.wav"
 noSounds = Get number of strings
 
+bundleLst = Replace all: ".wav", "", 1, "literals"
+Rename: "bundleLst"
+
 for f from 1 to noSounds
 	select soundLst
 	currFileName$ = Get string: f
-	soundFiles'f' = Read from file: "'input_Directory$'/'currFileName$'"
+	select bundleLst
+	currBundle$ = Get string: f
+
+
+	currSound = Read from file: "'input_Directory$'/'currFileName$'"
+
+	runScript: "./plugin_momel-intsint/analysis/automatic_min_max_f0.praat", pitch_span
+	currPitch = selected("Pitch")
+
+	runScript: "./plugin_momel-intsint/analysis/momel_single_file.praat", "'window_length' 'minimum_f0' 'maximum_f0' 'maximum_error' 'reduced_window_length' 'minimal_distance' 'minimal_frequency_ratio'" 
+	currPT = selected("PitchTier")
+	runScript: "./plugin_momel-intsint/analysis/code_with_intsint.praat"
+	momIntTG = selected("TextGrid")
+
+	tgTable = Down to Table: "no", 20, "yes", "no"
+	Append column: "bundle_id"
+	noAnchors = Get number of rows
+
+	for r from 1 to noAnchors
+		select tgTable
+		Set string value: r, "bundle_id", currBundle$
+	endfor
+
+	if f == 1
+		outTab = tgTable
+	else
+		selectObject: outTab 
+		plusObject: tgTable
+		outTab = Append
+	endif
 endfor
 
-for fe from 1 to noSounds
-		if fe == 1
-			selectObject: soundFiles'fe'
-		else
-			plusObject: soundFiles'fe'
-		endif	
-endfor
-
-Concatenate recoverably
-chainSound = selected ("Sound")
-chainTextGrid = selected ("TextGrid")
-
-#Cleanup 
-
-for fe from 1 to noSounds
-		removeObject: soundFiles'fe'
-endfor
-
-selectObject: chainSound
-
-
-
-runScript: "./plugin_momel-intsint/analysis/automatic_min_max_f0.praat", pitch_span
-currPitch = selected("Pitch")
-
-
-
-runScript: "./plugin_momel-intsint/analysis/momel_single_file.praat", "'window_length' 'minimum_f0' 'maximum_f0' 'maximum_error' 'reduced_window_length' 'minimal_distance' 'minimal_frequency_ratio'" 
-currPT = selected("PitchTier")
-runScript: "./plugin_momel-intsint/analysis/code_with_intsint.praat"
-momIntTG = selected("TextGrid")
-
-selectObject: chainTextGrid
-plusObject: momIntTG
-outTG = Merge
-outTable = Down to Table: "no", 20, "yes", "no"
+selectObject: outTab
 Save as semicolon-separated file: "'output_file$'"
 
