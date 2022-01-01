@@ -47,12 +47,12 @@ for f from 1 to noSounds
 	momIntTG = selected("TextGrid")
 
 	tgTable = Down to Table: "no", 20, "yes", "no"
-	Append column: "bundle_id"
+	Append column: "file"
 	noAnchors = Get number of rows
 
 	for r from 1 to noAnchors
 		select tgTable
-		Set string value: r, "bundle_id", currBundle$
+		Set string value: r, "file", currBundle$
 	endfor
 
 	if f == 1

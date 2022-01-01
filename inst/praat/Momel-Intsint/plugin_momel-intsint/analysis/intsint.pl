@@ -16,7 +16,7 @@ $version = 2.11 ;
 #	output format [int]:
 #				time (secs) tone (INTSINT) target (Hz) estimated_target (Hz)
 
-$verbose = 1;
+$verbose = 0;
 
 #input and ouput filename extensions
 $inext = "momel";

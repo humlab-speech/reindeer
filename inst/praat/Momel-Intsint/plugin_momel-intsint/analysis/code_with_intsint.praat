@@ -33,7 +33,7 @@ for iTarget to nTargets
 endfor
 
 execute calculate_intsint_labels.praat temp Momel Intsint IntsintMomel .momel .intsint .wav .TextGrid .PitchTier
-... no yes 5
+... no no 5
 
 
 Read Strings from raw text file... 'intsint_file$'

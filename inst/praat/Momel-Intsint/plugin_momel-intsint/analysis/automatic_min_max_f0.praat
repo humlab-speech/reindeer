@@ -29,7 +29,7 @@ Remove
 select mySound
 min_f0 = floor(q25 * 0.75/10)*10
 max_f0 = ceiling((min_f0 * 2^maximum_pitch_span)/10)*10
-printline detecting f0 with minimum pitch 'min_f0:' maximum pitch 'max_f0:'
+#printline detecting f0 with minimum pitch 'min_f0:' maximum pitch 'max_f0:'
 To Pitch... 0.01 min_f0 max_f0
 
 # Version History
