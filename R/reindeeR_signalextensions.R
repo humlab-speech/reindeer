@@ -463,7 +463,7 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 #' reindeer:::unlink_emuRDemoDir()
 #' reindeer:::create_ae_db() -> emuDBhandle
 #' reindeer:::make_dummy_metafiles(emuDBhandle)
-#' print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest") )
+#' print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest") )
 #' }
 
 
@@ -545,13 +545,13 @@ metadata_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=
 #' This function takes a function and explicit argument list and builds a list of parameters for a function call considering the metadata of a bundle (in a session).
 #'
 #'
-#' @inheritParams match_parameters
+#' @inheritParams metadata_parameters
 #' @param session Only consider this session.
 #' @param bundle  The bundle in the session to build an argument list for.
 #'
 #' @return A list which may be supplied to a `do.call` call.
 #'
-#' @seealso match_parameters
+#' @seealso metadata_parameters
 #' @seealso do.call
 #'
 
@@ -564,7 +564,7 @@ get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,
   funcFormals = as.list(formals(currFunc))
   names(funcFormals) -> fp
 
-  dspParList <- match_parameters(emuDBhandle,metadata.defaults = metadata.defaults, wide.format=FALSE) %>%
+  dspParList <- metadata_parameters(emuDBhandle,metadata.defaults = metadata.defaults, wide.format=FALSE) %>%
     dplyr::filter(!is.na(Parameter),!is.na(Setting) ) %>%
     dplyr::filter(bundle == currBundl && session == currSess) %>%
     dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter))
@@ -853,7 +853,7 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 
 # out <- get_metaFuncFormals(emuDBhandle,session="0000",bundle="msajc010",onTheFlyFunctionName = "forest")
 # print(get_metadata(emuDBhandle))
-# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
+# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
 #
 # # # git2r::init(emuDBhandle$basePath)
 #dd_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")
