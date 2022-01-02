@@ -79,6 +79,6 @@ metadata.
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db() -> emuDBhandle
 reindeer:::make_dummy_metafiles(emuDBhandle)
-print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest") )
+print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest") )
 }
 }

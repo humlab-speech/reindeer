@@ -15,9 +15,23 @@ get_metaFuncFormals(
 )
 }
 \arguments{
+\item{emuDBhandle}{The database handle}
+
 \item{session}{Only consider this session.}
 
 \item{bundle}{The bundle in the session to build an argument list for.}
+
+\item{onTheFlyFunctionName}{The name of the function for which appropriate
+parameters should be deduced.}
+
+\item{onTheFlyParams}{A list of explicit DSP function parameters.}
+
+\item{metadata.defaults}{Default settings for metadata. This argument is
+primarily used for setting default Age and Gender for bundles with no such
+metadata already set.}
+
+\item{package}{The signal processing package where the \code{onTheFlyFunctionName}
+function may be found. Defaults to \link{superassp}.}
 }
 \value{
 A list which may be supplied to a \code{do.call} call.
@@ -26,7 +40,7 @@ A list which may be supplied to a \code{do.call} call.
 This function takes a function and explicit argument list and builds a list of parameters for a function call considering the metadata of a bundle (in a session).
 }
 \seealso{
-match_parameters
+metadata_parameters
 
 do.call
 }
