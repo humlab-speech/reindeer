@@ -221,7 +221,12 @@ duplicate_level = emuR::duplicate_level
 #' @seealso [emuR::delete_itemsInLevel]
 delete_itemsInLevel = emuR::delete_itemsInLevel
 
-
+#' Create items programmatically. (A copy of the emuR function)
+#' @export
+#' @inheritParams emuR::create_itemsInLevel
+#' @inherit emuR::create_itemsInLevel return references description details sections seealso
+#' @seealso [emuR::create_itemsInLevel]
+create_itemsInLevel = emuR::create_itemsInLevel
 
 #' Query an emuDB. (A copy of the emuR function)
 #' @export
@@ -351,3 +356,10 @@ mel = emuR::mel
 #' @inherit emuR::bark return references description details sections seealso
 #' @seealso [emuR::bark]
 bark = emuR::bark
+
+#' Build links between labels based on time (A copy of the emuR function)
+#' @export
+#' @inheritParams emuR::autobuild_linkFromTimes
+#' @inherit emuR::autobuild_linkFromTimes return references description details sections seealso
+#' @seealso [emuR::autobuild_linkFromTimes]
+autobuild_linkFromTimes = emuR::autobuild_linkFromTimes
