@@ -41,6 +41,8 @@ for f from 1 to noSounds
 	runScript: "./plugin_momel-intsint/analysis/automatic_min_max_f0.praat", pitch_span
 	currPitch = selected("Pitch")
 
+	Save as binary file: "'input_Directory$'/'currBundle$'.Pitch"
+
 	runScript: "./plugin_momel-intsint/analysis/momel_single_file.praat", "'window_length' 'minimum_f0' 'maximum_f0' 'maximum_error' 'reduced_window_length' 'minimal_distance' 'minimal_frequency_ratio'" 
 	currPT = selected("PitchTier")
 	runScript: "./plugin_momel-intsint/analysis/code_with_intsint.praat"
