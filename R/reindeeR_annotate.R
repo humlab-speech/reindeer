@@ -158,10 +158,10 @@ annotate_INTSINT_MOMEL <- function(emuDBhandle,
   }
 
   emuR:::load_DBconfig(emuDBhandle) -> dbConfig
-  PRAAT_DEVEL <- TRUE
+
   praat_script <- ifelse(PRAAT_DEVEL== TRUE,
                          file.path("inst","praat","Momel-Intsint","processINTSINTMOMEL.praat"),
-                         file.path(system.file(package = "superassp",mustWork = TRUE),"praat","Momel-Intsint","processINTSINTMOMEL.praat")
+                         file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","Momel-Intsint","processINTSINTMOMEL.praat")
   )
 
   fl <- list_files(emuDBhandle,fileExtension=dbConfig$mediafileExtension)
@@ -176,11 +176,11 @@ annotate_INTSINT_MOMEL <- function(emuDBhandle,
 
   script_path <- ifelse(PRAAT_DEVEL== TRUE,
                                file.path("inst","praat","Momel-Intsint","plugin_momel-intsint"),
-                               file.path(system.file(package = "superassp",mustWork = TRUE),"praat","Momel-Intsint","plugin_momel-intsint"))
+                               file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","Momel-Intsint","plugin_momel-intsint"))
 
 
 
-  intsintmomel <- tjm.praat::wrap_praat_script(praat_location = get_praat(),
+  intsintmomel <- tjm.praat::wrap_praat_script(praat_location = superassp::get_praat(),
                                              script_code_to_run = readLines(praat_script)
                                              ,return="last-argument")
   #Copy additional files
@@ -248,7 +248,7 @@ annotate_INTSINT_MOMEL <- function(emuDBhandle,
 
 
   out <- create_itemsInLevel(emuDBhandle,itemsToCreate = outTab %>%
-                             dplyr::filter(attribute=="Intsint") ,verbose =verbose,rewriteAllAnnots = TRUE)
+                               dplyr::filter(attribute=="Intsint") ,verbose =verbose,rewriteAllAnnots = TRUE)
 
   if(return.wide){
     outTab <- outTab %>%
@@ -266,9 +266,9 @@ annotate_INTSINT_MOMEL <- function(emuDBhandle,
 # library(reindeer)
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-# add_ssffTrackDefinition(emuDBhandle,"f0",onTheFlyFunctionName = "ksvF0")
+# # add_ssffTrackDefinition(emuDBhandle,"f0",onTheFlyFunctionName = "ksvF0")
 # query(emuDBhandle,"Intonational =~ .*") -> sl
-# #query(emuDBhandle,"Tone = L-") -> sl
+# # #query(emuDBhandle,"Tone = L-") -> sl
 # annotate_INTSINT_MOMEL(emuDBhandle,sl) -> momelTab
 
 # add_levelDefinition(emuDBhandle = emuDBhandle, name="Intsint",type="EVENT",verbose = TRUE,rewriteAllAnnots = TRUE)
