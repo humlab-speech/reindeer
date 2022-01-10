@@ -14,6 +14,7 @@
 #'
 #' @importFrom Rdpack reprompt
 NULL
+PRAAT_DEVEL <- FALSE
 #> NULL
 
 
