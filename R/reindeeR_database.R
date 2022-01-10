@@ -148,7 +148,39 @@ import_recordings <- function (emuDBhandle, dir, targetSessionName = "0000", spe
   return(invisible(NULL))
 }
 
+#' Save the state of a speech database
+#'
+#' This function saves a snapshot of an Emu speech database into a git repository and
+#' optionally pushes changes to a remote git server. All altered files will be included in the snapshot.
+#'
+#' If a remote server has been specified for the git repository, the changes will be pushed there into the "master" branch by default.
+#'
+#'
+#' @param emuDBhandle The database handle
+#' @param push.changes If `TRUE` all changes will pushed into the remote git server.
+#' @param remote.name The name of the remote repository.
+#' @param remote.ref The reference in the remote repository where changes should be pushed.
+#'
+#' @export
+#'
+save_snapshot <- function(emuDBhandle,push.changes=TRUE,remote.name="origin",remote.ref="master"){
 
+  if(! git2r::in_repository(emuDBhandle$basePath)){
+    git2r::init(emuDBhandle$basePath)
+  }
+
+  mess <- paste0("Snapshot of database '", emuDBhandle$dbName ,"' created at ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"))
+  #Add all modified files
+  git2r::commit(repo=emuDBhandle$basePath, message = mess,all=TRUE )
+
+  if(push.changes && length(git2r::remotes(emuDBhandle$basePath) ) > 0 ){
+    git2r::push(object=emuDBhandle$basePath,remote.name,remote.ref)
+
+  }
+
+
+
+}
 ### For interactive testing
 #
 #
