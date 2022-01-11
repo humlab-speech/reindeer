@@ -10,6 +10,7 @@
 #' @param emuDBhandle The database handle.
 #' @param seglist A segment list (resulting from a call of [query]) which should be used as a cut list.
 #' @param output.directory The directory where all extracted parts of the signal, and sub-folders if required, will be placed.
+#' @param include.labels Boolean; Include the label of a segment in the output file name?
 #' @param create.session.subdir Boolean; Should bundles belonging to different sessions be kept separate?
 #' @param create.bundle.subdir Boolean; Should signal files belonging to different bundles be kept separate?
 #'
@@ -25,7 +26,7 @@
 #' extract_samples(emuDBhandle,psl,output.directory = output.directory,create.session.subdir=TRUE,create.bundle.subdir=TRUE)
 #' print(list.files(path=output.directory))
 #'
-extract_samples <- function(emuDBhandle,seglist, output.directory,create.session.subdir=TRUE,create.bundle.subdir=TRUE){
+extract_samples <- function(emuDBhandle,seglist, output.directory,include.labels=FALSE,create.session.subdir=TRUE,create.bundle.subdir=TRUE){
   dbConfig <- emuR:::load_DBconfig(emuDBhandle)
   mediafileExtension <- dbConfig$mediafileExtension
   seglist$absolute_file_path <- file.path(emuDBhandle$basePath,
@@ -41,13 +42,22 @@ extract_samples <- function(emuDBhandle,seglist, output.directory,create.session
                       file.path(out.dir, seglist[[r,"bundle"]]),
                       out.dir)
 
-    dir.create(out.dir,recursive=TRUE)
+    dir.create(out.dir,recursive=TRUE,showWarnings = FALSE)
     currSSF <- wrassp::read.AsspDataObj(fname=seglist[[r,"absolute_file_path"]],
                                         begin=seglist[[r,"sample_start"]],
                                         end=seglist[[r,"sample_end"]],
                                         samples = TRUE)
+
+    labelPart <- ifelse(include.labels,
+                        paste0("_",
+                               stringr::str_trim(seglist[[r,"labels"]],side="both"),
+                               "_"),
+                        "_")
+
     out.file <- file.path(out.dir,
-                          paste0(seglist[[r,"bundle"]],"_",seglist[[r,"sample_start"]],"_",seglist[[r,"sample_end"]],"_",seglist[[r,"sample_rate"]],
+                          paste0(seglist[[r,"bundle"]],
+                                 labelPart,
+                                 seglist[[r,"sample_start"]],"_",seglist[[r,"sample_end"]],"_",seglist[[r,"sample_rate"]],
                                  ".",mediafileExtension))
     wrassp::write.AsspDataObj(file = out.file, dobj = currSSF)
     rm(currSSF)
@@ -61,6 +71,6 @@ extract_samples <- function(emuDBhandle,seglist, output.directory,create.session
 # reindeer:::create_ae_db() -> emuDBhandle
 # query(emuDBhandle,"Phonetic = p") -> psl
 # output.directory <- file.path(tempdir(),"reindeeR_extract")
-# extract_samples(emuDBhandle,psl,output.directory = output.directory,create.session.subdir=TRUE,create.bundle.subdir=TRUE)
-#
+#  extract_samples(emuDBhandle,psl,output.directory = output.directory,create.session.subdir=TRUE,create.bundle.subdir=TRUE,include.labels = TRUE)
+# #
 # print(list.files(path=output.directory,recursive=TRUE))
