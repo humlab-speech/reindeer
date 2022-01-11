@@ -8,6 +8,7 @@ extract_samples(
   emuDBhandle,
   seglist,
   output.directory,
+  include.labels = FALSE,
   create.session.subdir = TRUE,
   create.bundle.subdir = TRUE
 )
@@ -18,6 +19,8 @@ extract_samples(
 \item{seglist}{A segment list (resulting from a call of \link{query}) which should be used as a cut list.}
 
 \item{output.directory}{The directory where all extracted parts of the signal, and sub-folders if required, will be placed.}
+
+\item{include.labels}{Boolean; Include the label of a segment in the output file name?}
 
 \item{create.session.subdir}{Boolean; Should bundles belonging to different sessions be kept separate?}
 
