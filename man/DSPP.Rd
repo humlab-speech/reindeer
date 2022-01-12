@@ -5,17 +5,15 @@
 \alias{DSPP}
 \title{The set of Default Signal Processing Parameters}
 \format{
-A \link[tibble:tibble]{tibble::tibble} with three columns
-\describe{
-\item{Gender}{The three values that should be used are : Male, Female and \code{NA}. \code{NA} row settings will be
-applied if Gender is not defined in the metadata for a speaker. }
-\item{Parameter}{The name of the parameter that should be supplied to the signal processing
-function}
-\item{Setting}{Defines the default setting for the parameter.
-Since some signal processing functions take character arguments, this
-column is defined as a character vector. The parameter values will however
-be converted to numeric if possible before applying them.}
-}
+A \link[tibble:tibble]{tibble::tibble} with three columns \describe{ \item{Gender}{The
+three values that should be used are : Male, Female and \code{NA}. \code{NA} row
+settings will be applied if Gender is not defined in the metadata for a
+speaker. } \item{Parameter}{The name of the parameter that should be
+supplied to the signal processing function} \item{Setting}{Defines the
+default setting for the parameter. Since some signal processing functions
+take character arguments, this column is defined as a character vector. The
+parameter values will however be converted to numeric if possible before
+applying them.} }
 }
 \usage{
 DSPP
@@ -39,12 +37,18 @@ used unaltered.
 
 The default settings contained within \code{DSPP} is collected directly from, or
 estimated from, a number of sources. The age independent but gender dependent
-parameters are generally found in the Praat or \link{wrassp} manuals. Nominal F1,
-F2 and F3 for young and adolescent male and female speakers were estimated as
-the mid point of the age dependent range published by
-\insertCite{Kent.2018.10.1016/j.jcomdis.2018.05.004}{reindeer}. The f0 ranges
-for young persons (5-10 years) were collected from
-\insertCite{Brockmann-Bauser.2015.10.1016/j.ijporl.2015.09.005}{reindeer}.
+parameters are generally found in the Praat
+\insertCite{Praatdoingphoneti:2022}{reindeer} or \link{wrassp}
+\insertCite{Winkelmann:2017cl}{reindeer} manuals. Nominal F1, F2 and F3 for
+young and adolescent male and female speakers were estimated as the mid point
+of the age dependent range published by
+\insertCite{Lee.1999.10.1121/1.426686,Perry:2001it,Linville:2001io,Goy:2013bp,Kent.2018.10.1016/j.jcomdis.2018.05.004}{reindeer}.
+The f0 ranges (\code{minF} and \code{maxF}) for children and adults have been
+idenfified from previous studies
+\insertCite{Graddol.1983.10.1177/002383098302600403,Goy:2013bp,Brockmann-Bauser.2015.10.1016/j.ijporl.2015.09.005}{reindeer}.
+Analysis window length (\code{windowSize}) used when searching for formants have
+been adopted from studies that include a wide range of participants
+\insertCite{Huber.1999.10.1121/1.427150,Gonzalez.2004.10.1016/s0095-4470(03)00049-4,Cartei.2013.10.1371/journal.pone.0081022}{reindeer}.
 
 By default, the DSPP settings will ask formant tracking functions to find
 five (5) formants within the frequence range of 50-\code{maxhzformant} Hz. The
