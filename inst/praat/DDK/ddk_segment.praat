@@ -17,7 +17,7 @@ form Automatic segmentation of DDK sequences
 	word Spectrogram_window_shape Gaussian
 	real Spectrogram_resolution 40.0
 	text Mediafile_extension wav
-	sentence TableOut /Users/frkkan96/Desktop/kaa_yw_pb.DDKTab
+	sentence TableOut ../../../tests/signalfiles/DDK/ddk.Table
 endform
 
 fileList = Create Strings as file list: "fileList", soundDirectory$ + "/*." + mediafile_extension$
@@ -106,6 +106,6 @@ endfor
 #plus currint
 #Remove
 selectObject: outTab
-#Save as semicolon-separated file: tableOut$
+Save as semicolon-separated file: tableOut$
 
 
