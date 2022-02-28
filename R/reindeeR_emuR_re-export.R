@@ -315,12 +315,19 @@ serve = emuR::serve
 #' @seealso [emuR::list_sampleRates]
 list_sampleRates = emuR::list_sampleRates
 
-#' Read a bundleList. (A copy of the emuR function)
+#' Read a stored bundleList. (A copy of the emuR function)
 #' @export
 #' @inheritParams emuR::read_bundleList
 #' @inherit emuR::read_bundleList return references description details sections seealso
 #' @seealso [emuR::read_bundleList]
 read_bundleList = emuR::read_bundleList
+
+#' Store a list of bundles or segments for later use in the transcription (web) application
+#' @export
+#' @inheritParams emuR::write_bundleList
+#' @inherit emuR::write_bundleList return references description details sections seealso
+#' @seealso [emuR::write_bundleList]
+write_bundleList = emuR::write_bundleList
 
 #' Rename bundles in emuDB. (A copy of the emuR function)
 #' @export
