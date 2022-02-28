@@ -12,10 +12,6 @@ form Automatic segmentation of DDK sequences
 	#text Sequence_label DDK
 	real Sequence_silence_threshold -25.0
 	real Sequence_minimum_duration 0.100
-	word WindowShape Gaussian1
-	real RelativeWidth 0.001
-	word Spectrogram_window_shape Gaussian
-	real Spectrogram_resolution 40.0
 	text Mediafile_extension wav
 	sentence TableOut ../../../tests/signalfiles/DDK/ddk.Table
 endform
