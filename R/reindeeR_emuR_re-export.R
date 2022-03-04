@@ -286,6 +286,13 @@ list_sessions = emuR::list_sessions
 #' @seealso [emuR::list_bundles]
 list_bundles = emuR::list_bundles
 
+#' Create a new emuDB. (A copy of the emuR function)
+#' @export
+#' @inheritParams emuR::create_emuDB
+#' @inherit emuR::create_emuDB return references description details sections seealso
+#' @seealso [emuR::create_emuDB]
+create_emuDB = emuR::create_emuDB
+
 #' Load an emuDB. (A copy of the emuR function)
 #' @export
 #' @inheritParams emuR::load_emuDB
