@@ -347,24 +347,38 @@ import_metadata <- function(emuDBhandle,Excelfile){
 
 
 
-#' A utility function used for programatically setting metadata for a bundle, or default values for a session or an entire database.
+#' A utility function used for programatically setting metadata for a bundle, or
+#' default values for a session or an entire database.
 #'
-#' The function takes a list and a specification of where the metadata should be set. The default behaviour is to
-#' keep already set metadata, and overwrite only the values that are named in the list. The user may change this
-#' behaviour by setting \code{reset.before.add=TRUE}, in which case all previous  bundle, session
-#' or database level metadata will be replaced with the contents of the list.
+#' The function takes a list and a specification of where the metadata should be
+#' set. The default behaviour is to keep already set metadata, and overwrite
+#' only the values that are named in the list. The user may change this
+#' behaviour by setting \code{reset.before.add=TRUE}, in which case all previous
+#' bundle, session or database level metadata will be replaced with the contents
+#' of the list.
 #'
-#' If a bundle name and a \code{session} name is provided, the metadata will be inserted only for that fully speficied \code{bundle}.
-#' If only a \code{bundle} name is provided, the function will add the metadata for the bundle only if there is just
-#' one session in the database. If there are multiple \code{session}s, the function will given an error.
+#' If a bundle name and a \code{session} name is provided, the metadata will be
+#' inserted only for that fully specified \code{bundle}. If only a \code{bundle}
+#' name is provided, the function will add the metadata for the bundle only if
+#' there is just one session in the database. If there are multiple
+#' \code{session}s, the function will given an error.
 #'
-#' If no \code{session} or \code{bundle} names are provided, the metadata will be inserted as default values for the entire database.
+#' If no \code{session} or \code{bundle} names are provided, the metadata will
+#' be inserted as default values for the entire database. Please note that
+#' database wide ingested metadata defaults currently interferes with the Emu
+#' web app and should not be put into general use before this issue has been
+#' fixed in the Emu web app.
 #'
 #' @param emuDBhandle An Emu database handle
-#' @param metadataList A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user. The user may also clear (remove from the set of defined metadata) by setting the property to NULL.
+#' @param metadataList A list specifying the metadata to be set. If set to an
+#'   empty list (\code{list()}) the function will clear all metadata, if the
+#'   argument \code{reset.before.add=TRUE} is given by the user. The user may
+#'   also clear (remove from the set of defined metadata) by setting the
+#'   property to NULL.
 #' @param bundle An optional name of a bundle
 #' @param session An optional name of a session
-#' @param reset.before.add If set to TRUE, the function will ignore previously set metadata and simply add the metadata supplied in the list.
+#' @param reset.before.add If set to TRUE, the function will ignore previously
+#'   set metadata and simply add the metadata supplied in the list.
 #'
 #' @return
 #' @export
@@ -384,7 +398,8 @@ import_metadata <- function(emuDBhandle,Excelfile){
 #'
 add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, reset.before.add=FALSE){
 
-  if(is.null(bundle) & is.null(session)){
+  if(is.null(bundle) && is.null(session)){
+
     #Database wide injection
 
     emuR:::load_DBconfig(emuDBhandle) -> dbCfg
@@ -564,11 +579,14 @@ biographize <- function(segs_tbl,emuDBhandle,compute_digests=FALSE,algorithm="sh
 
 ### INTERACTIVE testing
 
-# reindeer:::unlink_emuRDemoDir()
-# reindeer:::create_ae_db() -> emuDBhandle
-# add_metadata(emuDBhandle,session = "0000",bundle = "msajc003",metadataList = list(Gender=NA,Age=10))
-# add_metadata(emuDBhandle,session = "0000",bundle = "msajc003",metadataList = list(Gender=NULL,Age=20))
-#
+#reindeer:::unlink_emuRDemoDir()
+#reindeer:::create_ae_db() -> emuDBhandle
+#add_metadata(emuDBhandle,session = "0000",bundle = "msajc003",metadataList = list(Gender=NA,Age=10))
+#rstudioapi::navigateToFile(file.path(emuDBhandle$basePath,"ae_DBconfig.json"))
+#add_metadata(emuDBhandle,metadataList = list(Gender=NA,Age=10))
+
+#add_metadata(emuDBhandle,session = "0000",bundle = "msajc003",metadataList = list(Gender=NULL,Age=20))
+
 # dir.create(file.path(emuDBhandle$basePath,"temp"))
 # for(i in 1:11){
 #   file.copy(file.path(emuDBhandle$basePath,"0000_ses"),file.path(emuDBhandle$basePath,"temp"),recursive = TRUE)

@@ -2,7 +2,8 @@
 % Please edit documentation in R/reindeeR_metadata.R
 \name{add_metadata}
 \alias{add_metadata}
-\title{A utility function used for programatically setting metadata for a bundle, or default values for a session or an entire database.}
+\title{A utility function used for programatically setting metadata for a bundle, or
+default values for a session or an entire database.}
 \usage{
 add_metadata(
   emuDBhandle,
@@ -15,29 +16,42 @@ add_metadata(
 \arguments{
 \item{emuDBhandle}{An Emu database handle}
 
-\item{metadataList}{A list specifying the metadata to be set. If set to an empty list (\code{list()}) the function will clear all metadata, if the argument \code{reset.before.add=TRUE} is given by the user. The user may also clear (remove from the set of defined metadata) by setting the property to NULL.}
+\item{metadataList}{A list specifying the metadata to be set. If set to an
+empty list (\code{list()}) the function will clear all metadata, if the
+argument \code{reset.before.add=TRUE} is given by the user. The user may
+also clear (remove from the set of defined metadata) by setting the
+property to NULL.}
 
 \item{bundle}{An optional name of a bundle}
 
 \item{session}{An optional name of a session}
 
-\item{reset.before.add}{If set to TRUE, the function will ignore previously set metadata and simply add the metadata supplied in the list.}
+\item{reset.before.add}{If set to TRUE, the function will ignore previously
+set metadata and simply add the metadata supplied in the list.}
 }
 \value{
 
 }
 \description{
-The function takes a list and a specification of where the metadata should be set. The default behaviour is to
-keep already set metadata, and overwrite only the values that are named in the list. The user may change this
-behaviour by setting \code{reset.before.add=TRUE}, in which case all previous  bundle, session
-or database level metadata will be replaced with the contents of the list.
+The function takes a list and a specification of where the metadata should be
+set. The default behaviour is to keep already set metadata, and overwrite
+only the values that are named in the list. The user may change this
+behaviour by setting \code{reset.before.add=TRUE}, in which case all previous
+bundle, session or database level metadata will be replaced with the contents
+of the list.
 }
 \details{
-If a bundle name and a \code{session} name is provided, the metadata will be inserted only for that fully speficied \code{bundle}.
-If only a \code{bundle} name is provided, the function will add the metadata for the bundle only if there is just
-one session in the database. If there are multiple \code{session}s, the function will given an error.
+If a bundle name and a \code{session} name is provided, the metadata will be
+inserted only for that fully specified \code{bundle}. If only a \code{bundle}
+name is provided, the function will add the metadata for the bundle only if
+there is just one session in the database. If there are multiple
+\code{session}s, the function will given an error.
 
-If no \code{session} or \code{bundle} names are provided, the metadata will be inserted as default values for the entire database.
+If no \code{session} or \code{bundle} names are provided, the metadata will
+be inserted as default values for the entire database. Please note that
+database wide ingested metadata defaults currently interferes with the Emu
+web app and should not be put into general use before this issue has been
+fixed in the Emu web app.
 }
 \examples{
 \dontrun{
