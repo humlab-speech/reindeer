@@ -31,7 +31,8 @@ Imports:
     git2r,
     glue,
     tidyr,
-    stringr
+    stringr,
+    reticulate
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.2

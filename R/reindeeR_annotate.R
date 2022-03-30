@@ -259,11 +259,230 @@ annotate_INTSINT_MOMEL <- function(emuDBhandle,
 
 }
 
+# sentence SoundDirectory ../../../tests/signalfiles/DDK
+# real BeginTime 0.0
+# real EndTime 0.0
+# real Time_step 0.005
+# real Minimum_pitch 100.0
+# real Silence_threshold_(dB) -9.0
+# real Minimum_silent_interval_duration_(s) 0.05
+# real	Minimum_sounding_interval_duration_(s) 0.025
+# text Consonant_label C
+# text Vowel_label V
+# #text Sequence_label DDK
+# real Sequence_silence_threshold -25.0
+# real Sequence_minimum_duration 0.100
+# text Mediafile_extension wav
+
+annotate_DDK <- function(emuDBhandle,
+                         seglist,
+                         windowSize = 30,
+                         minF = 60,
+                         cvThreshold= -9.0,
+                         sequenceThreshold=-25.0,
+                         minConsonantDuration=0.050,
+                         minVowelDuration=0.025,
+                         minSequenceDuration=0.100,
+                         consonantLabel="C",
+                         vowelLabel="V",
+                         ddkSequenceLabel="DDK",
+                         ddkSyllablesLabel="DDK Syllables",
+                         ddkCVLabel="DDK CV",
+                         return.wide = TRUE,
+                         force = FALSE,
+                         verbose = FALSE,
+                         praat_path = NULL) {
+
+
+  if(! superassp::have_praat(praat_path)){
+    stop("Could not find praat. Please specify a full path.")
+  }
+
+  if(!verbose){
+    logger::log_threshold(logger::WARN)
+  }
+  lvls <- list_levelDefinitions(emuDBhandle)
+
+  if(! ddkSequenceLabel %in% lvls$name){
+    logger::log_info("Creating a new level '",ddkSequenceLabel,"'")
+    add_levelDefinition(emuDBhandle = emuDBhandle, name=ddkSequenceLabel,type="SEGMENT",verbose = verbose,rewriteAllAnnots = TRUE)
+    #Add different kints of sequence labels later
+    # set_legalLabels(emuDBhandle = emuDBhandle,
+    #                 levelName=ddkSequenceLabel,
+    #                 attributeDefinitionName=ddkSequenceLabel,
+    #                 legalLabels=c(ddkSequenceLabel))
+
+    # add_attrDefLabelGroup(emuDBhandle = emuDBhandle,
+    #                       levelName=intsint.level,
+    #                       attributeDefinitionName=intsint.level,
+    #                       labelGroupName="Absolute_tones",
+    #                       labelGroupValues = absolute.tone.labels)
+    #
+    # add_attrDefLabelGroup(emuDBhandle = emuDBhandle,
+    #                       levelName=intsint.level,
+    #                       attributeDefinitionName=intsint.level,
+    #                       labelGroupName="Relative_tones",
+    #                       labelGroupValues = relative.tone.labels)
+  }else{
+    #We should check existing definitions
+    ads <- list_attributeDefinitions(emuDBhandle = emuDBhandle,levelName=intsint.level)$name
+    if(! all(ads %in% attribute.definitions) && all(attribute.definitions %in% ads)){
+
+      stop("The attribute definitions set for the level '",intsint.level,"' conflict with the ones given as argument to the function.\n You need to remove it first using the 'remove_levelDefinition' function, or fix the conflict.\n Removing the level definition will of course discard all information in it, so please make sure you want to overwrite it.")
+    }
+  }
+
+  emuR:::load_DBconfig(emuDBhandle) -> dbConfig
+
+  praat_script <- ifelse(PRAAT_DEVEL== TRUE,
+                         file.path("inst","praat","Momel-Intsint","processINTSINTMOMEL.praat"),
+                         file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","Momel-Intsint","processINTSINTMOMEL.praat")
+  )
+
+  fl <- list_files(emuDBhandle,fileExtension=dbConfig$mediafileExtension)
+  seglist <- seglist %>%
+    dplyr::left_join(fl,by=c("session","bundle")) #Augment the data by segment list data with file information
+  intsintmomel <- tjm.praat::wrap_praat_script(praat_location = get_praat(),
+                                               script_code_to_run = readLines(praat_script)
+                                               ,return="last-argument")
+  inDir <- file.path(tempdir(check=TRUE),"INT")
+  unlink(inDir,force=TRUE,recursive=TRUE)
+  dir.create(inDir)
+
+  script_path <- ifelse(PRAAT_DEVEL== TRUE,
+                        file.path("inst","praat","Momel-Intsint","plugin_momel-intsint"),
+                        file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","Momel-Intsint","plugin_momel-intsint"))
+
+
+
+  intsintmomel <- tjm.praat::wrap_praat_script(praat_location = superassp::get_praat(),
+                                               script_code_to_run = readLines(praat_script)
+                                               ,return="last-argument")
+  #Copy additional files
+  copied <- file.copy(from=script_path,to = tempdir(),overwrite = TRUE,recursive = TRUE)
+
+
+  outFile <- file.path(inDir,"MOMELINTSINT.csv")
+
+  for(r in 1:nrow(seglist)){
+    #Just to get sample rate
+    inWav <- wrassp::read.AsspDataObj(fname = seglist[[r,"absolute_file_path"]],
+                                      begin=0,
+                                      end=1,
+                                      samples=TRUE)
+    sr <- attr(inWav,"sampleRate")
+    # Now add an analysis window size to the extracted signal
+    halfWindow <- windowSize / 1000 * sr /2
+    inWav <- wrassp::read.AsspDataObj(fname = seglist[[r,"absolute_file_path"]],
+                                      begin = seglist[[r,"sample_start"]] - halfWindow,
+                                      end = seglist[[r,"sample_end"]] + halfWindow,
+                                      samples = TRUE)
+    outFileName <- file.path(inDir,paste0(r,".wav"))
+    wrassp::write.AsspDataObj(file = outFileName,dobj = inWav)
+  }
+  outputFileName <- file.path(inDir,"MOMELINTSINT.csv")
+  logFileName <- file.path(inDir,"MOMELINTSINT.log")
+  # sentence Input_Directory /Users/frkkan96/Desktop/INT/
+  #   #sentence Momel_parameters 30 60 750 1.04 20 5 0.05
+  #   integer Window_length_(ms) 30
+  # integer Minimum_f0_(Hz) 60
+  # integer Maximum_f0_(Hz) 750
+  # real Pitch_span 1.5 (=normal, 2.5=expressive speech)
+  # real Maximum_error 1.04
+  # integer Reduced_window_length_(ms) 20
+  # integer Minimal_distance_(ms) 20
+  # real Minimal_frequency_ratio 0.05
+  # sentence Output_file /Users/frkkan96/Desktop/INT/MOMELINTSINT.csv
+
+
+  #sink(file = logFileName,type = c("output", "message"))
+  csvFile <- intsintmomel(inDir,
+                          windowSize,
+                          minF,
+                          maxF,
+                          pitchSpan,
+                          maximumError,
+                          reducWindowSize,
+                          minimalDistance,
+                          minimalFrequencyRatio,
+                          outputFileName)
+  #sink()
+
+  momelTab <- read.delim(csvFile,sep = ";",na.strings = c("undefined","NA",""),strip.white = TRUE) %>%
+    dplyr::transmute(sl_rowIdx=as.character(file),level="Intsint",attribute=tier,time=tmin*1000,`labels`=text)
+
+
+
+  outTab <- seglist %>%
+    tibble::rownames_to_column(var = "sl_rowIdx")  %>%
+    dplyr::select(sl_rowIdx,session,bundle,start) %>%
+    dplyr::left_join(momelTab,by ="sl_rowIdx") %>%
+    dplyr::mutate(start=(start + time + windowSize /2 )) %>%
+    dplyr::select(session, bundle,level,attribute,start,`labels`) %>%
+    dplyr::arrange(session, bundle,level,start,attribute,`labels`)
+
+
+  out <- create_itemsInLevel(emuDBhandle,itemsToCreate = outTab %>%
+                               dplyr::filter(attribute=="Intsint") ,verbose =verbose,rewriteAllAnnots = TRUE)
+
+  if(return.wide){
+    outTab <- outTab %>%
+      tidyr::pivot_wider(names_from="attribute",values_from = "labels") %>%
+      dplyr::mutate(across(IntsintMomel:Momel, utils::type.convert))
+  }
+  return(outTab)
+
+}
+
+#
+# annotate_INTSINT_MOMEL <- function(emuDBhandle,
+#                                    seglist,
+#                                    windowSize=30,
+#                                    minF=60,
+#                                    maxF=750,
+#                                    pitchSpan=1.5,
+#                                    return.wide=TRUE,
+#                                    maximumError=1.04,
+#                                    reducWindowSize=20,
+#                                    minimalDistance=20,
+#                                    minimalFrequencyRatio=0.05,
+#                                    intsint.level="Intsint",
+#                                    attribute.definitions=c("Momel","Intsint","IntsintMomel"),
+#                                    absolute.tone.labels=c("T","M","B"),
+#                                    relative.tone.labels=c("H","U","S","D","L"),
+#                                    force=FALSE,
+#                                    verbose=FALSE,
+#                                    praat_path=NULL){
+
+annotate_voiceactivity <- function(soundFile="/Users/frkkan96/Desktop/kaa_yw_pb.wav",conda.env="pyannote"){
+  reticulate::use_condaenv(conda.env)
+  reticulate::import("pyannote.audio",as = "pa") -> pa
+  pa$Pipeline$from_pretrained("pyannote/voice-activity-detection") -> Pipeline
+  diarization <- Pipeline(soundFile)
+  #as.list(reticulate::iterate(diarization$itertracks(yield_label=TRUE))) -> pyLst
+  diarization$for_json() -> diaList
+  as.data.frame(diaList$content) %>%
+    dplyr::select(dplyr::starts_with("segment")) %>%
+    tidyr::pivot_longer(cols= segment.start:segment.end.24,names_to="prop",values_to="times") %>%
+    tidyr::separate(prop,sep="[.]",into = c("segment","point","id")) %>%
+    tidyr::pivot_wider(names_from = "point",values_from = "times") %>%
+    dplyr::mutate(id=ifelse(is.na(id),1,as.integer(id)+1)) %>%
+    dplyr::select(-segment) -> out
+  return(out)
+}
+
+
 ### For interactive testing
 #
 #
 # library(superassp)
 # library(reindeer)
+#unlink(file.path(tempdir(),"ddktest"),recursive = TRUE)
+#create_emuDB(name="DDK",targetDir = file.path(tempdir(),"ddktest"))
+#load_emuDB(file.path(tempdir(),"ddktest","DDK_emuDB")) -> ddk
+#import_recordings(ddk,dir = "tests/signalfiles/DDK/",targetSessionName = "ddktest")
+
+
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
 # # add_ssffTrackDefinition(emuDBhandle,"f0",onTheFlyFunctionName = "ksvF0")
