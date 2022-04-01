@@ -33,6 +33,9 @@ Imports:
     tidyr,
     stringr,
     reticulate
+Remotes:
+  github::tjmahr/tjm.praat
+  github::humlab-speech/superassp
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.2
