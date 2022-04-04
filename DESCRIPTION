@@ -32,7 +32,8 @@ Imports:
     glue,
     tidyr,
     stringr,
-    reticulate
+    reticulate,
+    tidyselect
 Remotes:
   github::tjmahr/tjm.praat
   github::humlab-speech/superassp

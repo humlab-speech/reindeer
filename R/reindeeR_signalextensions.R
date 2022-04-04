@@ -22,7 +22,7 @@
 #' @export
 #'
 #'
-get_parameters <- function(recompute=FALSE){
+get_metadataParameters <- function(recompute=FALSE){
 
   if(!recompute){
     return(DSPP)
@@ -66,8 +66,32 @@ get_parameters <- function(recompute=FALSE){
     tidyr::pivot_wider(names_from="Parameter",values_from = "Setting",id_cols = c("Gender","Age"))%>%
     dplyr::mutate(windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize )) %>%
     dplyr::mutate(nominalF2 = ifelse(is.na(nominalF3),ceiling(nominalF1*3),nominalF2 )) %>%
-    dplyr::mutate(nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3 )) -> DSPP
+    dplyr::mutate(nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3 ))  %>%
+    mutate(across(where(is.numeric), ~round(.,digits = 0 ))) %>%
+    dplyr::arrange(Gender,Age) -> DSPP_mf
 
+    # if(impute){
+    #   mice::complete(mice::mice(DSPP_mf %>%
+    #                               dplyr::filter(Gender=="Female") %>%
+    #                               dplyr::arrange(Age), print = FALSE, maxit = 1),action="long",include=FALSE) %>%-> DSPP_f
+    #   mice::complete(mice::mice(DSPP_mf %>%
+    #                               dplyr::filter(Gender=="Male") %>%
+    #                               dplyr::arrange(Age))) -> DSPP_m
+    #   DSPP_mf <-- DSPP_m %>%
+    #     dplyr::bind_rows(DSPP_f)
+    # }
+
+    DSPP_mf %>%
+      dplyr::group_by(Age) %>%
+      dplyr::select(-Gender) %>%
+      dplyr::summarise(dplyr::across(tidyselect::starts_with("max"),max),
+                       dplyr::across(tidyselect::starts_with("min"),min),
+                       dplyr::across(.fns = ~ mean(.,na.rm=TRUE))) %>%
+      dplyr::mutate(dplyr::across(tidyselect::everything(),~ round(.,0)),Gender=NA)  -> DSPP_na
+
+    DSPP_mf %>%
+      dplyr::bind_rows(DSPP_na)%>%
+      dplyr::mutate(dplyr::across(where(is.numeric), as.integer)) -> DSPP
   return(DSPP)
 }
 
