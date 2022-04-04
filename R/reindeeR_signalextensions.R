@@ -1,25 +1,33 @@
 #' Provides the user with speaker dependent signal processing parameters
 #'
-#' The source of the default signal processing parameters may be a spreadsheet
-#' file in the OOXML Workbook ISO/IEC 29500:2008 standard format.The simplest
-#' way to obtain such a file is to provide this function with a file name that
-#' does not exist. This function will then write the [DSPP] set to the file, and
-#' the user may then edit the file by hand using Microsoft Excel, Libreoffice
-#' Calc or some other standard compliant software. Once edited, this function
-#' may be used to read in the spreadsheet file to a tibble that may be used for
-#' signal processing purposes.
+#' This function returns age and gender specific speech signal processing
+#' parameters. Normally, the function just returns the stored /pre-computed
+#' `DSPP` tibble, which contains the output of this when applied previously.
 #'
-#' Alternatively, the user may use this function to just get the defaults stored
-#' in [DSPP] returned directly by not supplying a file name.
+#'
+#' Recomputation may be required if more data has been added to the file
+#' `file.path(system.file(package = "reindeer",mustWork =
+#' TRUE),"default_parameters.xlsx")`. If re-computation has been requested, this
+#' function then expands the age ranges in the spreadsheet file and computes a
+#' Gender stratified locally-weighted polynomial regression with age as the
+#' independent variable and the parameter value as the dependent variable.
+#' Separate models are computed for Male and Female speakers. Additionally, a
+#' separate model of all parameters are computed across all data for the case
+#' where the gender of a speaker is unknown (`Gender==NA`). Parameters that have
+#' previously been estimated using the function are are stored in the `DSPP`
+#' data frame.
 #'
 #' @importFrom "logger" WARN
 #'
-#' @param recompute If `TRUE`, this function will estimate age appropriate settings from the collection of empirical defaults stored in this package. If `FALSE`, this function will just return the stored `DSPP` data.
+#' @param recompute If `TRUE`, this function will estimate age appropriate
+#'   settings from the collection of empirical defaults stored in this package.
+#'   If `FALSE`, this function will just return the stored `DSPP` data.
 #'
-#' @return A [tibble:tibble] with one row per age and gender combination, and with one column per parameter for which an age dependent setting was identified in the set of parameters.
+#' @return A [tibble::tibble] with one row per age and gender combination, and
+#'   with one column per parameter for which an age dependent setting was
+#'   identified in the set of parameters.
 #'
 #'
-#' @export
 #'
 #'
 get_metadataParameters <- function(recompute=FALSE){
@@ -33,7 +41,9 @@ get_metadataParameters <- function(recompute=FALSE){
     return(out)
   }
 
-  openxlsx::read.xlsx(file.path(system.file(package = "reindeer",mustWork = TRUE),"default_parameters.xlsx"),sep.names = " ") %>%
+  openxlsx::read.xlsx(file.path(system.file(package = "reindeer",mustWork = TRUE),"default_parameters.xlsx"),sep.names = " ") -> defaults
+
+  defaults %>%
     dplyr::filter( Gender %in% c("Male","Female")) %>%
     dplyr::select(Gender:Age_upper,Parameter,Setting,`Study participants`,`Study identifier`) %>%
     dplyr::rowwise() %>%
@@ -70,32 +80,103 @@ get_metadataParameters <- function(recompute=FALSE){
     mutate(across(where(is.numeric), ~round(.,digits = 0 ))) %>%
     dplyr::arrange(Gender,Age) -> DSPP_mf
 
-    # if(impute){
-    #   mice::complete(mice::mice(DSPP_mf %>%
-    #                               dplyr::filter(Gender=="Female") %>%
-    #                               dplyr::arrange(Age), print = FALSE, maxit = 1),action="long",include=FALSE) %>%-> DSPP_f
-    #   mice::complete(mice::mice(DSPP_mf %>%
-    #                               dplyr::filter(Gender=="Male") %>%
-    #                               dplyr::arrange(Age))) -> DSPP_m
-    #   DSPP_mf <-- DSPP_m %>%
-    #     dplyr::bind_rows(DSPP_f)
-    # }
 
-    DSPP_mf %>%
-      dplyr::group_by(Age) %>%
-      dplyr::select(-Gender) %>%
-      dplyr::summarise(dplyr::across(tidyselect::starts_with("max"),max),
-                       dplyr::across(tidyselect::starts_with("min"),min),
-                       dplyr::across(.fns = ~ mean(.,na.rm=TRUE))) %>%
-      dplyr::mutate(dplyr::across(tidyselect::everything(),~ round(.,0)),Gender=NA)  -> DSPP_na
+  defaults %>%
+    #dplyr::select(Age_lower:Age_upper,Parameter,Setting,`Study participants`,`Study identifier`) %>%
+    dplyr::rowwise() %>%
+    # divide df into a list of data.frames based on supplied grouping variables
+    dplyr::group_split() %>%
+    #Gender,Parameter,Setting,`Study participants`,`Study identifier`
+    # for each element in the list, apply this function
+    purrr::map_dfr(function(df.x) {
+      with(df.x,
+           # get the data.frame your function returns
+           ff(Age_lower,Age_upper) %>%
+             # add your grouping variables back-in (stripped by ff)
+             dplyr::mutate(Parameter=Parameter[1],Setting=Setting[1],`Study participants`=`Study participants`[1],`Study identifier`=`Study identifier`[1])
+      )
+    }) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(Age=ceiling(Age)) %>%
+    dplyr::group_split(Parameter) %>%
+    purrr::map_dfr(function(df.x) {
+      with(df.x,
+           # get the data.frame your function returns
+           data.frame(
+             Setting=predict(loess(Setting ~ Age, weights=`Study participants` , data=.,span=0.5),
+                             data.frame(Age = seq(min(Age), max(Age), 1)),surface = "direct",statistics = "approximate"),
+             Age = seq(min(Age), max(Age), 1)) %>%
+             # add your grouping variables back-in (stripped by ff)
+             dplyr::mutate(Parameter=Parameter[1]))
+    }) %>%
+    dplyr::ungroup() %>%
+    tidyr::pivot_wider(names_from="Parameter",values_from = "Setting",id_cols = c("Age"))%>%
+    dplyr::mutate(windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize )) %>%
+    dplyr::mutate(nominalF2 = ifelse(is.na(nominalF3),ceiling(nominalF1*3),nominalF2 )) %>%
+    dplyr::mutate(nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3 ))  %>%
+    mutate(across(where(is.numeric), ~round(.,digits = 0 ))) %>%
+    dplyr::arrange(Age) %>%
+    dplyr::mutate(Gender=NA) ->  DSPP_na
 
     DSPP_mf %>%
       dplyr::bind_rows(DSPP_na)%>%
       dplyr::mutate(dplyr::across(where(is.numeric), as.integer)) -> DSPP
+
   return(DSPP)
 }
 
+#' Select superassp DSP function parameters based on metadata
+#'
+#' This function takes an Emu database handle and a function defined in
+#' [superassp] or a named package, and outputs a [tibble::tibble] containing
+#' function paramers to use for each bundle. The function parameters are derived
+#' from the database of age and gender specific settings obtained from in the
+#' literature based Gender and Age metadata information set for the bundle.
+#'
+#' @param emuDBhandle The Emu database handle.
+#' @param onTheFlyFunctionName The name of the digital speech processing function
+#' @param onTheFlyParams If default parameters are given, they are applied to all bundles / files, overwriting parameters set based on metadata.
+#' @param metadata.defaults Default values for metadata. Usually used for setting Age and Gender for bundles missing that information.
+#' @param recompute If `TRUE` the Age and Gender specific DSP settings will be recomputed from the database. Please see [get_metadataParameters] for more information.
+#' @param package
+#'
+#' @return A [tibble::tibble] with one row per bundle / session and with extra columns containing parameters to apply.
+#'
+#' @examples
+#' retuire(superassp)
+#' reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
+#' reindeer:::add_dummy_metadata(emuDBhandle)
+#'  mp <- match_parameters(emuDBhandle,
+#'  onTheFlyFunctionName = "forest",onTheFlyParams = list(nominalF1=200),metadata.defaults = list(Age=35,Gender=NA)))
+#' print(mp)
+#'
+match_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=NULL,metadata.defaults=list(Gender=NA,Age=35),recompute=FALSE,package="superassp"){
 
+  meta <- get_metadata(emuDBhandle,manditory=names(metadata.defaults))
+  dsp <- get_metadataParameters(recompute=recompute)
+  #Get information on what function is called, and what parameters it may take
+
+  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
+  funcFormals = as.list(formals(currFunc))
+  names(funcFormals) -> fp
+  toSetFp <- intersect(fp,names(dsp)) # Which metadata derived settings will be used by the function
+  functionDefaults <- funcFormals[toSetFp]
+
+  meta_settings <- meta %>%
+    dplyr::left_join(dsp,na_matches = "na") %>%
+    dplyr::select(session, bundle, all_of(toSetFp)) %>%
+    tidyr::replace_na(functionDefaults) %>%
+    dplyr::group_by(session,bundle)
+
+  if(! is.null(onTheFlyParams) && length(onTheFlyParams) > 0){
+    #Now overwrite explicitly provided arguments
+    meta_settings <- meta_settings %>%
+      dplyr::mutate(as.data.frame(onTheFlyParams))
+  }
+
+  return(meta_settings)
+
+}
 
 #' Call any function to compute an EmuR SSFF track definition.
 #'
@@ -734,6 +815,9 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
 # reindeer:::add_dummy_metadata(emuDBhandle)
+#
+# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(nominalF1=200),metadata.defaults = list(Age=35,Gender=NA)))
+
 # add_trackDefinition(emuDBhandle,name="fms",onTheFlyFunctionName = "forest")
 
 # add_trackDefinition(emuDBhandle,"zcr",onTheFlyFunctionName = "zcrana")
