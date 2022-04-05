@@ -19,7 +19,7 @@ test_that("Importation of speech signal files works",{
 
   expect_equal(nrow(pw),  3)
 
-  expect_equal(nrow(list_bundles(emuDBhandle,session = "generated")) , 3 )
+  expect_equal(nrow(list_bundles(emuDBhandle,sessionPattern = "generated")) , 3 )
 
   #Check that all files are mono sound files, and readable as such
   for(i in 1:nrow(pw)){
@@ -50,7 +50,7 @@ test_that("Importation of EGG and speech signal files works",{
 
   expect_true(nrow(list_sessions(emuDBhandle)) == 2 )
 
-  expect_true(nrow(list_bundles(emuDBhandle,session = "EGG")) == 1 )
+  expect_true(nrow(list_bundles(emuDBhandle,sessionPattern = "EGG")) == 1 )
 
   signalfile <- wrassp::read.AsspDataObj(pw$absolute_file_path[[1]])
 
