@@ -30,7 +30,7 @@
 #'
 #'
 #'
-get_metadataParameters <- function(recompute=FALSE){
+dspp_metadataParameters <- function(recompute=FALSE){
 
   if(!recompute){
     return(DSPP)
@@ -153,7 +153,7 @@ get_metadataParameters <- function(recompute=FALSE){
 match_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=NULL,metadata.defaults=list(Gender=NA,Age=35),recompute=FALSE,package="superassp"){
 
   meta <- get_metadata(emuDBhandle,manditory=names(metadata.defaults))
-  dsp <- get_metadataParameters(recompute=recompute)
+  dsp <- dspp_metadataParameters(recompute=recompute)
   #Get information on what function is called, and what parameters it may take
 
   currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
@@ -162,11 +162,12 @@ match_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=NUL
   toSetFp <- intersect(fp,names(dsp)) # Which metadata derived settings will be used by the function
   functionDefaults <- funcFormals[toSetFp]
 
-  meta_settings <- meta %>%
+  suppressMessages(meta_settings <- meta %>%
+    dplyr::mutate(Age=as.integer(round(Age,digits = 0))) %>%
     dplyr::left_join(dsp,na_matches = "na") %>%
     dplyr::select(session, bundle, all_of(toSetFp)) %>%
     tidyr::replace_na(functionDefaults) %>%
-    dplyr::group_by(session,bundle)
+    dplyr::group_by(session,bundle))
 
   if(! is.null(onTheFlyParams) && length(onTheFlyParams) > 0){
     #Now overwrite explicitly provided arguments
@@ -343,10 +344,11 @@ add_trackDefinition <- function(
       logger::log_threshold(logger::WARN)
     }
 
-    meta_settings <- metadata_parameters(emuDBhandle = emuDBhandle,
+    meta_settings <- match_parameters(emuDBhandle = emuDBhandle,
                                          onTheFlyFunctionName = onTheFlyFunctionName,
                                          onTheFlyParams = onTheFlyParams,
                                          metadata.defaults = metadata.defaults,
+                                         recompute=FALSE,
                                          package = package)
 
 
@@ -368,6 +370,7 @@ add_trackDefinition <- function(
     fl_meta_settings %>%
       dplyr::rename(listOfFiles=absolute_file_path) %>%
       dplyr::group_map( as.list) -> dspParList
+
 
     if(verbose){
       if(overwriteFiles){
@@ -400,6 +403,14 @@ add_trackDefinition <- function(
         toLog <- utils::modifyList(list("function"=onTheFlyFunctionName),currArgLst)
         #logger::log_info(logger::deparse_to_one_line(toLog))
         logger::log_info(toLog)
+
+        #DSP functions in wrassp need numeric arguments (not intergers).
+
+        if(length(currArgLst) > 0 ){
+          for(an in names(currArgLst)){
+            currArgLst[an] = ifelse(class(currArgLst[[an]]) =="integer",as.numeric(currArgLst[[an]]),currArgLst[[an]])
+          }
+        }
 
         #Now actually make the function call
         do.call(currFunc, currArgLst)
@@ -518,39 +529,31 @@ get_ssffObject <- function(emuDBhandle, extension, n ){
 }
 
 
-
-
-#' A utility function that builds a list of parameters to use in function call based on metadata
+#' A utility function that computes appropriate parameters for a bundle based on metadata
 #'
-#' This function takes a function and explicit argument list and builds a list of parameters for a function call considering the metadata of a bundle (in a session).
+#' This function may be used to derive what parameters would be appropriate to use for a single bundle (in a session) bases on metadata set for the bundle.
 #'
-#'
-#' @inheritParams metadata_parameters
+#' @inheritParams match_parameters
 #' @param session Only consider this session.
 #' @param bundle  The bundle in the session to build an argument list for.
 #'
-#' @return A list which may be supplied to a `do.call` call.
+#' @return A list which may be supplied to a `do.call` call for the DSP function.
 #'
-#' @seealso metadata_parameters
+#'
 #' @seealso do.call
-#'
 
-get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,onTheFlyParams=list(),metadata.defaults=list(Gender=NA,Age=35),package="superassp"){
+
+get_metaFuncFormals <- function(emuDBhandle,session,bundle,onTheFlyFunctionName,onTheFlyParams=list(),metadata.defaults=list(Gender=NA,Age=35),recompute=FALSE,package="superassp"){
 
   currBundl <- bundle
   currSess <- session
 
-  currFunc <- utils::getFromNamespace(onTheFlyFunctionName,package)
-  funcFormals = as.list(formals(currFunc))
-  names(funcFormals) -> fp
-
-  dspParList <- metadata_parameters(emuDBhandle,metadata.defaults = metadata.defaults, wide.format=FALSE) %>%
-    dplyr::filter(!is.na(Parameter),!is.na(Setting) ) %>%
+  dspDF <- match_parameters(emuDBhandle= emuDBhandle,onTheFlyFunctionName=onTheFlyFunctionName,onTheFlyParams=onTheFlyParams,metadata.defaults=metadata.defaults,recompute=recompute,package="superassp") %>%
     dplyr::filter(bundle == currBundl && session == currSess) %>%
-    dplyr::group_map( ~ setNames(.x$Setting,nm=.x$Parameter))
+    ungroup() %>%
+    select(-bundle,-session)
 
-  #return(dspParList)
-    purrr::flatten(utils::modifyList(purrr::flatten(dspParList),onTheFlyParams)) -> argLst
+  argLst <- utils::modifyList(as.list(dspDF),onTheFlyParams)
   #Since Settings have to be strings (character) in the DSPP table due to the "gender" argument being one
   #we need to convert strings like "11" to proper 11 values.
   argLst <- lapply(argLst,
@@ -809,24 +812,24 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 
 ### For interactive testing
 #
-
 # library(superassp)
 # library(reindeer)
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-# reindeer:::add_dummy_metadata(emuDBhandle)
-#
-# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(nominalF1=200),metadata.defaults = list(Age=35,Gender=NA)))
-
+#reindeer:::add_dummy_metadata(emuDBhandle)
 # add_trackDefinition(emuDBhandle,name="fms",onTheFlyFunctionName = "forest")
+# print(list_files(emuDBhandle,"fms"))
+
+# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(nominalF1=200),metadata.defaults = list(Age=35,Gender=NA)))
+#
 
 # add_trackDefinition(emuDBhandle,"zcr",onTheFlyFunctionName = "zcrana")
 #  get_metadata(emuDBhandle) -> md
 # reindeer:::add_dummy_metadata(emuDBhandle)
 # get_metadata(emuDBhandle) -> md
-# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest") -> mp)
+# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest") -> mp)
 
-# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(te=2,ett=3,numFormants=9)) -> mp2)
+# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(te=2,ett=3,numFormants=9)) -> mp2)
 # query(emuDBhandle,"Phonetic = s") -> sl
 # sl <- sl[1:3,]
 #
@@ -836,7 +839,7 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 
 # out <- get_metaFuncFormals(emuDBhandle,session="0000",bundle="msajc010",onTheFlyFunctionName = "forest")
 # print(get_metadata(emuDBhandle))
-# print(metadata_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
+# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest")-> out)
 #
 # # # git2r::init(emuDBhandle$basePath)
 #dd_trackDefinition(emuDBhandle,"f02","pitch",onTheFlyFunctionName = "mhsF0")

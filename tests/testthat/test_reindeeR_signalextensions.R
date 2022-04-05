@@ -2,7 +2,7 @@
 library(testthat)
 library(reindeer)
 library(superassp)
-library(dplyr)
+library(dplyr,verbose = FALSE)
 
 #Set up the base test database
 reindeer:::unlink_emuRDemoDir()
@@ -18,9 +18,9 @@ nonSSFFFunctions <-c("rfcana","afdiff","affilter")
 test_that("Check that we can get default signal processing parameters",{
   data("DSPP")
   #message(nrow(DSPP))
-  reindeer::get_parameters() -> dsp
+  reindeer:::dspp_metadataParameters() -> dspp
 
-  testthat::expect_equal(nrow(DSPP),nrow(dsp))
+  testthat::expect_equal(nrow(DSPP),nrow(dspp))
   testthat::expect_gte(nrow(DSPP),60)
 
 })
@@ -32,7 +32,7 @@ for(fun in setdiff(names(wrassp::wrasspOutputInfos),nonSSFFFunctions)){
     reindeer:::add_dummy_metadata(emuDBhandle)
     fl = emuR::list_files(emuDBhandle,"wav")
     unlink(emuR::list_files(emuDBhandle,"meta_json")[2,"absolute_file_path"][[1]])
-     md <- reindeer:::metadata_parameters(emuDBhandle,"forest")
+     md <- reindeer:::match_parameters(emuDBhandle,"forest")
 
      testthat::expect_equal(nrow(md), nrow(fl))
 
