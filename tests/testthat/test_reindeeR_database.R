@@ -60,7 +60,7 @@ test_that("Importation of EGG and speech signal files works",{
 
   expect_true(nrow(pe) == 1)
 
-  expect_true(nrow(list_bundles(emuDBhandle,session = "EGG")) == 1 )
+  expect_true(nrow(list_bundles(emuDBhandle,sessionPattern = "EGG")) == 1 )
 
   eggfile <- wrassp::read.AsspDataObj(pe$absolute_file_path[[1]])
 
