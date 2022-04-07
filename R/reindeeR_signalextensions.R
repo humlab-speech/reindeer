@@ -33,6 +33,7 @@
 dspp_metadataParameters <- function(recompute=FALSE){
 
   if(!recompute){
+    data(DSPP)
     return(DSPP)
   }
 
