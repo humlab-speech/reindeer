@@ -33,7 +33,8 @@ Imports:
     tidyr,
     stringr,
     reticulate,
-    tidyselect
+    tidyselect,
+    openssl
 Remotes:
   github::tjmahr/tjm.praat,
   github::humlab-speech/superassp

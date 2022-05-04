@@ -12,6 +12,7 @@ extract_samples(
   include.metadata.fields = FALSE,
   create.session.subdir = TRUE,
   create.bundle.subdir = TRUE,
+  encode.name = FALSE,
   field.separator = "_"
 )
 }
@@ -37,6 +38,9 @@ sessions be kept separate?}
 \item{create.bundle.subdir}{Boolean; Should signal files belonging to
 different bundles be kept separate?}
 
+\item{encode.name}{boolean; Should the bundle name be obfuscated in the
+output using md5 hashing?}
+
 \item{field.separator}{The field separator string to use when constructing
 the output file name.}
 }
@@ -50,6 +54,11 @@ extracted signal file will be placed in sub-folders according session and /
 or bundle if the user specifies it. If
 \verb{create.session.subdir=FALSE,create.bundle.subdir=FALSE}, all extracted
 signal portions will be placed together in the output directory.
+}
+\details{
+Optionally, the user may obfuscate the bundle name by MD5 hashing. This
+process makes the origin of the recording not possible to deduce from the
+name.
 }
 \examples{
 library(reindeer)
