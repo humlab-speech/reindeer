@@ -12,7 +12,10 @@ extract_samples(
   include.metadata.fields = FALSE,
   create.session.subdir = TRUE,
   create.bundle.subdir = TRUE,
+<<<<<<< HEAD
   encode.name = FALSE,
+=======
+>>>>>>> 2668115d53b903696093cc7a4a8968d29cc67740
   field.separator = "_"
 )
 }
@@ -28,6 +31,7 @@ signal, and sub-folders if required, will be placed.}
 \item{include.labels}{Boolean; Include the label of a segment in the output
 file name?}
 
+<<<<<<< HEAD
 \item{include.metadata.fields}{Names of metadata fields whos values should be
 included in the file name. If a boolean (TRUE) all metadata fields will be
 encoded in the name of the output file.}
@@ -43,6 +47,15 @@ output using md5 hashing?}
 
 \item{field.separator}{The field separator string to use when constructing
 the output file name.}
+=======
+\item{include.metadata.fields}{Names of metadata fields whos values should be included in the file name. If a boolean (TRUE) all metadata fields will be encoded in the name of the output file.}
+
+\item{create.session.subdir}{Boolean; Should bundles belonging to different sessions be kept separate?}
+
+\item{create.bundle.subdir}{Boolean; Should signal files belonging to different bundles be kept separate?}
+
+\item{field.separator}{The field separator string to use when constructing the output file name.}
+>>>>>>> 2668115d53b903696093cc7a4a8968d29cc67740
 }
 \description{
 This function enables the user to extract parts of speech recordings based on

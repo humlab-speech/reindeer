@@ -12,6 +12,7 @@
 #' `create.session.subdir=FALSE,create.bundle.subdir=FALSE`, all extracted
 #' signal portions will be placed together in the output directory.
 #'
+
 #' Optionally, the user may obfuscate the bundle name by MD5 hashing. This
 #' process makes the origin of the recording not possible to deduce from the
 #' name.
@@ -49,7 +50,9 @@
 #' extract_samples(emuDBhandle,psl,output.directory = output.directory,create.session.subdir=TRUE,create.bundle.subdir=TRUE)
 #' print(list.files(path=output.directory))
 #'
+
 extract_samples <- function(emuDBhandle,seglist, output.directory,include.labels=FALSE,include.metadata.fields=FALSE,create.session.subdir=TRUE,create.bundle.subdir=TRUE,encode.name=FALSE,field.separator="_"){
+
   dbConfig <- emuR:::load_DBconfig(emuDBhandle)
   mediafileExtension <- dbConfig$mediafileExtension
   seglist$absolute_file_path <- file.path(emuDBhandle$basePath,
@@ -84,6 +87,7 @@ extract_samples <- function(emuDBhandle,seglist, output.directory,include.labels
     seglist %>%
       mutate(bundle=openssl::md5(bundle)) -> seglist
   }
+
 
   for(r in 1:nrow(seglist)){
     out.dir <- ifelse(create.session.subdir,
@@ -120,6 +124,7 @@ extract_samples <- function(emuDBhandle,seglist, output.directory,include.labels
 
 
 ### For interactive testing
+
  # library(reindeer)
  # reindeer:::unlink_emuRDemoDir()
  # reindeer:::create_ae_db() -> emuDBhandle
@@ -130,5 +135,5 @@ extract_samples <- function(emuDBhandle,seglist, output.directory,include.labels
 #  extract_samples(emuDBhandle,psl,output.directory = output.directory,create.session.subdir=FALSE,create.bundle.subdir=TRUE,include.labels = TRUE,include.metadata.fields = c("Gender","Age"))
 #  extract_samples(emuDBhandle,psl,output.directory = output.directory,create.session.subdir=FALSE,create.bundle.subdir=TRUE,include.labels = TRUE,include.metadata.fields =TRUE,field.separator="..")
 #  extract_samples(emuDBhandle,psl,output.directory = output.directory,create.session.subdir=FALSE,create.bundle.subdir=TRUE,include.labels = TRUE,include.metadata.fields = c("Gender","Age"),encode.name = TRUE)
-#
+
 # print(list.files(path=output.directory,recursive=TRUE))
