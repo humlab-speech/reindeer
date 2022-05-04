@@ -9,8 +9,10 @@ extract_samples(
   seglist,
   output.directory,
   include.labels = FALSE,
+  include.metadata.fields = FALSE,
   create.session.subdir = TRUE,
-  create.bundle.subdir = TRUE
+  create.bundle.subdir = TRUE,
+  field.separator = "_"
 )
 }
 \arguments{
@@ -22,9 +24,13 @@ extract_samples(
 
 \item{include.labels}{Boolean; Include the label of a segment in the output file name?}
 
+\item{include.metadata.fields}{Names of metadata fields whos values should be included in the file name. If a boolean (TRUE) all metadata fields will be encoded in the name of the output file.}
+
 \item{create.session.subdir}{Boolean; Should bundles belonging to different sessions be kept separate?}
 
 \item{create.bundle.subdir}{Boolean; Should signal files belonging to different bundles be kept separate?}
+
+\item{field.separator}{The field separator string to use when constructing the output file name.}
 }
 \description{
 This function enables the user to extract parts of speech recordings based on a segment list (resulting from a call of \link{query}).
