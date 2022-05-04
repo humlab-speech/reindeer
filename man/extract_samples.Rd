@@ -9,26 +9,47 @@ extract_samples(
   seglist,
   output.directory,
   include.labels = FALSE,
+  include.metadata.fields = FALSE,
   create.session.subdir = TRUE,
-  create.bundle.subdir = TRUE
+  create.bundle.subdir = TRUE,
+  field.separator = "_"
 )
 }
 \arguments{
 \item{emuDBhandle}{The database handle.}
 
-\item{seglist}{A segment list (resulting from a call of \link{query}) which should be used as a cut list.}
+\item{seglist}{A segment list (resulting from a call of \link{query}) which should
+be used as a cut list.}
 
-\item{output.directory}{The directory where all extracted parts of the signal, and sub-folders if required, will be placed.}
+\item{output.directory}{The directory where all extracted parts of the
+signal, and sub-folders if required, will be placed.}
 
-\item{include.labels}{Boolean; Include the label of a segment in the output file name?}
+\item{include.labels}{Boolean; Include the label of a segment in the output
+file name?}
 
-\item{create.session.subdir}{Boolean; Should bundles belonging to different sessions be kept separate?}
+\item{include.metadata.fields}{Names of metadata fields whos values should be
+included in the file name. If a boolean (TRUE) all metadata fields will be
+encoded in the name of the output file.}
 
-\item{create.bundle.subdir}{Boolean; Should signal files belonging to different bundles be kept separate?}
+\item{create.session.subdir}{Boolean; Should bundles belonging to different
+sessions be kept separate?}
+
+\item{create.bundle.subdir}{Boolean; Should signal files belonging to
+different bundles be kept separate?}
+
+\item{field.separator}{The field separator string to use when constructing
+the output file name.}
 }
 \description{
-This function enables the user to extract parts of speech recordings based on a segment list (resulting from a call of \link{query}).
-The extracted parts will be named by the sample it was cut from, the first sample, last sample extracted, as well as the sample rate of the original media file. The extracted signal file will be placed in sub-folders according session and / or bundle if the user specifies it. If \verb{create.session.subdir=FALSE,create.bundle.subdir=FALSE}, all extracted signal portions will be placed together in the output directory.
+This function enables the user to extract parts of speech recordings based on
+a segment list (resulting from a call of \link{query}). The extracted parts will
+be named by the segment label, the first sample, last sample extracted, as
+well as the sample rate of the original media file. The user can also append
+metadata fields to the file file name following the segment label. The
+extracted signal file will be placed in sub-folders according session and /
+or bundle if the user specifies it. If
+\verb{create.session.subdir=FALSE,create.bundle.subdir=FALSE}, all extracted
+signal portions will be placed together in the output directory.
 }
 \examples{
 library(reindeer)
