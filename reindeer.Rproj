@@ -1,7 +1,7 @@
 Version: 1.0
 
 RestoreWorkspace: No
-SaveWorkspace: No
+SaveWorkspace: Yes
 AlwaysSaveHistory: Default
 
 EnableCodeIndexing: Yes
@@ -22,3 +22,7 @@ PackageRoxygenize: rd,collate,namespace
 
 QuitChildProcessesOnExit: Yes
 DisableExecuteRprofile: Yes
+
+PythonType: conda
+PythonVersion: 3.8.13
+PythonPath: ~/opt/anaconda3/envs/pysuperassp/bin/python3.8

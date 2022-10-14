@@ -11,7 +11,6 @@ annotate_INTSINT_MOMEL(
   minF = 60,
   maxF = 750,
   pitchSpan = 1.5,
-  return.wide = TRUE,
   maximumError = 1.04,
   reducWindowSize = 20,
   minimalDistance = 20,
@@ -45,10 +44,6 @@ searching for a pitch contour.}
 \item{pitchSpan}{The maximum pitch span to consider. Defaults to 1.5 octave,
 but could be expanded to 2.5 for expressive speech.}
 
-\item{return.wide}{Should the output be formated as a long tibble, with all
-attribute names in a column 'attribute' and labels in a column 'labels', or
-in wide format (where all attributes are given their own column).}
-
 \item{maximumError}{The maximum error allowed by MOMEL. See the momel source
 code for more information.}
 
@@ -61,7 +56,7 @@ momel source code for more information.}
 \item{minimalFrequencyRatio}{See the momel source code for information on
 this parameter.}
 
-\item{intsint.level}{THe name of the transcription level that should be
+\item{intsint.level}{The name of the transcription level that should be
 created and used for storing annotations. If this level already exists, it
 will be used if attribute definitions match the ones given here.}
 
