@@ -530,9 +530,191 @@ vad = pipeline(soundFile)")
   return(annotations)
 }
 
+#annotate_PRAATDET <- function(filePath){
 
+#   form File info
+#   comment Full path to EGG files
+#   text directory /Users/jkirby/Projects/egg/praatdet/examples/
+#     comment Full path to TextGrids
+#   text textgrids /Users/jkirby/Projects/egg/praatdet/examples/grids/
+#     comment Name of output file (written to same path as EGG files)
+#   word outfile egg_out.txt
+#   comment Extension for audio file (.wav, .egg, etc.)
+#   word extension .wav
+#   comment Channel of audio file containing EGG signal
+#   integer eggChan 1
+#   comment Start from a particular token?
+#     integer startFile 1
+#   comment Tier of interest (if irrelevant, leave as default)
+#   integer intervalTier 3
+#   comment Label of interval of interest (blank for none/all)
+#   word intervalLabel v
+#   comment Number of interval of interest (0 for none/all)
+#   integer intervalNum 0
+#   comment Separator (-, _ ...) when parsing token names
+#   word separator _
+#   comment Minimum and maximum f0 thresholds
+#   integer minF0 75
+#   integer maxF0 600
+#   comment k: Smoothing window size parameter (points on each side)
+#   integer k 10
+#   comment Threshold for Howard's method
+#     real    threshold 3/7
+#     comment Filter frequency cutoff
+#     integer passFrequency 40
+#     comment Filter cutoff smoothing
+#     integer smoothHz 20
+#     comment Manually edit points and periods?
+#     boolean manualCheck 0
+#     comment Use existing PointProcess files, if available?
+#     boolean useExistingPP 0
+#     comment Invert signal (if your EGG has closed=down for some reason)
+#     boolean invertSignal 0
+# endform
+#}
+
+
+
+
+#' Mark periods as events
+#'
+#' This function uses Praat \insertCite{Praatdoingphoneti:2022}{reindeer} to
+#' extract a periodicity contour, and the associated intensity. The estimated
+#' timing of each glottal cycle is marked at the maximum peak, and the timing
+#' and intensity of that peak is then marked as an event with associated label in the
+#' `levelname` transcription level.
+#'
+#' @details
+#' If an intensity level could not be determined at the peak, the label of the
+#' EVENT will be empty.
+#'
+#'
+#' @param emuDBhandle A emuR database handle.
+#' @inheritParams superassp::praat_pitch
+#' @param interpolation The method used for finding intensity associated with the pitch period event (ont of "nearest", or "linear", "cubic", "sinc70" or "sinc700" interpolation).
+#' @param RelativeWidth The relative with of the window used for extracting part of the signal for analysis.
+#' @param levelname The name of the (EVENT) annotation level to insert into the database.
+#' @param clear Should the `levename` level be cleared before inserting annotations?
+#'
+#' @return A [tibble::tibble] containing information on the labels inserted (session, bundle, start, level, attribute, labels)
+#' @export
+#'
+#' @references \insertAllCited{}
+
+annotate_periods <- function(emuDBhandle,
+                             beginTime=0.0,
+                             endTime=0.0,
+                             windowShift=5,
+                             minF=75.0,
+                             maxF=600.0,
+                             windowShape="Gaussian1",
+                             interpolation="cubic",
+                             RelativeWidth=1.0,
+                             levelname="AUTO_PERIODS",
+                             clear=TRUE
+                             ){
+
+
+  fl <- list_files(emuDBhandle,emuR:::load_DBconfig(emuDBhandle)$mediafileExtension) %>%
+    dplyr::rename(listOfFiles = absolute_file_path)
+
+
+  if(levelname %in%  emuR::list_levelDefinitions(emuDBhandle)$name ){
+    if(clear){
+      emuR::remove_levelDefinition(emuDBhandle,levelname,force=TRUE,verbose=FALSE)
+
+    }else{
+      stop("There is already a level named '",levelname,"' in the database. Please ")
+    }
+  }
+  emuR::add_levelDefinition(emuDBhandle,levelname,"EVENT",rewriteAllAnnots = TRUE,verbose = FALSE)
+
+
+
+  for(f in 1:nrow(fl)){
+    soundFile <-  fl %>%
+      dplyr::slice(f) %>%
+      purrr::pluck("listOfFiles")
+
+    soundFile <- normalizePath(soundFile)
+
+    dsp_directory <- superassp:::make_dsp_environment()
+
+
+
+
+    praat_script <- ifelse(PRAAT_DEVEL== TRUE,
+                           file.path("inst","praat","praat_periods.praat"),
+                           file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","praat_periods.praat")
+    )
+
+
+
+    periods <- superassp::cs_wrap_praat_script(praat_location = superassp::get_praat(),
+                                               script_code_to_run = readLines(praat_script),
+                                               directory=dsp_directory,
+                                               return="last-argument")
+
+    wavFileName <- tempfile(tmpdir = dsp_directory,fileext = ".wav")
+    outTabFilename <- paste0(tools::file_path_sans_ext(wavFileName),".csv")
+
+    R.utils::createLink(link=wavFileName, target=soundFile)
+
+
+    # form Compute
+    # sentence SoundFile /Users/frkkan96/Desktop/kaa_yw_pb.wav
+    # real BeginTime 0.0
+    # real EndTime 0.0
+    # real Time_step 0.005
+    # real Minimum_f0 75.0
+    # real Maximum_f0 600.0
+    # word WindowShape Gaussian1
+    # word Interpolation cubic
+    # real RelativeWidth 1.0
+    # sentence TrackOut /Users/frkkan96/Desktop/kaa_yw_pb.per
+    # endform
+
+    outTab <- periods(wavFileName,
+                      beginTime,
+                      endTime,
+                      windowShift /1000, #Praat needs seconds
+                      minF,
+                      maxF,
+                      windowShape,
+                      interpolation,
+                      RelativeWidth,
+                      outTabFilename
+
+    )
+    periodTab <- readr::read_csv(outTab,col_types = "dd",na=c("--undefined--","NA",""))
+
+    fl[[f,"periodTab"]] <- list(periodTab)
+
+    superassp:::clear_dsp_environment(dsp_directory)
+
+  }
+  fl <- fl %>%
+    tidyr::unnest(periodTab) %>%
+    dplyr::rename(start=Time,labels=Intensity) %>%
+    dplyr::mutate(start= start * 1000,
+                  level="AUTO_PERIODS",attribute="AUTO_PERIODS",labels=as.character(round(labels,digits = 2))) %>%
+    dplyr::select(-listOfFiles,-file)
+
+  emuR::create_itemsInLevel(emuDBhandle,itemsToCreate = fl,rewriteAllAnnots = TRUE,verbose = FALSE)
+
+  return(fl)
+}
 
 # ### For interactive testing
+#PRAAT_DEVEL=TRUE
+#remove_levelDefinition(emuDBhandle,"AUTO_PERIODS",force=TRUE,verbose=FALSE)
+#add_levelDefinition(emuDBhandle,"AUTO_PERIODS","EVENT")
+#annotate_periods(emuDBhandle) -> out
+
+
+#add_perspective(emuDBhandle,"Periods")
+#set_levelCanvasesOrder(emuDBhandle,"Periods",c("AUTO_PERIODS"))
+#set_signalCanvasesOrder(emuDBhandle,"Periods",c("OSCI"))
 
 
 
