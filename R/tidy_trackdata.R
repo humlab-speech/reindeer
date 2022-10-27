@@ -396,7 +396,8 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
        dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
        dplyr::mutate(out = list(map(temp,as_tibble))) %>%
        tidyr::unnest(out) %>%
-       tidyr::unnest(out)
+       tidyr::unnest(out) %>%
+       dplyr::select(-temp)
 
 
   outDF <- .data %>%
@@ -471,8 +472,21 @@ library(reindeer)
 #reindeer:::make_dummy_metafiles(ae)
 
 out <- ae |>
- ask_for("Phonetic = s") |>
- quantify(.from=forest,windowSize=30)
+  ask_for("Phonetic =~ '^.*[i:]'") |>
+ quantify(.from=forest,windowSize=30)|>
+  glimpse()
+
+
+
+out2 <- ae |>
+  ask_for("Phonetic =~ '^.*[i:]'") |>
+  quantify(.from=fake_voice_report,windowSize=30)|>
+  glimpse()
+
+out3 <- ae |>
+  ask_for("Phonetic =~ '^.*[i:]'") |>
+  quantify(.from="fm",windowSize=30) |>
+  glimpse()
 
 # ae |>
 #  search_for("Syllable = S | W" ) |>
