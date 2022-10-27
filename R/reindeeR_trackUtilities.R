@@ -42,3 +42,52 @@ bin_time <- function(x,bins=10,percent=FALSE){
   return(out)
 }
 
+
+#' Cut a vector of ages into age ranges
+#'
+#' The function makes it easier to construct well presented range factors from a
+#' vector of ages, by stating explicitly the first ages that should be included
+#' in a new factor level (as a vector). Alternatively, the used may specify that
+#' a new level should start every `new.at` (integer) years.
+#'
+#' @details The function does not perform any rounding up or down, truncating or
+#'   any other transformation on the vector of ages before cutting it into
+#'   discrete age ranges. So, if the user wants a person of age 10 years and 8
+#'   months to be considered part of a "11-13 yrs" age range rather than a
+#'   preceding "9-10 yrs" range, then the user should round the ages to whole
+#'   integers (e.g. using `round(ages,0)` before applying this function.
+#'
+#' @param ages The vector of ages.
+#' @param new.at A vector of ages at which a new age range should be started,
+#'   *or* a single integer indicating the interval where a new interval is
+#'   started. For instance, `new.at=10` indicates that a range will be
+#'   constructed for "20-29 yrs", "30-39 yrs", and so on.
+#' @param suffix The string suffix that is appended to the age range (defaults
+#'   to " yrs"). The user has to add a space to the suffix if required for the
+#'   application.
+#' @param start.at.zero Should the first interval start at zero (the default).
+#'
+#' @return A factor of age ranges.
+#' @export
+#'
+#' @examples
+#' ages <- c(1,1.99999,2,4,10,11)
+#' # Unevenly spaced age ranges
+#' age_ranges(ages, new.at=c(0,2,4,6,8,seq(10,130,10)))
+#' # Evenly spaced age ranges
+#' age_ranges(ages, new.at=5)
+#'
+age_ranges <- function(ages, new.at,suffix=" yrs",start.at.zero=TRUE){
+
+  if(length(new.at) == 1) new.at <- c(0,seq(new.at,((max(ages) %/% new.at) +1 )* new.at, new.at))
+
+  #This makes sure teh age ranges are always complete, even when not starting from zero
+  if(! start.at.zero) new.at <- c(min(ages)-1, new.at)
+
+  #Make sure the age range starts at 0
+  if(new.at[[1]] != 0 && start.at.zero) new.at <- c(0,new.at)
+  labs <- paste0(c(paste(head(new.at,n=-1),c(new.at[-1]-1),sep="-"), paste0(" ≥",tail(new.at,n=1))),suffix)
+
+  cut(ages,breaks = c(new.at,max(ages)+1),right = FALSE,include.lowest = TRUE,labels=labs)
+}
+
