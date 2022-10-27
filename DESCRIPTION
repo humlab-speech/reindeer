@@ -36,7 +36,8 @@ Imports:
     tidyselect,
     openssl,
     furrr,
-    progressr
+    progressr,
+    imputeTS
 Remotes:
   github::tjmahr/tjm.praat,
   github::humlab-speech/superassp

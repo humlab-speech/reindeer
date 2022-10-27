@@ -5,7 +5,7 @@
 #' `DSPP` tibble, which contains the output of this when applied previously.
 #'
 #'
-#' Recomputation may be required if more data has been added to the file
+#' Re-computation may be required if more data has been added to the file
 #' `file.path(system.file(package = "reindeer",mustWork =
 #' TRUE),"default_parameters.xlsx")`. If re-computation has been requested, this
 #' function then expands the age ranges in the spreadsheet file and computes a
@@ -13,7 +13,7 @@
 #' independent variable and the parameter value as the dependent variable.
 #' Separate models are computed for Male and Female speakers. Additionally, a
 #' separate model of all parameters are computed across all data for the case
-#' where the gender of a speaker is unknown (`Gender==NA`). Parameters that have
+#' where the gender of a speaker is unknown (`Gender==Unspecified`). Parameters that have
 #' previously been estimated using the function are are stored in the `DSPP`
 #' data frame.
 #'
@@ -22,15 +22,19 @@
 #' @param recompute If `TRUE`, this function will estimate age appropriate
 #'   settings from the collection of empirical defaults stored in this package.
 #'   If `FALSE`, this function will just return the stored `DSPP` data.
+#' @param impute Impute missing settings using time series analysis? The imputation mechanism used is currently State Space Models and Kalman Smoothing [imputeTS::na_kalman].
+#' @param defaultsEstimatedSampleSize The estimated sample size on which software default settings have been based.
+#'   This is a guess, of course, as the basis for the program default settings are rarely reported. The minimum sample size of 10 speakers
+#'   is a reasonable estimate considering the study sample sized in studies at the time when algorithms were primarily developed.
 #'
 #' @return A [tibble::tibble] with one row per age and gender combination, and
 #'   with one column per parameter for which an age dependent setting was
 #'   identified in the set of parameters.
 #'
+#' @seealso imputeTS::na_kalman
 #'
 #'
-#'
-dspp_metadataParameters <- function(recompute=FALSE){
+dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender"),impute=TRUE,defaultsEstimatedSampleSize=10){
 
   if(!recompute){
     data(DSPP)
@@ -42,11 +46,13 @@ dspp_metadataParameters <- function(recompute=FALSE){
     return(out)
   }
 
+
   openxlsx::read.xlsx(file.path(system.file(package = "reindeer",mustWork = TRUE),"default_parameters.xlsx"),sep.names = " ") -> defaults
 
   defaults %>%
     dplyr::filter( Gender %in% c("Male","Female")) %>%
     dplyr::select(Gender:Age_upper,Parameter,Setting,`Study participants`,`Study identifier`) %>%
+    dplyr::mutate(`Study participants`=ifelse(`Study participants` < defaultsEstimatedSampleSize,defaultsEstimatedSampleSize,`Study participants`)) %>%
     dplyr::rowwise() %>%
     # divide df into a list of data.frames based on supplied grouping variables
     dplyr::group_split() %>%
@@ -60,14 +66,19 @@ dspp_metadataParameters <- function(recompute=FALSE){
              dplyr::mutate(Gender = Gender[1],Parameter=Parameter[1],Setting=Setting[1],`Study participants`=`Study participants`[1],`Study identifier`=`Study identifier`[1])
       )
     }) %>%
+    dplyr::mutate(weight = dplyr::case_when(
+      stringr::str_starts(Parameter,"min") ~ `Study participants` / Setting,
+      stringr::str_starts(Parameter,"max") ~ `Study participants` * Setting,
+      TRUE ~ `Study participants`)) %>%
+    dplyr:: select(-`Study identifier`) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(Age=ceiling(Age)) %>%
+    dplyr::mutate(Age=floor(Age)) %>%
     dplyr::group_split(Gender,Parameter) %>%
     purrr::map_dfr(function(df.x) {
       with(df.x,
            # get the data.frame your function returns
            data.frame(
-             Setting=predict(loess(Setting ~ Age, weights=`Study participants` , data=.,span=0.5),
+             Setting=predict(loess(Setting ~ Age, weights=weight , data=.,span=1),
                              data.frame(Age = seq(min(Age), max(Age), 1)),surface = "direct",statistics = "approximate"),
              Age = seq(min(Age), max(Age), 1)) %>%
              # add your grouping variables back-in (stripped by ff)
@@ -76,14 +87,22 @@ dspp_metadataParameters <- function(recompute=FALSE){
     dplyr::ungroup() %>%
     tidyr::pivot_wider(names_from="Parameter",values_from = "Setting",id_cols = c("Gender","Age"))%>%
     dplyr::mutate(windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize )) %>%
-    dplyr::mutate(nominalF2 = ifelse(is.na(nominalF3),ceiling(nominalF1*3),nominalF2 )) %>%
+    dplyr::mutate(nominalF2 = ifelse(is.na(nominalF2),ceiling(nominalF1*3),nominalF2 )) %>%
     dplyr::mutate(nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3 ))  %>%
-    mutate(across(where(is.numeric), ~round(.,digits = 0 ))) %>%
+    dplyr::mutate(across(where(is.numeric), ~round(.,digits = 0 ))) %>%
     dplyr::arrange(Gender,Age) -> DSPP_mf
 
+  if(impute){
+    DSPP_mf <- DSPP_mf %>%
+      dplyr::group_by(Gender) %>%
+      dplyr::mutate(dplyr::across(tidyselect:::everything(), ~ imputeTS::na_kalman(.,smooth=FALSE,model="StructTS"))) %>%
+      dplyr::ungroup()
+  }
 
   defaults %>%
-    #dplyr::select(Age_lower:Age_upper,Parameter,Setting,`Study participants`,`Study identifier`) %>%
+    dplyr::select(Gender:Age_upper,Parameter,Setting,`Study participants`,`Study identifier`) %>%
+    dplyr::select(-Gender) %>%
+    dplyr::mutate(`Study participants`=ifelse(`Study participants` < defaultsEstimatedSampleSize,defaultsEstimatedSampleSize,`Study participants`)) %>%
     dplyr::rowwise() %>%
     # divide df into a list of data.frames based on supplied grouping variables
     dplyr::group_split() %>%
@@ -97,14 +116,19 @@ dspp_metadataParameters <- function(recompute=FALSE){
              dplyr::mutate(Parameter=Parameter[1],Setting=Setting[1],`Study participants`=`Study participants`[1],`Study identifier`=`Study identifier`[1])
       )
     }) %>%
+    dplyr::mutate(weight = dplyr::case_when(
+      stringr::str_starts(Parameter,"min") ~ `Study participants` / Setting,
+      stringr::str_starts(Parameter,"max") ~ `Study participants` * Setting,
+      TRUE ~ `Study participants`)) %>%
+    dplyr:: select(-`Study identifier`) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(Age=ceiling(Age)) %>%
+    dplyr::mutate(Age=floor(Age)) %>%
     dplyr::group_split(Parameter) %>%
     purrr::map_dfr(function(df.x) {
       with(df.x,
            # get the data.frame your function returns
            data.frame(
-             Setting=predict(loess(Setting ~ Age, weights=`Study participants` , data=.,span=0.5),
+             Setting=predict(loess(Setting ~ Age, weights=weight , data=.,span=1),
                              data.frame(Age = seq(min(Age), max(Age), 1)),surface = "direct",statistics = "approximate"),
              Age = seq(min(Age), max(Age), 1)) %>%
              # add your grouping variables back-in (stripped by ff)
@@ -113,18 +137,35 @@ dspp_metadataParameters <- function(recompute=FALSE){
     dplyr::ungroup() %>%
     tidyr::pivot_wider(names_from="Parameter",values_from = "Setting",id_cols = c("Age"))%>%
     dplyr::mutate(windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize )) %>%
-    dplyr::mutate(nominalF2 = ifelse(is.na(nominalF3),ceiling(nominalF1*3),nominalF2 )) %>%
+    dplyr::mutate(nominalF2 = ifelse(is.na(nominalF2),ceiling(nominalF1*3),nominalF2 )) %>%
     dplyr::mutate(nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3 ))  %>%
-    mutate(across(where(is.numeric), ~round(.,digits = 0 ))) %>%
-    dplyr::arrange(Age) %>%
-    dplyr::mutate(Gender=NA) ->  DSPP_na
+    dplyr::mutate(across(where(is.numeric), ~round(.,digits = 0 ))) -> DSPP_unspecified
 
-    DSPP_mf %>%
-      dplyr::bind_rows(DSPP_na)%>%
-      dplyr::mutate(dplyr::across(where(is.numeric), as.integer)) -> DSPP
+  if(impute){
+    DSPP_unspecified <- DSPP_unspecified %>%
+      dplyr::mutate(dplyr::across(tidyselect:::everything() , ~ imputeTS::na_kalman(.,smooth=FALSE,model="StructTS"))) %>%
+      dplyr::ungroup()
+  }
+
+  DSPP_unspecified %>%
+    dplyr::mutate(Gender="Unspecified") %>%
+    dplyr::arrange(Age) -> DSPP_unspecified
+
+
+
+
+
+  DSPP <- DSPP_mf %>%
+    dplyr::bind_rows(DSPP_unspecified) %>%
+    dplyr::mutate(across(where(is.numeric), as.integer)) %>%
+    dplyr::mutate(Gender=factor(Gender,levels = c("Female","Male","Unspecified")))
+
+
 
   return(DSPP)
 }
+
+
 
 #' Select superassp DSP function parameters based on metadata
 #'
@@ -165,6 +206,7 @@ match_parameters <- function(emuDBhandle,onTheFlyFunctionName,onTheFlyParams=NUL
 
   suppressMessages(meta_settings <- meta %>%
     dplyr::mutate(Age=as.integer(round(Age,digits = 0))) %>%
+    tidyr::replace_na(list(Gender="Unspecified")) %>%
     dplyr::left_join(dsp,na_matches = "na") %>%
     dplyr::select(session, bundle, all_of(toSetFp)) %>%
     tidyr::replace_na(functionDefaults) %>%
@@ -817,11 +859,16 @@ get_trackdata2 <- function (emuDBhandle, seglist = NULL, ssffTrackName = NULL,
 # library(reindeer)
 # reindeer:::unlink_emuRDemoDir()
 # reindeer:::create_ae_db(verbose = TRUE) -> emuDBhandle
-#reindeer:::add_dummy_metadata(emuDBhandle)
+# reindeer:::add_dummy_metadata(emuDBhandle)
+#
+# print(get_metadata(emuDBhandle,manditory = c("Age","a","Gender")))
+
+
+
 # add_trackDefinition(emuDBhandle,name="fms",onTheFlyFunctionName = "forest")
 # print(list_files(emuDBhandle,"fms"))
 
-# print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(nominalF1=200),metadata.defaults = list(Age=35,Gender=NA)))
+#print(match_parameters(emuDBhandle,onTheFlyFunctionName = "forest",onTheFlyParams = list(nominalF1=200),metadata.defaults = list(Age=35,Gender=NA)))
 #
 
 # add_trackDefinition(emuDBhandle,"zcr",onTheFlyFunctionName = "zcrana")

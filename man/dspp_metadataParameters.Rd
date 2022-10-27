@@ -4,12 +4,23 @@
 \alias{dspp_metadataParameters}
 \title{Provides the user with speaker dependent signal processing parameters}
 \usage{
-dspp_metadataParameters(recompute = FALSE)
+dspp_metadataParameters(
+  recompute = FALSE,
+  id.columns = c("Age", "Gender"),
+  impute = TRUE,
+  defaultsEstimatedSampleSize = 10
+)
 }
 \arguments{
 \item{recompute}{If \code{TRUE}, this function will estimate age appropriate
 settings from the collection of empirical defaults stored in this package.
 If \code{FALSE}, this function will just return the stored \code{DSPP} data.}
+
+\item{impute}{Impute missing settings using time series analysis? The imputation mechanism used is currently State Space Models and Kalman Smoothing \link[imputeTS:na_kalman]{imputeTS::na_kalman}.}
+
+\item{defaultsEstimatedSampleSize}{The estimated sample size on which software default settings have been based.
+This is a guess, of course, as the basis for the program default settings are rarely reported. The minimum sample size of 10 speakers
+is a reasonable estimate considering the study sample sized in studies at the time when algorithms were primarily developed.}
 }
 \value{
 A \link[tibble:tibble]{tibble::tibble} with one row per age and gender combination, and
@@ -29,7 +40,10 @@ Gender stratified locally-weighted polynomial regression with age as the
 independent variable and the parameter value as the dependent variable.
 Separate models are computed for Male and Female speakers. Additionally, a
 separate model of all parameters are computed across all data for the case
-where the gender of a speaker is unknown (\code{Gender==NA}). Parameters that have
+where the gender of a speaker is unknown (\code{Gender==Unspecified}). Parameters that have
 previously been estimated using the function are are stored in the \code{DSPP}
 data frame.
+}
+\seealso{
+imputeTS::na_kalman
 }
