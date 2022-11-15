@@ -243,10 +243,28 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
 
 quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified",Age=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.package="superassp",.handle=NULL){
 
+
   #Capture dot arguments for if we want to manipulate them
   dotArgs <- list(...)
-  logger::log_debug(paste(dotArgs))
+  fcall <- match.call(expand.dots = FALSE)
+  fcallS <- toString(fcall)
 
+  logger::log_debug("Function quantify called with arguments {fcallS}")
+
+  #We first need to derive the database handle
+
+  #In the first case, we are given a database handle or the corresponding basePath as a string
+
+  if("emuDBhandle" %in% class(.data) || (is.character(.data) && stringr::str_ends(basename(ae$basePath),"_emuDB") && dir.exists(.data))) {
+    # We then need to create a handle object
+    utils::capture.output(
+      .handle <- emuR::load_emuDB(.data,verbose = TRUE)
+    ) -> dbload.info
+
+  }
+
+  #The second case is when we have no explicitly set .handle argument, but a segment list with a
+  # valid "basePath" attribute set. We then create the database handle from that basePath.
   if(is.null(.handle) && ! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
     # We then need to create a handle object
     utils::capture.output(
@@ -256,37 +274,53 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
     stop("Could not derive the database path. Please provide an explicit database handle object using the .handle argument. See ?emuR::load_emuDB for details.")
   }
 
-  # We now have a database handle in the .handle variable
-  if(is.function(.from)){
-    .f <- .from # Here we apply a function to all *.wav files in the database
-    logger::log_debug("We got a function in the .from argument")
-  }
+  # This sets the default input media file extension, which handled the case when a
+  #function is called to compute a list or SSFF track result based on a wave file
+  # This variable will then be set to something else if
+  # we want to read in a pre-computed SSFF track stored on disk instead.
+  inputSignalsExtension <- emuR:::load_DBconfig(.handle)$mediafileExtension
 
 
-  if(is.character(.from)){
-    if(exists(.from) ){
-      logger::log_debug("We got a function name as a character in the .from argument")
-      .f <- utils::getFromNamespace(.from,.package)
+  # This section handles the case where we want to compute signals or a
+  # list of results from the wave file directly
+  if(is.function(.from) || is.function(purrr::safely(get)(.from)$result)){
+    if(is.function(.from)){
+      .f <- .from
     }else{
-      #The string should here be the name of a track
+      .f <- purrr::safely(get)(.from)$result
+    }
 
-      if(.from %in% emuR::list_ssffTrackDefinitions(.handle)$name){
-        logger::log_debug("We got a function in the .from argument")
-        .f <- readtrack
-        dotArgs[".field"] <- .from
-      }else{
-        #In this case, the specified track does not exist
-        logger::log_error(paste0("A track named '",.from,"' does not exist in the database."))
-      }
+    funName <- fcall$.from
+    logger::log_debug("We got a function in the .from argument : '{funName}'")
+  }else{
+    # Ok, so not a function
+    if(is.character(.from) && .from %in% emuR::list_ssffTrackDefinitions(.handle)$name){
+      #The string should here be the name of a track
+      logger::log_debug("We got a SSFF track field in the .from argument")
+      .f <- readtrack
+      funName <- "readtrack"
+      inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae) %>%
+        dplyr::filter(name==.from) %>%
+        dplyr::select(fileExtension) %>%
+        purrr::pluck(1)
+      dotArgs[".from"] <- .from
     }
   }
 
+
+
+
+
+
+  #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
   innerMapFunction <- function(.session,.bundle,...){
 
     p(message=sprintf("Processing session %s (%s)",.session,.bundle))
-    #dotdotdot <- as.list(...)
+    dotdotdot <- list(...)
+    dotdotdotS <- toString(dotdotdot)
 
     #logger::log_debug(sprintf("Using settings %s when applying the function to session %s ( bundle %s).",as.character(jsonlite::toJSON(dotdotdot)),.session,.bundle))
+    logger::log_debug("[{.session}:{.bundle})] Using settings \n{dotdotdotS}\n when applying the function {funName}.")
     result <- .f(...)
 
     return(result)
@@ -294,9 +328,9 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
 
   idCols <- names(.metadata.defaults)
 
-  handlers(global = TRUE)
-  old_handlers <- handlers(c("progress"))
-  on.exit(handlers(old_handlers), add = TRUE)
+  progressr::handlers(global = TRUE)
+  old_handlers <- progressr::handlers(c("progress"))
+  on.exit(progressr::handlers(old_handlers), add = TRUE)
 
 
   #Logic that concerns formal arguments
@@ -313,7 +347,6 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
   # Make sure that we have a DSP default settings data.frame
   dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
     tidyr::replace_na(list(Gender="Unspecified"))
-
 
   #After this we can be sure that parameters set per session or bundle are  available
   # but have been overwritten by explicitly set settings given to this function as we proceed
@@ -333,14 +366,18 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
                        by=idCols,
                        unmatched="ignore")
 
-  # Thsi block will add settings that were set in DSP defaults only
+
+  # This block will add settings that were set in DSP defaults only
   completedStoredDSPSettings <- filledMeta %>%
     dplyr::ungroup() %>%
     dplyr::left_join(
-      dplyr::select(dsp,c(idCols,dspColumnsToAdd))
+      dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
       ,by=idCols) %>%
     tidyr::replace_na(functionDefaults) %>%
     dplyr::mutate(toFile=FALSE)  #Make sure an object is returned
+
+
+  # TODO: Se till att .from sätts i data.framen om det är en kolumns
 
   # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
   # or if the 5000 Hz ceiling is instead increased and the default number of formants extracted is kept constant
@@ -351,22 +388,22 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
   }
 
   # What we now need is an 'listOfFiles' to supply to the DSP function
-  soundFiles <- emuR::list_files(.handle,emuR:::load_DBconfig(.handle)$mediafileExtension) %>%
+  signalFiles <- emuR::list_files(.handle,inputSignalsExtension) %>%
       dplyr::rename(listOfFiles=absolute_file_path) %>%
       dplyr::select(-file)
 
-  # The names of columns to keep are now the columns that are defined either in soundFiles or
+  # The names of columns to keep are now the columns that are defined either in signalFiles or
   # in dspCompletedSettings, and which will be used by the DSP function
   settingsThatWillBeUsed <- intersect(formalArgsNames,
                                       union(names(completedStoredDSPSettings),
-                                            names(soundFiles))
+                                            names(signalFiles))
                                       ) # This will be used to remove unwanted columns
 
   #Here we construct the settings that we want to use when applying the specific DSP
   # function to bundles (in specific sessions)
   sessionBundleDSPSettingsDF <-  completedStoredDSPSettings %>%
-      dplyr::left_join(soundFiles,by=c("session","bundle")) %>%
-      dplyr::select(c("session","bundle",settingsThatWillBeUsed))
+      dplyr::left_join(signalFiles,by=c("session","bundle")) %>%
+      dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
 
   # Now we need to transfer the session / bundle settings to the segment list
   # to get start and end times too into the call
@@ -381,23 +418,24 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
   cat("\nProcessing",num_to_do,"segments.\n")
   p <- progressor(num_to_do)
 
+
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
   appliedDFResultInList <- segmentDSPDF %>%
-    dplyr::rowwise() %>%
     dplyr::rename(.session=session,.bundle=bundle) %>%
-    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>% ## Fix for wrassp functions that expect "numeric" values, not integers
+    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>%
+    dplyr::rowwise() %>% ## Fix for wrassp functions that expect "numeric" values, not integers
     dplyr::mutate(temp = list(pmap(cur_data(),.f=innerMapFunction))) %>%
-    dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session)
+    dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
+    tidyr::unnest(temp)
 
-
-     resTibble <- appliedDFResultInList %>%
-       tibble::rownames_to_column(var = "sl_rowIdx") %>%
-       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
-       dplyr::mutate(out = list(map(temp,as_tibble))) %>%
-       tidyr::unnest(out) %>%
-       tidyr::unnest(out) %>%
-       dplyr::select(-temp)
+   resTibble <- appliedDFResultInList %>%
+     tibble::rownames_to_column(var = "sl_rowIdx") %>%
+     dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
+     dplyr::ungroup() %>%
+     dplyr::mutate(out = map(temp,as_tibble)) %>%
+     dplyr::select(-temp) %>%
+     tidyr::unnest(out)
 
 
   outDF <- .data %>%
@@ -411,49 +449,60 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
 
 
 
-as_tibble.AsspDataObj <- function(x,.field=1, prefix="T",na.zeros=TRUE){
-  df <- data.frame(x[[.field]])
 
-  colnames(df) <- paste0(prefix,seq(1,ncol(df)))
+readtrack <- function(listOfFiles,field=1,beginTime=0, endTime=0,sample_start=0, sample_end=0){
 
-  times <- seq(from=attr(x,"startTime"),
-               by=1/attr(x,"sampleRate"),
-               length.out=nrow(df))
-  out <-
-    tibble(times_orig=times,
-               times_rel=seq(from=0,to=(attr(x,"endRecord")-1)* 1000/attr(x,"sampleRate") ,by=1000/attr(x,"sampleRate")),
-               times_norm=times_rel / max(times_rel)
-               )
-  if(na.zeros){
-    out <- as_tibble(out) %>%
-      mutate(across(tidyselect::matches("T[0-9]+"), ~ na_if(.x,0)))
-  }
-
-  return(out)
-
-}
-
-readtrack <- function(listOfFiles,.field=1,beginTime=0, endTime=0){
   if(! all(file.exists(listOfFiles))){
     msg <- paste0("The input files ",paste(listOfFiles,collapse = ", "), " do not exist.")
     logger::log_error(msg)
     stop(msg)
   }
+  if(length(listOfFiles) > 1) stop("The 'readtrack' function is unable to process more than one file at a time")
 
-  trackObj <- wrassp::read.AsspDataObj(listOfFiles)
+  samples <- TRUE
+  begin <- sample_start
+  end <- sample_end
 
-  if(is.numeric(.field)){
-    toremove <- setdiff(seq_along(names(trackObj)),.field)
-  }
-  if(is.character(.field)){
-    toremove <- setdiff(names(trackObj),.field)
-  }
-  #Not NULL out not needed fields
-  for(f in toremove){
-    trackObj[f] <- NULL
+  #Only activate time based subsetting of samples are not set
+  if( ( !is.null(beginTime) && (beginTime > 0 && sample_start == 0 )) || ( !is.null(endTime) && (endTime > 0 && sample_end == 0 )) ){
+    samples <- FALSE
+    begin <- beginTime
+    end <- endTime
   }
 
-  return(trackObj)
+  trackObj <- wrassp::read.AsspDataObj(listOfFiles,begin=begin, end=end,samples=samples)
+
+  if(is.null(field) || missing(field) ){
+    field <- names(trackObj)[[1]]
+  }
+
+  if(!is.character(field)) stop("Please supply a field name as a string.")
+  # Now construct the SSFF data obhect
+  outDataObj = list()
+
+  fieldTable <- as.data.frame(trackObj[[field]] )
+
+  #Copy attributes over
+  attr(outDataObj, "trackFormats") <- attr(trackObj, "trackFormats")[match(field,names(trackObj))]
+  attr(outDataObj,"filePath") <- attr(trackObj,"filePath")
+  attr(outDataObj, "sampleRate") <- attr(trackObj, "sampleRate")
+  attr(outDataObj, "origFreq") <-  attr(trackObj, "origFreq")
+  attr(outDataObj, "startTime") <- attr(trackObj, "startTime")
+  attr(outDataObj, "startRecord") <- attr(trackObj, "startRecord")
+  attr(outDataObj, "endRecord") <- attr(trackObj, "endRecord")
+  class(outDataObj) = "AsspDataObj"
+
+  wrassp::AsspFileFormat(outDataObj) <- "SSFF"
+  wrassp::AsspDataFormat(outDataObj) <- as.integer(2) # == binary
+
+
+
+  names(fieldTable) <- NULL
+
+  outDataObj = wrassp::addTrack(outDataObj,  field, as.matrix(fieldTable), "INT16")
+
+
+  return(outDataObj)
 
 }
 
@@ -468,25 +517,24 @@ library(furrr)
 library(progress)
 library(reindeer)
 
-#reindeer:::create_ae_db() -> ae
-#reindeer:::make_dummy_metafiles(ae)
+# reindeer:::create_ae_db() -> ae
+# reindeer:::make_dummy_metafiles(ae)
 
 out <- ae |>
   ask_for("Phonetic =~ '^.*[i:]'") |>
  quantify(.from=forest,windowSize=30)|>
   glimpse()
 
+# out2 <- ae |>
+#   ask_for("Phonetic =~ '^.*[i:]'") |>
+#   quantify(.from=fake_voice_report,windowSize=30) %>%
+#   glimpse()
+#
+# out3 <- ae |>
+#   ask_for("Phonetic =~ '^.*[i:]'") |>
+#   quantify("fm") %>%
+#   glimpse()
 
-
-out2 <- ae |>
-  ask_for("Phonetic =~ '^.*[i:]'") |>
-  quantify(.from=fake_voice_report,windowSize=30)|>
-  glimpse()
-
-out3 <- ae |>
-  ask_for("Phonetic =~ '^.*[i:]'") |>
-  quantify(.from="fm",windowSize=30) |>
-  glimpse()
 
 # ae |>
 #  search_for("Syllable = S | W" ) |>
@@ -503,12 +551,9 @@ out3 <- ae |>
   #  ask_for("Word =~ .*") |>
   #  capture_all(level="Phonetic") |>
 
-
-# out %>%
-#   tibble::rownames_to_column(var = "sl_rowIdx") %>%
-#   dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
-#   dplyr::mutate(out = map_dfc(temp,.f=as_tibble))
-
+#forest("~/Desktop/a1.wav",toFile=FALSE) -> fms
+#readtrack("~/Desktop/a1.fms") -> fms
+#print(as_tibble(fms))
 
 
 
