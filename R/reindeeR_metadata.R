@@ -380,7 +380,6 @@ import_metadata <- function(emuDBhandle,Excelfile){
 #' @param reset.before.add If set to TRUE, the function will ignore previously
 #'   set metadata and simply add the metadata supplied in the list.
 #'
-#' @return
 #' @export
 #'
 #' @examples
