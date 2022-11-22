@@ -238,40 +238,79 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
 
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
+#.metadata_defaults=list(Gender="Undefined",Age=35)
+furnish <- function(within,from_where, ... ){
+  if(missing(from_where)) stop("You need to state a function name or the file extension from which the data columns should be gathered")
+
+  #We have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
+  if(is.character(within) && stringr::str_ends(within,"_emuDB") && dir.exists(within)){
+    .handle <- emuR::load_emuDB(within,verbose = FALSE)
+  }
+  if("emuDBhandle" %in% class(within)){
+    #reload the database just to make sure that the handle is still valid
+    within <- emuR::load_emuDB(within$basePath,verbose = FALSE)
+  }else{
+    stop("The within argument can only be either a character vector indicating the path to the database, or an emuR database handle.")
+  }
+
+  #If we have a function, then we should compute tracks
+  if(is.function(from_where) || is.function(purrr::safely(get)(from_where)$result)){
 
 
+    bundles <- emuR::list_bundles(within) %>%
+      dplyr::rename(bundle=name) %>%
+      dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0)
+    attr(bundles,"basePath") <- within$basePath
 
-quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified",Age=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.package="superassp",.handle=NULL){
+  }
+  out <- quantify(.data=bundles,.from={{from_where}},...,.metadata_defaults=.metadata_defaults)
+
+  return(.data)
+}
+
+#print(furnish(ae,forest,nominalF1=2000,explicitExt="ds") -> out)
+
+
+quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
+
 
 
   #Capture dot arguments for if we want to manipulate them
   dotArgs <- list(...)
   fcall <- match.call(expand.dots = FALSE)
   fcallS <- toString(fcall)
+  idCols <- c("Gender","Age")
 
   logger::log_debug("Function quantify called with arguments {fcallS}")
 
-  #We first need to derive the database handle
+  ###
+  # Derive .handle object
+  ##
 
-  #In the first case, we are given a database handle or the corresponding basePath as a string
-
-  if("emuDBhandle" %in% class(.data) || (is.character(.data) && stringr::str_ends(basename(ae$basePath),"_emuDB") && dir.exists(.data))) {
-    # We then need to create a handle object
-    utils::capture.output(
-      .handle <- emuR::load_emuDB(.data,verbose = TRUE)
-    ) -> dbload.info
-
-  }
-
-  #The second case is when we have no explicitly set .handle argument, but a segment list with a
+  #The first possible case is when we have no explicitly set .handle argument, but a segment list with a
   # valid "basePath" attribute set. We then create the database handle from that basePath.
-  if(is.null(.handle) && ! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
-    # We then need to create a handle object
-    utils::capture.output(
-      .handle <- emuR::load_emuDB(attr(.data,"basePath"),verbose = TRUE)
-    ) -> dbload.info
+  if(is.null(.handle)) {
+    if(! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
+      logger::log_debug("No explicit .handle argument found")
+      # We then need to create a handle object
+      utils::capture.output(
+        .handle <- emuR::load_emuDB(attr(.data,"basePath"),verbose = TRUE)
+      ) -> dbload.info
+    }else{
+      logger::log_debug("Got .handle={.handle}")
+      stop("Could not derive the database path. Please provide an explicit database handle object using the .handle argument. See ?emuR::load_emuDB for details.")
+    }
   }else{
-    stop("Could not derive the database path. Please provide an explicit database handle object using the .handle argument. See ?emuR::load_emuDB for details.")
+    # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
+    if(is.character(.handle) && stringr::str_ends(.handle,"_emuDB") && dir.exists(.handle)){
+      .handle <- emuR::load_emuDB(.handle,verbose = FALSE)
+    }
+    if("emuDBhandle" %in% class(.handle)){
+      #reload the database just to make sure that the handle is still valid
+      .handle <- emuR::load_emuDB(.handle$basePath,verbose = FALSE)
+    }else{
+      stop("The .handle argument can only be either a character vector indicating the path to the database, or an emuR database handle.")
+    }
   }
 
   # This sets the default input media file extension, which handled the case when a
@@ -282,7 +321,7 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
 
 
   # This section handles the case where we want to compute signals or a
-  # list of results from the wave file directly
+  # list of results from the wave file directly??p
   if(is.function(.from) || is.function(purrr::safely(get)(.from)$result)){
     if(is.function(.from)){
       .f <- .from
@@ -293,22 +332,22 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
     funName <- fcall$.from
     logger::log_debug("We got a function in the .from argument : '{funName}'")
   }else{
-    # Ok, so not a function
+    # Ok, so not a function, so we need to make sure that the .from argument is a string
+    # and the name of a track in the database
     if(is.character(.from) && .from %in% emuR::list_ssffTrackDefinitions(.handle)$name){
       #The string should here be the name of a track
-      logger::log_debug("We got a SSFF track field in the .from argument")
+      logger::log_debug("We got a SSFF track field in the .from argument : {.from}")
       .f <- readtrack
       funName <- "readtrack"
       inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae) %>%
         dplyr::filter(name==.from) %>%
         dplyr::select(fileExtension) %>%
         purrr::pluck(1)
-      dotArgs[".from"] <- .from
+      dotArgs["field"] <- .from
+    }else{
+      stop("The .from argument needs to be the name of a track in the database or a function that should do the signal processing.")
     }
   }
-
-
-
 
 
 
@@ -319,14 +358,12 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
     dotdotdot <- list(...)
     dotdotdotS <- toString(dotdotdot)
 
-    #logger::log_debug(sprintf("Using settings %s when applying the function to session %s ( bundle %s).",as.character(jsonlite::toJSON(dotdotdot)),.session,.bundle))
     logger::log_debug("[{.session}:{.bundle})] Using settings \n{dotdotdotS}\n when applying the function {funName}.")
     result <- .f(...)
 
     return(result)
   }
 
-  idCols <- names(.metadata.defaults)
 
   progressr::handlers(global = TRUE)
   old_handlers <- progressr::handlers(c("progress"))
@@ -339,8 +376,6 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
 
 
   #Logic that concerns actual arguments
-
-
   dotArgsRT <- tibble::as_tibble_row(dotArgs)
   dotArgsNames <- names(dotArgs)
 
@@ -351,9 +386,10 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
   #After this we can be sure that parameters set per session or bundle are  available
   # but have been overwritten by explicitly set settings given to this function as we proceed
   meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
-    tidyr::replace_na(.metadata.defaults) %>%
-    dplyr::mutate(dotArgsRT) %>%
-    dplyr::mutate(Age=as.integer(round(Age,digits = 0)))
+    dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
+    tidyr::replace_na(.metadata_defaults) %>%
+    dplyr::mutate(dotArgsRT)
+
 
 
   #This variable is used for filling in missing values in arguments explicitly set in metadata
@@ -363,8 +399,7 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
   filledMeta <- meta %>%
     dplyr::rows_update(y=dsp %>%
                          dplyr::select(all_of(precomputedVariableNames)),
-                       by=idCols,
-                       unmatched="ignore")
+                       by=idCols,unmatched = "ignore")
 
 
   # This block will add settings that were set in DSP defaults only
@@ -374,10 +409,8 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
       dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
       ,by=idCols) %>%
     tidyr::replace_na(functionDefaults) %>%
-    dplyr::mutate(toFile=FALSE)  #Make sure an object is returned
+    dplyr::mutate(toFile=FALSE)
 
-
-  # TODO: Se till att .from sätts i data.framen om det är en kolumns
 
   # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
   # or if the 5000 Hz ceiling is instead increased and the default number of formants extracted is kept constant
@@ -429,28 +462,40 @@ quantify <- function(.data,.from,...,.metadata.defaults=list(Gender="Unspecified
     dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
     tidyr::unnest(temp)
 
-   resTibble <- appliedDFResultInList %>%
-     tibble::rownames_to_column(var = "sl_rowIdx") %>%
-     dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
-     dplyr::ungroup() %>%
-     dplyr::mutate(out = map(temp,as_tibble)) %>%
-     dplyr::select(-temp) %>%
-     tidyr::unnest(out)
+
+  #Mark the special case where .data is called by provide()
+  if(setequal(names(.data),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
+    #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
+    # but just returned
+    logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
+    provideOutDF <-  list_bundles(.handle) %>%
+      dplyr::bind_cols(appliedDFResultInList) %>%
+      dplyr::rename(bundle=name,)
+
+    return(provideOutDF)
+  }else{
+    #The default case, in which we are processing a segment list
+    resTibble <- appliedDFResultInList %>%
+      tibble::rownames_to_column(var = "sl_rowIdx") %>%
+      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(out = map(temp,as_tibble)) %>%
+      dplyr::select(-temp) %>%
+      tidyr::unnest(out)
 
 
-  outDF <- .data %>%
-    tibble::rownames_to_column(var = "sl_rowIdx") %>%
-    dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx)) %>%
-    dplyr::left_join(resTibble, by="sl_rowIdx") %>%
-    dplyr::arrange(sl_rowIdx,start_item_id,end_item_id)
+    quantifyOutDF <- .data %>%
+      tibble::rownames_to_column(var = "sl_rowIdx") %>%
+      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx)) %>%
+      dplyr::left_join(resTibble, by="sl_rowIdx") %>%
+      dplyr::arrange(sl_rowIdx,start_item_id,end_item_id)
 
-  return(outDF)
+    return(quantifyOutDF)
+  }
+
 }
 
-
-
-
-readtrack <- function(listOfFiles,field=1,beginTime=0, endTime=0,sample_start=0, sample_end=0){
+readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=0, sample_end=0){
 
   if(! all(file.exists(listOfFiles))){
     msg <- paste0("The input files ",paste(listOfFiles,collapse = ", "), " do not exist.")
@@ -472,8 +517,9 @@ readtrack <- function(listOfFiles,field=1,beginTime=0, endTime=0,sample_start=0,
 
   trackObj <- wrassp::read.AsspDataObj(listOfFiles,begin=begin, end=end,samples=samples)
 
-  if(is.null(field) || missing(field) ){
-    field <- names(trackObj)[[1]]
+  if(is.null(field) || length(field) == 0 || missing(field) ){
+    .field <- type.convert(field,as.is = TRUE)
+    field <- names(trackObj)[[.field]]
   }
 
   if(!is.character(field)) stop("Please supply a field name as a string.")
@@ -519,17 +565,18 @@ library(reindeer)
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
+#add_ssffTrackDefinition(ae,"bw","bw","bw","forest")
 
-out <- ae |>
-  ask_for("Phonetic =~ '^.*[i:]'") |>
- quantify(.from=forest,windowSize=30)|>
-  glimpse()
-
+# out <- ae |>
+#   ask_for("Phonetic =~ '^.*[i:]'") |>
+#  quantify(.from=forest,windowSize=30)|>
+#   glimpse()
+#
 # out2 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
 #   quantify(.from=fake_voice_report,windowSize=30) %>%
 #   glimpse()
-#
+
 # out3 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
 #   quantify("fm") %>%
