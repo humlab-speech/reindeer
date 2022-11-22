@@ -1,4 +1,30 @@
 
+create_egg_db <- function(){
+  eggdir <- normalizePath(ifelse(PRAAT_DEVEL== TRUE,
+         file.path("inst","praat","praatdet","examples"),
+         file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","praatdet","examples")
+  ))
+  dbDir <- file.path(tempdir(),"egg_emuDB")
+  unlink(dbDir,recursive = TRUE, force=TRUE)
+  emuR::create_emuDB("egg",tempdir())
+  emuR::load_emuDB(dbDir) -> eggdb
+  reindeer::import_recordings(eggdb,dir=eggdir, speech.channel = 2, egg.channel = 1,verbose=TRUE)
+  return(eggdb)
+}
+
+unlink_eggDemoDir <- function(){
+  demodir <- file.path(tempdir(),"egg_emuDB")
+  res <- unlink(demodir,recursive = TRUE)
+  binRes <- c(TRUE,FALSE)[res+1]
+  return(binRes)
+}
+
+unlink_emuRDemoDir <- function(){
+  demodir <- file.path(tempdir(),"emuR_demoData")
+  res <- unlink(demodir,recursive = TRUE)
+  binRes <- c(TRUE,FALSE)[res+1]
+  return(binRes)
+}
 
 create_ae_db <- function(verbose=TRUE){
   demodir <- file.path(tempdir(),"emuR_demoData")
