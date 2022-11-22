@@ -238,34 +238,62 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
 
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
-#.metadata_defaults=list(Gender="Undefined",Age=35)
-furnish <- function(within,from_where, ... ){
-  if(missing(from_where)) stop("You need to state a function name or the file extension from which the data columns should be gathered")
+#
+
+
+furnish <- function(inside,from_what, ... ,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.package="superassp"){
+  if(missing(from_what)) stop("You need to state a function name or the file extension from which the data columns should be gathered")
 
   #We have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-  if(is.character(within) && stringr::str_ends(within,"_emuDB") && dir.exists(within)){
-    .handle <- emuR::load_emuDB(within,verbose = FALSE)
+  if(is.character(inside) && stringr::str_ends(inside,"_emuDB") && dir.exists(inside)){
+    .handle <- emuR::load_emuDB(inside,verbose = FALSE)
   }
-  if("emuDBhandle" %in% class(within)){
+  if("emuDBhandle" %in% class(inside)){
     #reload the database just to make sure that the handle is still valid
-    within <- emuR::load_emuDB(within$basePath,verbose = FALSE)
+    inside <- emuR::load_emuDB(inside$basePath,verbose = FALSE)
   }else{
-    stop("The within argument can only be either a character vector indicating the path to the database, or an emuR database handle.")
+    stop("The 'inside' argument can only be either a character vector indicating the path to the database, or an emuR database handle.")
   }
 
-  #If we have a function, then we should compute tracks
-  if(is.function(from_where) || is.function(purrr::safely(get)(from_where)$result)){
-
-
-    bundles <- emuR::list_bundles(within) %>%
+  #If we have a function, then we should get some base data for the track calculations
+  if(is.function(from_what) || is.function(purrr::safely(get)(from_what)$result)){
+    bundles <- emuR::list_bundles(inside) %>%
       dplyr::rename(bundle=name) %>%
       dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0)
-    attr(bundles,"basePath") <- within$basePath
+    attr(bundles,"basePath") <- inside$basePath
 
+    # Here we envoke the special mode of quantify where an intermediate nested result is returned
+    quantifications <- quantify(.data=bundles,.from={{from_what}},...,.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package)
+
+    #parameters <- quantifications %>%
+    #  dplyr::select(parameters) %>%
+    #  tidyr::unnest(parameters)
+    #Overwrite the file extension used by the default by the function is the user said so
+    fileExtension <- ifelse(is.null(purrr::pluck(quantifications,"parameters",1,"explicitExt")),
+                            superassp::get_extension(from_what),
+                            purrr::pluck(quantifications,"parameters",1,"explicitExt"))
+
+    quantifications <- quantifications %>%
+      dplyr::rename(dobj= temp) %>%
+      dplyr::mutate(file= file.path(inside$basePath,
+                                           paste0(session,emuR:::session.suffix),
+                                           paste0(bundle,emuR:::bundle.dir.suffix),
+                                           paste(bundle,fileExtension,sep="."))) %>%
+      dplyr::select(dobj,file)
+
+   #Now finally write teh SSFF files
+   quantifications %>%
+     furrr::future_pwalk(wrassp::write.AsspDataObj)
+
+  }else{
+    # we have a file extension only
+    fileExtension <- from_what
   }
-  out <- quantify(.data=bundles,.from={{from_where}},...,.metadata_defaults=.metadata_defaults)
 
-  return(.data)
+
+  #TODO: Make sure all mentioned tracks are connected up to the file now
+
+  return(quantifications)
 }
 
 #print(furnish(ae,forest,nominalF1=2000,explicitExt="ds") -> out)
@@ -459,7 +487,9 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
     dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>%
     dplyr::rowwise() %>% ## Fix for wrassp functions that expect "numeric" values, not integers
     dplyr::mutate(temp = list(pmap(cur_data(),.f=innerMapFunction))) %>%
-    dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
+    #dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
+    dplyr::select(-.bundle,-.session) %>%
+    tidyr::nest(parameters=c(tidyselect::everything(), -temp,-toFile)) %>%
     tidyr::unnest(temp)
 
 
@@ -470,12 +500,13 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
     logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
     provideOutDF <-  list_bundles(.handle) %>%
       dplyr::bind_cols(appliedDFResultInList) %>%
-      dplyr::rename(bundle=name,)
+      dplyr::rename(bundle=name)
 
     return(provideOutDF)
   }else{
     #The default case, in which we are processing a segment list
     resTibble <- appliedDFResultInList %>%
+      dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
       tibble::rownames_to_column(var = "sl_rowIdx") %>%
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
       dplyr::ungroup() %>%
@@ -567,10 +598,10 @@ library(reindeer)
 # reindeer:::make_dummy_metafiles(ae)
 #add_ssffTrackDefinition(ae,"bw","bw","bw","forest")
 
-# out <- ae |>
-#   ask_for("Phonetic =~ '^.*[i:]'") |>
-#  quantify(.from=forest,windowSize=30)|>
-#   glimpse()
+out <- ae |>
+  ask_for("Phonetic =~ '^.*[i:]'") |>
+ quantify(.from=forest,windowSize=30)|>
+  glimpse()
 #
 # out2 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
@@ -582,6 +613,9 @@ library(reindeer)
 #   quantify("fm") %>%
 #   glimpse()
 
+out <- ae |>
+  furnish(forest) |>
+  glimpse()
 
 # ae |>
 #  search_for("Syllable = S | W" ) |>
