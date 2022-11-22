@@ -705,8 +705,126 @@ annotate_periods <- function(emuDBhandle,
   return(fl)
 }
 
+#   text directory /Users/jkirby/Projects/egg/praatdet/examples/
+#   word outfile egg_out.txt
+#   word extension .wav
+#   integer eggChan 1
+#     integer startFile 1
+#   integer intervalTier 3
+#   word intervalLabel v
+#   integer intervalNum 0
+#   word separator _
+#   integer minF0 75
+#   integer maxF0 600
+#   integer k 10
+#     real    threshold 3/7
+#     integer passFrequency 40
+#     integer smoothHz 20
+#     boolean manualCheck 0
+#     boolean useExistingPP 0
+#     boolean invertSignal 0
+
+
+annotate_peakdet <- function(eggFile="/Users/frkkan96/Desktop/eggtest/dâlem_iso_1_mis.egg",
+                             extension=".egg",
+                             eggChan=1,
+                             minF=75,
+                             maxF=600,
+                             k=10,
+                             threshold=3/7,
+                             passFrequency=40,
+                             smoothHz=20,
+                             invertSignal=FALSE
+                             ){
+
+  eggFile <- normalizePath(eggFile)
+
+  dsp_directory <- superassp:::make_dsp_environment()
+
+  list.files("/Users/frkkan96/Documents/src/reindeer/inst/praat/praatdet",pattern  = ".praat")
+
+
+  praat_script <- ifelse(PRAAT_DEVEL== TRUE,
+                         file.path("inst","praat","praatdet","shelldet.praat"),
+                         file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","praatdet","shelldet.praat")
+  )
+
+
+
+  praatdet <- superassp::cs_wrap_praat_script(praat_location = superassp::get_praat(),
+                                             script_code_to_run = readLines(praat_script),
+                                             directory=dsp_directory,
+                                             return="info-window")
+  # We need  to copy some additional praat files
+  auxpraatfiles <- list.files(ifelse(PRAAT_DEVEL== TRUE,
+                                     file.path("inst","praat","praatdet"),
+                                     file.path(system.file(package = "reindeer",mustWork = TRUE),"praat","praatdet")),pattern  = ".praat",full.names=TRUE)
+
+
+  file.copy(auxpraatfiles,dsp_directory)
+
+  eggFileName <- tempfile(tmpdir = dsp_directory,fileext = extension)
+  outTabFilename <- paste0(tools::file_path_sans_ext(eggFileName),".csv")
+
+  R.utils::createLink(link=eggFileName, target=eggFile)
+
+  #   text directory /Users/jkirby/Projects/egg/praatdet/examples/
+  #   word outfile egg_out.txt
+  #   word extension .wav
+  #   integer eggChan 1
+  #     integer startFile 1
+  #   integer intervalTier 3
+  #   word intervalLabel v
+  #   integer intervalNum 0
+  #   word separator _
+  #   integer minF0 75
+  #   integer maxF0 600
+  #   integer k 10
+  #     real    threshold 3/7
+  #     integer passFrequency 40
+  #     integer smoothHz 20
+  #     boolean manualCheck 0
+  #     boolean useExistingPP 0
+  #     boolean invertSignal 0
+
+  res <- praatdet(paste0(dsp_directory,"/"),
+                  paste0(dsp_directory,"/"),
+                  "egg_out.txt",
+                  extension,
+                  eggChan,
+                  1,
+                  3,
+                  "v",
+                  0,
+                  "___",
+                  minF,
+                  maxF,
+                  k,
+                  threshold,
+                  passFrequency,
+                  smoothHz,
+                  0,
+                  0,
+                  ifelse(invertSignal,1,0)
+  )
+
+  res <- (res == "All done.")
+
+  outTab <- file.path(dsp_directory,"egg_out.txt")
+  eggsTab <- readr::read_csv(outTab,col_types = "ccciddddd",na=c("--undefined--","NA",""))
+
+
+
+}
+
 # ### For interactive testing
-#PRAAT_DEVEL=TRUE
+# PRAAT_DEVEL=TRUE
+# unlink_eggDemoDir()
+# create_egg_db() -> egg
+# add_levelDefinition(egg,"EGG","SEGMENT")
+#
+#
+# annotate_peakdet() -> out
 #remove_levelDefinition(emuDBhandle,"AUTO_PERIODS",force=TRUE,verbose=FALSE)
 #add_levelDefinition(emuDBhandle,"AUTO_PERIODS","EVENT")
 #annotate_periods(emuDBhandle) -> out
