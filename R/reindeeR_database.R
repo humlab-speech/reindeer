@@ -35,7 +35,6 @@
 #'
 #' @export
 #'
-
 import_recordings <- function (emuDBhandle, dir, targetSessionName = "0000", speech.channel=1,egg.channel=NULL, verbose = TRUE)
 {
   emuR:::check_emuDBhandle(emuDBhandle)
@@ -163,7 +162,7 @@ import_recordings <- function (emuDBhandle, dir, targetSessionName = "0000", spe
 #'
 #' @export
 #'
-save_snapshot <- function(emuDBhandle,push.changes=TRUE,remote.name="origin",remote.ref="master"){
+snapshot <- function(emuDBhandle,push.changes=TRUE,remote.name="origin",remote.ref="master"){
 
   if(! git2r::in_repository(emuDBhandle$basePath)){
     git2r::init(emuDBhandle$basePath)
@@ -181,6 +180,16 @@ save_snapshot <- function(emuDBhandle,push.changes=TRUE,remote.name="origin",rem
 
 
 }
+
+rename_bundles <- function(emuDBhandle,old_names, new_names){
+
+  if(missing(old_names) || missing(new_names) || length(old_names) != length(new_names)) {
+    stop("You must provide the same number of old and new file names.")
+  }
+
+}
+
+
 ### For interactive testing
 #
 #
