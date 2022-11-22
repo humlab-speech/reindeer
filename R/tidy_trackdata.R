@@ -585,37 +585,37 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 ## INTERACTIVE TESTING
 #
-library(tidyverse)
-library(purrr)
-library(progressr)
-library(tibble)
-library(superassp)
-library(furrr)
-library(progress)
-library(reindeer)
+# library(tidyverse)
+# library(purrr)
+# library(progressr)
+# library(tibble)
+# library(superassp)
+# library(furrr)
+# library(progress)
+# library(reindeer)
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
 #add_ssffTrackDefinition(ae,"bw","bw","bw","forest")
 
-out <- ae |>
-  ask_for("Phonetic =~ '^.*[i:]'") |>
- quantify(.from=forest,windowSize=30)|>
-  glimpse()
+#out <- ae |>
+#  ask_for("Phonetic =~ '^.*[i:]'") |>
+# quantify(.from=forest,windowSize=30)|>
+#  glimpse()
 #
 # out2 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
 #   quantify(.from=fake_voice_report,windowSize=30) %>%
 #   glimpse()
 
-# out3 <- ae |>
-#   ask_for("Phonetic =~ '^.*[i:]'") |>
-#   quantify("fm") %>%
-#   glimpse()
-
-out <- ae |>
-  furnish(forest) |>
+out3 <- ae |>
+  ask_for("Phonetic =~ '^.*[i:]'") |>
+  quantify("fm") %>%
   glimpse()
+
+#out <- ae |>
+#  furnish(forest) |>
+#  glimpse()
 
 # ae |>
 #  search_for("Syllable = S | W" ) |>
