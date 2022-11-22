@@ -29,9 +29,6 @@ property to NULL.}
 \item{reset.before.add}{If set to TRUE, the function will ignore previously
 set metadata and simply add the metadata supplied in the list.}
 }
-\value{
-
-}
 \description{
 The function takes a list and a specification of where the metadata should be
 set. The default behaviour is to keep already set metadata, and overwrite
