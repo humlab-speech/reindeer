@@ -112,7 +112,7 @@ climb_to <- function(.data,  .attribute_name ,.collapse = TRUE, .skip_times = FA
       .source  <- emuR::load_emuDB(attr(.data,"basePath"),verbose = FALSE)
     ) -> dbload.info
   }else{
-    logger::log_error("Could not derive the database path from the segment list.\n Please provide an explicit database handle object using the .handle argument. See ?emuR::load_emuDB for details.")
+    logger::log_error("Could not derive the database path from the segment list.\n Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
   }
 
   res <- emuR::requery_hier(emuDBhandle = .source,seglist= .data,level=.attribute_name,timeRefSegmentLevel = .times_from, calcTimes = !.skip_times,verbose = .interactive, resultType = "tibble")
@@ -136,7 +136,7 @@ scout_forward <- function(.data,  steps_forward, count_from="START" , capture=1,
       .handle <- emuR::load_emuDB(attr(.data,"basePath"),verbose = TRUE)
     ) -> dbload.info
   }else{
-    stop("Could not derive the database path. Please provide an explicit database handle object using the .handle argument. See ?emuR::load_emuDB for details.")
+    stop("Could not derive the database path. Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
   }
 
   res <- emuR::requery_seq(emuDBhandle = .handle,seglist= .data,offset=steps_forward, offsetRef=count_from,length=capture, ignoreOutOfBounds = ignore_bundle_boundaries, timeRefSegmentLevel = times_from, calcTimes = !skip_times,verbose = interactive, resultType = "tibble")
@@ -211,7 +211,7 @@ define <- function(.x, what=c("level","link","global_lg","track","bundle","sessi
   al <- list(...)
   if(what == "level" ) {
     if(al[["name"]] %in% emuR::list_levelDefinitions(emuDBhandle = .handle)[["name"]]){
-      logger::log_warn('The level with the name \'{al[["name"]]}\' is already defined. Using the existing definition')
+      logger::log_warn('The level with the name \'{al[["name"]]}\' is already defined. .source the existing definition')
     }else{
       if(all(names(al) %in% methods::formalArgs(emuR::add_levelDefinition))) {
         logger::log_info('Adding a level named {al[["name"]]} to the database.')
@@ -241,47 +241,90 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
 #
 
 
-furnish <- function(inside,from_what, ... ,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.package="superassp"){
-  if(missing(from_what)) stop("You need to state a function name or the file extension from which the data columns should be gathered")
+furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.package="superassp"){
+  if(missing(.source)) cli::cli_abort(c("Missing source name",
+                                      "i"="You need to state a function name or the file extension from which the data columns should be gathered",
+                                      "x"="The argument .source is missing"))
 
   #We have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-  if(is.character(inside) && stringr::str_ends(inside,"_emuDB") && dir.exists(inside)){
+  if(is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
     .handle <- emuR::load_emuDB(inside,verbose = FALSE)
   }
-  if("emuDBhandle" %in% class(inside)){
+  if("emuDBhandle" %in% class(.inside_of)){
     #reload the database just to make sure that the handle is still valid
-    inside <- emuR::load_emuDB(inside$basePath,verbose = FALSE)
+    .inside_of <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
   }else{
-    stop("The 'inside' argument can only be either a character vector indicating the path to the database, or an emuR database handle.")
+    cli::cli_abort(c("Wrong .inside_of argument",
+                   "i"="The '.inside_of' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
+                   "x"="The .inside_of argument supplied is a {class(.inside_of)}"))
   }
 
+
+
+  ## Check that track specifications given in ... are ok
+  trackSpec <- rlang::dots_list(...,.named = TRUE, .homonyms="error", .check_assign=TRUE)
+  #Overwrite the file extension used by the default by the function is the user said so
+  fileExtension <- dplyr::coalesce(trackSpec$explicitExt,
+                          superassp::get_extension(.source))
+  rlang::inform(paste0("Using the output file extension '.",fileExtension,"'."),call = rlang::caller_env())
+  tracksToDefine <- data.frame(name=names(trackSpec),columnName=unlist(trackSpec,use.names = FALSE),fileExtension=fileExtension) %>%
+    dplyr::mutate(across(everything(), ~ stringr::str_remove_all(.,"[\'\"]") ))
+  #tracksToDefine may now include also the names of function arguments, which we needs to adress later
+
+  tracksDefined <- emuR::list_ssffTrackDefinitions(.inside_of)
+
+  #This is the set of track specifications that already in the database
+  # and we can safely just re-apply them
+  useExistingDefinition <- tracksToDefine %>%
+    dplyr::inner_join(tracksDefined,by=c("name","columnName","fileExtension"))
+
+  makeAFuzzAbout <- tracksToDefine %>%
+    dplyr::filter(name %in% tracksDefined$name)
+
+  cli::cli_warn(c("Duplicate track definitions",
+                  "x"="The database '{(.inside_of$dbName)}' already contains tracks with with names {makeAFuzzAbout$name}",
+                  "i"= "Duplicate definitions will be ignored"))
+
+
+
   #If we have a function, then we should get some base data for the track calculations
-  if(is.function(from_what) || is.function(purrr::safely(get)(from_what)$result)){
-    bundles <- emuR::list_bundles(inside) %>%
+  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
+    bundles <- emuR::list_bundles(.inside_of) %>%
       dplyr::rename(bundle=name) %>%
-      dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0)
-    attr(bundles,"basePath") <- inside$basePath
+      dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0) %>%
+      dplyr::mutate(.file= file.path(.inside_of$basePath,
+                                    paste0(session,emuR:::session.suffix),
+                                    paste0(bundle,emuR:::bundle.dir.suffix),
+                                    paste(bundle,fileExtension,sep="."))) %>%
+      dplyr::filter( (.force) | (!file.exists(.file))) %>%
+      dplyr::select(-.file) #Make sure this variable does not mess up execution of the function
+    attr(bundles,"basePath") <- .inside_of$basePath
+
+    if(nrow(bundles) < 1){
+      logger::log_info("[furnish] No signal files needs updating and updating is not forced. Skipping the signal processing step.")
+      return(.inside_of)
+    }
+    #Explicitly remove track name specifications with names that are also formal
+    # args of the function
+    tracksToDefine <- tracksToDefine %>%
+      dplyr::filter(! name %in% methods::formalArgs(.source))
+
+
 
     # Here we envoke the special mode of quantify where an intermediate nested result is returned
-    quantifications <- quantify(.data=bundles,.from={{from_what}},...,.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package)
-
-    #parameters <- quantifications %>%
-    #  dplyr::select(parameters) %>%
-    #  tidyr::unnest(parameters)
-    #Overwrite the file extension used by the default by the function is the user said so
-    fileExtension <- ifelse(is.null(purrr::pluck(quantifications,"parameters",1,"explicitExt")),
-                            superassp::get_extension(from_what),
-                            purrr::pluck(quantifications,"parameters",1,"explicitExt"))
+    quantifications <- quantify(.what=bundles,.source={{.source}},rlang::enquos(...),.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package)
 
     quantifications <- quantifications %>%
       dplyr::rename(dobj= temp) %>%
-      dplyr::mutate(file= file.path(inside$basePath,
+      dplyr::mutate(file= file.path(.inside_of$basePath,
                                            paste0(session,emuR:::session.suffix),
                                            paste0(bundle,emuR:::bundle.dir.suffix),
                                            paste(bundle,fileExtension,sep="."))) %>%
-      dplyr::select(dobj,file)
+      dplyr::select(dobj,file) %>%
+      dplyr::filter(!file.exists(file))
 
-   #Now finally write teh SSFF files
+  return(quantifications)
+   #Now finally write SSFF files
    quantifications %>%
      furrr::future_pwalk(wrassp::write.AsspDataObj)
 
@@ -290,24 +333,25 @@ furnish <- function(inside,from_what, ... ,.metadata_defaults=list("Gender"="Und
     fileExtension <- from_what
   }
 
-
   #TODO: Make sure all mentioned tracks are connected up to the file now
-
-  return(quantifications)
+  #c(tracksToDefine,makeAFuzzAbout,toJustUpdate)
+ return(makeAFuzzAbout)
 }
-
-#print(furnish(ae,forest,nominalF1=2000,explicitExt="ds") -> out)
-
-
-quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
+#furnish(list(1),forest)
+print(out <- furnish(ae,forest,FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=FALSE))
+print(emuR::list_ssffTrackDefinitions(ae))
 
 
+quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
 
   #Capture dot arguments for if we want to manipulate them
   dotArgs <- list(...)
   fcall <- match.call(expand.dots = FALSE)
   fcallS <- toString(fcall)
   idCols <- c("Gender","Age")
+  if(nrow(.what ) < 1){
+    logger::log_error("Trying to quantify an empty set of signals. Exiting.")
+  }
 
   logger::log_debug("Function quantify called with arguments {fcallS}")
 
@@ -318,15 +362,15 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
   #The first possible case is when we have no explicitly set .handle argument, but a segment list with a
   # valid "basePath" attribute set. We then create the database handle from that basePath.
   if(is.null(.handle)) {
-    if(! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
+    if(! is.null(attr(.what,"basePath")) && dir.exists(attr(.what,"basePath"))) {
       logger::log_debug("No explicit .handle argument found")
       # We then need to create a handle object
       utils::capture.output(
-        .handle <- emuR::load_emuDB(attr(.data,"basePath"),verbose = TRUE)
+        .handle <- emuR::load_emuDB(attr(.what,"basePath"),verbose = TRUE)
       ) -> dbload.info
     }else{
       logger::log_debug("Got .handle={.handle}")
-      stop("Could not derive the database path. Please provide an explicit database handle object using the .handle argument. See ?emuR::load_emuDB for details.")
+      stop("Could not derive the database path. Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
     }
   }else{
     # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
@@ -350,30 +394,30 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
 
   # This section handles the case where we want to compute signals or a
   # list of results from the wave file directly??p
-  if(is.function(.from) || is.function(purrr::safely(get)(.from)$result)){
-    if(is.function(.from)){
-      .f <- .from
+  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
+    if(is.function(.source)){
+      .f <- .source
     }else{
-      .f <- purrr::safely(get)(.from)$result
+      .f <- purrr::safely(get)(.source)$result
     }
 
-    funName <- fcall$.from
-    logger::log_debug("We got a function in the .from argument : '{funName}'")
+    funName <- fcall$.source
+    logger::log_debug("We got a function in the .source argument : '{funName}'")
   }else{
-    # Ok, so not a function, so we need to make sure that the .from argument is a string
+    # Ok, so not a function, so we need to make sure that the .source argument is a string
     # and the name of a track in the database
-    if(is.character(.from) && .from %in% emuR::list_ssffTrackDefinitions(.handle)$name){
+    if(is.character(.source) && .source %in% emuR::list_ssffTrackDefinitions(.handle)$name){
       #The string should here be the name of a track
-      logger::log_debug("We got a SSFF track field in the .from argument : {.from}")
+      logger::log_debug("We got a SSFF track field in the .source argument : {.source}")
       .f <- readtrack
       funName <- "readtrack"
       inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae) %>%
-        dplyr::filter(name==.from) %>%
+        dplyr::filter(name==.source) %>%
         dplyr::select(fileExtension) %>%
         purrr::pluck(1)
-      dotArgs["field"] <- .from
+      dotArgs["field"] <- .source
     }else{
-      stop("The .from argument needs to be the name of a track in the database or a function that should do the signal processing.")
+      stop("The .source argument needs to be the name of a track in the database or a function that should do the signal processing.")
     }
   }
 
@@ -386,7 +430,7 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
     dotdotdot <- list(...)
     dotdotdotS <- toString(dotdotdot)
 
-    logger::log_debug("[{.session}:{.bundle})] Using settings \n{dotdotdotS}\n when applying the function {funName}.")
+    logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.")
     result <- .f(...)
 
     return(result)
@@ -404,7 +448,7 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
 
 
   #Logic that concerns actual arguments
-  dotArgsRT <- tibble::as_tibble_row(dotArgs)
+  #dotArgsRT <- tibble::as_tibble_row(dotArgs)
   dotArgsNames <- names(dotArgs)
 
   # Make sure that we have a DSP default settings data.frame
@@ -416,7 +460,7 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
   meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
     dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
     tidyr::replace_na(.metadata_defaults) %>%
-    dplyr::mutate(dotArgsRT)
+    dplyr::mutate(dotArgs)
 
 
 
@@ -436,8 +480,8 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
     dplyr::left_join(
       dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
       ,by=idCols) %>%
-    tidyr::replace_na(functionDefaults) %>%
-    dplyr::mutate(toFile=FALSE)
+    tidyr::replace_na(functionDefaults)  %>%
+    dplyr::mutate(toFile=FALSE)  #Forcefully inject a toFile argument
 
 
   # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
@@ -468,7 +512,7 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
 
   # Now we need to transfer the session / bundle settings to the segment list
   # to get start and end times too into the call
-  segmentDSPDF <- .data %>%
+  segmentDSPDF <- .what %>%
     tibble::rownames_to_column(var = "sl_rowIdx") %>%
     dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle")) %>%
     dplyr::rename(beginTime=start,endTime=end) %>%
@@ -484,17 +528,17 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
   # the columns in the data frame
   appliedDFResultInList <- segmentDSPDF %>%
     dplyr::rename(.session=session,.bundle=bundle) %>%
-    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>%
-    dplyr::rowwise() %>% ## Fix for wrassp functions that expect "numeric" values, not integers
+    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>% ## Fix for wrassp functions that expect "numeric" values, not integers
+    dplyr::rowwise() %>%
     dplyr::mutate(temp = list(pmap(cur_data(),.f=innerMapFunction))) %>%
     #dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
     dplyr::select(-.bundle,-.session) %>%
-    tidyr::nest(parameters=c(tidyselect::everything(), -temp,-toFile)) %>%
+    tidyr::nest(parameters=c(tidyselect::everything(), -temp)) %>%
     tidyr::unnest(temp)
 
 
-  #Mark the special case where .data is called by provide()
-  if(setequal(names(.data),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
+  #Mark the special case where .what is called by provide()
+  if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
     #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
     # but just returned
     logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
@@ -515,7 +559,7 @@ quantify <- function(.data,.from,...,.by_maxFormantHz=TRUE,.metadata_defaults=li
       tidyr::unnest(out)
 
 
-    quantifyOutDF <- .data %>%
+    quantifyOutDF <- .what %>%
       tibble::rownames_to_column(var = "sl_rowIdx") %>%
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx)) %>%
       dplyr::left_join(resTibble, by="sl_rowIdx") %>%
@@ -583,16 +627,18 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 }
 
+
+
 ## INTERACTIVE TESTING
 #
-# library(tidyverse)
-# library(purrr)
-# library(progressr)
-# library(tibble)
-# library(superassp)
-# library(furrr)
-# library(progress)
-# library(reindeer)
+library(tidyverse)
+library(purrr)
+library(progressr)
+library(tibble)
+library(superassp)
+library(furrr)
+library(progress)
+library(reindeer)
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
@@ -608,14 +654,12 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 #   quantify(.from=fake_voice_report,windowSize=30) %>%
 #   glimpse()
 
-out3 <- ae |>
-  ask_for("Phonetic =~ '^.*[i:]'") |>
-  quantify("fm") %>%
-  glimpse()
+# out3 <- ae |>
+#   ask_for("Phonetic =~ '^.*[i:]'") |>
+#   quantify("fm") %>%
+#   glimpse()
 
-#out <- ae |>
-#  furnish(forest) |>
-#  glimpse()
+
 
 # ae |>
 #  search_for("Syllable = S | W" ) |>
