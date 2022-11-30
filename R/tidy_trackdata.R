@@ -338,8 +338,8 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
  return(makeAFuzzAbout)
 }
 #furnish(list(1),forest)
-print(out <- furnish(ae,forest,FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=FALSE))
-print(emuR::list_ssffTrackDefinitions(ae))
+#print(out <- furnish(ae,forest,FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=FALSE))
+#print(emuR::list_ssffTrackDefinitions(ae))
 
 
 quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
@@ -350,7 +350,9 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
   fcallS <- toString(fcall)
   idCols <- c("Gender","Age")
   if(nrow(.what ) < 1){
-    logger::log_error("Trying to quantify an empty set of signals. Exiting.")
+    cli::cli_abort(c("Erroneous .what argument",
+                     "i"="The list of segments or signals is empty",
+                     "x"="The .what argument contains {nrow(.what)} rows."))
   }
 
   logger::log_debug("Function quantify called with arguments {fcallS}")
@@ -381,7 +383,11 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
       #reload the database just to make sure that the handle is still valid
       .handle <- emuR::load_emuDB(.handle$basePath,verbose = FALSE)
     }else{
-      stop("The .handle argument can only be either a character vector indicating the path to the database, or an emuR database handle.")
+      cli::cli_abort(c("Not appropriate .handle argument",
+                       "i"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
+                       "x"="The .handle argument supplied is a {class(.handle)}",
+                       "x"="The database {dplyr::coalesce(.handle$basePath,.handle)} does not exits."))
+
     }
   }
 
@@ -417,7 +423,10 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
         purrr::pluck(1)
       dotArgs["field"] <- .source
     }else{
-      stop("The .source argument needs to be the name of a track in the database or a function that should do the signal processing.")
+      cli::abort(c("Cannot use the indicated .source",
+                   "i"="The .source argument contains {(.source)} and is of class {class(.source)}",
+                   "i"="The .source is reported to be able to return the columns {superassp::get_definedtracks(.source)} when converted to a tibble",
+                   "x"="The .source needs to be the name of a track in the database or a function that should do the signal processing."))
     }
   }
 
@@ -435,7 +444,6 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
 
     return(result)
   }
-
 
   progressr::handlers(global = TRUE)
   old_handlers <- progressr::handlers(c("progress"))
@@ -520,9 +528,9 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
 
   #Set up the progress bar
   num_to_do <- nrow(segmentDSPDF)
-  cat("\nProcessing",num_to_do,"segments.\n")
-  p <- progressor(num_to_do)
 
+
+  p <- progressr::progressor(num_to_do)
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
@@ -564,6 +572,7 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx)) %>%
       dplyr::left_join(resTibble, by="sl_rowIdx") %>%
       dplyr::arrange(sl_rowIdx,start_item_id,end_item_id)
+
 
     return(quantifyOutDF)
   }
@@ -644,10 +653,10 @@ library(reindeer)
 # reindeer:::make_dummy_metafiles(ae)
 #add_ssffTrackDefinition(ae,"bw","bw","bw","forest")
 
-#out <- ae |>
-#  ask_for("Phonetic =~ '^.*[i:]'") |>
-# quantify(.from=forest,windowSize=30)|>
-#  glimpse()
+out <- ae |>
+  ask_for("Phonetic =~ '^.*[i:]'") |>
+ quantify(forest,windowSize=30)|>
+  glimpse()
 #
 # out2 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
