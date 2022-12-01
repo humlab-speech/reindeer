@@ -181,6 +181,120 @@ save_snapshot <- function(emuDBhandle,push.changes=TRUE,remote.name="origin",rem
 
 
 }
+
+#' Batch rename bundles
+#'
+#' This function simplifies renaming of bundles.
+#'
+#' The user it expected to supply a data frame and tibble with "session" and
+#' "name" columns, and a vector of new bundle names with the length as the
+#' number of rows in the `from` data.frame. The function will then rename all
+#' bundle directories and all files in the bundle directories to the new name
+#' one by one.
+#'
+#' @details Bundle renaming is a sensitive process and many things can go wrong.
+#' Therefore the function will by default simulate the file renaming and return
+#' a summary of the plan for the user to review. The user may then enter the
+#' same arguments again and set `simylate=TRUE` to actually perform the renaming.
+#'
+#' If the database is part of a git repository, the changes will be committed and pushed
+#'
+#' @param emuDBhandle An emuR database handle
+#' @param from A tibble or data.frame with columns "session" and "name",
+#'   identifying the bundle to rename. The usual procedure is to first invoke
+#'   [reindeer::list_bundles] and then filter out the bundles the user wants to
+#'   rename.
+#' @param to A vector of strings containing new names of the bundles in `from`.
+#'   The vector has to be of the same length as the number of rows in `from`.
+#' @param simulate Boolean; Should the bundle renaming just be simulated, or
+#'   actually performed?
+#'
+#' @return Either the updated bundle listing, or a tibble showing the file
+#'   renaming plan.
+#' @export
+#'
+#' @examples
+#'
+#' \dontrun{
+#' library(dplyr)
+#' reindeer:::create_ae_db() -> emuDBhandle
+#' r <- list_bundles(emuDBhandle) %>%
+#'   dplyr::mutate(to=toupper(name)) %>%
+#'   dplyr::mutate(to=stringr::str_replace(to,"([A-Z]+)([0-9]+)","\\1-\\2")) %>%
+#'   dplyr::mutate(to=tolower(to))
+#'
+#'  print(rename_bundles(emuDBhandle,r[1:2,c("session","name")],r[1:2,"to"],simulate=TRUE))
+#' }
+#'
+rename_bundles <- function(emuDBhandle,from,to,simulate=TRUE){
+
+  if(nrow(from) != nrow(as.data.frame(to))) {
+    cli::cli_abort(c("Wrong number of bundles",
+                     "i"="The number of bundles in the from argument {nrow(from)}",
+                     "i"="The number of bundles in the to argument {nrow(to)}",
+                     "x"="For every bundle in the from argument there must be an output bundle name in the to argument"))
+  }
+
+  if(! setequal( names(from), c("session","name"))){
+    cli::cli_abort(c("The structure of the from tibble is wrong",
+                     "i"="The 'from' has column names {names(from)}",
+                     "x"="The 'from' argument needs to have the same columns as the output of `list_bundles`, which is 'session' and 'name'."))
+  }
+
+  fl <- emuR::list_files(emuDBhandle)   %>%
+    dplyr::filter(session %in% from$session, bundle %in% from$name ) %>%
+    dplyr::rename(inputPath=absolute_file_path) %>%
+    dplyr::mutate(outputPath=stringr::str_replace_all(
+      inputPath,
+      purrr::set_names(to[[1]],nm=from$name)
+    )) %>%
+    dplyr::mutate(inputDirPath=dirname(inputPath),
+                  outputDirPath=dirname(outputPath),
+                  newInputPath=file.path(outputDirPath,basename(inputPath)))
+
+  #return(fl)
+  inRepo <- git2r::in_repository(emuDBhandle$basePath)
+
+
+
+  if(!simulate){
+
+    dirs <- fl %>%
+      dplyr::select(inputDirPath,outputDirPath) %>%
+      dplyr::distinct()
+
+    file.rename(dirs[["inputDirPath"]],dirs[["outputDirPath"]])
+    file.rename(fl[["newInputPath"]],fl[["outputPath"]])
+
+    if(inRepo){
+      git2r::add(repo=emuDBhandle$basePath, path=fl[["outputPath"]])
+      git2r::add(repo=emuDBhandle$basePath, path=fl[["outputDirPath"]])
+      git2r::commit(repo=emuDBhandle$basePath,message=paste("Renamed bundles",paste0(from$name,collapse=", ")))
+    }
+
+    return(emuR::list_bundles(emuDBhandle))
+  }else{
+    return(fl %>%
+             dplyr::rename(session=session, original_path=inputPath,new_path=outputPath) %>%
+             dplyr::transmute(session=session,
+                           original_path=stringr::str_replace(original_path,paste0(emuDBhandle$basePath,"/"),""),
+                           new_path=stringr::str_replace(new_path,paste0(emuDBhandle$basePath,"/"),"")
+                                                            )
+           )
+  }
+
+
+}
+
+#reindeer:::unlink_emuRDemoDir()
+#reindeer:::create_ae_db() -> emuDBhandle
+# r <- list_bundles(emuDBhandle) %>%
+#   mutate(to=toupper(name)) %>%
+#   mutate(to=stringr::str_replace(to,"([A-Z]+)([0-9]+)","\\1-\\2")) %>%
+#   mutate(to=tolower(to))
+#
+# print(rename_bundles(emuDBhandle,r[1:2,c("session","name")],r[1:2,"to"],simulate=TRUE) -> out)
+
 ### For interactive testing
 #
 #
