@@ -244,7 +244,7 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
 furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.package="superassp"){
   if(missing(.source)) cli::cli_abort(c("Missing source name",
                                       "i"="You need to state a function name or the file extension from which the data columns should be gathered",
-                                      "x"="The argument .source is missing"))
+                                      "x"="The argument {.var .source} is missing"))
 
   #We have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
   if(is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
@@ -256,7 +256,7 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
   }else{
     cli::cli_abort(c("Wrong .inside_of argument",
                    "i"="The '.inside_of' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                   "x"="The .inside_of argument supplied is a {class(.inside_of)}"))
+                   "x"="The .inside_of argument supplied is a {.val class(.inside_of)}"))
   }
 
 
@@ -266,7 +266,9 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
   #Overwrite the file extension used by the default by the function is the user said so
   fileExtension <- dplyr::coalesce(trackSpec$explicitExt,
                           superassp::get_extension(.source))
-  rlang::inform(paste0("Using the output file extension '.",fileExtension,"'."),call = rlang::caller_env())
+
+  cli::cli_alert_info("Using the {.val {fileExtension}} output file extension.")
+
   tracksToDefine <- data.frame(name=names(trackSpec),columnName=unlist(trackSpec,use.names = FALSE),fileExtension=fileExtension) %>%
     dplyr::mutate(across(everything(), ~ stringr::str_remove_all(.,"[\'\"]") ))
   #tracksToDefine may now include also the names of function arguments, which we needs to adress later
@@ -275,40 +277,60 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
 
   #This is the set of track specifications that already in the database
   # and we can safely just re-apply them
-  useExistingDefinition <- tracksToDefine %>%
-    dplyr::inner_join(tracksDefined,by=c("name","columnName","fileExtension"))
+  #useExistingDefinition <- tracksToDefine %>%
+  #  dplyr::inner_join(tracksDefined,by=c("name","columnName","fileExtension"))
 
-  makeAFuzzAbout <- tracksToDefine %>%
-    dplyr::filter(name %in% tracksDefined$name)
+  # makeAFuzzAbout <- tracksToDefine %>%
+  #   dplyr::filter(name %in% tracksDefined$name)
+  #
+  # cli::cli_warn(c("Duplicate track definitions",
+  #                 "x"="The database {.val {(.inside_of$dbName)}} already contains tracks with with names {.var {makeAFuzzAbout$name}}",
+  #                 "i"= "Duplicate definitions will be ignored"))
 
-  cli::cli_warn(c("Duplicate track definitions",
-                  "x"="The database '{(.inside_of$dbName)}' already contains tracks with with names {makeAFuzzAbout$name}",
-                  "i"= "Duplicate definitions will be ignored"))
 
 
 
   #If we have a function, then we should get some base data for the track calculations
-  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
+  if(is.function(.source) || ( ! is.null(get0(.source)) && is.function( get0(.source)))){
     bundles <- emuR::list_bundles(.inside_of) %>%
       dplyr::rename(bundle=name) %>%
       dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0) %>%
       dplyr::mutate(.file= file.path(.inside_of$basePath,
                                     paste0(session,emuR:::session.suffix),
                                     paste0(bundle,emuR:::bundle.dir.suffix),
-                                    paste(bundle,fileExtension,sep="."))) %>%
-      dplyr::filter( (.force) | (!file.exists(.file))) %>%
-      dplyr::select(-.file) #Make sure this variable does not mess up execution of the function
+                                    paste(bundle,fileExtension,sep=".")))
+    bundles <- bundles %>%
+      dplyr::mutate(.force=.force) %>%
+      dplyr::filter( .force |  !file.exists(.file)) %>%
+      dplyr::select(-.file,-.force) #Make sure this variable does not mess up execution of the function
+
     attr(bundles,"basePath") <- .inside_of$basePath
 
     if(nrow(bundles) < 1){
-      logger::log_info("[furnish] No signal files needs updating and updating is not forced. Skipping the signal processing step.")
+      #We deliberately do not raise an error here since we want to be able to continue processing even when
+      # nothing needs to be done
+      cli::cli_alert_success("Skipping the signal processing")
+      cli::cli_alert_info("No signal files needs updating and updating is not forced.")
+      cli::cli_alert_info("The database contains {.val {nrow(emuR::list_bundles(.inside_of))}} bundles")
+      cli::cli_alert_info("There are {.val {nrow(emuR::list_files(.inside_of,fileExtension))}} signal files with the file extension {.val {fileExtension}}")
+
+
       return(.inside_of)
     }
-    #Explicitly remove track name specifications with names that are also formal
-    # args of the function
-    tracksToDefine <- tracksToDefine %>%
-      dplyr::filter(! name %in% methods::formalArgs(.source))
 
+
+    makeAFuzzAbout <- tracksToDefine %>%
+      dplyr::filter(! name %in% methods::formalArgs(.source), ! columnName %in% superassp::get_definedtracks(.source))
+
+    cli::cli_alert_warning("Skipping computation of {.var {makeAFuzzAbout$name}} as the fields {.val {makeAFuzzAbout$columnName}} is not computed by the function supplied as {.arg .source}")
+
+    #Explicitly remove track name specifications with names that are also formal
+    # args of the function, or are not computed by the .source function
+    tracksToDefine <- tracksToDefine %>%
+      dplyr::filter(! name %in% methods::formalArgs(.source), columnName %in% superassp::get_definedtracks(.source))
+
+
+    cli::cli_alert_info("Will compute tracks {.var {tracksToDefine$name}} on {.vals {nrow(bundles)}} bundles.")
 
 
     # Here we envoke the special mode of quantify where an intermediate nested result is returned
@@ -323,23 +345,44 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
       dplyr::select(dobj,file) %>%
       dplyr::filter(!file.exists(file))
 
-  return(quantifications)
+
    #Now finally write SSFF files
    quantifications %>%
      furrr::future_pwalk(wrassp::write.AsspDataObj)
 
+    for(track in 1:nrow(tracksToDefine)){
+      if(! tracksToDefine[track,"name"] %in% tracksDefined$name){
+        emuR::add_ssffTrackDefinition(emuDBhandle = .inside_of,columnName = tracksToDefine[[track,"columnName"]], name = tracksToDefine[[track,"name"]],fileExtension = tracksToDefine[[track,"fileExtension"]])
+        cli::cli_alert_success("Connected the track {.field {tracksToDefine[[track,\"columnName\"]]}} inside files with the extension {.field {tracksToDefine[[track,\"fileExtension\"]]}} and named it {.var {tracksToDefine[[track,\"name\"]]}} ")
+      }else{
+        cli::cli_alert_info("Not defining a new track {.code {tracksToDefine[track,\"name\"]}} since it is already defined in the database.")
+      }
+    }
+
   }else{
     # we have a file extension only
-    fileExtension <- from_what
+
+    signalfiles <- emuR::list_files(.inside_of,.source)
+    if(nrow(signalfiles) < nrow(emuR::list_bundles(.inside_of))) {
+      cli::cli_abort(c("Missing signal files",
+                       "x"="Some bundles do not have the required signal files.Please generate them first",
+                       "i"= "There are {.val {nrow(signalfiles)}} signal files with the file extension {.arg {(.source)}}.",
+                       "i"="The database contains {.val {nrow(emuR::list_bundles(.inside_of))}}.")
+                     )
+    }
+    tracksToDefine <- tracksToDefine %>%
+      dplyr::filter(columnName %in% superassp::get_definedtracks(.source))
   }
 
-  #TODO: Make sure all mentioned tracks are connected up to the file now
-  #c(tracksToDefine,makeAFuzzAbout,toJustUpdate)
- return(makeAFuzzAbout)
+
 }
-#furnish(list(1),forest)
-#print(out <- furnish(ae,forest,FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=FALSE))
-#print(emuR::list_ssffTrackDefinitions(ae))
+
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db() -> ae
+reindeer:::make_dummy_metafiles(ae)
+
+print(out <- furnish(ae,"fms",FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=TRUE))
+print(emuR::list_ssffTrackDefinitions(ae))
 
 
 quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
@@ -637,7 +680,6 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 }
 
 
-
 ## INTERACTIVE TESTING
 #
 library(tidyverse)
@@ -653,10 +695,10 @@ library(reindeer)
 # reindeer:::make_dummy_metafiles(ae)
 #add_ssffTrackDefinition(ae,"bw","bw","bw","forest")
 
-out <- ae |>
-  ask_for("Phonetic =~ '^.*[i:]'") |>
- quantify(forest,windowSize=30)|>
-  glimpse()
+# out <- ae |>
+#   ask_for("Phonetic =~ '^.*[i:]'") |>
+#  quantify(forest,windowSize=30)|>
+#   glimpse()
 #
 # out2 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
