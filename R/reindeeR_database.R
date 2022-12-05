@@ -181,14 +181,6 @@ snapshot <- function(emuDBhandle,push.changes=TRUE,remote.name="origin",remote.r
 
 }
 
-rename_bundles <- function(emuDBhandle,old_names, new_names){
-
-  if(missing(old_names) || missing(new_names) || length(old_names) != length(new_names)) {
-    stop("You must provide the same number of old and new file names.")
-  }
-
-}
-
 
 ### For interactive testing
 #
