@@ -286,6 +286,23 @@ rename_bundles <- function(emuDBhandle,from,to,simulate=TRUE){
 
 }
 
+fix_annot_names <- function(emuDBhandle){
+
+  jf <- reindeer::list_files(emuDBhandle,"json")$absolute_file_path
+
+  for(f in jf){
+    jsonlite::read_json(f,simplifyVector = TRUE) -> current
+
+    fnBase <- stringr::str_replace(basename(f),"_annot.json","")[1]
+    current[["name"]] <- jsonlite::unbox(fnBase)
+    current[["annotates"]] <- jsonlite::unbox(paste(fnBase,"wav",sep="."))
+    jsonlite::write_json(x=current, path = f,pretty = TRUE,auto_unbox=TRUE)
+  }
+
+}
+#fix_annot_names(emuDBhandle) -> out
+#rstudioapi::navigateToFile(reindeer::list_files(emuDBhandle,"json")[[1,"absolute_file_path"]])
+
 #reindeer:::unlink_emuRDemoDir()
 #reindeer:::create_ae_db() -> emuDBhandle
 # r <- list_bundles(emuDBhandle) %>%
