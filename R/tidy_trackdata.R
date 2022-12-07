@@ -377,9 +377,9 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
 
 }
 
-reindeer:::unlink_emuRDemoDir()
-reindeer:::create_ae_db() -> ae
-reindeer:::make_dummy_metafiles(ae)
+#reindeer:::unlink_emuRDemoDir()
+#reindeer:::create_ae_db() -> ae
+#reindeer:::make_dummy_metafiles(ae)
 
 print(out <- furnish(ae,"fms",FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=TRUE))
 print(emuR::list_ssffTrackDefinitions(ae))
@@ -682,14 +682,14 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 ## INTERACTIVE TESTING
 #
-library(tidyverse)
-library(purrr)
-library(progressr)
-library(tibble)
-library(superassp)
-library(furrr)
-library(progress)
-library(reindeer)
+# library(tidyverse)
+# library(purrr)
+# library(progressr)
+# library(tibble)
+# library(superassp)
+# library(furrr)
+# library(progress)
+# library(reindeer)
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
