@@ -33,7 +33,7 @@ parameters. Normally, the function just returns the stored /pre-computed
 \code{DSPP} tibble, which contains the output of this when applied previously.
 }
 \details{
-Recomputation may be required if more data has been added to the file
+Re-computation may be required if more data has been added to the file
 \code{file.path(system.file(package = "reindeer",mustWork = TRUE),"default_parameters.xlsx")}. If re-computation has been requested, this
 function then expands the age ranges in the spreadsheet file and computes a
 Gender stratified locally-weighted polynomial regression with age as the
