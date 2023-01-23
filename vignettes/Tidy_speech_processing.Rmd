@@ -1,0 +1,57 @@
+---
+title: "Tidy speech processing"
+author: "Fredrik Karlsson"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Tidy speech processing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Introduction
+
+The purpose of this document is to present the tidy work with speech databases that is fascilitated by the `reindeer` package.
+
+## What is a speech database?
+
+Whenever we refer to a speech databse in this document, we refer to a database set up according to the Emu Speech Database Management System standards. 
+A database *handle* is a reference of some sort to the location of the base directory of an Emu database. That is, it can be the full path to a `<database name>_emuDB` directory, of an `emuDBhandle` created by explicitly making a connection between the database on disc and something in memory using [emuR::load_emuDB].
+
+The advantages of using a path is that it is directly usable again when you save a session,  does not require the  additional step of explicit loading, and avoids the burden for the researcher of having to keep apart two names for what are actually the same thing.
+
+The disadvantage of using the path, and therefore the advantage of using `emuDBhandle` objects, is that the code may run _a bit_ faster as the functions discussed here then do not have to attach the database themselves. 
+
+## Databasing
+
+Like most gardens, a speech corpus will grow to an unwieldy and unstructured collection of speech files if not managed properly. A database will have three basic kinds of `things` in them
+
+1) The original speech registrations. Usually, these files are simply sound (`wav`) files, but may also be other kinds of registrations that happened as the audio recording was made (and in the same sampling intervals as the speech registration). If an electroglottograph is used, for instance, the EGG track may be recorded in the same file as the audio recording, as a separate channel. Other examples may be airflow readings from oral and nasal openings. If one wants to reason about how to refer to and distinguish between things on this list, speech registrations stand out as not being possible to acquire again with the exact same result. 
+
+2) Derived signal descriptions. These are most often in the form of SSFF^[Simple Signal File Format] files, which then summarize some property of the original speech registration in a specific time slice.
+
+```{r The listing of a, echo=FALSE}
+reindeer:::create_ae_db(verbose = FALSE) -> ae
+list.files(ae$basePath,recursive = TRUE,include.dirs = TRUE)
+
+```
+Now there are two major `things` that we need to set up in a database in order for it to have value. The first are some annotation levels where you would insert labels to some portion of the signal. 
+
+```{r Transcription level initiation}
+reindeer:::create_ae_db(verbose = FALSE) -> ae
+
+ae |>
+    tier("Comments",type="s",parent=NULL)
+
+
+```
+
+
