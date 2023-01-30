@@ -454,21 +454,106 @@ annotate_DDK <- function(emuDBhandle,
 #                                    verbose=FALSE,
 #                                    praat_path=NULL){
 
-annotate_voiceactivity <- function(soundFile="/Users/frkkan96/Desktop/kaa_yw_pb.wav",conda.env="pyannote"){
-  reticulate::use_condaenv(conda.env)
-  reticulate::import("pyannote.audio",as = "pa") -> pa
-  pa$Pipeline$from_pretrained("pyannote/voice-activity-detection") -> Pipeline
-  diarization <- Pipeline(soundFile)
-  #as.list(reticulate::iterate(diarization$itertracks(yield_label=TRUE))) -> pyLst
-  diarization$for_json() -> diaList
-  as.data.frame(diaList$content) %>%
-    dplyr::select(dplyr::starts_with("segment")) %>%
-    tidyr::pivot_longer(cols= segment.start:segment.end.24,names_to="prop",values_to="times") %>%
-    tidyr::separate(prop,sep="[.]",into = c("segment","point","id")) %>%
-    tidyr::pivot_wider(names_from = "point",values_from = "times") %>%
-    dplyr::mutate(id=ifelse(is.na(id),1,as.integer(id)+1)) %>%
-    dplyr::select(-segment) -> out
-  return(out)
+#' Perform voice activity detection across a database
+#'
+#' Voice activity detection is applied to a database to find portions of speech
+#' signals where spoken communication is likely to have occured, to make
+#' transcription work more efficient in databases with silences or many small
+#' utterances that should be disrecarded. The segmentation is intended to be
+#' used for indexing and easy navigation of the database only, and should not
+#' inserted into a hierarchy of levels. The intended use of this function is
+#' instead to supply the result of a "VAD == SPEECH" [reindeer::query] call to a
+#' [reindeer::serve] or [reindeer:write_bundleList] so that the annotations can
+#' be used for efficient navigation of a database. If not helpful in the
+#' recording settings used, the user can rerun this function and with more
+#' applicable thresholds, overwriting previously generated labels.
+#'
+#' @details Sections thought to contain speech will be marked in the `levelname`
+#'   level by a SEGMENT with the label SPEECH. The `levelname` level will be
+#'   cleared before inserting labels if this function is applied again to the
+#'   database. The speech segmentation model of the pyannote-audio framework
+#'   is used in speech segementation \insertCite{Bredin.2019,Bredin.2021}{reindeer}
+#'
+#' @param emuDBhandle An [emuR] database handle.
+#' @param auth_key A [Hugging Face 'User Access Token'](https://huggingface.co/settings/tokens) for a user which has activated access to the
+#' [pyannote/segmentation model](https://huggingface.co/pyannote/segmentation).
+#' @param levelname The name of fhe segmentation level (and attribute) to create
+#'   to hold the annotations of speech.
+#' @param speech_probability_threshold  The probability threshold above which
+#'   the model will percieve the signal to contain speech.
+#' @param nospeech_probability_threshold The probability threshold below which
+#'   the model will percieve the signal to contain non-speech.
+#' @param minimum_speech_duration The minimum duration of a section of speech to
+#'   consider (in seconds).
+#' @param minimum_nonspeech_duration The minimum duration of a portion that
+#'   could be non-speech (in seconds).
+#'
+#' @return A tibble
+#' @export
+#' @references
+#' \insertAllCited{}
+#'
+annotate_voiceactivity <- function(emuDBhandle,
+                                   auth_key,
+                                   levelname="VAD",
+                                   speech_probability_threshold = 0.6,
+                                   nospeech_probability_threshold = 0.4,
+                                   minimum_speech_duration = 0.2,
+                                   minimum_nonspeech_duration = 0.1){
+
+  fl <- list_files(emuDBhandle,
+                   emuR:::load_DBconfig(emuDBhandle)$mediafileExtension) %>%
+    dplyr::select(-file) %>%
+    dplyr::rename(listOfFiles = absolute_file_path)
+
+ if(levelname %in% list_levelDefinitions(emuDBhandle)$name ){
+    emuR::remove_levelDefinition(emuDBhandle,name=levelname,force = TRUE)
+  }
+  emuR::add_levelDefinition(emuDBhandle,name=levelname,type="SEGMENT",verbose = FALSE)
+
+  for(f in 1:nrow(fl)){
+    soundFile <- fl[[f,"listOfFiles"]]
+    py$soundFile <- reticulate::r_to_py(soundFile)
+    py$token <- reticulate::r_to_py(auth_key)
+    py$speech_probability_threshold <- reticulate::r_to_py(speech_probability_threshold)
+    py$nospeech_probability_threshold <- reticulate::r_to_py(nospeech_probability_threshold)
+    py$minimum_speech_duration <- reticulate::r_to_py(minimum_speech_duration)
+    py$minimum_nonspeech_duration <- reticulate::r_to_py(minimum_nonspeech_duration)
+
+    reticulate::py_run_string("from pyannote.audio import Model\
+import gc\
+model = Model.from_pretrained(\"pyannote/segmentation\", use_auth_token=token)\
+from pyannote.audio.pipelines import VoiceActivityDetection\
+pipeline = VoiceActivityDetection(segmentation=model)\
+HYPER_PARAMETERS = {\
+  \"onset\": speech_probability_threshold, \
+  \"offset\": nospeech_probability_threshold,\
+  \"min_duration_on\": minimum_speech_duration,\
+  \"min_duration_off\": minimum_nonspeech_duration\
+}\
+pipeline = pipeline.instantiate(HYPER_PARAMETERS)\
+vad = pipeline(soundFile)\
+del soundFile\
+gc.collect()")
+    currSegmentation <- readr::read_delim(py$vad$to_lab(),delim = " ",col_names = FALSE,col_types="ddc") %>%
+      dplyr::rename(start= X1, end=X2, label=X3) %>%
+      mutate(listOfFiles = soundFile)
+
+    if(f == 1){
+      segmentation <- currSegmentation
+    }else{
+      segmentation <- segmentation %>%
+        bind_rows(currSegmentation)
+    }
+  }
+  annotations <- fl %>%
+    dplyr::left_join(segmentation,by="listOfFiles") %>%
+    dplyr::select(-listOfFiles) %>%
+    dplyr::rename(labels= label) %>%
+    dplyr::mutate(start=start *1000, end=end * 1000,level = levelname,attribute = levelname,start_item_seq_idx=1)
+
+  emuR::create_itemsInLevel(emuDBhandle,itemsToCreate = annotations)
+  return(annotations)
 }
 
 
