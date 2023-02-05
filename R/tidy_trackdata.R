@@ -1,5 +1,6 @@
 
 
+ITEM <- TRUE
 
 
 fake_voice_report <- function(listOfFiles,
@@ -149,7 +150,9 @@ retreat <- function() {1}
 
 harvest <- function() {1}
 
-peek_at <- function(.x, what=c("levels","links","global_lg","tracks","bundles","sessions","perspectives","files","attributes","local_lg"),...){
+
+
+peek_at <- function(.x, what=c("levels","links","labelgroups","tracks","bundles","sessions","perspectives","files","attributes"),...){
 
   if("emuDBhandle" %in% class(.x)){
     .handle <- .x
@@ -165,7 +168,12 @@ peek_at <- function(.x, what=c("levels","links","global_lg","tracks","bundles","
   }
  al <- list(...)
 
-  what <- match.arg(what, c("levels","links","global_lg","tracks","bundles","sessions","perspectives","files","attributes","local_lg"))
+  what <- match.arg(what, c("levels","links","labelgroups","tracks","bundles","sessions","perspectives","files","attributes"))
+
+  if(what == "labelgroups") {
+    #A label can be globally or locally defined, so we need to check whether extra arguments were given.
+    what <- ifelse(length(al) == 0, "global_lg","local_lg")
+  }
 
   res <- switch(what,
                 levels = tibble::as_tibble(emuR::list_levelDefinitions(.handle)), # name         type    nrOfAttrDefs attrDefNames
@@ -188,6 +196,16 @@ peek_at <- function(.x, what=c("levels","links","global_lg","tracks","bundles","
   #DBI::dbDisconnect(.handle$connection) # Gracefully disconnect the connection
   return(res)
 }
+
+peek_levels <- purrr::partial(peek_at, what="levels")
+peek_links <- purrr::partial(peek_at, what="links")
+peek_labelgroups <- purrr::partial(peek_at, what="labelgroups")
+peek_tracks <- purrr::partial(peek_at, what="tracks")
+peek_bundles <- purrr::partial(peek_at, what="bundles")
+peek_sessions <- purrr::partial(peek_at, what="sessions")
+peek_perspectives <- purrr::partial(peek_at, what="perspectives")
+peek_attributes <- purrr::partial(peek_at, what="attributes")
+
 
 
 define <- function(.x, what=c("level","link","global_lg","track","bundle","session","perspective","file","attribute","local_lg"),...){
@@ -239,6 +257,246 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 #
+quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
+
+  #Capture dot arguments for if we want to manipulate them
+  dotArgs <- list(...)
+  fcall <- match.call(expand.dots = FALSE)
+  fcallS <- toString(fcall)
+  idCols <- c("Gender","Age")
+  if(nrow(.what ) < 1){
+    cli::cli_abort(c("Erroneous .what argument",
+                     "i"="The list of segments or signals is empty",
+                     "x"="The .what argument contains {nrow(.what)} rows."))
+  }
+
+  logger::log_debug("Function quantify called with arguments {fcallS}")
+
+  ###
+  # Derive .handle object
+  ##
+
+  #The first possible case is when we have no explicitly set .handle argument, but a segment list with a
+  # valid "basePath" attribute set. We then create the database handle from that basePath.
+  if(is.null(.handle)) {
+    if(! is.null(attr(.what,"basePath")) && dir.exists(attr(.what,"basePath"))) {
+      logger::log_debug("No explicit .handle argument found")
+      # We then need to create a handle object
+      utils::capture.output(
+        .handle <- emuR::load_emuDB(attr(.what,"basePath"),verbose = TRUE)
+      ) -> dbload.info
+    }else{
+      logger::log_debug("Got .handle={.handle}")
+      stop("Could not derive the database path. Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
+    }
+  }else{
+    # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
+    if(is.character(.handle) && stringr::str_ends(.handle,"_emuDB") && dir.exists(.handle)){
+      .handle <- emuR::load_emuDB(.handle,verbose = FALSE)
+    }
+    if("emuDBhandle" %in% class(.handle)){
+      #reload the database just to make sure that the handle is still valid
+      .handle <- emuR::load_emuDB(.handle$basePath,verbose = FALSE)
+    }else{
+      cli::cli_abort(c("Not appropriate .handle argument",
+                       "i"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
+                       "x"="The .handle argument supplied is a {class(.handle)}",
+                       "x"="The database {dplyr::coalesce(.handle$basePath,.handle)} does not exits."))
+
+    }
+  }
+
+  # This sets the default input media file extension, which handled the case when a
+  #function is called to compute a list or SSFF track result based on a wave file
+  # This variable will then be set to something else if
+  # we want to read in a pre-computed SSFF track stored on disk instead.
+  inputSignalsExtension <- emuR:::load_DBconfig(.handle)$mediafileExtension
+
+
+  # This section handles the case where we want to compute signals or a
+  # list of results from the wave file directly??p
+  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
+    if(is.function(.source)){
+      .f <- .source
+    }else{
+      .f <- purrr::safely(get)(.source)$result
+    }
+
+    funName <- fcall$.source
+    logger::log_debug("We got a function in the .source argument : '{funName}'")
+  }else{
+    # Ok, so not a function, so we need to make sure that the .source argument is a string
+    # and the name of a track in the database
+    if(is.character(.source) && .source %in% emuR::list_ssffTrackDefinitions(.handle)$name){
+      #The string should here be the name of a track
+      logger::log_debug("We got a SSFF track field in the .source argument : {.source}")
+      .f <- readtrack
+      funName <- "readtrack"
+      inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae) %>%
+        dplyr::filter(name==.source) %>%
+        dplyr::select(fileExtension) %>%
+        purrr::pluck(1)
+      dotArgs["field"] <- .source
+    }else{
+      cli::abort(c("Cannot use the indicated .source",
+                   "i"="The .source argument contains {(.source)} and is of class {class(.source)}",
+                   "i"="The .source is reported to be able to return the columns {superassp::get_definedtracks(.source)} when converted to a tibble",
+                   "x"="The .source needs to be the name of a track in the database or a function that should do the signal processing."))
+    }
+  }
+
+
+
+  #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
+  innerMapFunction <- function(.session,.bundle,...){
+
+    p(message=sprintf("Processing session %s (%s)",.session,.bundle))
+    dotdotdot <- list(...)
+    dotdotdotS <- toString(dotdotdot)
+
+    logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.")
+    result <- .f(...)
+
+    return(result)
+  }
+
+  progressr::handlers(global = TRUE)
+  old_handlers <- progressr::handlers(c("progress"))
+  on.exit(progressr::handlers(old_handlers), add = TRUE)
+
+
+  #Logic that concerns formal arguments
+  formalArgsNames <- methods::formalArgs(.f)
+  functionDefaults <- as.list(formals(.f))
+
+
+  #Logic that concerns actual arguments
+  #dotArgsRT <- tibble::as_tibble_row(dotArgs)
+  dotArgsNames <- names(dotArgs)
+
+  # Make sure that we have a DSP default settings data.frame
+  dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
+    tidyr::replace_na(list(Gender="Unspecified"))
+
+  #After this we can be sure that parameters set per session or bundle are  available
+  # but have been overwritten by explicitly set settings given to this function as we proceed
+  meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
+    dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
+    tidyr::replace_na(.metadata_defaults) %>%
+    dplyr::mutate(dotArgs)
+
+
+
+  #This variable is used for filling in missing values in arguments explicitly set in metadata
+  precomputedVariableNames <- intersect(names(meta),names(dsp))
+  dspColumnsToAdd <- setdiff(names(dsp),names(meta))
+
+  filledMeta <- meta %>%
+    dplyr::rows_update(y=dsp %>%
+                         dplyr::select(all_of(precomputedVariableNames)),
+                       by=idCols,unmatched = "ignore")
+
+
+  # This block will add settings that were set in DSP defaults only
+  completedStoredDSPSettings <- filledMeta %>%
+    dplyr::ungroup() %>%
+    dplyr::left_join(
+      dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
+      ,by=idCols) %>%
+    tidyr::replace_na(functionDefaults)  %>%
+    dplyr::mutate(toFile=FALSE)  #Forcefully inject a toFile argument
+
+
+  # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
+  # or if the 5000 Hz ceiling is instead increased and the default number of formants extracted is kept constant
+
+  if(.by_maxFormantHz && "numFormants" %in% names(completedStoredDSPSettings)){
+    completedStoredDSPSettings <- completedStoredDSPSettings %>%
+      dplyr::select(-numFormants)
+  }
+
+  # What we now need is an 'listOfFiles' to supply to the DSP function
+  signalFiles <- emuR::list_files(.handle,inputSignalsExtension) %>%
+    dplyr::rename(listOfFiles=absolute_file_path) %>%
+    dplyr::select(-file)
+
+  # The names of columns to keep are now the columns that are defined either in signalFiles or
+  # in dspCompletedSettings, and which will be used by the DSP function
+  settingsThatWillBeUsed <- intersect(formalArgsNames,
+                                      union(names(completedStoredDSPSettings),
+                                            names(signalFiles))
+  ) # This will be used to remove unwanted columns
+
+  #Here we construct the settings that we want to use when applying the specific DSP
+  # function to bundles (in specific sessions)
+  sessionBundleDSPSettingsDF <-  completedStoredDSPSettings %>%
+    dplyr::left_join(signalFiles,by=c("session","bundle")) %>%
+    dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
+
+  # Now we need to transfer the session / bundle settings to the segment list
+  # to get start and end times too into the call
+  segmentDSPDF <- .what %>%
+    tibble::rownames_to_column(var = "sl_rowIdx") %>%
+    dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle")) %>%
+    dplyr::rename(beginTime=start,endTime=end) %>%
+    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))
+
+  #Set up the progress bar
+  num_to_do <- nrow(segmentDSPDF)
+
+
+  p <- progressr::progressor(num_to_do)
+
+  # Here we apply the DSP function once per row and with settings comming from
+  # the columns in the data frame
+  appliedDFResultInList <- segmentDSPDF %>%
+    dplyr::rename(.session=session,.bundle=bundle) %>%
+    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>% ## Fix for wrassp functions that expect "numeric" values, not integers
+    dplyr::rowwise() %>%
+    dplyr::mutate(temp = list(purrr::pmap(cur_data(),.f=innerMapFunction))) %>%
+    #dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
+    dplyr::select(-.bundle,-.session) %>%
+    tidyr::nest(parameters=c(tidyselect::everything(), -temp)) %>%
+    tidyr::unnest(temp)
+
+
+  #Mark the special case where .what is called by provide()
+  if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
+    #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
+    # but just returned
+    logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
+    provideOutDF <-  list_bundles(.handle) %>%
+      dplyr::bind_cols(appliedDFResultInList) %>%
+      dplyr::rename(bundle=name)
+
+
+    attr(provideOutDF,"basePath") <- .handle$basePath #This ensures that we can reattach the database later
+
+    return(provideOutDF)
+  }else{
+    #The default case, in which we are processing a segment list
+    resTibble <- appliedDFResultInList %>%
+      dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
+      tibble::rownames_to_column(var = "sl_rowIdx") %>%
+      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(out = purrr::map(temp,as_tibble)) %>%
+      dplyr::select(-temp) %>%
+      tidyr::unnest(out)
+
+
+    quantifyOutDF <- .what %>%
+      tibble::rownames_to_column(var = "sl_rowIdx") %>%
+      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx)) %>%
+      dplyr::left_join(resTibble, by="sl_rowIdx") %>%
+      dplyr::arrange(sl_rowIdx,start_item_id,end_item_id)
+
+    attr(quantifyOutDF,"basePath") <- .handle$basePath #This ensures that we can reattach the database later
+
+    return(quantifyOutDF)
+  }
+
+}
 
 
 
@@ -415,293 +673,60 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
       cli::cli_alert_info("Not defining a new track {.code {tracksToDefine[track,\"name\"]}} since it is already defined in the database.")
     }
   }
+  res <- emuR::list_ssffTrackDefinitions(.inside_of)
+  attr(res,"basePath") <- .inside_of$basePath #This ensures that we can reattach the database later
+
+  return(res)
 }
 
 
 provide_perspective <- function(.inside_of, name, levels_order, signals_order)
 
 
-reindeer:::unlink_emuRDemoDir()
-Sys.sleep(0.2)
-reindeer:::create_ae_db() -> ae
-Sys.sleep(0.1)
-reindeer:::make_dummy_metafiles(ae)
-Sys.sleep(0.1)
-print(out <- furnish(ae,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",.force=TRUE))
-print(out2 <- furnish(ae,"fms",FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=TRUE))
-
-print(emuR::list_ssffTrackDefinitions(ae))
-
-
-quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
-
-  #Capture dot arguments for if we want to manipulate them
-  dotArgs <- list(...)
-  fcall <- match.call(expand.dots = FALSE)
-  fcallS <- toString(fcall)
-  idCols <- c("Gender","Age")
-  if(nrow(.what ) < 1){
-    cli::cli_abort(c("Erroneous .what argument",
-                     "i"="The list of segments or signals is empty",
-                     "x"="The .what argument contains {nrow(.what)} rows."))
-  }
-
-  logger::log_debug("Function quantify called with arguments {fcallS}")
-
-  ###
-  # Derive .handle object
-  ##
-
-  #The first possible case is when we have no explicitly set .handle argument, but a segment list with a
-  # valid "basePath" attribute set. We then create the database handle from that basePath.
-  if(is.null(.handle)) {
-    if(! is.null(attr(.what,"basePath")) && dir.exists(attr(.what,"basePath"))) {
-      logger::log_debug("No explicit .handle argument found")
-      # We then need to create a handle object
-      utils::capture.output(
-        .handle <- emuR::load_emuDB(attr(.what,"basePath"),verbose = TRUE)
-      ) -> dbload.info
-    }else{
-      logger::log_debug("Got .handle={.handle}")
-      stop("Could not derive the database path. Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
-    }
-  }else{
-    # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-    if(is.character(.handle) && stringr::str_ends(.handle,"_emuDB") && dir.exists(.handle)){
-      .handle <- emuR::load_emuDB(.handle,verbose = FALSE)
-    }
-    if("emuDBhandle" %in% class(.handle)){
-      #reload the database just to make sure that the handle is still valid
-      .handle <- emuR::load_emuDB(.handle$basePath,verbose = FALSE)
-    }else{
-      cli::cli_abort(c("Not appropriate .handle argument",
-                       "i"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                       "x"="The .handle argument supplied is a {class(.handle)}",
-                       "x"="The database {dplyr::coalesce(.handle$basePath,.handle)} does not exits."))
-
-    }
-  }
-
-  # This sets the default input media file extension, which handled the case when a
-  #function is called to compute a list or SSFF track result based on a wave file
-  # This variable will then be set to something else if
-  # we want to read in a pre-computed SSFF track stored on disk instead.
-  inputSignalsExtension <- emuR:::load_DBconfig(.handle)$mediafileExtension
-
-
-  # This section handles the case where we want to compute signals or a
-  # list of results from the wave file directly??p
-  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
-    if(is.function(.source)){
-      .f <- .source
-    }else{
-      .f <- purrr::safely(get)(.source)$result
-    }
-
-    funName <- fcall$.source
-    logger::log_debug("We got a function in the .source argument : '{funName}'")
-  }else{
-    # Ok, so not a function, so we need to make sure that the .source argument is a string
-    # and the name of a track in the database
-    if(is.character(.source) && .source %in% emuR::list_ssffTrackDefinitions(.handle)$name){
-      #The string should here be the name of a track
-      logger::log_debug("We got a SSFF track field in the .source argument : {.source}")
-      .f <- readtrack
-      funName <- "readtrack"
-      inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae) %>%
-        dplyr::filter(name==.source) %>%
-        dplyr::select(fileExtension) %>%
-        purrr::pluck(1)
-      dotArgs["field"] <- .source
-    }else{
-      cli::abort(c("Cannot use the indicated .source",
-                   "i"="The .source argument contains {(.source)} and is of class {class(.source)}",
-                   "i"="The .source is reported to be able to return the columns {superassp::get_definedtracks(.source)} when converted to a tibble",
-                   "x"="The .source needs to be the name of a track in the database or a function that should do the signal processing."))
-    }
-  }
-
-
-
-  #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
-  innerMapFunction <- function(.session,.bundle,...){
-
-    p(message=sprintf("Processing session %s (%s)",.session,.bundle))
-    dotdotdot <- list(...)
-    dotdotdotS <- toString(dotdotdot)
-
-    logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.")
-    result <- .f(...)
-
-    return(result)
-  }
-
-  progressr::handlers(global = TRUE)
-  old_handlers <- progressr::handlers(c("progress"))
-  on.exit(progressr::handlers(old_handlers), add = TRUE)
-
-
-  #Logic that concerns formal arguments
-  formalArgsNames <- methods::formalArgs(.f)
-  functionDefaults <- as.list(formals(.f))
-
-
-  #Logic that concerns actual arguments
-  #dotArgsRT <- tibble::as_tibble_row(dotArgs)
-  dotArgsNames <- names(dotArgs)
-
-  # Make sure that we have a DSP default settings data.frame
-  dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
-    tidyr::replace_na(list(Gender="Unspecified"))
-
-  #After this we can be sure that parameters set per session or bundle are  available
-  # but have been overwritten by explicitly set settings given to this function as we proceed
-  meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
-    dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
-    tidyr::replace_na(.metadata_defaults) %>%
-    dplyr::mutate(dotArgs)
-
-
-
-  #This variable is used for filling in missing values in arguments explicitly set in metadata
-  precomputedVariableNames <- intersect(names(meta),names(dsp))
-  dspColumnsToAdd <- setdiff(names(dsp),names(meta))
-
-  filledMeta <- meta %>%
-    dplyr::rows_update(y=dsp %>%
-                         dplyr::select(all_of(precomputedVariableNames)),
-                       by=idCols,unmatched = "ignore")
-
-
-  # This block will add settings that were set in DSP defaults only
-  completedStoredDSPSettings <- filledMeta %>%
-    dplyr::ungroup() %>%
-    dplyr::left_join(
-      dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
-      ,by=idCols) %>%
-    tidyr::replace_na(functionDefaults)  %>%
-    dplyr::mutate(toFile=FALSE)  #Forcefully inject a toFile argument
-
-
-  # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
-  # or if the 5000 Hz ceiling is instead increased and the default number of formants extracted is kept constant
-
-  if(.by_maxFormantHz && "numFormants" %in% names(completedStoredDSPSettings)){
-    completedStoredDSPSettings <- completedStoredDSPSettings %>%
-      dplyr::select(-numFormants)
-  }
-
-  # What we now need is an 'listOfFiles' to supply to the DSP function
-  signalFiles <- emuR::list_files(.handle,inputSignalsExtension) %>%
-      dplyr::rename(listOfFiles=absolute_file_path) %>%
-      dplyr::select(-file)
-
-  # The names of columns to keep are now the columns that are defined either in signalFiles or
-  # in dspCompletedSettings, and which will be used by the DSP function
-  settingsThatWillBeUsed <- intersect(formalArgsNames,
-                                      union(names(completedStoredDSPSettings),
-                                            names(signalFiles))
-                                      ) # This will be used to remove unwanted columns
-
-  #Here we construct the settings that we want to use when applying the specific DSP
-  # function to bundles (in specific sessions)
-  sessionBundleDSPSettingsDF <-  completedStoredDSPSettings %>%
-      dplyr::left_join(signalFiles,by=c("session","bundle")) %>%
-      dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
-
-  # Now we need to transfer the session / bundle settings to the segment list
-  # to get start and end times too into the call
-  segmentDSPDF <- .what %>%
-    tibble::rownames_to_column(var = "sl_rowIdx") %>%
-    dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle")) %>%
-    dplyr::rename(beginTime=start,endTime=end) %>%
-    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))
-
-  #Set up the progress bar
-  num_to_do <- nrow(segmentDSPDF)
-
-
-  p <- progressr::progressor(num_to_do)
-
-  # Here we apply the DSP function once per row and with settings comming from
-  # the columns in the data frame
-  appliedDFResultInList <- segmentDSPDF %>%
-    dplyr::rename(.session=session,.bundle=bundle) %>%
-    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>% ## Fix for wrassp functions that expect "numeric" values, not integers
-    dplyr::rowwise() %>%
-    dplyr::mutate(temp = list(pmap(cur_data(),.f=innerMapFunction))) %>%
-    #dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
-    dplyr::select(-.bundle,-.session) %>%
-    tidyr::nest(parameters=c(tidyselect::everything(), -temp)) %>%
-    tidyr::unnest(temp)
-
-
-  #Mark the special case where .what is called by provide()
-  if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
-    #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
-    # but just returned
-    logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
-    provideOutDF <-  list_bundles(.handle) %>%
-      dplyr::bind_cols(appliedDFResultInList) %>%
-      dplyr::rename(bundle=name)
-
-    return(provideOutDF)
-  }else{
-    #The default case, in which we are processing a segment list
-    resTibble <- appliedDFResultInList %>%
-      dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
-      tibble::rownames_to_column(var = "sl_rowIdx") %>%
-      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(out = map(temp,as_tibble)) %>%
-      dplyr::select(-temp) %>%
-      tidyr::unnest(out)
-
-
-    quantifyOutDF <- .what %>%
-      tibble::rownames_to_column(var = "sl_rowIdx") %>%
-      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx)) %>%
-      dplyr::left_join(resTibble, by="sl_rowIdx") %>%
-      dplyr::arrange(sl_rowIdx,start_item_id,end_item_id)
-
-
-    return(quantifyOutDF)
-  }
-
-}
-
 tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
-
-  if(is.character(inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(inside_of)){
-    inside_of <- emuR::load_emuDB(inside_of,verbose = FALSE)
-  }
-  if("emuDBhandle" %in% class(inside_of)){
-    #reload the database just to make sure that the handle is still valid
-    inside_of <- emuR::load_emuDB(inside_of$basePath,verbose = FALSE)
-  }else{
-    cli::cli_abort(c("Wrong inside_of argument",
-                     "i"="The 'inside_of' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                     "x"="The inside_of argument supplied is a {.val class(inside_of)}"))
-  }
-  existingTiers <- emuR::list_levelDefinitions(inside_of)
-
-  typeFirst <- stringr::str_to_lower(
-    stringr::str_trunc(tier_type,width = 1,side = "right")
-  )
-  if(! typeFirst %in% c("s","i","e")){
-    allowed <- c("EVENT","SEGMENT","ITEM")
-    cli::cli_abort(c("Unable to deduce annotation type",
-                     "x"="The annotation type must be one of {.val allowed}",
-                     "i"="The type specified was {.val {tier_type}} which could not be linked with any of the allowed types."))
-  }else{
-    typeDF <- data.frame("s"="SEGMENT","e"="EVENT","i"="ITEM")
-    purrr::pluck(typeDF,type_name,1)
-  }
 
   if(missing(tier_name) ) {
     cli::cli_abort(c("Invalid tier name",
                      "x"="A tier name must be specified"))
   }
+  if("emuDBhandle" %in% class(inside_of)){
+    #reload the database just to make sure that the handle is still valid
+    inside_of <- emuR::load_emuDB(inside_of$basePath,verbose = FALSE)
+  }else{
+    if( is.character(inside_of) && stringr::str_ends(inside_of,"_emuDB") && dir.exists(inside_of)){
+      inside_of <- emuR::load_emuDB(inside_of,verbose = FALSE)
+    }else{
+      strAttr <- attr(inside_of,"basePath")
+      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
+        inside_of <- emuR::load_emuDB(strAttr,verbose = FALSE)
+      }else{
+        #This is the fallback
+        cli::cli_abort(c("Wrong inside_of argument",
+                         "i"="The 'inside_of' argument can only be either a character vector indicating the path to the database, an emuR database handle, or a tibble or data.frame with an attached attribute indicating where the database were located.",
+                         "x"="The inside_of argument supplied is a {.val class(inside_of)}"))
+      }
+
+      }
+    }
+
+
+
+  existingTiers <- emuR::list_levelDefinitions(inside_of)
+
+
+
+  typeFirst <- stringr::str_to_lower(substring(tier_type,1,1))
+
+  if(! typeFirst %in% c("s","i","e")){
+    allowed <- c("EVENT","SEGMENT","ITEM")
+    cli::cli_abort(c("Unable to deduce annotation type",
+                     "x"="The annotation type must be one of {.val {allowed}}",
+                     "i"="The type specified was {.val {tier_type}} which could not be linked with any of the allowed types."))
+  }
+  typeDF <- data.frame("s"="SEGMENT","e"="EVENT","i"="ITEM")
+  emuR_type <- purrr::pluck(typeDF,typeFirst,1)
+
+
   #Second option for failure re tier name is that it already exists
   if( tier_name %in% existingTiers) {
     cli::cli_alert_warning(c("Existing tier",
@@ -709,9 +734,13 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
                              "i"="The database used is {.path inside_of$basePath}"))
   }else{
     #If not null and not existing, we can se if we can set it up
-    emuR::add_levelDefinition(inside_of,name = tier_name,type = )
+    emuR::add_levelDefinition(inside_of,name = tier_name,type = emuR_type)
 
   }
+  res <- emuR::list_levelDefinitions(inside_of)
+  attr(res,"basePath") <- inside_of$basePath #This ensures that we can reattach the database later
+
+  return(res)
 }
 
 readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=0, sample_end=0){
