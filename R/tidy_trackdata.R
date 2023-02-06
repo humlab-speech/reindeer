@@ -129,7 +129,7 @@ climb_to <- function(.data,  .attribute_name ,.collapse = TRUE, .skip_times = FA
 #skip_forward
 #skip_backward
 
-scout_forward <- function(.data,  steps_forward, count_from="START" , capture=1, ignore_bundle_boundaries=FALSE, calculate_times = TRUE, times_from = NULL, interactive=FALSE, .handle=NULL) {
+scout <- function(.data,  steps_forward, count_from="START" , capture=1, ignore_bundle_boundaries=FALSE, calculate_times = TRUE, times_from = NULL, interactive=FALSE, .handle=NULL) {
 
   if(is.null(.handle) && ! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
     # We then need to create a handle object
@@ -140,7 +140,7 @@ scout_forward <- function(.data,  steps_forward, count_from="START" , capture=1,
     stop("Could not derive the database path. Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
   }
 
-  res <- emuR::requery_seq(emuDBhandle = .handle,seglist= .data,offset=steps_forward, offsetRef=count_from,length=capture, ignoreOutOfBounds = ignore_bundle_boundaries, timeRefSegmentLevel = times_from, calcTimes = !skip_times,verbose = interactive, resultType = "tibble")
+  res <- emuR::requery_seq(emuDBhandle = .handle,seglist= .data,offset=steps_forward, offsetRef=count_from,length=capture, ignoreOutOfBounds = ignore_bundle_boundaries, timeRefSegmentLevel = times_from, calcTimes = calculate_times,verbose = interactive, resultType = "tibble")
   attr(res,"basePath") <- .handle$basePath #This ensures that we can reattach the database later
   #DBI::dbDisconnect(.handle$connection) # Gracefully disconnect the connection
   return(res)
@@ -506,16 +506,24 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
                                       "x"="The argument {.var .source} is missing"))
 
   #We have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-  if(is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
-    .handle <- emuR::load_emuDB(inside,verbose = FALSE)
-  }
   if("emuDBhandle" %in% class(.inside_of)){
     #reload the database just to make sure that the handle is still valid
-    .inside_of <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
+    inside_of <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
   }else{
-    cli::cli_abort(c("Wrong .inside_of argument",
-                   "i"="The '.inside_of' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                   "x"="The .inside_of argument supplied is a {.val class(.inside_of)}"))
+    if( is.character(.inside_of) && stringr::str_ends(inside_of,"_emuDB") && dir.exists(inside_of)){
+      inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
+    }else{
+      strAttr <- attr(.inside_of,"basePath")
+      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
+        .inside_of <- emuR::load_emuDB(strAttr,verbose = FALSE)
+      }else{
+        #This is the fallback
+        cli::cli_abort(c("Wrong .inside_of argument",
+                         "i"="The '.inside_of' argument can only be either a character vector indicating the path to the database, an emuR database handle, or a tibble or data.frame with an attached attribute indicating where the database were located.",
+                         "x"="The inside_of argument supplied is a {.val class(.inside_of)}"))
+      }
+
+    }
   }
   #Awailable track extensions of files in the database
   availableDataFileExtensions <- list_files(.inside_of) %>%
@@ -706,13 +714,10 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
                          "x"="The inside_of argument supplied is a {.val class(inside_of)}"))
       }
 
-      }
     }
-
-
+  }
 
   existingTiers <- emuR::list_levelDefinitions(inside_of)
-
 
 
   typeFirst <- stringr::str_to_lower(substring(tier_type,1,1))
@@ -727,14 +732,15 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
   emuR_type <- purrr::pluck(typeDF,typeFirst,1)
 
 
+
   #Second option for failure re tier name is that it already exists
-  if( tier_name %in% existingTiers) {
-    cli::cli_alert_warning(c("Existing tier",
-                             "x"="A tier with the name {.var tier_name} already exist in the database.",
+  if( tier_name %in% existingTiers$name) {
+    cli::cli_alert_info(c("Skipping the creation of existing tier",
+                             "x"="A tier with the name {.var tier_name} already exist in the database and will be skipped.",
                              "i"="The database used is {.path inside_of$basePath}"))
   }else{
     #If not null and not existing, we can se if we can set it up
-    emuR::add_levelDefinition(inside_of,name = tier_name,type = emuR_type)
+    emuR::add_levelDefinition(inside_of,name = tier_name,type = emuR_type, verbose = FALSE, rewriteAllAnnots = TRUE)
 
   }
   res <- emuR::list_levelDefinitions(inside_of)
@@ -803,14 +809,14 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 ## INTERACTIVE TESTING
 #
-library(tidyverse)
-library(purrr)
-library(progressr)
-library(tibble)
-library(superassp)
-library(furrr)
-library(progress)
-library(reindeer)
+# library(tidyverse)
+# library(purrr)
+# library(progressr)
+# library(tibble)
+# library(superassp)
+# library(furrr)
+# library(progress)
+# library(reindeer)
 
 
 # reindeer:::create_ae_db() -> ae
