@@ -76,33 +76,75 @@ double_fake_voice_report <- function(listOfFiles,
 
 ## ae |>
 # track("ae",forest)
+deduce_source_database <- function(inside_of){
 
-ask_for <- function(.source, .query,.sessions_regex = ".*", .bundles_regex = ".*",.times_from = NULL, .calculate_times = TRUE,.interactive=FALSE){
-  if(missing(.source)) stop("Please provide an Emu database handle or the full path to an Emu database in the .source argument")
-  if(missing(.query)) stop("Please specify a query in the Emu Query Language.")
+  if("emuDBhandle" %in% class(inside_of)){
+    #reload the database just to make sure that the handle is still valid
+    inside_of <- emuR::load_emuDB(inside_of$basePath,verbose = FALSE)
+  }else{
+    if( is.character(inside_of) && stringr::str_ends(inside_of,"_emuDB") && dir.exists(inside_of)){
+      # We then need to create a handle object
+      utils::capture.output(
+        inside_of <- emuR::load_emuDB(inside_of,verbose = FALSE)
+      ) -> dbload.info
+      logger::log_info(paste(dbload.info,collapse = "\n"))
 
-  if("character" %in% class(.source) ){
-    # We then need to create a handle object
-    utils::capture.output(
-      .handle <- emuR::load_emuDB(attr(.source,"basePath"),verbose = FALSE)
-    ) -> dbload.info
-    logger::log_info(paste(dbload.info,collapse = "\n"))
+    }else{
+      strAttr <- attr(inside_of,"basePath")
+      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
+        # We then need to create a handle object
+        utils::capture.output(
+          inside_of <- emuR::load_emuDB(attr(strAttr,"basePath"),verbose = FALSE)
+        ) -> dbload.info
+        logger::log_info(paste(dbload.info,collapse = "\n"))
+
+      }else{
+        #This is the fallback
+        cli::cli_abort(c("Cannot determine the location of the database",
+                         "x"="The database location will be deduced from the first argument supplied to tue function.",
+                         "i"="The first argument supplied is a {.val {class(inside_of)}}",
+                         "i"="The function can take a path, an emuR database handle, or deduce the path from the result of a previous reindeer function call."))
+      }
+
+    }
   }
-  if( "emuDBhandle" %in% class(.source)){
-    .handle <- .source
-  }
+  return(inside_of)
+}
 
-  res <- emuR::query(emuDBhandle=.handle, query=.query,sessionPattern = .sessions_regex, bundlePattern = .bundles_regex ,timeRefSegmentLevel = .times_from, calcTimes = .calculate_times,verbose = .interactive, resultType = "tibble")
-  attr(res,"basePath") <- .handle$basePath #This ensures that we can reattach the database later
 
-  if("character" %in% class(.source) && ! "emuDBhandle" %in% class(.source)){
-    DBI::dbDisconnect(.handle$connection) # Gracefully disconnect the connection
-    rm(.handle)
-  }
+
+ask_for <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*",times_from = NULL, calculate_times = TRUE,interactive=FALSE){
+  if(missing(source)) cli::cli_abort("Please provide an Emu database handle or the full path to an Emu database in the {.args inside_of}  argument")
+  if(missing(query)) cli::cli_abort("Please specify a query in the Emu Query Language.")
+
+
+  inside_of <- deduce_source_database(inside_of)
+
+  res <- emuR::query(emuDBhandle=inside_of, query=query,sessionPattern = sessions_regex, bundlePattern = bundles_regex ,timeRefSegmentLevel = times_from, calcTimes = calculate_times,verbose = interactive, resultType = "tibble")
+
+  attr(res,"basePath") <- inside_of$basePath #This ensures that we can reattach the database later
 
   return(res)
 }
 
+anchor <- function(inside_of, segment_list,anchor_against=NULL){
+  if(missing(inside_of)) cli::cli_abort("Missing {.args inside_of} argument.")
+  if(missing(segment_list)) cli::cli_abort("A segment list is required")
+
+  if("character" %in% class(source) ){
+    # We then need to create a handle object
+    utils::capture.output(
+      handle <- emuR::load_emuDB(attr(inside_of,"basePath"),verbose = FALSE)
+    ) -> dbload.info
+    logger::log_info(paste(dbload.info,collapse = "\n"))
+  }
+  if( "emuDBhandle" %in% class(inside_of)){
+    handle <- inside_of
+  }
+
+  res <- emuR::requery_seq(inside_of,seglist = segment_list,calcTimes = TRUE,offset=0,offsetRef = "START",length=1,resultType = "tibble",timeRefSegmentLevel = anchor_against)
+  attr(res,"basePath") <- .handle$basePath #This ensures that we can reattach the database later
+}
 
 
 climb_to <- function(.data,  .attribute_name ,.collapse = TRUE, .skip_times = FALSE, .times_from = NULL, .interactive=FALSE, .handle=NULL) {
@@ -257,7 +299,7 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 #
-quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
+quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
 
   #Capture dot arguments for if we want to manipulate them
   dotArgs <- list(...)
@@ -345,7 +387,8 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
     }
   }
 
-
+  #This version of the original function .f that is quarantee to return a list of $result and $error
+  safe_f <- purrr::safely(.f, otherwise=NA)
 
   #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
   innerMapFunction <- function(.session,.bundle,...){
@@ -355,9 +398,9 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
     dotdotdotS <- toString(dotdotdot)
 
     logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.")
-    result <- .f(...)
+    result <- safe_f(...)
 
-    return(result)
+    return(result$result)
   }
 
   progressr::handlers(global = TRUE)
@@ -415,7 +458,7 @@ quantify <- function(.what,.source,...,.by_maxFormantHz=TRUE,.metadata_defaults=
       dplyr::select(-numFormants)
   }
 
-  # What we now need is an 'listOfFiles' to supply to the DSP function
+  # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
   signalFiles <- emuR::list_files(.handle,inputSignalsExtension) %>%
     dplyr::rename(listOfFiles=absolute_file_path) %>%
     dplyr::select(-file)
