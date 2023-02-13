@@ -114,7 +114,7 @@ deduce_source_database <- function(inside_of){
 
 
 ask_for <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*",times_from = NULL, calculate_times = TRUE,interactive=FALSE){
-  if(missing(source)) cli::cli_abort("Please provide an Emu database handle or the full path to an Emu database in the {.args inside_of}  argument")
+  if(missing(inside_of)) cli::cli_abort("Please provide an Emu database handle or the full path to an Emu database in the {.args inside_of}  argument")
   if(missing(query)) cli::cli_abort("Please specify a query in the Emu Query Language.")
 
 
@@ -299,18 +299,28 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 #
-quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.handle=NULL){
+quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
 
   #Capture dot arguments for if we want to manipulate them
   dotArgs <- list(...)
   fcall <- match.call(expand.dots = FALSE)
   fcallS <- toString(fcall)
   idCols <- c("Gender","Age")
+
   if(nrow(.what ) < 1){
-    cli::cli_abort(c("Erroneous .what argument",
+    #Nonsense segment list
+    cli::cli_abort(c("Erroneous segment list argument",
                      "i"="The list of segments or signals is empty",
                      "x"="The .what argument contains {nrow(.what)} rows."))
   }
+  if(any(is.na(.what[c("start","end")]))){
+    #We need to have all start and end times specified to proceed
+    cli::cli_alert_info(c("Missing time references",
+                     "x"="Some start or end times in the segment list supplied as the {.param .what} argument is missing",
+                     "i"="I will try to deduce times from associated levels with time information."))
+    .what <- anchor(.what)
+  }
+
 
   logger::log_debug("Function quantify called with arguments {fcallS}")
 
@@ -387,25 +397,25 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     }
   }
 
-  #This version of the original function .f that is quarantee to return a list of $result and $error
-  safe_f <- purrr::safely(.f, otherwise=NA)
+  #This version of the original function .f that is quarantee to return a list of $result (which is possibly NA) and $error
+  safe_f <- purrr::possibly(.f, otherwise=NA)
 
   #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
   innerMapFunction <- function(.session,.bundle,...){
 
-    p(message=sprintf("Processing session %s (%s)",.session,.bundle))
+    #p(message=sprintf("Processing session %s (%s)",.session,.bundle))
     dotdotdot <- list(...)
     dotdotdotS <- toString(dotdotdot)
 
     logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.")
     result <- safe_f(...)
 
-    return(result$result)
+    return(result)
   }
 
-  progressr::handlers(global = TRUE)
-  old_handlers <- progressr::handlers(c("progress"))
-  on.exit(progressr::handlers(old_handlers), add = TRUE)
+  #progressr::handlers(global = TRUE)
+  #old_handlers <- progressr::handlers(c("progress"))
+  #on.exit(progressr::handlers(old_handlers), add = TRUE)
 
 
   #Logic that concerns formal arguments
@@ -482,19 +492,47 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     tibble::rownames_to_column(var = "sl_rowIdx") %>%
     dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle")) %>%
     dplyr::rename(beginTime=start,endTime=end) %>%
-    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))
+    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed))) %>%
+    dplyr::rename(.session=session,.bundle=bundle) %>%
+    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) ## Fix for wrassp functions that expect "numeric" values, not integers
+
+  if(!is.null(.where)){
+    #This is the special case where we have a .where argument and need to extract just a portion of the data
+
+    #Window shift is an especially important property to know, if we want to get data from a portion of each segment
+    wsDefault <- functionDefaults["windowShift"]
+  }
+
+  ###### Now to the processing
+  #Log settings that will be applied to an excel file
+  if(!is.null(.parameter_log_excel)) {
+    .parameter_log_excel <- normalizePath(.parameter_log_excel)
+    if(is.character(.parameter_log_excel) && dir.exists(dirname(.parameter_log_excel))){
+      #Write a new excel file, named either according to the specified name in
+      #.parameter_log_excel or as a generated file name (if the string is a directory path)
+      #cli::cli_abort("{.path {dirname(.parameter_log_excel)}} {.path {(.parameter_log_excel)}}")
+      excel_filename <- ifelse( file.info(.parameter_log_excel)[["isdir"]] && dir.exists(.parameter_log_excel),
+                         file.path(.parameter_log_excel,
+                                   paste0(stringr::str_replace_all(format(Sys.time(),usetz = TRUE)," ","_"),".xlsx")),
+                         .parameter_log_excel)
+      openxlsx::write.xlsx(segmentDSPDF,file=excel_filename)
+      cli::cli_alert_info("Wrote a summary of parameters used when processing into file {.path {excel_filename}}")
+    }else{
+      cli::cli_warn(c("Unable to write parameter file",
+                      "x"= "A parameter file could not be created in {.path {(.parameter_log_excel)}}"))
+    }
+
+  }
 
   #Set up the progress bar
   num_to_do <- nrow(segmentDSPDF)
 
 
-  p <- progressr::progressor(num_to_do)
+ # p <- progressr::progressor(num_to_do)
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
   appliedDFResultInList <- segmentDSPDF %>%
-    dplyr::rename(.session=session,.bundle=bundle) %>%
-    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) %>% ## Fix for wrassp functions that expect "numeric" values, not integers
     dplyr::rowwise() %>%
     dplyr::mutate(temp = list(purrr::pmap(cur_data(),.f=innerMapFunction))) %>%
     #dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
@@ -541,33 +579,15 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
 }
 
+quantify_naively <- purrr:::partial(quantify, .naively=TRUE)
 
-
-furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE){
+furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE){
   if(missing(.source)) cli::cli_abort(c("Missing source name",
                                       "i"="You need to state a function name or the file extension from which the data columns should be gathered",
                                       "x"="The argument {.var .source} is missing"))
 
-  #We have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-  if("emuDBhandle" %in% class(.inside_of)){
-    #reload the database just to make sure that the handle is still valid
-    inside_of <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
-  }else{
-    if( is.character(.inside_of) && stringr::str_ends(inside_of,"_emuDB") && dir.exists(inside_of)){
-      inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
-    }else{
-      strAttr <- attr(.inside_of,"basePath")
-      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
-        .inside_of <- emuR::load_emuDB(strAttr,verbose = FALSE)
-      }else{
-        #This is the fallback
-        cli::cli_abort(c("Wrong .inside_of argument",
-                         "i"="The '.inside_of' argument can only be either a character vector indicating the path to the database, an emuR database handle, or a tibble or data.frame with an attached attribute indicating where the database were located.",
-                         "x"="The inside_of argument supplied is a {.val class(.inside_of)}"))
-      }
+  .inside_of <- deduce_source_database(.inside_of)
 
-    }
-  }
   #Awailable track extensions of files in the database
   availableDataFileExtensions <- list_files(.inside_of) %>%
     dplyr::mutate(file=stringr::str_replace(file,"^.*[.]","")) %>%
@@ -664,7 +684,7 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
 
 
     # Here we envoke the special mode of quantify where an intermediate nested result is returned
-    quantifications <- quantify(.what=bundles,.source={{.source}},rlang::enquos(...),.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package)
+    quantifications <- quantify(.what=bundles,.source={{.source}},rlang::enquos(...),.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package, .naively = .naively)
 
     quantifications <- quantifications %>%
       dplyr::rename(dobj= temp) %>%
@@ -740,25 +760,9 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
     cli::cli_abort(c("Invalid tier name",
                      "x"="A tier name must be specified"))
   }
-  if("emuDBhandle" %in% class(inside_of)){
-    #reload the database just to make sure that the handle is still valid
-    inside_of <- emuR::load_emuDB(inside_of$basePath,verbose = FALSE)
-  }else{
-    if( is.character(inside_of) && stringr::str_ends(inside_of,"_emuDB") && dir.exists(inside_of)){
-      inside_of <- emuR::load_emuDB(inside_of,verbose = FALSE)
-    }else{
-      strAttr <- attr(inside_of,"basePath")
-      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
-        inside_of <- emuR::load_emuDB(strAttr,verbose = FALSE)
-      }else{
-        #This is the fallback
-        cli::cli_abort(c("Wrong inside_of argument",
-                         "i"="The 'inside_of' argument can only be either a character vector indicating the path to the database, an emuR database handle, or a tibble or data.frame with an attached attribute indicating where the database were located.",
-                         "x"="The inside_of argument supplied is a {.val class(inside_of)}"))
-      }
 
-    }
-  }
+  inside_of <- deduce_source_database(inside_of)
+
 
   existingTiers <- emuR::list_levelDefinitions(inside_of)
 
