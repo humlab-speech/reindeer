@@ -38,7 +38,7 @@ dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender")
 
   if(!recompute){
     data(DSPP)
-    return(DSPP)
+    return(reindeer::DSPP)
   }
 
   ff <- function(Age_lower,Age_upper,... ) {

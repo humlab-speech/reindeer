@@ -427,64 +427,83 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   #dotArgsRT <- tibble::as_tibble_row(dotArgs)
   dotArgsNames <- names(dotArgs)
 
-  # Make sure that we have a DSP default settings data.frame
-  dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
-    tidyr::replace_na(list(Gender="Unspecified"))
-
-  #After this we can be sure that parameters set per session or bundle are  available
-  # but have been overwritten by explicitly set settings given to this function as we proceed
-  meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
-    dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
-    tidyr::replace_na(.metadata_defaults) %>%
-    dplyr::mutate(dotArgs)
-
-
-
-  #This variable is used for filling in missing values in arguments explicitly set in metadata
-  precomputedVariableNames <- intersect(names(meta),names(dsp))
-  dspColumnsToAdd <- setdiff(names(dsp),names(meta))
-
-  filledMeta <- meta %>%
-    dplyr::rows_update(y=dsp %>%
-                         dplyr::select(all_of(precomputedVariableNames)),
-                       by=idCols,unmatched = "ignore")
-
-
-  # This block will add settings that were set in DSP defaults only
-  completedStoredDSPSettings <- filledMeta %>%
-    dplyr::ungroup() %>%
-    dplyr::left_join(
-      dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
-      ,by=idCols) %>%
-    tidyr::replace_na(functionDefaults)  %>%
-    dplyr::mutate(toFile=FALSE)  #Forcefully inject a toFile argument
-
-
-  # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
-  # or if the 5000 Hz ceiling is instead increased and the default number of formants extracted is kept constant
-
-  if(.by_maxFormantHz && "numFormants" %in% names(completedStoredDSPSettings)){
-    completedStoredDSPSettings <- completedStoredDSPSettings %>%
-      dplyr::select(-numFormants)
-  }
-
   # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
   signalFiles <- emuR::list_files(.handle,inputSignalsExtension) %>%
     dplyr::rename(listOfFiles=absolute_file_path) %>%
     dplyr::select(-file)
 
-  # The names of columns to keep are now the columns that are defined either in signalFiles or
-  # in dspCompletedSettings, and which will be used by the DSP function
-  settingsThatWillBeUsed <- intersect(formalArgsNames,
-                                      union(names(completedStoredDSPSettings),
-                                            names(signalFiles))
-  ) # This will be used to remove unwanted columns
+  if(! .naively){
+    #### Deduce DSP settings based on metadata
 
-  #Here we construct the settings that we want to use when applying the specific DSP
-  # function to bundles (in specific sessions)
-  sessionBundleDSPSettingsDF <-  completedStoredDSPSettings %>%
-    dplyr::left_join(signalFiles,by=c("session","bundle")) %>%
-    dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
+    cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
+
+    # Make sure that we have a DSP default settings data.frame
+    dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
+      tidyr::replace_na(list(Gender="Unspecified"))
+
+    #After this we can be sure that parameters set per session or bundle are  available
+    # but have been overwritten by explicitly set settings given to this function as we proceed
+    meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
+      dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
+      tidyr::replace_na(.metadata_defaults) %>%
+      dplyr::mutate(dotArgs)
+
+
+
+    #This variable is used for filling in missing values in arguments explicitly set in metadata
+    precomputedVariableNames <- intersect(names(meta),names(dsp))
+    dspColumnsToAdd <- setdiff(names(dsp),names(meta))
+
+    filledMeta <- meta %>%
+      dplyr::rows_update(y=dsp %>%
+                           dplyr::select(all_of(precomputedVariableNames)),
+                         by=idCols,unmatched = "ignore")
+
+
+    # This block will add settings that were set in DSP defaults only
+    completedStoredDSPSettings <- filledMeta %>%
+      dplyr::ungroup() %>%
+      dplyr::left_join(
+        dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
+        ,by=idCols) %>%
+      tidyr::replace_na(functionDefaults)  %>%
+      dplyr::mutate(toFile=FALSE)  #Forcefully inject a toFile argument
+
+
+    # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
+    # or if the 5000 Hz ceiling is instead increased and the default number of formants extracted is kept constant
+
+    if(.by_maxFormantHz && "numFormants" %in% names(completedStoredDSPSettings)){
+      completedStoredDSPSettings <- completedStoredDSPSettings %>%
+        dplyr::select(-numFormants)
+
+      # The names of columns to keep are now the columns that are defined either in signalFiles or
+      # in dspCompletedSettings, and which will be used by the DSP function
+      settingsThatWillBeUsed <- intersect(formalArgsNames,
+                                          union(names(completedStoredDSPSettings),
+                                                names(signalFiles))
+      ) # This will be used to remove unwanted columns
+
+      #Here we construct the settings that we want to use when applying the specific DSP
+      # function to bundles (in specific sessions)
+      sessionBundleDSPSettingsDF <-  completedStoredDSPSettings %>%
+        dplyr::left_join(signalFiles,by=c("session","bundle")) %>%
+        dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
+
+
+
+    }
+  }else{
+    #Naive DSP arm
+    cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata")
+
+    sessionBundleDSPSettingsDF <- signalFiles
+    # The names of columns to keep are now the columns that are defined  in signalFiles and which will be used by the DSP function
+    settingsThatWillBeUsed <- intersect(formalArgsNames,names(signalFiles) )
+
+  }
+
+
 
   # Now we need to transfer the session / bundle settings to the segment list
   # to get start and end times too into the call
