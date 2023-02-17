@@ -76,40 +76,6 @@ double_fake_voice_report <- function(listOfFiles,
 
 ## ae |>
 # track("ae",forest)
-deduce_source_database <- function(inside_of){
-
-  if("emuDBhandle" %in% class(inside_of)){
-    #reload the database just to make sure that the handle is still valid
-    inside_of <- emuR::load_emuDB(inside_of$basePath,verbose = FALSE)
-  }else{
-    if( is.character(inside_of) && stringr::str_ends(inside_of,"_emuDB") && dir.exists(inside_of)){
-      # We then need to create a handle object
-      utils::capture.output(
-        inside_of <- emuR::load_emuDB(inside_of,verbose = FALSE)
-      ) -> dbload.info
-      logger::log_info(paste(dbload.info,collapse = "\n"))
-
-    }else{
-      strAttr <- attr(inside_of,"basePath")
-      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
-        # We then need to create a handle object
-        utils::capture.output(
-          inside_of <- emuR::load_emuDB(attr(strAttr,"basePath"),verbose = FALSE)
-        ) -> dbload.info
-        logger::log_info(paste(dbload.info,collapse = "\n"))
-
-      }else{
-        #This is the fallback
-        cli::cli_abort(c("Cannot determine the location of the database",
-                         "x"="The database location will be deduced from the first argument supplied to tue function.",
-                         "i"="The first argument supplied is a {.val {class(inside_of)}}",
-                         "i"="The function can take a path, an emuR database handle, or deduce the path from the result of a previous reindeer function call."))
-      }
-
-    }
-  }
-  return(inside_of)
-}
 
 
 
@@ -534,7 +500,9 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
                          file.path(.parameter_log_excel,
                                    paste0(stringr::str_replace_all(format(Sys.time(),usetz = TRUE)," ","_"),".xlsx")),
                          .parameter_log_excel)
-      openxlsx::write.xlsx(segmentDSPDF,file=excel_filename)
+      openxlsx::write.xlsx(segmentDSPDF %>%
+                             dplyr::rename(bundle=.bundle,session=.session)
+                           ,file=excel_filename, overwrite=TRUE, asTable=TRUE)
       cli::cli_alert_info("Wrote a summary of parameters used when processing into file {.path {excel_filename}}")
     }else{
       cli::cli_warn(c("Unable to write parameter file",
@@ -600,15 +568,46 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
 quantify_naively <- purrr:::partial(quantify, .naively=TRUE)
 
-furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE){
+furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL){
+
   if(missing(.source)) cli::cli_abort(c("Missing source name",
                                       "i"="You need to state a function name or the file extension from which the data columns should be gathered",
                                       "x"="The argument {.var .source} is missing"))
 
-  .inside_of <- deduce_source_database(.inside_of)
+  if("emuDBhandle" %in% class(.inside_of)){
+    #reload the database just to make sure that the handle is still valid
+    .inside_of <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
+  }else{
+    if( is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
+      # We then need to create a handle object
+      utils::capture.output(
+        .inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
+      ) -> dbload.info
+      logger::log_info(paste(dbload.info,collapse = "\n"))
+
+    }else{
+      strAttr <- attr(.inside_of,"basePath")
+      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
+        # We then need to create a handle object
+        utils::capture.output(
+          .inside_of <- emuR::load_emuDB(attr(strAttr,"basePath"),verbose = FALSE)
+        ) -> dbload.info
+        logger::log_info(paste(dbload.info,collapse = "\n"))
+
+      }else{
+        #This is the fallback
+        cli::cli_abort(c("Cannot determine the location of the database",
+                         "x"="The database location will be deduced from the first argument supplied to tue function.",
+                         "i"="The function first tried to use the {.var .inside_of} argument, wich is of class {.val {class(.inside_of)}}",
+                         "i"="The function then tried to use the {.var .source} argument, wich is of class {.val {class(.source)}} and has the attributes  {.var {names(attributes(.source))}}."))
+      }
+
+    }
+  }
+
 
   #Awailable track extensions of files in the database
-  availableDataFileExtensions <- list_files(.inside_of) %>%
+  availableDataFileExtensions <- emuR::list_files(.inside_of) %>%
     dplyr::mutate(file=stringr::str_replace(file,"^.*[.]","")) %>%
     dplyr::filter(!file %in% c("json",emuR:::load_DBconfig(.inside_of)$mediafileExtension,reindeer:::metadata.extension)) %>%
     dplyr::select(file) %>%
@@ -646,18 +645,28 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
     }
   }
 
+  # We need to make a data.frame structure from the track specifications given as arguments,
+  # as this will simplify comparison of track name and field with the already created
+  # later in the code.
 
   tracksToDefine <- data.frame(name=names(trackSpec),columnName=unlist(trackSpec,use.names = FALSE),fileExtension=fileExtension) %>%
     dplyr::mutate(across(everything(), ~ stringr::str_remove_all(.,"[\'\"]") ))
   #tracksToDefine may now include also the names of function arguments, which we needs to adress later
 
-  tracksDefined <- emuR::list_ssffTrackDefinitions(.inside_of)
+  #This is the base structure which says what is already defined,
+  # which we will use later to deduce if the user supplied track specifications are
+  # valid or not
+  tracksAlreadyDefined <- emuR::list_ssffTrackDefinitions(.inside_of)
 
 
-  #If we have a function, then we should get some base data for the track calculations
+  #If we have a function, then we should use it to create new tracks
   if(is.function(.source) || ( ! is.null(get0(.source)) && is.function( get0(.source)))){
 
     cli::cli_alert_info("Using the {.val {fileExtension}} file extension for stored signal files.")
+
+    # We here make a fake segment list with start and end times that suggest whole file processing
+    # so that we can reuse quantify to deduce parameters, optionally log parameters, do the DSP work, and all that stuff.
+
     bundles <- emuR::list_bundles(.inside_of) %>%
       dplyr::rename(bundle=name) %>%
       dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0) %>%
@@ -680,30 +689,34 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
       cli::cli_alert_info("The database contains {.val {nrow(emuR::list_bundles(.inside_of))}} bundles")
       cli::cli_alert_info("There are {.val {nrow(emuR::list_files(.inside_of,fileExtension))}} signal files with the file extension {.val {fileExtension}}")
 
-      # Return the database handle
+      # In this case we are not doing any DSP and all that is left is to return the database handle.
       return(.inside_of)
     }
 
-
+    # We start fuzzing about ... arguments that are not valid function arguments
+    # and that do not describe a connection to a field in the output as reported by the function
     makeAFuzzAbout <- tracksToDefine %>%
       dplyr::filter(! name %in% methods::formalArgs(.source), ! columnName %in% superassp::get_definedtracks(.source))
 
     if(nrow(makeAFuzzAbout) > 0 ){
-      cli::cli_alert_warning("Skipping computation of {.var {makeAFuzzAbout$name}} as the fields {.val {makeAFuzzAbout$columnName}} is not computed by the function supplied as {.arg .source}")
-
-      #Explicitly remove track name specifications with names that are also formal
-      # args of the function, or are not computed by the .source function
-      tracksToDefine <- tracksToDefine %>%
-        dplyr::filter(! name %in% methods::formalArgs(.source), columnName %in% superassp::get_definedtracks(.source))
+      cli::cli_alert_warning(c("Skipping computation of {.var {makeAFuzzAbout$name}}",
+                               "x"="The fields {.val {makeAFuzzAbout$columnName}} are not computed by the function supplied as {.arg .source}",
+                               "x"="The fields {.val {makeAFuzzAbout$columnName}} also not not a formal argument to the function supplied as {.arg .source}",
+                               "i"="The formal arguments of the function is {.val {formalArgs(.source)}}"))
 
     }
+
+    #Explicitly remove track name specifications with names that are also formal
+    # args of the function, or are not computed by the .source function
+    tracksToDefine <- tracksToDefine %>%
+      dplyr::filter(! name %in% methods::formalArgs(.source), columnName %in% superassp::get_definedtracks(.source))
 
 
     cli::cli_alert_info("Will compute tracks {.var {tracksToDefine$name}} on {.vals {nrow(bundles)}} bundles.")
 
 
     # Here we envoke the special mode of quantify where an intermediate nested result is returned
-    quantifications <- quantify(.what=bundles,.source={{.source}},rlang::enquos(...),.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package, .naively = .naively)
+    quantifications <- quantify(.what=bundles,.source={{.source}},rlang::enquos(...),.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package, .naively = .naively,.parameter_log_excel=.parameter_log_excel)
 
     quantifications <- quantifications %>%
       dplyr::rename(dobj= temp) %>%
@@ -756,8 +769,13 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
   }
 
   for(track in 1:nrow(tracksToDefine)){
-    if(! tracksToDefine[track,"name"] %in% tracksDefined$name){
-      emuR::add_ssffTrackDefinition(emuDBhandle = .inside_of,columnName = tracksToDefine[[track,"columnName"]], name = tracksToDefine[[track,"name"]],fileExtension = tracksToDefine[[track,"fileExtension"]])
+    if(! tracksToDefine[track,"name"] %in% tracksAlreadyDefined$name){
+      emuR::add_ssffTrackDefinition(emuDBhandle = .inside_of,
+                                    columnName = tracksToDefine[[track,"columnName"]],
+                                    name = tracksToDefine[[track,"name"]],
+                                    fileExtension = tracksToDefine[[track,"fileExtension"]]
+                                    )
+
       cli::cli_alert_success("Connected the field {.field {tracksToDefine[[track,\"columnName\"]]}} inside of .{.field {tracksToDefine[[track,\"fileExtension\"]]}} signal files and named it {.var {tracksToDefine[[track,\"name\"]]}} ")
     }else{
       cli::cli_alert_info("Not defining a new track {.code {tracksToDefine[track,\"name\"]}} since it is already defined in the database.")
