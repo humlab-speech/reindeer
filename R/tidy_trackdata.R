@@ -265,7 +265,10 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 #
-quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
+quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.use_cache_file=NULL,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
+
+
+  # Initial check of arguments ----------------------------------------------
 
   #Capture dot arguments for if we want to manipulate them
   dotArgs <- list(...)
@@ -290,9 +293,8 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
   logger::log_debug("Function quantify called with arguments {fcallS}")
 
-  ###
-  # Derive .handle object
-  ##
+  ## What to compute from (the .what argument and the .hancle object ) ------------------
+
 
   #The first possible case is when we have no explicitly set .handle argument, but a segment list with a
   # valid "basePath" attribute set. We then create the database handle from that basePath.
@@ -331,8 +333,11 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   inputSignalsExtension <- emuR:::load_DBconfig(.handle)$mediafileExtension
 
 
+  ## Source setup ------------------------------------------------------------
+
+
   # This section handles the case where we want to compute signals or a
-  # list of results from the wave file directly??p
+  # list of results from the wave file directly??
   if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
     if(is.function(.source)){
       .f <- .source
@@ -363,6 +368,46 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     }
   }
 
+
+  # The inner applied function ----------------------------------------------
+
+
+  ## The progress bar --------------------------------------------------------
+
+
+  progressr::handlers(global = TRUE)
+  #old_handlers <- progressr::handlers(c("progress"))
+  on.exit(progressr::handlers(old_handlers), add = TRUE)
+
+  ## Set up an optional cache system -----------------------------------------
+
+
+  ## Make a date specific cache file if
+  if(.cache_file) {
+    #Set a date specific cache file
+    .cache_file <- file.path(tempdir(),format(Sys.time(), "cachefile%Y%m%d.sqlite"))
+    cli::cli_alert_info("Using cache file {(.cache_file)}")
+  }
+  #Now, since we set up a default file name above if .cache_file is just TRUE
+  # we should be able to use the character string as the file name
+  if(!is.null(.cache_file) && is.character(.cache_file)){
+    .cache_connection <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=.cache_file)
+
+    if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
+                                                                "i","The {arg {(.cache_file)}} argument you cave was {.path {(.cache_file)}}."))
+
+    RSQLite::dbSendQuery(.cache_connection,"CREATE TABLE cache (sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
+  }else{
+    cli::cli_abort(c("You specified the cache file name wrong",
+                     "x"="The cache file can be specified as a path, or you can just give TRUE to use a default file name based on the date",
+                     "i"="The {.arg {(.cache_file)}} argument you cave was {.path {(.cache_file)}}."))
+  }
+
+
+
+  ## Definition and setup directly related to the inner applied funct --------
+
+
   #This version of the original function .f that is quarantee to return a list of $result (which is possibly NA) and $error
   safe_f <- purrr::possibly(.f, otherwise=NA)
 
@@ -376,12 +421,16 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.")
     result <- safe_f(...)
 
+    if(is.character(.cache_file)) {
+
+    }
+
     return(result)
   }
 
-  #progressr::handlers(global = TRUE)
-  #old_handlers <- progressr::handlers(c("progress"))
-  #on.exit(progressr::handlers(old_handlers), add = TRUE)
+
+  # Deduction of DSP processing arguments -----------------------------------
+
 
 
   #Logic that concerns formal arguments
@@ -398,8 +447,9 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     dplyr::rename(listOfFiles=absolute_file_path) %>%
     dplyr::select(-file)
 
+
   if(! .naively){
-    #### Deduce DSP settings based on metadata
+    ## Deduce DSP settings based on metadata -----------------------------------
 
     cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
 
@@ -456,11 +506,9 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
         dplyr::left_join(signalFiles,by=c("session","bundle")) %>%
         dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
 
-
-
     }
   }else{
-    #Naive DSP arm
+    ## Naive DSP arm -----------------------------------
     cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata")
 
     sessionBundleDSPSettingsDF <- signalFiles
@@ -470,9 +518,10 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   }
 
 
+  ## Make the environment suitable for collecting quantification parameters --------
 
   # Now we need to transfer the session / bundle settings to the segment list
-  # to get start and end times too into the call
+  # to get start and end times into the call also
   segmentDSPDF <- .what %>%
     tibble::rownames_to_column(var = "sl_rowIdx") %>%
     dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle")) %>%
@@ -481,15 +530,16 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     dplyr::rename(.session=session,.bundle=bundle) %>%
     dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) ## Fix for wrassp functions that expect "numeric" values, not integers
 
-  if(!is.null(.where)){
-    #This is the special case where we have a .where argument and need to extract just a portion of the data
+  #Set up the progress bar
+  num_to_do <- nrow(segmentDSPDF)
 
-    #Window shift is an especially important property to know, if we want to get data from a portion of each segment
-    wsDefault <- functionDefaults["windowShift"]
-  }
 
-  ###### Now to the processing
-  #Log settings that will be applied to an excel file
+  p <- progressr::progressor(num_to_do)
+
+
+  ## Optionally log the parameter table to an Excel output -------------------
+
+
   if(!is.null(.parameter_log_excel)) {
     .parameter_log_excel <- normalizePath(.parameter_log_excel)
     if(is.character(.parameter_log_excel) && dir.exists(dirname(.parameter_log_excel))){
@@ -497,38 +547,37 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
       #.parameter_log_excel or as a generated file name (if the string is a directory path)
       #cli::cli_abort("{.path {dirname(.parameter_log_excel)}} {.path {(.parameter_log_excel)}}")
       excel_filename <- ifelse( file.info(.parameter_log_excel)[["isdir"]] && dir.exists(.parameter_log_excel),
-                         file.path(.parameter_log_excel,
-                                   paste0(stringr::str_replace_all(format(Sys.time(),usetz = TRUE)," ","_"),".xlsx")),
-                         .parameter_log_excel)
+                                file.path(.parameter_log_excel,
+                                          paste0(stringr::str_replace_all(format(Sys.time(),usetz = TRUE)," ","_"),".xlsx")),
+                                .parameter_log_excel)
       openxlsx::write.xlsx(segmentDSPDF %>%
                              dplyr::rename(bundle=.bundle,session=.session)
                            ,file=excel_filename, overwrite=TRUE, asTable=TRUE)
       cli::cli_alert_info("Wrote a summary of parameters used when processing into file {.path {excel_filename}}")
+
     }else{
+      #Not able to create a parameter file or deduce a name for it
       cli::cli_warn(c("Unable to write parameter file",
                       "x"= "A parameter file could not be created in {.path {(.parameter_log_excel)}}"))
     }
 
   }
 
-  #Set up the progress bar
-  num_to_do <- nrow(segmentDSPDF)
 
+  # Do the actual quantification  work --------------------------------------------
 
- # p <- progressr::progressor(num_to_do)
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
   appliedDFResultInList <- segmentDSPDF %>%
     dplyr::rowwise() %>%
-    dplyr::mutate(temp = list(purrr::pmap(cur_data(),.f=innerMapFunction))) %>%
-    #dplyr::select(-any_of(settingsThatWillBeUsed),-.bundle,-.session) %>%
+    dplyr::mutate(temp = list(purrr::pmap(cur_data(),.f=innerMapFunction))) %>% # This is the busy line
     dplyr::select(-.bundle,-.session) %>%
     tidyr::nest(parameters=c(tidyselect::everything(), -temp)) %>%
     tidyr::unnest(temp)
 
 
-  #Mark the special case where .what is called by provide()
+  ## Handle  the special case where .what is called by furnish() --------------------------------------------
   if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
     #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
     # but just returned
@@ -541,8 +590,9 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     attr(provideOutDF,"basePath") <- .handle$basePath #This ensures that we can reattach the database later
 
     return(provideOutDF)
+
   }else{
-    #The default case, in which we are processing a segment list
+    ## Handle the default case, in which we are processing a segment list --------------------------------------------
     resTibble <- appliedDFResultInList %>%
       dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
       tibble::rownames_to_column(var = "sl_rowIdx") %>%
