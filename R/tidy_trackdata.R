@@ -84,7 +84,37 @@ ask_for <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*"
   if(missing(query)) cli::cli_abort("Please specify a query in the Emu Query Language.")
 
 
-  inside_of <- deduce_source_database(inside_of)
+  if("emuDBhandle" %in% class(inside_of)){
+    #reload the database just to make sure that the handle is still valid
+    inside_of <- emuR::load_emuDB(inside_of$basePath,verbose = FALSE)
+  }else{
+    if( is.character(inside_of) && stringr::str_ends(inside_of,"_emuDB") && dir.exists(inside_of)){
+      # We then need to create a handle object
+      utils::capture.output(
+        .inside_of <- emuR::load_emuDB(inside_of,verbose = FALSE)
+      ) -> dbload.info
+      logger::log_info(paste(dbload.info,collapse = "\n"))
+
+    }else{
+      strAttr <- attr(inside_of,"basePath")
+      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
+        # We then need to create a handle object
+        utils::capture.output(
+          inside_of <- emuR::load_emuDB(attr(strAttr,"basePath"),verbose = FALSE)
+        ) -> dbload.info
+        logger::log_info(paste(dbload.info,collapse = "\n"))
+
+      }else{
+        #This is the fallback
+        cli::cli_abort(c("Could not determine the location of the database",
+                         "x"="The database location will be deduced from the {.arg inside_of} argument to the function.",
+                         "x"="Derivation of the location will be attempted using the ",
+                         "i"="{.arg inside_of} is of class {.val {class(inside_of)}}",
+                         "i"="{.arg inside_of} has the attributes  {.val {names(attributes(inside_of))}}."))
+      }
+
+    }
+  }
 
   res <- emuR::query(emuDBhandle=inside_of, query=query,sessionPattern = sessions_regex, bundlePattern = bundles_regex ,timeRefSegmentLevel = times_from, calcTimes = calculate_times,verbose = interactive, resultType = "tibble")
 
@@ -265,7 +295,7 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 #
-quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.use_cache_file=NULL,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
+quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
 
 
   # Initial check of arguments ----------------------------------------------
@@ -352,7 +382,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     # and the name of a track in the database
     if(is.character(.source) && .source %in% emuR::list_ssffTrackDefinitions(.handle)$name){
       #The string should here be the name of a track
-      logger::log_debug("We got a SSFF track field in the .source argument : {.source}")
+      logger::log_debug("We got a SSFF track field in the .source argument : {(.source)}")
       .f <- readtrack
       funName <- "readtrack"
       inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae) %>%
@@ -360,6 +390,13 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
         dplyr::select(fileExtension) %>%
         purrr::pluck(1)
       dotArgs["field"] <- .source
+
+      #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
+      if(!.naively || .recompute ) cli::cli_alert_warning(c("Ignoring inconsistent instructions.",
+                                                         "x"="Directly reading the {.field {(.source)}} track require no preparation of DSP parameters.",
+                                                         "i"="Arguments{.arg .recompute} and {.arg .naively} will ignored."))
+      .naively <- TRUE
+      .recompute <- FALSE
     }else{
       cli::abort(c("Cannot use the indicated .source",
                    "i"="The .source argument contains {(.source)} and is of class {class(.source)}",
@@ -375,33 +412,56 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   ## The progress bar --------------------------------------------------------
 
 
-  progressr::handlers(global = TRUE)
-  #old_handlers <- progressr::handlers(c("progress"))
+  old_handlers <- progressr::handlers(c("progress"))
   on.exit(progressr::handlers(old_handlers), add = TRUE)
 
-  ## Set up an optional cache system -----------------------------------------
+  ## Optional cache system setup -----------------------------------------
 
+  .cache_connection <- NULL
 
   ## Make a date specific cache file if
-  if(.cache_file) {
-    #Set a date specific cache file
-    .cache_file <- file.path(tempdir(),format(Sys.time(), "cachefile%Y%m%d.sqlite"))
-    cli::cli_alert_info("Using cache file {(.cache_file)}")
-  }
-  #Now, since we set up a default file name above if .cache_file is just TRUE
-  # we should be able to use the character string as the file name
-  if(!is.null(.cache_file) && is.character(.cache_file)){
-    .cache_connection <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=.cache_file)
+  if(!is.null(.cache_file) && ! isFALSE(.cache_file)){
+    if(.cache_file) {
+      #Set a date specific cache file
+      .cache_file <- file.path(tempdir(),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
+      cli::cli_alert_info("Using cache file {(.cache_file)}")
+    }
+    #Now, since we set up a default file name above if .cache_file is just TRUE
+    # we should be able to use the character string as the file name
+    if(is.character(.cache_file)){
+      cacheFileExists <- file.exists(normalizePath(.cache_file))
 
-    if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
-                                                                "i","The {arg {(.cache_file)}} argument you cave was {.path {(.cache_file)}}."))
+      .cache_connection <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=.cache_file)
 
-    RSQLite::dbSendQuery(.cache_connection,"CREATE TABLE cache (sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
+      if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
+                                                                  "i","The {arg {(.cache_file)}} argument you cave was {.path {(.cache_file)}}."))
+      #Check table format requirements
+      if(! "cache" %in% RSQLite::dbListTables(.cache_connection)
+         || ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache"))){
+
+        cli::cli_alert_warning(c("Missing a correctly prepared space for signal processing cache",
+                                 "x","The cache file is assumed to have a {.var cache} table with fields {.field {c(\"sl_rowIdx\",\"obj\")}}."))
+
+
+        RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
+
+      }
+
+      RSQLite::dbExecute(.cache_connection,"CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
+
+    }else{
+      #The cache file is not NULL, not TRUE (auto-generated), and not a character vector
+      cli::cli_abort(c("The cache file name could not be deduced",
+                       "x"="A full path can be given; a value TRUE vill generate a default file name based on the current date.",
+                       "i"="The {.arg .cache_file} provided to the fucntion was {.val {(.cache_file)}}."))
+    }
+
+
   }else{
-    cli::cli_abort(c("You specified the cache file name wrong",
-                     "x"="The cache file can be specified as a path, or you can just give TRUE to use a default file name based on the date",
-                     "i"="The {.arg {(.cache_file)}} argument you cave was {.path {(.cache_file)}}."))
+    #the case when no cache file should be used
+    cli::cli_alert_info("Intermediate results are {.strong not} cached.")
   }
+
 
 
 
@@ -412,17 +472,40 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   safe_f <- purrr::possibly(.f, otherwise=NA)
 
   #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
-  innerMapFunction <- function(.session,.bundle,...){
+  innerMapFunction <- function(.sl_rowIdx,.session,.bundle,...){
 
-    #p(message=sprintf("Processing session %s (%s)",.session,.bundle))
     dotdotdot <- list(...)
     dotdotdotS <- toString(dotdotdot)
+    result <- NULL
 
-    logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.")
-    result <- safe_f(...)
+    if(!is.null(.cache_connection)){
+      #Check existing values
 
-    if(is.character(.cache_file)) {
+      cachedObj <- dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
 
+      if(nrow(cachedObj) > 0){
+        #Load rather than comput
+        logger::log_debug("[{.session}:{.bundle})] Loading data from cache file.\n")
+        p(message=sprintf("Loading data from from cache for bundle %s (%s) [%i]",.bundle,.session,.sl_rowIdx))
+        result <- base::unserialize(
+          base::charToRaw(
+            cachedObj$obj[[1]]))
+      }
+
+    }
+    #Compute if the results is still not defined
+    if(is.null(result)){
+      p(message=sprintf("Processing bundle %s (%s) [%i]",.bundle,.session,.sl_rowIdx))
+      logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
+      result <- safe_f(...)
+    }
+
+    #Maybe store the results in cache?
+    if(!is.null(.cache_connection)){
+      objser <- base::rawToChar(base::serialize(result, connection = NULL,ascii = TRUE))
+      #serTab <- tibble(sl_rowIdx=.sl_rowIdx,obj=objser)
+
+      RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(.sl_rowIdx,objser))
     }
 
     return(result)
@@ -451,7 +534,8 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   if(! .naively){
     ## Deduce DSP settings based on metadata -----------------------------------
 
-    cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
+    #If we are just reading a track, the user is already aware that this will be done naively
+    if(!funName =="readtrack") cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
 
     # Make sure that we have a DSP default settings data.frame
     dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
@@ -509,7 +593,9 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     }
   }else{
     ## Naive DSP arm -----------------------------------
-    cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata")
+
+    #If we are just reading a track, the user is already aware that this will be done naively
+    if(!funName =="readtrack") cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata")
 
     sessionBundleDSPSettingsDF <- signalFiles
     # The names of columns to keep are now the columns that are defined  in signalFiles and which will be used by the DSP function
@@ -570,20 +656,23 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
   appliedDFResultInList <- segmentDSPDF %>%
+    tibble::rownames_to_column(var = ".sl_rowIdx") %>%
+    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx)) %>%
     dplyr::rowwise() %>%
     dplyr::mutate(temp = list(purrr::pmap(cur_data(),.f=innerMapFunction))) %>% # This is the busy line
     dplyr::select(-.bundle,-.session) %>%
-    tidyr::nest(parameters=c(tidyselect::everything(), -temp)) %>%
+    tidyr::nest(parameters=c(tidyselect::everything(), -temp, -.sl_rowIdx)) %>%
     tidyr::unnest(temp)
 
 
-  ## Handle  the special case where .what is called by furnish() --------------------------------------------
+  ## The special case where .what is called by furnish() --------------------------------------------
   if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
     #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
     # but just returned
     logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
     provideOutDF <-  list_bundles(.handle) %>%
       dplyr::bind_cols(appliedDFResultInList) %>%
+      dplyr::select(-.sl_rowIdx) %>% # Clean up the not needed row number indication
       dplyr::rename(bundle=name)
 
 
@@ -592,11 +681,10 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     return(provideOutDF)
 
   }else{
-    ## Handle the default case, in which we are processing a segment list --------------------------------------------
+    ## The default case, in which we are processing a segment list --------------------------------------------
     resTibble <- appliedDFResultInList %>%
+      dplyr::rename(sl_rowIdx=.sl_rowIdx) %>% #Make the output emuR segment list compatible
       dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
-      tibble::rownames_to_column(var = "sl_rowIdx") %>%
-      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))%>%
       dplyr::ungroup() %>%
       dplyr::mutate(out = purrr::map(temp,as_tibble)) %>%
       dplyr::select(-temp) %>%
@@ -848,7 +936,35 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
                      "x"="A tier name must be specified"))
   }
 
-  inside_of <- deduce_source_database(inside_of)
+  #The first possible case is when we have no explicitly set .handle argument, but a segment list with a
+  # valid "basePath" attribute set. We then create the database handle from that basePath.
+  if(is.null(.handle)) {
+    if(! is.null(attr(.what,"basePath")) && dir.exists(attr(.what,"basePath"))) {
+      logger::log_debug("No explicit .handle argument found")
+      # We then need to create a handle object
+      utils::capture.output(
+        .handle <- emuR::load_emuDB(attr(.what,"basePath"),verbose = TRUE)
+      ) -> dbload.info
+    }else{
+      logger::log_debug("Got .handle={.handle}")
+      stop("Could not derive the database path. Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
+    }
+  }else{
+    # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
+    if(is.character(.handle) && stringr::str_ends(.handle,"_emuDB") && dir.exists(.handle)){
+      .handle <- emuR::load_emuDB(.handle,verbose = FALSE)
+    }
+    if("emuDBhandle" %in% class(.handle)){
+      #reload the database just to make sure that the handle is still valid
+      .handle <- emuR::load_emuDB(.handle$basePath,verbose = FALSE)
+    }else{
+      cli::cli_abort(c("Not appropriate .handle argument",
+                       "i"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
+                       "x"="The .handle argument supplied is a {class(.handle)}",
+                       "x"="The database {dplyr::coalesce(.handle$basePath,.handle)} does not exits."))
+
+    }
+  }
 
 
   existingTiers <- emuR::list_levelDefinitions(inside_of)
