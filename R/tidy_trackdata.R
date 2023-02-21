@@ -392,9 +392,10 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
       dotArgs["field"] <- .source
 
       #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
-      if(!.naively || .recompute ) cli::cli_alert_warning(c("Ignoring inconsistent instructions.",
-                                                         "x"="Directly reading the {.field {(.source)}} track require no preparation of DSP parameters.",
-                                                         "i"="Arguments{.arg .recompute} and {.arg .naively} will ignored."))
+      if(!.naively || .recompute ) {
+        cli::cli_alert_warning("Directly reading the {.field {(.source)}} track require no DSP parameter deduction.")
+        cli::cli_alert_info(" - The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}.")
+      }
       .naively <- TRUE
       .recompute <- FALSE
     }else{
@@ -431,16 +432,16 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     if(is.character(.cache_file)){
       cacheFileExists <- file.exists(normalizePath(.cache_file))
 
-      .cache_connection <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=.cache_file)
+      .cache_connection <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=.cache_file,flags=RSQLite::SQLITE_RWC)
 
       if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
-                                                                  "i","The {arg {(.cache_file)}} argument you cave was {.path {(.cache_file)}}."))
+                                                                  "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
       #Check table format requirements
       if(! "cache" %in% RSQLite::dbListTables(.cache_connection)
          || ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache"))){
 
-        cli::cli_alert_warning(c("Missing a correctly prepared space for signal processing cache",
-                                 "x","The cache file is assumed to have a {.var cache} table with fields {.field {c(\"sl_rowIdx\",\"obj\")}}."))
+        cli::cli_alert_warning("Missing a correctly prepared space for signal processing cache")
+        cli::cli_alert_info(" - The cache file is assumed to have a {.var cache} table with fields {.field {c(\"sl_rowIdx\",\"obj\")}}.")
 
 
         RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
