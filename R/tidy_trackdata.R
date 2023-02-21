@@ -302,6 +302,9 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
   #Capture dot arguments for if we want to manipulate them
   dotArgs <- list(...)
+  dotArgsDF <- as.data.frame(dotArgs)
+  dotArgsNames <- names(dotArgs)
+
   fcall <- match.call(expand.dots = FALSE)
   fcallS <- toString(fcall)
   idCols <- c("Gender","Age")
@@ -522,10 +525,6 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   functionDefaults <- as.list(formals(.f))
 
 
-  #Logic that concerns actual arguments
-  #dotArgsRT <- tibble::as_tibble_row(dotArgs)
-  dotArgsNames <- names(dotArgs)
-
   # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
   signalFiles <- emuR::list_files(.handle,inputSignalsExtension) %>%
     dplyr::rename(listOfFiles=absolute_file_path) %>%
@@ -548,9 +547,9 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
       dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
       tidyr::replace_na(.metadata_defaults)
 
-    if(length(dotArgs) > 0){
+    if(nrow(dotArgsDF) > 0){
       meta <- meta %>%
-        dplyr::mutate(dotArgs)
+        dplyr::mutate(dotArgsDF)
     }
 
 
@@ -642,10 +641,11 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
                                 file.path(.parameter_log_excel,
                                           paste0(stringr::str_replace_all(format(Sys.time(),usetz = TRUE)," ","_"),".xlsx")),
                                 .parameter_log_excel)
-      openxlsx::write.xlsx(segmentDSPDF %>%
-                             dplyr::rename(bundle=.bundle,session=.session)
-                           ,file=excel_filename, overwrite=TRUE, asTable=TRUE)
-      cli::cli_alert_info("Wrote a summary of parameters used when processing into file {.path {excel_filename}}")
+      parameterData <- segmentDSPDF %>%
+        dplyr::rename(bundle=.bundle,session=.session)
+
+      openxlsx::write.xlsx(x = parameterData,file=excel_filename, asTable=FALSE)
+      cli::cli_alert_info("Wrote a summary of parameters used when processing into {.file {excel_filename}}")
 
     }else{
       #Not able to create a parameter file or deduce a name for it
