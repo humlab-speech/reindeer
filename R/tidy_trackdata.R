@@ -546,8 +546,13 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     # but have been overwritten by explicitly set settings given to this function as we proceed
     meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
       dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
-      tidyr::replace_na(.metadata_defaults) %>%
-      dplyr::mutate(dotArgs)
+      tidyr::replace_na(.metadata_defaults)
+
+    if(length(dotArgs) > 0){
+      meta <- meta %>%
+        dplyr::mutate(dotArgs)
+    }
+
 
 
 
@@ -596,7 +601,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     ## Naive DSP arm -----------------------------------
 
     #If we are just reading a track, the user is already aware that this will be done naively
-    if(!funName =="readtrack") cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata")
+    if(!funName =="readtrack") cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata.")
 
     sessionBundleDSPSettingsDF <- signalFiles
     # The names of columns to keep are now the columns that are defined  in signalFiles and which will be used by the DSP function
