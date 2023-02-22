@@ -378,8 +378,8 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
       .f <- purrr::safely(get)(.source)$result
     }
 
-    funName <- fcall$.source
-    logger::log_debug("We got a function in the .source argument : '{funName}'")
+    funName <- rlang::as_name(fcall$.source[[1]])
+
   }else{
     # Ok, so not a function, so we need to make sure that the .source argument is a string
     # and the name of a track in the database
@@ -494,7 +494,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     #Compute if the results is still not defined
     if(is.null(result)){
 
-      logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
+      logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
       result <- safe_f(...)
     }
 
@@ -535,6 +535,13 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
       tidyr::replace_na(list(Gender="Unspecified"))
 
+    if(nrow(dsp) > 0 ){
+      if(.recompute){
+          cli::cli_alert_success(cli::ansi_strwrap("Recomputed DSP settings age and gender appropriate DSP settings based on metanalysis data in the {.file {file.path(system.file(package = \"reindeer\",mustWork = TRUE),\"default_parameters.xlsx\")}} file."))
+      }else{
+        cli::cli_alert_success("Loaded precomputed age and gender appropriate DSP settings")
+      }
+    }
     #After this we can be sure that parameters set per session or bundle are  available
     # but have been overwritten by explicitly set settings given to this function as we proceed
     meta <- reindeer:::get_metadata(.handle,manditory=idCols) %>%
@@ -639,7 +646,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
         dplyr::rename(bundle=.bundle,session=.session)
 
       openxlsx::write.xlsx(x = parameterData,file=excel_filename, asTable=FALSE)
-      cli::cli_alert_info("Wrote DSP parameters used into {.file {excel_filename}}")
+      cli::cli_alert_success("Wrote DSP parameters used into {.file {excel_filename}}")
 
     }else{
       #Not able to create a parameter file or deduce a name for it
@@ -672,14 +679,14 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
     #return(appliedDFResultInList)
 
-  ## The special case where .what is called by furnish() --------------------------------------------
+  ## [special] The case where .what is called by furnish() --------------------------------------------
   if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
     #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
     # but just returned
     logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
+
     provideOutDF <-  list_bundles(.handle) %>%
-      dplyr::bind_cols(appliedDFResultInList) %>%
-      dplyr::select(-.sl_rowIdx) %>% # Clean up the not needed row number indication
+      dplyr::mutate(dobj=appliedDFResultInList) %>%
       dplyr::rename(bundle=name)
 
 
@@ -688,16 +695,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     return(provideOutDF)
 
   }else{
-    ## The default case, in which we are processing a segment list --------------------------------------------
-
-    #Previous (not purr) version
-    # resTibble <- appliedDFResultInList %>%
-    #   dplyr::rename(sl_rowIdx=.sl_rowIdx) %>% #Make the output emuR segment list compatible
-    #   dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
-    #   dplyr::ungroup() %>%
-    #   dplyr::mutate(out = purrr::map(temp,as_tibble)) %>%
-    #   dplyr::select(-temp) %>%
-    #   tidyr::unnest(out)
+    ##  [default] The case in which we are processing a segment list --------------------------------------------
 
     resTibble <- appliedDFResultInList %>%
       purrr::map_dfr(as_tibble) %>%
@@ -719,7 +717,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
 quantify_naively <- purrr:::partial(quantify, .naively=TRUE)
 
-furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL){
+furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL){
 
 
   # Check inputs ------------------------------------------------------------
@@ -760,8 +758,13 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
     }
   }
 
+  logger::log_debug(".inside_of is now {.inside_of}")
 
-  #Available track extensions of files in the database
+  # Investigate what is already in the database -----------------------------
+
+  ## Available extensions of track files in the database -----------------------------
+
+
   availableDataFileExtensions <- emuR::list_files(.inside_of) %>%
     dplyr::mutate(file=stringr::str_replace(file,"^.*[.]","")) %>%
     dplyr::filter(!file %in% c("json",emuR:::load_DBconfig(.inside_of)$mediafileExtension,reindeer:::metadata.extension)) %>%
@@ -806,6 +809,8 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
 
   tracksToDefine <- data.frame(name=names(trackSpec),columnName=unlist(trackSpec,use.names = FALSE),fileExtension=fileExtension) %>%
     dplyr::mutate(across(everything(), ~ stringr::str_remove_all(.,"[\'\"]") ))
+
+
   #tracksToDefine may now include also the names of function arguments, which we needs to adress later
 
   #This is the base structure which says what is already defined,
@@ -814,13 +819,37 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
   tracksAlreadyDefined <- emuR::list_ssffTrackDefinitions(.inside_of)
 
 
-  # The application of a function -------------------------------------------
 
+  # Create tracks and connect fields -------------------------------------------
+
+  ## [a] The application of a function to create tracks -------------------------------------------
 
   #If we have a function, then we should use it to create new tracks
   if(is.function(.source) || ( ! is.null(get0(.source)) && is.function( get0(.source)))){
 
+    if(.force && ! .really_force){
+      cli::cli_alert_warning("You have indicated that existing signal tracks should be overwritten.")
+      cli::cli_alert_warning("This is a very invasive process and requires confirmation.")
+      if(cli::has_keypress_support()){
+        cli::cli_alert_warning("Please confirm that processing should proceed (y/n)")
+        kp <- cli::keypress(block = TRUE)
+        if(! kp %in% c("y","Y") ) cli::cli_abort(c("Processing aborted",
+                                                   "x"="Files will only be overwritten if you press 'y' or 'Y",
+                                                   "x"="You can also confirm overwriting by supplying {.arg .really_force=TRUE} to the function",
+                                                   "i"="The {.fun furnish} commant was called with {.arg .force={(.force)}} and {.arg .really_force={(.really_force)}}"),call=NULL)
+      }else{
+        cli::cli_abort(c("Processing aborted",
+                         "x"="You must confirm overwriting by supplying {.arg .really_force=TRUE} to the function",
+                         "i"="The {.fun furnish} commant was called with {.arg .force={(.force)}} and {.arg .really_force={(.really_force)}}"))
+      }
+
+      }
+
+
     cli::cli_alert_info("Using the {.val {fileExtension}} file extension for stored signal files.")
+
+    ### Prepare the segment list that quantify needs -------------------------------------------
+
 
     # We here make a fake segment list with start and end times that suggest whole file processing
     # so that we can reuse quantify to deduce parameters, optionally log parameters, do the DSP work, and all that stuff.
@@ -864,26 +893,38 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
 
     }
 
+
     #Explicitly remove track name specifications with names that are also formal
     # args of the function, or are not computed by the .source function
     tracksToDefine <- tracksToDefine %>%
       dplyr::filter(! name %in% methods::formalArgs(.source), columnName %in% superassp::get_definedtracks(.source))
 
 
-    cli::cli_alert_info("Will compute tracks {.var {tracksToDefine$name}} on {.vals {nrow(bundles)}} bundles.")
+    cli::cli_alert_info("Will compute tracks and attach tracks {.field {tracksToDefine$name}} for {.val {nrow(bundles)}} bundles.")
 
 
-    # Here we envoke the special mode of quantify where an intermediate nested result is returned
-    quantifications <- quantify(.what=bundles,.source={{.source}},rlang::enquos(...),.metadata_defaults=.metadata_defaults,.by_maxFormantHz=.by_maxFormantHz,.recompute=.recompute,.package=.package, .naively = .naively,.parameter_log_excel=.parameter_log_excel)
+    # Finally call quantify to do the DSP work --------------------------------
+
+
+    # Here we envoke a special mode of quantify where an intermediate nested result is returned
+    quantifications <- quantify(.what=bundles,
+                                .source={{.source}},
+                                 {{as.list(...)}},
+                                .metadata_defaults=.metadata_defaults,
+                                .by_maxFormantHz=.by_maxFormantHz,
+                                .recompute=.recompute,
+                                .package=.package,
+                                .naively = .naively,
+                                .parameter_log_excel=.parameter_log_excel)
+
 
     quantifications <- quantifications %>%
-      dplyr::rename(dobj= temp) %>%
       dplyr::mutate(file= file.path(.inside_of$basePath,
                                            paste0(session,emuR:::session.suffix),
                                            paste0(bundle,emuR:::bundle.dir.suffix),
                                            paste(bundle,fileExtension,sep="."))) %>%
       dplyr::select(dobj,file) %>%
-      dplyr::filter(!file.exists(file))
+      dplyr::filter(.force || !file.exists(file)) #Filter out files that exists if not .force(d)
 
 
    #Now finally write SSFF files
@@ -893,8 +934,12 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
 
   }else{
 
-    cli::cli_alert_info("Considering signal files with the {.val {fileExtension}} file extension.")
+    ## [b] The attachment of tracks to fields in already prepared files ------------
+
     # we have a file extension only
+
+    cli::cli_alert_info("Considering signal files with the {.val {fileExtension}} file extension.")
+
     #First check that the files actually exist
     allSignalfiles <- emuR::list_files(.inside_of)
     wantedSignalfiles <- allSignalfiles %>%
@@ -934,11 +979,14 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
                                     fileExtension = tracksToDefine[[track,"fileExtension"]]
                                     )
 
-      cli::cli_alert_success("Connected the field {.field {tracksToDefine[[track,\"columnName\"]]}} inside of .{.field {tracksToDefine[[track,\"fileExtension\"]]}} signal files and named it {.var {tracksToDefine[[track,\"name\"]]}} ")
+      cli::cli_alert_success("Connected the field {.field {tracksToDefine[[track,\"columnName\"]]}} in {.code <bundle name>}.{.field {tracksToDefine[[track,\"fileExtension\"]]}} signal files and named it {.var {tracksToDefine[[track,\"name\"]]}} ")
     }else{
-      cli::cli_alert_info("Not defining a new track {.code {tracksToDefine[track,\"name\"]}} since it is already defined in the database.")
+      cli::cli_alert_info(c("Not defining a new track {.field {tracksToDefine[track,\"name\"]}}",
+                            " since it is already connected with the field {.field {tracksToDefine[track,\"columnName\"]}}",
+                            " in an {.field {tracksToDefine[track,\"fileExtension\"]}} SSFF track signal file."))
     }
   }
+
   res <- emuR::list_ssffTrackDefinitions(.inside_of)
   attr(res,"basePath") <- .inside_of$basePath #This ensures that we can reattach the database later
 
