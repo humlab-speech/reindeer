@@ -413,12 +413,6 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   # The inner applied function ----------------------------------------------
 
 
-  ## The progress bar --------------------------------------------------------
-
-
-  old_handlers <- progressr::handlers(c("progress"))
-  on.exit(progressr::handlers(old_handlers), add = TRUE)
-
   ## Optional cache system setup -----------------------------------------
 
   .cache_connection <- NULL
@@ -428,7 +422,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     if(.cache_file) {
       #Set a date specific cache file
       .cache_file <- file.path(tempdir(),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
-      cli::cli_alert_info("Using cache file {(.cache_file)}")
+      cli::cli_alert_info("Using cache file {.file {(.cache_file)}}")
     }
     #Now, since we set up a default file name above if .cache_file is just TRUE
     # we should be able to use the character string as the file name
@@ -485,12 +479,12 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     if(!is.null(.cache_connection)){
       #Check existing values
 
-      cachedObj <- dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
+      cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
 
       if(nrow(cachedObj) > 0){
         #Load rather than comput
         logger::log_debug("[{.session}:{.bundle})] Loading data from cache file.\n")
-        p(message=sprintf("Loading data from from cache for bundle %s (%s) [%i]",.bundle,.session,.sl_rowIdx))
+
         result <- base::unserialize(
           base::charToRaw(
             cachedObj$obj[[1]]))
@@ -499,7 +493,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     }
     #Compute if the results is still not defined
     if(is.null(result)){
-      p(message=sprintf("Processing bundle %s (%s) [%i]",.bundle,.session,.sl_rowIdx))
+
       logger::log_debug("[{.session}:{.bundle})] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
       result <- safe_f(...)
     }
@@ -507,7 +501,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     #Maybe store the results in cache?
     if(!is.null(.cache_connection)){
       objser <- base::rawToChar(base::serialize(result, connection = NULL,ascii = TRUE))
-      #serTab <- tibble(sl_rowIdx=.sl_rowIdx,obj=objser)
+
 
       RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(.sl_rowIdx,objser))
     }
@@ -645,18 +639,24 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
         dplyr::rename(bundle=.bundle,session=.session)
 
       openxlsx::write.xlsx(x = parameterData,file=excel_filename, asTable=FALSE)
-      cli::cli_alert_info("Wrote a summary of parameters used when processing into {.file {excel_filename}}")
+      cli::cli_alert_info("Wrote DSP parameters used into {.file {excel_filename}}")
 
     }else{
       #Not able to create a parameter file or deduce a name for it
-      cli::cli_warn(c("Unable to write parameter file",
-                      "x"= "A parameter file could not be created in {.path {(.parameter_log_excel)}}"))
+      cli::cli_warn(c("Unable to write DSP parameter file",
+                      "x"= "A parameter file could not be created in {.file {(.parameter_log_excel)}}"))
     }
 
   }
 
 
   # Do the actual quantification  work --------------------------------------------
+
+  pb <- list(
+    type = "iterator",
+    format = "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} {cli::pb_percent} | ETA: {cli::pb_eta}",
+    clear = TRUE)
+
 
 
   # Here we apply the DSP function once per row and with settings comming from
@@ -665,11 +665,12 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     tibble::rownames_to_column(var = ".sl_rowIdx") %>%
     dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx)) %>%
     dplyr::rowwise() %>%
-    dplyr::mutate(temp = list(purrr::pmap(cur_data(),.f=innerMapFunction))) %>% # This is the busy line
-    dplyr::select(-.bundle,-.session) %>%
-    tidyr::nest(parameters=c(tidyselect::everything(), -temp, -.sl_rowIdx)) %>%
-    tidyr::unnest(temp)
+    purrr::pmap(.,.f=innerMapFunction,.progress = pb) #)  %>% # This is the busy line
+   # dplyr::select(-.bundle,-.session) %>%
+  #  tidyr::nest(parameters=c(tidyselect::everything(), -temp, -.sl_rowIdx)) %>%
+   # tidyr::unnest(temp)
 
+    #return(appliedDFResultInList)
 
   ## The special case where .what is called by furnish() --------------------------------------------
   if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
@@ -688,14 +689,20 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
   }else{
     ## The default case, in which we are processing a segment list --------------------------------------------
-    resTibble <- appliedDFResultInList %>%
-      dplyr::rename(sl_rowIdx=.sl_rowIdx) %>% #Make the output emuR segment list compatible
-      dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(out = purrr::map(temp,as_tibble)) %>%
-      dplyr::select(-temp) %>%
-      tidyr::unnest(out)
 
+    #Previous (not purr) version
+    # resTibble <- appliedDFResultInList %>%
+    #   dplyr::rename(sl_rowIdx=.sl_rowIdx) %>% #Make the output emuR segment list compatible
+    #   dplyr::select(-any_of(settingsThatWillBeUsed),-parameters) %>%
+    #   dplyr::ungroup() %>%
+    #   dplyr::mutate(out = purrr::map(temp,as_tibble)) %>%
+    #   dplyr::select(-temp) %>%
+    #   tidyr::unnest(out)
+
+    resTibble <- appliedDFResultInList %>%
+      purrr::map_dfr(as_tibble) %>%
+      tibble::rownames_to_column(var = "sl_rowIdx") %>%
+      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
 
     quantifyOutDF <- .what %>%
       tibble::rownames_to_column(var = "sl_rowIdx") %>%
@@ -713,6 +720,10 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 quantify_naively <- purrr:::partial(quantify, .naively=TRUE)
 
 furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL){
+
+
+  # Check inputs ------------------------------------------------------------
+
 
   if(missing(.source)) cli::cli_abort(c("Missing source name",
                                       "i"="You need to state a function name or the file extension from which the data columns should be gathered",
@@ -741,7 +752,7 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
       }else{
         #This is the fallback
         cli::cli_abort(c("Cannot determine the location of the database",
-                         "x"="The database location will be deduced from the first argument supplied to tue function.",
+                         "x"="The database location will be deduced from the first argument supplied to the function.",
                          "i"="The function first tried to use the {.var .inside_of} argument, wich is of class {.val {class(.inside_of)}}",
                          "i"="The function then tried to use the {.var .source} argument, wich is of class {.val {class(.source)}} and has the attributes  {.var {names(attributes(.source))}}."))
       }
@@ -750,7 +761,7 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
   }
 
 
-  #Awailable track extensions of files in the database
+  #Available track extensions of files in the database
   availableDataFileExtensions <- emuR::list_files(.inside_of) %>%
     dplyr::mutate(file=stringr::str_replace(file,"^.*[.]","")) %>%
     dplyr::filter(!file %in% c("json",emuR:::load_DBconfig(.inside_of)$mediafileExtension,reindeer:::metadata.extension)) %>%
@@ -801,6 +812,9 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.metadata_defaults=lis
   # which we will use later to deduce if the user supplied track specifications are
   # valid or not
   tracksAlreadyDefined <- emuR::list_ssffTrackDefinitions(.inside_of)
+
+
+  # The application of a function -------------------------------------------
 
 
   #If we have a function, then we should use it to create new tracks
