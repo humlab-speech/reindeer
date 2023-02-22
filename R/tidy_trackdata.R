@@ -466,7 +466,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
   ## Definition and setup directly related to the inner applied funct --------
 
 
-  #This version of the original function .f that is quarantee to return a list of $result (which is possibly NA) and $error
+  #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
   safe_f <- purrr::possibly(.f, otherwise=NA)
 
   #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
@@ -673,11 +673,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx)) %>%
     dplyr::rowwise() %>%
     purrr::pmap(.,.f=innerMapFunction,.progress = pb) #)  %>% # This is the busy line
-   # dplyr::select(-.bundle,-.session) %>%
-  #  tidyr::nest(parameters=c(tidyselect::everything(), -temp, -.sl_rowIdx)) %>%
-   # tidyr::unnest(temp)
 
-    #return(appliedDFResultInList)
 
   ## [special] The case where .what is called by furnish() --------------------------------------------
   if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
@@ -774,12 +770,17 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
 
 
   ## Check that track specifications given in ... are ok
-  trackSpec <- rlang::dots_list(...,.named = TRUE, .homonyms="error", .check_assign=TRUE)
+  dotdotArgs <- rlang::dots_list(...,.named = TRUE, .homonyms="error", .check_assign=TRUE)
   #Overwrite the file extension used by the default by the function is the user said so
+
+
+  ## Deduce file extension of output files -----------------------------------
+
+
   fileExtension <- NULL
-  if(!is.null(trackSpec$explicitExt)){
+  if(!is.null(dotdotArgs$explicitExt)){
     #An explicit file extension is given
-    fileExtension <- trackSpec$explicitExt
+    fileExtension <- dotdotArgs$explicitExt
   }else{
     if(is.character(.source) && (as.character(.source) %in% availableDataFileExtensions)){
       #The .source is the file extension of a signal file
@@ -795,8 +796,8 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
         #We failed to derive a file extension
         cli::cli_abort(c("Failed to derive a file extension to use",
                          "x"="To furnish a database with new pre-computed data, we need to derive a file extension",
-                         "i"="The extension supplied as the optional {.args explicitExt} argument is {.val {trackSpec$explicitExt}}.",
-                         "i"="The {.args .source} argument is set to {.val {.source}}.",
+                         "i"="The extension supplied as the optional {.args explicitExt} argument is {.val {dotdotArgs$explicitExt}}.",
+                         "i"="The {.arg .source} argument is set to {.val {.source}}.",
                          "i"="If considered a function, the {.args .source} argument is reported to default to using a {.val {.source}} file extension.")
                        )
       }
@@ -807,11 +808,11 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
   # as this will simplify comparison of track name and field with the already created
   # later in the code.
 
-  tracksToDefine <- data.frame(name=names(trackSpec),columnName=unlist(trackSpec,use.names = FALSE),fileExtension=fileExtension) %>%
+  tracksToDefine <- data.frame(name=names(dotdotArgs),
+                               columnName=unlist(dotdotArgs,use.names = FALSE),
+                               fileExtension=fileExtension) %>%
     dplyr::mutate(across(everything(), ~ stringr::str_remove_all(.,"[\'\"]") ))
 
-
-  #tracksToDefine may now include also the names of function arguments, which we needs to adress later
 
   #This is the base structure which says what is already defined,
   # which we will use later to deduce if the user supplied track specifications are
@@ -826,6 +827,8 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
 
   #If we have a function, then we should use it to create new tracks
   if(is.function(.source) || ( ! is.null(get0(.source)) && is.function( get0(.source)))){
+
+    ### Really make sure that we do not overwrite signal files unless intended -------------------------------------------
 
     if(.force && ! .really_force){
       cli::cli_alert_warning("You have indicated that existing signal tracks should be overwritten.")
