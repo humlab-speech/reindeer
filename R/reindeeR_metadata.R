@@ -118,8 +118,9 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE, manditor
     dplyr::rename(session=name)
 
   sessions$session_metadata_file <- file.path(emuDBhandle$basePath,
-                                              paste0(sessions,emuR:::session.suffix),
-                                              paste(sessions,"meta_json",sep="."))
+                                              paste0(sessions$session,emuR:::session.suffix),
+                                              paste(sessions$session,"meta_json",sep="."))
+
 
   sessJSONFilesDF <- sessions[file.exists(sessions$session_metadata_file),]
 
