@@ -295,7 +295,7 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 #
-quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
+quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
 
 
   # Initial check of arguments ----------------------------------------------
@@ -378,7 +378,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
       .f <- purrr::safely(get)(.source)$result
     }
 
-    funName <- rlang::as_name(fcall$.source[[1]])
+    funName <- fcall$.source
 
   }else{
     # Ok, so not a function, so we need to make sure that the .source argument is a string
@@ -427,18 +427,24 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
     #Now, since we set up a default file name above if .cache_file is just TRUE
     # we should be able to use the character string as the file name
     if(is.character(.cache_file)){
+      .cache_file <- normalizePath(.cache_file)
       cacheFileExists <- file.exists(normalizePath(.cache_file))
+
+      #Clear cache file if indicated
+      if(.clear_cache && cacheFileExists) unlink(normalizePath(.cache_file))
 
       .cache_connection <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=.cache_file,flags=RSQLite::SQLITE_RWC)
 
       if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
                                                                   "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
       #Check table format requirements
-      if(! "cache" %in% RSQLite::dbListTables(.cache_connection)
-         || ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache"))){
+      if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
+         (
+         ! "cache" %in% RSQLite::dbListTables(.cache_connection) ||
+         ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))){
 
         cli::cli_alert_warning("Missing a correctly prepared space for signal processing cache")
-        cli::cli_alert_info(" - The cache file is assumed to have a {.var cache} table with fields {.field {c(\"sl_rowIdx\",\"obj\")}}.")
+        cli::cli_ul("The cache file is assumed to have a {.var cache} table with fields {.field {c(\"sl_rowIdx\",\"obj\")}}.")
 
 
         RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
@@ -796,9 +802,9 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
         #We failed to derive a file extension
         cli::cli_abort(c("Failed to derive a file extension to use",
                          "x"="To furnish a database with new pre-computed data, we need to derive a file extension",
-                         "i"="The extension supplied as the optional {.args explicitExt} argument is {.val {dotdotArgs$explicitExt}}.",
+                         "i"="The extension supplied as the optional {.arg explicitExt} argument is {.val {dotdotArgs$explicitExt}}.",
                          "i"="The {.arg .source} argument is set to {.val {.source}}.",
-                         "i"="If considered a function, the {.args .source} argument is reported to default to using a {.val {.source}} file extension.")
+                         "i"="If considered a function, the {.arg .source} argument is reported to default to using a {.val {.source}} file extension.")
                        )
       }
     }

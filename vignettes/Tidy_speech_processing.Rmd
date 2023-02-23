@@ -47,7 +47,9 @@ Like most gardens, a speech corpus will grow unwieldy and unstructured if not ma
 We can get an overview of most of these types of files in a database using the syntax below. Please note that we are using one of the example databases included in the [emuR] package for this, so there are just a few files in there.
 
 ```{r The listing of a database using EmuR syntax, echo=FALSE}
+library(reindeer)
 #Load the 'ae' example database and attach some made up metadata to the bundles
+reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose = FALSE) -> ae 
 #This database handle stores also the full path to the actual database
 reindeer:::add_dummy_metadata(ae)
@@ -110,13 +112,16 @@ Once a directory for the database is set up and we have added some files to it, 
 Below we estimate fundamental frequency using two different digital processing algorithms, and one formant track with frequencies and bandwidths. We use a couple of equivalent syntaxes to do so, just to show how the verbs can be piped together. 
 
 ```{r Furnishing the database with some initial signal tracks }
+library(dplyr)
+library(superassp)
+
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose = FALSE) -> ae
 
 #TODO: explicitExt ses inte längre som ett argument till forest
 
-furnish(ae,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",.force=TRUE) |> 
-furnish("fms",FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=TRUE)
+furnish(ae,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",nominalF1=533,.force=TRUE, .really_force=TRUE,.parameter_log_excel = "~/Desktop/1.xlsx",.recompute = TRUE) #%>%
+#furnish("fms",FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=TRUE,.parameter_log_excel = "~/Desktop/2.xlsx")
 
 ```
 
@@ -172,7 +177,7 @@ segments_following |>
 ```{r Acquiring track data on the fly for segments}
 
 segments_following |>
-  quantify(forest, windowShift=10)
+  quantify(forest, windowShift=10,nominalF1 = 522,.recompute = FALSE, .naively = FALSE,.cache_file = TRUE,.clear_cache = TRUE,.parameter_log_excel = "~/Desktop/1.xlsx")
 
 ```
 
@@ -180,8 +185,8 @@ segments_following |>
 ```{r Using quantify to acquire summary acoustic data}
 
 segments_following |>
-  quantify(praat_voice_report,c=1)
+  quantify(praat_voice_report)
+  #quantify(forest)
 
 ```
-
 
