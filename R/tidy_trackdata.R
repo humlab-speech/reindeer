@@ -295,7 +295,7 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 #
-quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.handle=NULL){
+quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.inside_of=NULL){
 
 
   # Initial check of arguments ----------------------------------------------
@@ -331,30 +331,32 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
   #The first possible case is when we have no explicitly set .handle argument, but a segment list with a
   # valid "basePath" attribute set. We then create the database handle from that basePath.
-  if(is.null(.handle)) {
+  if(is.null(.inside_of)) {
     if(! is.null(attr(.what,"basePath")) && dir.exists(attr(.what,"basePath"))) {
       logger::log_debug("No explicit .handle argument found")
       # We then need to create a handle object
       utils::capture.output(
-        .handle <- emuR::load_emuDB(attr(.what,"basePath"),verbose = TRUE)
+        .inside_of <- emuR::load_emuDB(attr(.what,"basePath"),verbose = TRUE)
       ) -> dbload.info
     }else{
       logger::log_debug("Got .handle={.handle}")
-      stop("Could not derive the database path. Please provide an explicit database handle object .source the .handle argument. See ?emuR::load_emuDB for details.")
+      cli::cli_abort(c("Could not derive the database path.",
+                       "x"="Please provide an explicit database handle object in the {.arg .inside_of} argument.",
+                       "x"="See ?emuR::load_emuDB for details."))
     }
   }else{
     # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-    if(is.character(.handle) && stringr::str_ends(.handle,"_emuDB") && dir.exists(.handle)){
-      .handle <- emuR::load_emuDB(.handle,verbose = FALSE)
+    if(is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
+      .handle <- emuR::load_emuDB(.inside_of,verbose = FALSE)
     }
-    if("emuDBhandle" %in% class(.handle)){
+    if("emuDBhandle" %in% class(.inside_of)){
       #reload the database just to make sure that the handle is still valid
-      .handle <- emuR::load_emuDB(.handle$basePath,verbose = FALSE)
+      .handle <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
     }else{
       cli::cli_abort(c("Not appropriate .handle argument",
                        "i"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                       "x"="The .handle argument supplied is a {class(.handle)}",
-                       "x"="The database {dplyr::coalesce(.handle$basePath,.handle)} does not exits."))
+                       "x"="The .handle argument supplied is a {class(.inside_of)}",
+                       "x"="The database {dplyr::coalesce(.inside_of$basePath,.inside_of)} does not exits."))
 
     }
   }
@@ -543,7 +545,7 @@ quantify <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_followi
 
     if(nrow(dsp) > 0 ){
       if(.recompute){
-          cli::cli_alert_success(cli::ansi_strwrap("Recomputed DSP settings age and gender appropriate DSP settings based on metanalysis data in the {.file {file.path(system.file(package = \"reindeer\",mustWork = TRUE),\"default_parameters.xlsx\")}} file."))
+          cli::cli_alert_success(cli::ansi_strwrap("Recomputed DSP settings age and gender appropriate DSP settings based on metanalysis data in the {.file { file.path(system.file(package = \"reindeer\",mustWork = TRUE),\"default_parameters.xlsx\")  }} file."))
       }else{
         cli::cli_alert_success("Loaded precomputed age and gender appropriate DSP settings")
       }
@@ -724,28 +726,43 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
 
   # Check inputs ------------------------------------------------------------
 
-
-  if(missing(.source)) cli::cli_abort(c("Missing source name",
+  if(missing(.source)) {
+    cli::cli_abort(c("Missing source name",
                                       "i"="You need to state a function name or the file extension from which the data columns should be gathered",
                                       "x"="The argument {.var .source} is missing"))
+  }
 
   if("emuDBhandle" %in% class(.inside_of)){
     #reload the database just to make sure that the handle is still valid
     .inside_of <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
+    logger::log_debug(paste("Got an EmuDB handle object pointing to ",.inside_of$basePath,"."))
   }else{
-    if( is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
-      # We then need to create a handle object
-      utils::capture.output(
-        .inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
-      ) -> dbload.info
-      logger::log_info(paste(dbload.info,collapse = "\n"))
+    if( is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") ){
+      logger::log_debug(paste("Got a database location '",.inside_of,"'."))
 
-    }else{
-      strAttr <- attr(.inside_of,"basePath")
-      if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
+      if(dir.exists(.inside_of)){
         # We then need to create a handle object
         utils::capture.output(
-          .inside_of <- emuR::load_emuDB(attr(strAttr,"basePath"),verbose = FALSE)
+          .inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
+        ) -> dbload.info
+        logger::log_info(paste(dbload.info,collapse = "\n"))
+      }else{
+        cli::cli_abort(c("Non-existing database path",
+                         "x"="A database path was given as the {.arg .inside_of} argument but the location does not exist.")
+                       )
+      }
+    }else{
+      strAttr <- attr(.inside_of,"basePath")
+
+
+      if(! is.null(strAttr) &&
+         stringr::str_length(strAttr) > 0 &&
+         stringr::str_ends(strAttr,"_emuDB") &&
+         dir.exists(strAttr)){
+
+        # We then need to create a handle object
+        utils::capture.output(
+          .inside_of <- emuR::load_emuDB(strAttr,verbose = FALSE)
         ) -> dbload.info
         logger::log_info(paste(dbload.info,collapse = "\n"))
 
@@ -974,7 +991,7 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
     # Now finally make sure that tracksToDefine contains only
     # track names that are fields in the signal file
 
-    exampleSignalFile <- purrr:::pluck(emuR::list_files(ae,"fms"),"absolute_file_path",1)
+    exampleSignalFile <- purrr:::pluck(emuR::list_files(ae,fileExtension),"absolute_file_path",1)
 
     tracksToDefine <- tracksToDefine %>%
       dplyr::filter(columnName %in% superassp::get_definedtracks(exampleSignalFile))
@@ -992,7 +1009,7 @@ furnish <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.m
     }else{
       cli::cli_alert_info(c("Not defining a new track {.field {tracksToDefine[track,\"name\"]}}",
                             " since it is already connected with the field {.field {tracksToDefine[track,\"columnName\"]}}",
-                            " in an {.field {tracksToDefine[track,\"fileExtension\"]}} SSFF track signal file."))
+                            " in {.strong .{tracksToDefine[track,\"fileExtension\"]}} SSFF signal files."))
     }
   }
 
@@ -1133,6 +1150,71 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 }
 
+
+quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .inside_of=NULL,...){
+
+  quiet_query <- purrr::quietly(emuR::query)
+
+  if(is.character(.what1)){
+    if(is.null(.inside_of)){
+      cli::cli_abort(c("Unable to deduce a database handle",
+                       "x"=cli::ansi_strwrap("If {.arg .what1} is a query string, then you need to provide a database handle or path so that the full path to media files can be deduced")))
+    }
+
+    #We got a database query
+    first_query_res <- quiet_query(emuDBhandle = .inside_of,
+                                    query = .what1,
+                                   sessionPattern = ".*",
+                                   bundlePattern = ".*",
+                                   queryLang = "EQL2",
+                                   timeRefSegmentLevel = NULL,
+                                   resultType = "tibble",
+                                   calcTimes = TRUE,
+                                   verbose = FALSE)
+  .first_collection <- first_query_res$result
+  logger::log_warnings(paste0(first_query_res$warnings, collapse = "\n"))
+  logger::log_debug(paste0(first_query_res$messages, collapse = "\n"))
+  }else{
+    if(is.data.frame())
+  }
+
+  if(is.character(.second_collection)){
+    #We got a database query
+    first_query_res <- quiet_query(emuDBhandle = .inside_of,
+                                   query = .what2,
+                                   sessionPattern = ".*",
+                                   bundlePattern = ".*",
+                                   queryLang = "EQL2",
+                                   timeRefSegmentLevel = NULL,
+                                   resultType = "tibble",
+                                   calcTimes = TRUE,
+                                   verbose = FALSE)
+
+    .second_collection <- second_query_res$result
+    logger::log_warnings(paste0(second_query_res$warnings, collapse = "\n"))
+    logger::log_debug(paste0(second_query_res$messages, collapse = "\n"))
+  }
+
+  #We should now have two tibbles
+  if(! is.data.frame(.second_collection) || ! is.data.frame(.second_collection)) {
+    cli::cli_abort(c("Wrong specification of one or two of the collections",
+                     "x"=cli::ansi_strwrap("The segment lists / collections need to be either a {.cls data.frame}, a {.cls tibble}, or a {.cls string} containing an EmuQL2 query bu which the segments can be found."),
+                     "i"="The {.arg .first_collection} is of class {.cls {(.first_collection)}}, and {.arg .second_collection} of class {.cls {(.second_collection)}}"))
+  }
+
+  # The second query result may be from a different database
+  # and we need to check this and handle that case gracefully
+
+  .inside_of2 <- .inside_of
+
+  if(.by_session){
+    #This is the default case
+
+    by <- c("db_uuid", "session")
+
+  }
+
+}
 
 ## INTERACTIVE TESTING
 #
