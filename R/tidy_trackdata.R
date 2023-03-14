@@ -1160,7 +1160,7 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 }
 
 
-quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .inside_of=NULL,...){
+quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE, .inside_of=NULL){
 
 # Base setup --------------------------------------------------------------
 
@@ -1169,10 +1169,9 @@ quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .i
 
   #Define how the two datasets will be split before the function .source is applied
 
-  set_split_by <- ifelse(.by_session,
-                        c("session"), #Default: A session is usually a record of speech of a person in a specific state
-                        c("session", "bundle") # This case applies when a session directory is used keep e.g. recordings of a specific speaker together
-                        )
+  set_split_by <- "session" #Default: A session is usually a record of speech of a person in a specific state
+  if(.by_bundle) set_split_by <- c("session", "bundle") # This case applies when a session directory is used keep e.g. recordings of a specific speaker together
+
 
   # Setup of the first dataset ----------------------------------------------
 
@@ -1217,8 +1216,22 @@ quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .i
     dplyr::rename(listOfFiles=absolute_file_path)  |>
     dplyr::select(-file)
 
+  # Now replace the query with the result of the query
+  if(is.character(.what1)){
+    .what1 <- emuR::query(emuDBhandle = .inside_of1,
+                          query = .what1,
+                          calcTimes = TRUE,
+                          verbose=FALSE)
+  }
+
+  .what1_name <- purrr::pluck(methods::formalArgs(.source),1)
+
   .what1_df <-.what1   |>
-    dplyr::left_join(signalFiles_what1, by = c("session", "bundle"))
+    dplyr::left_join(signalFiles_what1, by = c("session", "bundle")) |>
+    tidyr::nest(.by=all_of(set_split_by))
+
+  names(.what1_df) <- c(set_split_by,.what1_name)
+
 
   # Setup of the second dataset ----------------------------------------------
 
@@ -1263,10 +1276,27 @@ quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .i
     dplyr::rename(listOfFiles=absolute_file_path)  |>
     dplyr::select(-file)
 
-  .what2_df <-.what2   |>
-    dplyr::left_join(signalFiles_what2, by = c("session", "bundle"))
+  # Now replace the query with the result of the query
+  if(is.character(.what2)){
+    .what2 <- emuR::query(emuDBhandle = .inside_of2,
+                          query = .what2,
+                          calcTimes = TRUE,
+                          verbose=FALSE)
+  }
 
-  return(.what2_df)
+  .what2_name <- purrr::pluck(methods::formalArgs(.source),2)
+
+  .what2_df <-.what2   |>
+    dplyr::left_join(signalFiles_what2, by = c("session", "bundle")) |>
+    tidyr::nest(.by=all_of(set_split_by))
+
+  names(.what2_df) <- c(set_split_by,.what2_name)
+
+
+  .what_df <- .what1_df |>
+    dplyr::inner_join(.what2_df,by = set_split_by)
+  return(.what_df)
+
 }
 
 ## INTERACTIVE TESTING
