@@ -394,9 +394,9 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
       logger::log_debug("We got a SSFF track field in the .source argument : {(.source)}")
       .f <- readtrack
       funName <- "readtrack"
-      inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae) %>%
-        dplyr::filter(name==.source) %>%
-        dplyr::select(fileExtension) %>%
+      inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae)  |>
+        dplyr::filter(name==.source)  |>
+        dplyr::select(fileExtension)  |>
         purrr::pluck(1)
       dotArgs["field"] <- .source
 
@@ -427,34 +427,42 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
   if(!is.null(.cache_file) && ! isFALSE(.cache_file)){
     if(.cache_file) {
       #Set a date specific cache file
-      .cache_file <- file.path(tempdir(),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
-      cli::cli_alert_info("Using cache file {.file {(.cache_file)}}")
+      .cache_file <- file.path(tempdir(check=TRUE),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
     }
     #Now, since we set up a default file name above if .cache_file is just TRUE
     # we should be able to use the character string as the file name
     if(is.character(.cache_file)){
       .cache_file <- normalizePath(.cache_file)
-      cacheFileExists <- file.exists(normalizePath(.cache_file))
+      cacheFileExists <- file.exists(.cache_file)
 
       #Clear cache file if indicated
-      if(.clear_cache && cacheFileExists) unlink(normalizePath(.cache_file))
+      if(.clear_cache && cacheFileExists){
+        unlink(.cache_file)
+        cacheFileExists <- file.exists(.cache_file)
+      }
 
-      .cache_connection <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=.cache_file,flags=RSQLite::SQLITE_RWC)
+      .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
+                                          user="root",
+                                          password="",
+                                          host="localhost",
+                                          dbname=.cache_file,
+                                          flags=RSQLite::SQLITE_RWC,
+                                          loadable.extensions=FALSE)
 
-      if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
-                                                                  "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
+#
+#       if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
+#                                                                   "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
       #Check table format requirements
       if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
-         (
-         ! "cache" %in% RSQLite::dbListTables(.cache_connection) ||
-         ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))){
+         (! "cache" %in% RSQLite::dbListTables(.cache_connection) || ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))
+         ){
 
-        cli::cli_alert_warning("Missing a correctly prepared space for signal processing cache")
-        cli::cli_ul("The cache file is assumed to have a {.var cache} table with fields {.field {c(\"sl_rowIdx\",\"obj\")}}.")
-
+        cli::cli_alert_info("Initializing cache file {.file {(.cache_file)}}")
 
         RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
 
+      }else{
+        cli::cli_alert_info("Using existing cache file {.file {(.cache_file)}}")
       }
 
       RSQLite::dbExecute(.cache_connection,"CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
@@ -532,8 +540,8 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
 
   # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
-  signalFiles <- emuR::list_files(.inside_of,inputSignalsExtension) %>%
-    dplyr::rename(listOfFiles=absolute_file_path) %>%
+  signalFiles <- emuR::list_files(.inside_of,inputSignalsExtension)  |>
+    dplyr::rename(listOfFiles=absolute_file_path)  |>
     dplyr::select(-file)
 
 
@@ -544,7 +552,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     if(!funName =="readtrack") cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
 
     # Make sure that we have a DSP default settings data.frame
-    dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute) %>%
+    dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute)  |>
       tidyr::replace_na(list(Gender="Unspecified"))
 
     if(nrow(dsp) > 0 ){
@@ -556,12 +564,12 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     }
     #After this we can be sure that parameters set per session or bundle are  available
     # but have been overwritten by explicitly set settings given to this function as we proceed
-    meta <- reindeer:::get_metadata(.inside_of,manditory=idCols) %>%
-      dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0))) %>%
+    meta <- reindeer:::get_metadata(.inside_of,manditory=idCols)  |>
+      dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0)))  |>
       tidyr::replace_na(.metadata_defaults)
 
     if(nrow(dotArgsDF) > 0){
-      meta <- meta %>%
+      meta <- meta  |>
         dplyr::mutate(dotArgsDF)
     }
 
@@ -572,19 +580,19 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     precomputedVariableNames <- intersect(names(meta),names(dsp))
     dspColumnsToAdd <- setdiff(names(dsp),names(meta))
 
-    filledMeta <- meta %>%
-      dplyr::rows_update(y=dsp %>%
+    filledMeta <- meta  |>
+      dplyr::rows_update(y=dsp  |>
                            dplyr::select(all_of(precomputedVariableNames)),
                          by=idCols,unmatched = "ignore")
 
 
     # This block will add settings that were set in DSP defaults only
-    completedStoredDSPSettings <- filledMeta %>%
-      dplyr::ungroup() %>%
+    completedStoredDSPSettings <- filledMeta  |>
+      dplyr::ungroup()  |>
       dplyr::left_join(
         dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
-        ,by=idCols) %>%
-      tidyr::replace_na(functionDefaults)  %>%
+        ,by=idCols)  |>
+      tidyr::replace_na(functionDefaults)   |>
       dplyr::mutate(toFile=FALSE)  #Forcefully inject a toFile argument
 
 
@@ -592,7 +600,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     # or if the 5000 Hz ceiling is instead increased and the default number of formants extracted is kept constant
 
     if(.by_maxFormantHz && "numFormants" %in% names(completedStoredDSPSettings)){
-      completedStoredDSPSettings <- completedStoredDSPSettings %>%
+      completedStoredDSPSettings <- completedStoredDSPSettings  |>
         dplyr::select(-numFormants)
 
       # The names of columns to keep are now the columns that are defined either in signalFiles or
@@ -604,8 +612,8 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
       #Here we construct the settings that we want to use when applying the specific DSP
       # function to bundles (in specific sessions)
-      sessionBundleDSPSettingsDF <-  completedStoredDSPSettings %>%
-        dplyr::left_join(signalFiles,by=c("session","bundle")) %>%
+      sessionBundleDSPSettingsDF <-  completedStoredDSPSettings  |>
+        dplyr::left_join(signalFiles,by=c("session","bundle"))  |>
         dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
 
     }
@@ -626,12 +634,12 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
   # Now we need to transfer the session / bundle settings to the segment list
   # to get start and end times into the call also
-  segmentDSPDF <- .what %>%
-    tibble::rownames_to_column(var = "sl_rowIdx") %>%
-    dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle")) %>%
-    dplyr::rename(beginTime=start,endTime=end) %>%
-    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed))) %>%
-    dplyr::rename(.session=session,.bundle=bundle) %>%
+  segmentDSPDF <- .what  |>
+    tibble::rownames_to_column(var = "sl_rowIdx")  |>
+    dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle"))  |>
+    dplyr::rename(beginTime=start,endTime=end)  |>
+    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))  |>
+    dplyr::rename(.session=session,.bundle=bundle)  |>
     dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) ## Fix for wrassp functions that expect "numeric" values, not integers
 
   #Set up the progress bar
@@ -654,7 +662,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
                                 file.path(.parameter_log_excel,
                                           paste0(stringr::str_replace_all(format(Sys.time(),usetz = TRUE)," ","_"),".xlsx")),
                                 .parameter_log_excel)
-      parameterData <- segmentDSPDF %>%
+      parameterData <- segmentDSPDF  |>
         dplyr::rename(bundle=.bundle,session=.session)
 
       openxlsx::write.xlsx(x = parameterData,file=excel_filename, asTable=FALSE)
@@ -680,11 +688,11 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
-  appliedDFResultInList <- segmentDSPDF %>%
-    tibble::rownames_to_column(var = ".sl_rowIdx") %>%
-    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx)) %>%
-    dplyr::rowwise() %>%
-    purrr::pmap(.,.f=innerMapFunction,.progress = pb) #)  %>% # This is the busy line
+  appliedDFResultInList <- segmentDSPDF  |>
+    tibble::rownames_to_column(var = ".sl_rowIdx")  |>
+    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))  |>
+    dplyr::rowwise()  |>
+    purrr::pmap(.f=innerMapFunction,.progress = pb) #)   |>  # This is the busy line
 
 
   ## [special] The case where .what is called by furnish() --------------------------------------------
@@ -693,8 +701,8 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     # but just returned
     logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
 
-    provideOutDF <-  list_bundles(.inside_of) %>%
-      dplyr::mutate(dobj=appliedDFResultInList) %>%
+    provideOutDF <-  emuR::list_bundles(.inside_of)  |>
+      dplyr::mutate(dobj=appliedDFResultInList)  |>
       dplyr::rename(bundle=name)
 
 
@@ -705,15 +713,15 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
   }else{
     ##  [default] The case in which we are processing a segment list --------------------------------------------
 
-    resTibble <- appliedDFResultInList %>%
-      purrr::map_dfr(as_tibble) %>%
-      tibble::rownames_to_column(var = "sl_rowIdx") %>%
+    resTibble <- appliedDFResultInList  |>
+      purrr::map_dfr(as_tibble)  |>
+      tibble::rownames_to_column(var = "sl_rowIdx")  |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
 
-    quantifyOutDF <- .what %>%
-      tibble::rownames_to_column(var = "sl_rowIdx") %>%
-      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx)) %>%
-      dplyr::left_join(resTibble, by="sl_rowIdx") %>%
+    quantifyOutDF <- .what  |>
+      tibble::rownames_to_column(var = "sl_rowIdx")  |>
+      dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))  |>
+      dplyr::left_join(resTibble, by="sl_rowIdx")  |>
       dplyr::arrange(sl_rowIdx,start_item_id,end_item_id)
 
     attr(quantifyOutDF,"basePath") <- .inside_of$basePath #This ensures that we can reattach the database later
@@ -775,11 +783,11 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
   ## Available extensions of track files in the database -----------------------------
 
 
-  availableDataFileExtensions <- emuR::list_files(.inside_of) %>%
-    dplyr::mutate(file=stringr::str_replace(file,"^.*[.]","")) %>%
-    dplyr::filter(!file %in% c("json",emuR:::load_DBconfig(.inside_of)$mediafileExtension,reindeer:::metadata.extension)) %>%
-    dplyr::select(file) %>%
-    dplyr::distinct() %>%
+  availableDataFileExtensions <- emuR::list_files(.inside_of)  |>
+    dplyr::mutate(file=stringr::str_replace(file,"^.*[.]",""))  |>
+    dplyr::filter(!file %in% c("json",emuR:::load_DBconfig(.inside_of)$mediafileExtension,reindeer:::metadata.extension))  |>
+    dplyr::select(file)  |>
+    dplyr::distinct()  |>
     purrr::pluck("file")
 
 
@@ -824,7 +832,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
   tracksToDefine <- data.frame(name=names(dotdotArgs),
                                columnName=unlist(dotdotArgs,use.names = FALSE),
-                               fileExtension=fileExtension) %>%
+                               fileExtension=fileExtension)  |>
     dplyr::mutate(across(everything(), ~ stringr::str_remove_all(.,"[\'\"]") ))
 
 
@@ -881,16 +889,16 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
       # We here make a fake segment list with start and end times that suggest whole file processing
       # so that we can reuse quantify to deduce parameters, optionally log parameters, do the DSP work, and all that stuff.
 
-      bundles <- emuR::list_bundles(.inside_of) %>%
-        dplyr::rename(bundle=name) %>%
-        dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0) %>%
+      bundles <- emuR::list_bundles(.inside_of)  |>
+        dplyr::rename(bundle=name)  |>
+        dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0)  |>
         dplyr::mutate(.file= file.path(.inside_of$basePath,
                                       paste0(session,emuR:::session.suffix),
                                       paste0(bundle,emuR:::bundle.dir.suffix),
                                       paste(bundle,fileExtension,sep=".")))
-      bundles <- bundles %>%
-        dplyr::mutate(.force=.force) %>%
-        dplyr::filter( .force |  !file.exists(.file)) %>%
+      bundles <- bundles  |>
+        dplyr::mutate(.force=.force)  |>
+        dplyr::filter( .force |  !file.exists(.file))  |>
         dplyr::select(-.file,-.force) #Make sure this variable does not mess up execution of the function
 
       attr(bundles,"basePath") <- .inside_of$basePath
@@ -909,7 +917,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
       # We start fuzzing about ... arguments that are not valid function arguments
       # and that do not describe a connection to a field in the output as reported by the function
-      makeAFuzzAbout <- tracksToDefine %>%
+      makeAFuzzAbout <- tracksToDefine  |>
         dplyr::filter(! name %in% methods::formalArgs(.source), ! columnName %in% superassp::get_definedtracks(.source))
 
       if(nrow(makeAFuzzAbout) > 0 ){
@@ -923,7 +931,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
       #Explicitly remove track name specifications with names that are also formal
       # args of the function, or are not computed by the .source function
-      tracksToDefine <- tracksToDefine %>%
+      tracksToDefine <- tracksToDefine  |>
         dplyr::filter(! name %in% methods::formalArgs(.source), columnName %in% superassp::get_definedtracks(.source))
 
 
@@ -945,17 +953,17 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
                                   .parameter_log_excel=.parameter_log_excel)
 
 
-      quantifications <- quantifications %>%
+      quantifications <- quantifications  |>
         dplyr::mutate(file= file.path(.inside_of$basePath,
                                              paste0(session,emuR:::session.suffix),
                                              paste0(bundle,emuR:::bundle.dir.suffix),
-                                             paste(bundle,fileExtension,sep="."))) %>%
-        dplyr::select(dobj,file) %>%
+                                             paste(bundle,fileExtension,sep=".")))  |>
+        dplyr::select(dobj,file)  |>
         dplyr::filter(.force || !file.exists(file)) #Filter out files that exists if not .force(d)
 
 
      #Now finally write SSFF files
-     quantifications %>%
+     quantifications  |>
        furrr::future_pwalk(wrassp::write.AsspDataObj)
 
 
@@ -969,7 +977,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
       #First check that the files actually exist
       allSignalfiles <- emuR::list_files(.inside_of)
-      wantedSignalfiles <- allSignalfiles %>%
+      wantedSignalfiles <- allSignalfiles  |>
         dplyr::filter(stringr::str_detect(file,paste0(".",.source,"$")))
 
       nbundles <- nrow(emuR::list_bundles(.inside_of))
@@ -994,7 +1002,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
       exampleSignalFile <- purrr:::pluck(emuR::list_files(ae,fileExtension),"absolute_file_path",1)
 
-      tracksToDefine <- tracksToDefine %>%
+      tracksToDefine <- tracksToDefine  |>
         dplyr::filter(columnName %in% superassp::get_definedtracks(exampleSignalFile))
     }
 
@@ -1205,11 +1213,11 @@ quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .i
   #Now complete the data set by adding a full path to signal files
   inputSignalsExtension <- emuR:::load_DBconfig(.inside_of1)$mediafileExtension
   # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
-  signalFiles_what1 <- emuR::list_files(.inside_of1,inputSignalsExtension) %>%
-    dplyr::rename(listOfFiles=absolute_file_path) %>%
+  signalFiles_what1 <- emuR::list_files(.inside_of1,inputSignalsExtension)  |>
+    dplyr::rename(listOfFiles=absolute_file_path)  |>
     dplyr::select(-file)
 
-  .what1_df <-.what1  %>%
+  .what1_df <-.what1   |>
     dplyr::left_join(signalFiles_what1, by = c("session", "bundle"))
 
   # Setup of the second dataset ----------------------------------------------
@@ -1251,11 +1259,11 @@ quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .i
   #Now complete the data set by adding a full path to signal files
   inputSignalsExtension <- emuR:::load_DBconfig(.inside_of2)$mediafileExtension
   # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
-  signalFiles_what2 <- emuR::list_files(.inside_of2,inputSignalsExtension) %>%
-    dplyr::rename(listOfFiles=absolute_file_path) %>%
+  signalFiles_what2 <- emuR::list_files(.inside_of2,inputSignalsExtension)  |>
+    dplyr::rename(listOfFiles=absolute_file_path)  |>
     dplyr::select(-file)
 
-  .what2_df <-.what2  %>%
+  .what2_df <-.what2   |>
     dplyr::left_join(signalFiles_what2, by = c("session", "bundle"))
 
   return(.what2_df)
@@ -1284,12 +1292,12 @@ quantify2 <- function(.what1, .what2, .source,.by_session=TRUE,.naively=TRUE, .i
 #
 # out2 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
-#   quantify(.from=fake_voice_report,windowSize=30) %>%
+#   quantify(.from=fake_voice_report,windowSize=30)  |>
 #   glimpse()
 
 # out3 <- ae |>
 #   ask_for("Phonetic =~ '^.*[i:]'") |>
-#   quantify("fm") %>%
+#   quantify("fm")  |>
 #   glimpse()
 
 
