@@ -37,7 +37,7 @@
 dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender"),impute=TRUE,defaultsEstimatedSampleSize=10){
 
   if(!recompute){
-    data(DSPP)
+    data(DSPP,package="reindeer")
     return(reindeer::DSPP)
   }
 
