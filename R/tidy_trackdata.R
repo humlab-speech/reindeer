@@ -2,6 +2,9 @@
 
 ITEM <- TRUE
 
+fake_two_df_fun <- function(x1,x2){
+  return(list(a=nrow(x1),b=nrow(x2)))
+}
 
 fake_voice_report <- function(listOfFiles,
                               beginTime = NULL,
@@ -301,17 +304,40 @@ quantify <- function(...){
 
 quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.inside_of=NULL){
 
-
-  # Initial check of arguments ----------------------------------------------
-
-  #Capture dot arguments for if we want to manipulate them
-  dotArgs <- list(...)
-  dotArgsDF <- as.data.frame(dotArgs)
-  dotArgsNames <- names(dotArgs)
-
   fcall <- match.call(expand.dots = FALSE)
   fcallS <- toString(fcall)
   idCols <- c("Gender","Age")
+
+
+  ## Explicit and Hard coded arguments ----------------------------------------------------
+
+
+
+  dotArgs <- list(...)
+  dotArgsNames <- names(dotArgs)
+  if("toFile" %in% dotArgsNames){
+    cli::cli_alert_info("Ignoring {.arg toFile} argument given to {.fun quantify}.")
+  }
+  #We will use this list later for filling in arguments before applying a function  in .source
+  explicitOrDefaultParams <- utils::modifyList(dotArgs,list(toFile=FALSE))
+
+  # Initial check of arguments ----------------------------------------------
+
+
+  #Check for the special case where the function was called by furnish
+  calledByFurnish <- FALSE
+  if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
+    calledByFurnish <- TRUE
+    #Now check for strange arguments
+    if(! is.null(.n_preceeding) || ! is.null(.n_preceeding) ||! is.null(.where)){
+      cli::cli_alert_info(c("Ignoring {.arg .where}, {.arg .n_preceeding}, and {.arg .n_follwing} arguments",
+                            "i"="Specifying a subset of data points to be returned does not make sense for {.fun furnish}."
+                            )
+                          )
+    }
+  }
+
+
 
   if(nrow(.what ) < 1){
     #Nonsense segment list
@@ -382,9 +408,15 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
       .f <- .source
     }else{
       .f <- purrr::safely(get)(.source)$result
+
+      cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
     }
 
-    funName <- fcall$.source
+    funName <- fcall[".source"]
+    willRemove <- setdiff(names(explicitOrDefaultParams),formalArgs(.source))
+    cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun .source}")
+
+    explicitOrDefaultParams <- explicitOrDefaultParams[ intersect(names(explicitOrDefaultParams),formalArgs(.source)) ]
 
   }else{
     # Ok, so not a function, so we need to make sure that the .source argument is a string
@@ -398,12 +430,17 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
         dplyr::filter(name==.source)  |>
         dplyr::select(fileExtension)  |>
         purrr::pluck(1)
-      dotArgs["field"] <- .source
+
+
+      cli::cli_alert_info("Reading data from the {.field {(.source)}} in {.val {inputSignalsExtension}} signal files.")
+
+      explicitOrDefaultParams <- utils::modifyList(explicitOrDefaultParams,list(field=.source))
 
       #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
       if(!.naively || .recompute ) {
-        cli::cli_alert_warning("Directly reading the {.field {(.source)}} track require no DSP parameter deduction.")
-        cli::cli_alert_info(" - The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}.")
+        cli::cli_bullets(c("i"="Directly reading the {.field {(.source)}} track require no DSP parameter deduction.",
+                                 ">"="The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}."))
+        #cli::cli_alert_info(" - The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}.")
       }
       .naively <- TRUE
       .recompute <- FALSE
@@ -414,9 +451,6 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
                    "x"="The .source needs to be the name of a track in the database or a function that should do the signal processing."))
     }
   }
-
-
-  # The inner applied function ----------------------------------------------
 
 
   ## Optional cache system setup -----------------------------------------
@@ -568,13 +602,6 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
       dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0)))  |>
       tidyr::replace_na(.metadata_defaults)
 
-    if(nrow(dotArgsDF) > 0){
-      meta <- meta  |>
-        dplyr::mutate(dotArgsDF)
-    }
-
-
-
 
     #This variable is used for filling in missing values in arguments explicitly set in metadata
     precomputedVariableNames <- intersect(names(meta),names(dsp))
@@ -684,6 +711,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     format = "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} {cli::pb_percent} | ETA: {cli::pb_eta}",
     clear = TRUE)
 
+  explicitOrDefaultParamsDF <- as.data.frame(explicitOrDefaultParams)
 
 
   # Here we apply the DSP function once per row and with settings comming from
@@ -691,12 +719,14 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
   appliedDFResultInList <- segmentDSPDF  |>
     tibble::rownames_to_column(var = ".sl_rowIdx")  |>
     dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))  |>
+    dplyr::mutate(explicitOrDefaultParamsDF) |> # This row ovewrites all deduced parameters with explicitly set ones, including toFile=FALSE if used
     dplyr::rowwise()  |>
-    purrr::pmap(.f=innerMapFunction,.progress = pb) #)   |>  # This is the busy line
+    purrr::pmap(.f=innerMapFunction,.progress = pb) # This is the busy line
 
 
   ## [special] The case where .what is called by furnish() --------------------------------------------
-  if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
+
+  if(calledByFurnish){
     #Activate the special case at the end of processing where SSFF tracks and lists are not expanded
     # but just returned
     logger::log_debug("Preparing to return a tibble of bundles and AsspDataObj")
@@ -714,14 +744,14 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     ##  [default] The case in which we are processing a segment list --------------------------------------------
 
     resTibble <- appliedDFResultInList  |>
-      purrr::map_dfr(as_tibble)  |>
-      tibble::rownames_to_column(var = "sl_rowIdx")  |>
+      purrr::map_dfr(as_tibble,.id="sl_rowIdx")  |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
+
 
     quantifyOutDF <- .what  |>
       tibble::rownames_to_column(var = "sl_rowIdx")  |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))  |>
-      dplyr::left_join(resTibble, by="sl_rowIdx")  |>
+      dplyr::left_join(resTibble, by="sl_rowIdx",multiple="all")  |>
       dplyr::arrange(sl_rowIdx,start_item_id,end_item_id)
 
     attr(quantifyOutDF,"basePath") <- .inside_of$basePath #This ensures that we can reattach the database later
@@ -1102,7 +1132,7 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
   return(res)
 }
 
-readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=0, sample_end=0){
+readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=0, sample_end=0,toFile=FALSE){
 
   if(! all(file.exists(listOfFiles))){
     msg <- paste0("The input files ",paste(listOfFiles,collapse = ", "), " do not exist.")
@@ -1162,7 +1192,16 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE, .inside_of=NULL){
 
-# Base setup --------------------------------------------------------------
+
+  # Basic checks of input ---------------------------------------------------
+
+  if(missing(.source) || !is.function(.source)) {
+    cli::cli_abort(c("Missing or not appropriate {.arg .source} argument",
+                     "x"="The {.arg .source} argument should be a function",
+                     "i"="{.arg .source} is a {.cls {class(.source)}}. It needs to be a {.cls function}."))
+  }
+
+  # Base setup --------------------------------------------------------------
 
 
   quiet_query <- purrr::quietly(emuR::query)
@@ -1172,6 +1211,57 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   set_split_by <- "session" #Default: A session is usually a record of speech of a person in a specific state
   if(.by_bundle) set_split_by <- c("session", "bundle") # This case applies when a session directory is used keep e.g. recordings of a specific speaker together
 
+
+  #
+
+  required_fields <- c("labels", "start", "end", "db_uuid", "sample_start", "sample_end", "sample_rate", "listOfFiles")
+
+  ## Definition and setup directly related to the inner applied funct --------
+
+
+  #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
+  safe_f <- purrr::possibly(.source, otherwise=NA)
+
+  #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
+  innerMapFunction <- function(.sl_rowIdx,.session,.bundle,...){
+
+    dotdotdot <- list(...)
+    dotdotdotS <- toString(dotdotdot)
+    result <- NULL
+    .cache_connection <- NULL
+
+    if(!is.null(.cache_connection)){
+      #Check existing values
+
+      #cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
+
+      if(nrow(cachedObj) > 0){
+        #Load rather than comput
+        logger::log_debug("[{.session}:{.bundle})] Loading data from cache file.\n")
+
+        result <- base::unserialize(
+          base::charToRaw(
+            cachedObj$obj[[1]]))
+      }
+
+    }
+    #Compute if the results is still not defined
+    if(is.null(result)){
+
+      logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
+      result <- safe_f(...)
+    }
+
+    #Maybe store the results in cache?
+    #if(!is.null(.cache_connection)){
+    #  objser <- base::rawToChar(base::serialize(result, connection = NULL,ascii = TRUE))
+
+
+    #  RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(.sl_rowIdx,objser))
+    #}
+
+    return(result)
+  }
 
   # Setup of the first dataset ----------------------------------------------
 
@@ -1294,62 +1384,88 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
 
   .what_df <- .what1_df |>
-    dplyr::inner_join(.what2_df,by = set_split_by)
+    dplyr::inner_join(.what2_df,by = set_split_by) |>
+    dplyr::rowwise()
+
+
+  # Check result set compatibility ------------------------------------------
+
+
+  ## Check that all required fields are returned in the tibbles in list columns ----
+  to_check <- .what_df |>
+   dplyr::ungroup()|>
+   dplyr::slice(1)
+
+
+  # Check that all required fields are returned in the tibbles in list columns
+  if(length(setdiff(required_fields, names(purrr::pluck(to_check,3,1)))) > 0 ||
+     length(setdiff(required_fields, names(purrr::pluck(to_check,4,1)))) > 0
+    ){
+    cli::cli_abort(c("Missing required fields",
+                     "!"="The {.cls tibble} / {.cls data.frame} needs to have some required fields for them to be passed to the function given as the {.arg .source} argument.",
+                     "i"="Required fields are {.field {required_fields}}.",
+                     "i"="The first data set has the columns {.field {names(purrr::pluck(to_check,3,1))}}",
+                     "i"="The first data set has the columns {.field {names(purrr::pluck(to_check,4,1))}}"))
+  }
+
+
+  ## Report on incompatibilities ---------------------------------------------
+
+
+  only_in_df1 <- dplyr::anti_join(.what1_df,.what2_df,by=set_split_by)
+  only_in_df2 <- dplyr::anti_join(.what2_df,.what1_df,by=set_split_by)
+  if(nrow(only_in_df1) > 0 ){
+    cli::cli_alert_warning(c("!"="The {.field {(.what2_name)}} argument of the function given as {.arg .source} has {nrow(only_in_df1)} rows with no mathch in {.field {(.what1_name)}} and will be ignored."))
+  }
+
+  if(nrow(only_in_df2) > 0 ){
+    cli::cli_alert_warning(c("!"="The {.field {(.what1_name)}} argument of the function given as {.arg .source} has {nrow(only_in_df2)} rows with no mathch in {.field {(.what2_name)}} and will be ignored."))
+  }
+
+  # Do the actual processing work -------------------------------------------
+
+
+  .what_df <- .what_df |>
+    dplyr::ungroup() |>
+    tibble::rownames_to_column(var = ".sl_rowIdx")  |>
+    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))  |>
+    dplyr::rename(.session=session,.bundle=bundle) |>
+    dplyr::rowwise()  |>
+    dplyr::glimpse() |>
+    purrr::pmap(.f=innerMapFunction,.progress = TRUE) # This is the busy line
+
+
+
   return(.what_df)
 
 }
 
 ## INTERACTIVE TESTING
 #
-# library(tidyverse)
-# library(purrr)
-# library(progressr)
-# library(tibble)
-# library(superassp)
-# library(furrr)
-# library(progress)
-# library(reindeer)
+library(tidyverse)
+library(purrr)
+library(progressr)
+library(tibble)
+library(superassp)
+library(furrr)
+library(progress)
+library(reindeer)
 
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
-#add_ssffTrackDefinition(ae,"bw","bw","bw","forest")
-
-# out <- ae |>
-#   ask_for("Phonetic =~ '^.*[i:]'") |>
-#  quantify(forest,windowSize=30)|>
-#   glimpse()
-#
-# out2 <- ae |>
-#   ask_for("Phonetic =~ '^.*[i:]'") |>
-#   quantify(.from=fake_voice_report,windowSize=30)  |>
-#   glimpse()
-
-# out3 <- ae |>
-#   ask_for("Phonetic =~ '^.*[i:]'") |>
-#   quantify("fm")  |>
-#   glimpse()
+q1 <- "Utterance != ''"
+q2 <- "Phonetic = V"
+reindeer::query(ae, q2) |>
+  group_by(session,bundle) |>
+  nest()
+(quantify2(q1,
+          q2,
+          .source=fake_two_df_fun,
+          .inside_of = ae,
+          .by_bundle = TRUE) -> out)
 
 
-
-# ae |>
-#  search_for("Syllable = S | W" ) |>
-#  climb_to("Word") |>
-#  scout_ahead(steps_forward=2, look_ahead=2, look_backwards=2) |>
-#  quantify_from(.source=ksvF0, minF=50)
-
-# ae |>
-#  search_for("Syllable = S | W" ) |>
-#  scout_backwards(steps_forward=2, look_ahead=2, look_backwards=2)
-#  quantify_from(.source="f0", .transform=st)
-
-#ae |>
-  #  ask_for("Word =~ .*") |>
-  #  capture_all(level="Phonetic") |>
-
-#forest("~/Desktop/a1.wav",toFile=FALSE) -> fms
-#readtrack("~/Desktop/a1.fms") -> fms
-#print(as_tibble(fms))
-
+df <- data.frame(time=seq(0,1,0.1),label=as.character(1:11))
 
 
