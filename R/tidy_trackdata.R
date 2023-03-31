@@ -466,23 +466,26 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     #Now, since we set up a default file name above if .cache_file is just TRUE
     # we should be able to use the character string as the file name
     if(is.character(.cache_file)){
-      .cache_file <- normalizePath(.cache_file)
+      #There is no reason for file path normalization to not work in this call
+      # so the warnings given by default for the not yet existing file will just be ignored
+      suppressWarnings(.cache_file <- normalizePath(.cache_file,mustWork = NA))
       cacheFileExists <- file.exists(.cache_file)
 
       #Clear cache file if indicated
       if(.clear_cache && cacheFileExists){
-        unlink(.cache_file)
+
+        suppressWarnings( unlink(.cache_file))
         cacheFileExists <- file.exists(.cache_file)
       }
-
-      .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
-                                          user="root",
-                                          password="",
-                                          host="localhost",
-                                          dbname=.cache_file,
-                                          flags=RSQLite::SQLITE_RWC,
-                                          loadable.extensions=FALSE)
-
+      suppressWarnings(
+        .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
+                                            user="root",
+                                            password="",
+                                            host="localhost",
+                                            dbname=.cache_file,
+                                            flags=RSQLite::SQLITE_RWC,
+                                            loadable.extensions=FALSE)
+      )
 #
 #       if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
 #                                                                   "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
@@ -680,7 +683,11 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
 
   if(!is.null(.parameter_log_excel)) {
-    .parameter_log_excel <- normalizePath(.parameter_log_excel)
+
+    #There is no reason for file path normalization to not work in this call
+    # so the warnings given by default for the not yet existing file will just be ignored
+    suppressWarnings(.parameter_log_excel <- normalizePath(.parameter_log_excel,mustWork = NA))
+
     if(is.character(.parameter_log_excel) && dir.exists(dirname(.parameter_log_excel))){
       #Write a new excel file, named either according to the specified name in
       #.parameter_log_excel or as a generated file name (if the string is a directory path)
@@ -692,8 +699,11 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
       parameterData <- segmentDSPDF  |>
         dplyr::rename(bundle=.bundle,session=.session)
 
-      openxlsx::write.xlsx(x = parameterData,file=excel_filename, asTable=FALSE)
+      openxlsx::write.xlsx(x = parameterData,file=excel_filename, asTable=FALSE, overwrite = TRUE)
+
+
       cli::cli_alert_success("Wrote DSP parameters used into {.file {excel_filename}}")
+      cli::cli_bullets(c(">"="Please note that default parameters of the called DSP function are not included in the log as they cannot unambigiously be deduced by {.fun quantify}."))
 
     }else{
       #Not able to create a parameter file or deduce a name for it
@@ -711,15 +721,27 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     format = "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} {cli::pb_percent} | ETA: {cli::pb_eta}",
     clear = TRUE)
 
-  explicitOrDefaultParamsDF <- as.data.frame(explicitOrDefaultParams)
+  explicitOrDefaultParamsDF <- as_tibble(explicitOrDefaultParams)
 
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
   appliedDFResultInList <- segmentDSPDF  |>
     tibble::rownames_to_column(var = ".sl_rowIdx")  |>
-    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))  |>
-    dplyr::mutate(explicitOrDefaultParamsDF) |> # This row ovewrites all deduced parameters with explicitly set ones, including toFile=FALSE if used
+    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))
+
+
+
+
+  if(nrow(explicitOrDefaultParamsDF) > 0 && ncol(explicitOrDefaultParamsDF) > 0) {
+    # This row ovewrites all deduced parameters with explicitly set ones, including toFile=FALSE if used by the called function
+    appliedDFResultInList <-  appliedDFResultInList |>
+    dplyr::mutate(explicitOrDefaultParamsDF)
+  }
+
+
+  # Do the final grouping and apply the DSP function inside of a wrapper
+  appliedDFResultInList <- appliedDFResultInList |>
     dplyr::rowwise()  |>
     purrr::pmap(.f=innerMapFunction,.progress = pb) # This is the busy line
 
@@ -744,8 +766,33 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     ##  [default] The case in which we are processing a segment list --------------------------------------------
 
     resTibble <- appliedDFResultInList  |>
-      purrr::map_dfr(as_tibble,.id="sl_rowIdx")  |>
+      purrr::map_dfr(as_tibble, .id="sl_rowIdx") |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
+
+    ### Perform 'cut' extraction ------------------------------------------------
+
+    if(!is.null(.where)){
+      if(is.null(.n_preceeding) && is.null(.n_following)){
+        cli::cli_inform(c("i"="Extracting one data point nearest the {(.where*100)}% time point for each segment"))
+        .n_preceeding <- 0
+        .n_following <- 0
+      }else{
+        .n_preceeding <- ifelse(is.null(.n_preceeding),0, .n_preceeding)
+        .n_following <- ifelse(is.null(.n_following),0, .n_following)
+
+        cli::cli_inform(c("i"="Extracting the data point nearest the {(.where*100)}% time point and at most {.val {(.n_preceeding)}} before and {.val {(.n_following)}} points following."))
+      }
+
+      resTibble <- resTibble |>
+        dplyr::group_by(sl_rowIdx) |>
+        dplyr::mutate(dist = (frame_time / max(frame_time)) -.where) |>
+        dplyr::mutate(ind_of_min = which.min(abs(dist) ),
+                      maxind=which.max(dist)) |>
+        dplyr::slice(seq(max(first(ind_of_min) - .n_preceeding ,0),min(first(maxind),first(ind_of_min) + .n_following))) |>
+        dplyr::select(-dist,-ind_of_min,-maxind)
+      cat("blopp")
+      return(resTibble)
+    }
 
 
     quantifyOutDF <- .what  |>
@@ -1454,18 +1501,18 @@ library(reindeer)
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
-q1 <- "Utterance != ''"
-q2 <- "Phonetic = V"
-reindeer::query(ae, q2) |>
-  group_by(session,bundle) |>
-  nest()
-(quantify2(q1,
-          q2,
-          .source=fake_two_df_fun,
-          .inside_of = ae,
-          .by_bundle = TRUE) -> out)
-
-
-df <- data.frame(time=seq(0,1,0.1),label=as.character(1:11))
+# q1 <- "Utterance != ''"
+# q2 <- "Phonetic = V"
+# reindeer::query(ae, q2) |>
+#   group_by(session,bundle) |>
+#   nest()
+# (quantify2(q1,
+#           q2,
+#           .source=fake_two_df_fun,
+#           .inside_of = ae,
+#           .by_bundle = TRUE) -> out)
+#
+#
+# df <- data.frame(time=seq(0,1,0.1),label=as.character(1:11))
 
 
