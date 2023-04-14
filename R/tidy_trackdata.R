@@ -2,8 +2,26 @@
 
 ITEM <- TRUE
 
-fake_two_df_fun <- function(x1,x2){
-  return(list(a=nrow(x1),b=nrow(x2)))
+fake_two_df_fun <- function( svDF,
+                              csDF,
+                              speaker.name = NULL,
+                              speaker.ID = NULL,
+                              speaker.dob = NULL,
+                              session.datetime = NULL,
+                              pdf.path = NULL,
+                              simple.output = FALSE,
+                              overwrite.pdfs = FALSE){
+
+  return(list(svDF=paste0(dim(svDF),collapse=","),
+                csDF=aste0(dim(csDF),collapse=","),
+                speaker.name=speaker.name ,
+                speaker.ID = speaker.ID,
+                speaker.dob = speaker.dob,
+                session.datetime = session.datetime,
+                pdf.path = pdf.path,
+                simple.output = simple.output,
+                overwrite.pdfs = overwrite.pdfs)
+         )
 }
 
 fake_voice_report <- function(listOfFiles,
@@ -1237,7 +1255,8 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 }
 
 
-quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE, .inside_of=NULL){
+quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundle=FALSE,.naively=TRUE, .inside_of=NULL){
+
 
 
   # Basic checks of input ---------------------------------------------------
@@ -1248,8 +1267,11 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
                      "i"="{.arg .source} is a {.cls {class(.source)}}. It needs to be a {.cls function}."))
   }
 
-  # Base setup --------------------------------------------------------------
+  fun <-rlang::enquos(.source)
+  funName <- as.character(fun)
 
+# cat(funName)
+  # Base setup --------------------------------------------------------------
 
   quiet_query <- purrr::quietly(emuR::query)
 
@@ -1259,7 +1281,6 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   if(.by_bundle) set_split_by <- c("session", "bundle") # This case applies when a session directory is used keep e.g. recordings of a specific speaker together
 
 
-  #
 
   required_fields <- c("labels", "start", "end", "db_uuid", "sample_start", "sample_end", "sample_rate", "listOfFiles")
 
@@ -1272,8 +1293,7 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
   innerMapFunction <- function(.sl_rowIdx,.session,.bundle,...){
 
-    dotdotdot <- list(...)
-    dotdotdotS <- toString(dotdotdot)
+
     result <- NULL
     .cache_connection <- NULL
 
@@ -1295,7 +1315,7 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
     #Compute if the results is still not defined
     if(is.null(result)){
 
-      logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
+      #logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
       result <- safe_f(...)
     }
 
@@ -1364,7 +1384,7 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   .what1_name <- purrr::pluck(methods::formalArgs(.source),1)
 
   .what1_df <-.what1   |>
-    dplyr::left_join(signalFiles_what1, by = c("session", "bundle")) |>
+    dplyr::left_join(signalFiles_what1, by = set_split_by,multiple="all") |>
     tidyr::nest(.by=all_of(set_split_by))
 
   names(.what1_df) <- c(set_split_by,.what1_name)
@@ -1445,14 +1465,14 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
 
   # Check that all required fields are returned in the tibbles in list columns
-  if(length(setdiff(required_fields, names(purrr::pluck(to_check,3,1)))) > 0 ||
-     length(setdiff(required_fields, names(purrr::pluck(to_check,4,1)))) > 0
+  if(length(setdiff(required_fields, names(purrr::pluck(to_check,.what1_name,1)))) > 0 ||
+     length(setdiff(required_fields, names(purrr::pluck(to_check,.what2_name,1)))) > 0
     ){
     cli::cli_abort(c("Missing required fields",
                      "!"="The {.cls tibble} / {.cls data.frame} needs to have some required fields for them to be passed to the function given as the {.arg .source} argument.",
                      "i"="Required fields are {.field {required_fields}}.",
                      "i"="The first data set has the columns {.field {names(purrr::pluck(to_check,3,1))}}",
-                     "i"="The first data set has the columns {.field {names(purrr::pluck(to_check,4,1))}}"))
+                     "i"="The second data set has the columns {.field {names(purrr::pluck(to_check,4,1))}}"))
   }
 
 
@@ -1472,20 +1492,37 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   # Do the actual processing work -------------------------------------------
 
 
+  ## Final preparations -------------------------------------------------------
+
+
   .what_df <- .what_df |>
     dplyr::ungroup() |>
     tibble::rownames_to_column(var = ".sl_rowIdx")  |>
     dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))  |>
-    dplyr::rename(.session=session,.bundle=bundle) |>
-    dplyr::rowwise()  |>
+    dplyr::mutate(!!!rlang::enexprs(...)) |> #Here we pass on the ... arguments to mutate so that we can set both a=session,b="dsds" and a will be a copy of session and b will be a string
     dplyr::glimpse() |>
+    dplyr::rename_with( ~ stringr::str_replace(.x,"^","."),dplyr::all_of(set_split_by)) |>
+    dplyr::rowwise() # Row-wise processing is assumed post-nesting
+
+  if(.glue_arguments){
+    .what_df <- .what_df |>
+      dplyr::mutate_if(is.character, glue)
+  }
+
+  ## Apply the DSP function -------------------------------------------------------
+  .what_df <- .what_df |>
     purrr::pmap(.f=innerMapFunction,.progress = TRUE) # This is the busy line
 
+
+
+  # Finalize function -------------------------------------------------------
 
 
   return(.what_df)
 
 }
+
+
 
 ## INTERACTIVE TESTING
 #
@@ -1498,6 +1535,13 @@ library(furrr)
 library(progress)
 library(reindeer)
 
+
+ask_for(ae,"Phonetic = @|I|E")  -> svDF
+ask_for(ae,"Word =~ .*") -> csDF
+
+
+quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = TRUE) -> to_checkBundle
+quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") |> glimpse() -> to_checkSession
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
