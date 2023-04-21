@@ -11,9 +11,9 @@ fake_two_df_fun <- function( svDF,
                               pdf.path = NULL,
                               simple.output = FALSE,
                               overwrite.pdfs = FALSE){
-
+  Sys.sleep(.5)
   return(list(svDF=paste0(dim(svDF),collapse=","),
-                csDF=aste0(dim(csDF),collapse=","),
+                csDF=paste0(dim(csDF),collapse=","),
                 speaker.name=speaker.name ,
                 speaker.ID = speaker.ID,
                 speaker.dob = speaker.dob,
@@ -98,7 +98,25 @@ double_fake_voice_report <- function(listOfFiles,
 ## ae |>
 # track("ae",forest)
 
-
+# > query(ae,"Phonetic=V") %>% glimpse()
+# Rows: 3
+# Columns: 16
+# $ labels             <chr> "V", "V", "V"
+# $ start              <dbl> 187.425, 340.175, 1943.175
+# $ end                <dbl> 256.925, 426.675, 2037.425
+# $ db_uuid            <chr> "0fc618dc-8980-414d-8c7a-144a649ce199", "0fc618dc-8980-414d-8c7a-144…
+# $ session            <chr> "0000", "0000", "0000"
+# $ bundle             <chr> "msajc003", "msajc003", "msajc057"
+# $ start_item_id      <int> 147, 149, 189
+# $ end_item_id        <int> 147, 149, 189
+# $ level              <chr> "Phonetic", "Phonetic", "Phonetic"
+# $ attribute          <chr> "Phonetic", "Phonetic", "Phonetic"
+# $ start_item_seq_idx <int> 1, 3, 28
+# $ end_item_seq_idx   <int> 1, 3, 28
+# $ type               <chr> "SEGMENT", "SEGMENT", "SEGMENT"
+# $ sample_start       <int> 3749, 6804, 38864
+# $ sample_end         <int> 5138, 8533, 40748
+# $ sample_rate        <int> 20000, 20000, 20000
 
 ask_for <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*",times_from = NULL, calculate_times = TRUE,interactive=FALSE){
   if(missing(inside_of)) cli::cli_abort("Please provide an Emu database handle or the full path to an Emu database in the {.args inside_of}  argument")
@@ -808,10 +826,11 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
                       maxind=which.max(dist)) |>
         dplyr::slice(seq(max(first(ind_of_min) - .n_preceeding ,0),min(first(maxind),first(ind_of_min) + .n_following))) |>
         dplyr::select(-dist,-ind_of_min,-maxind)
-      cat("blopp")
+      #cat("blopp")
       return(resTibble)
     }
 
+    ### Prepare return set  ------------------------------------------------
 
     quantifyOutDF <- .what  |>
       tibble::rownames_to_column(var = "sl_rowIdx")  |>
@@ -1255,7 +1274,7 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 }
 
 
-quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundle=FALSE,.naively=TRUE, .inside_of=NULL){
+quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE, .cache_file=NULL,.inside_of=NULL){
 
 
 
@@ -1267,10 +1286,14 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
                      "i"="{.arg .source} is a {.cls {class(.source)}}. It needs to be a {.cls function}."))
   }
 
-  fun <-rlang::enquos(.source)
-  funName <- as.character(fun)
+  if(!.naively){
+    cli::cli_alert_warning(c("!"="Metadata informed processing is currently not implmented"))
+    cli::cli_alert_warning(c("i"="Using speaker naive DSP parameters."))
+    .naively <- TRUE
+  }
 
-# cat(funName)
+
+
   # Base setup --------------------------------------------------------------
 
   quiet_query <- purrr::quietly(emuR::query)
@@ -1284,14 +1307,39 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
 
   required_fields <- c("labels", "start", "end", "db_uuid", "sample_start", "sample_end", "sample_rate", "listOfFiles")
 
+  ## Source setup ------------------------------------------------------------
+
+
+  # This section handles the case where we want to compute signals or a
+  # list of results from the wave file directly??
+  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
+    if(is.function(.source)){
+      funName <- as.character(rlang::call_args(rlang::current_call())$.source)
+      #Just leave .source unmodified
+    }else{
+      funName <- .source
+      .f <- purrr::safely(get)(.source)$result
+
+      cli::cli_inform("Applying the function {.fun {funName}} to the segment list.")
+    }
+
+    ddd <- rlang::list2(...)
+    ! names(ddd) %in% methods::formalArgs(.source) -> isNotValidArgs
+    willRemove <- ddd[isNotValidArgs]
+    cli::cli_alert_info(c("w"="Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}"))
+
+    #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
+    safe_f <- purrr::safely(.source, otherwise=NA)
+
+  }else{
+    cli::cli_abort(c("The {.arg .source} argument needs to be a function or the name of a function."))
+  }
+
   ## Definition and setup directly related to the inner applied funct --------
 
 
-  #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
-  safe_f <- purrr::possibly(.source, otherwise=NA)
-
   #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
-  innerMapFunction <- function(.sl_rowIdx,.session,.bundle,...){
+  innerMapFunction <- function(sl_rowIdx,session,bundle=NULL,...){
 
 
     result <- NULL
@@ -1300,11 +1348,11 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
     if(!is.null(.cache_connection)){
       #Check existing values
 
-      #cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
+      cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",sl_rowIdx)
 
       if(nrow(cachedObj) > 0){
         #Load rather than comput
-        logger::log_debug("[{.session}:{.bundle})] Loading data from cache file.\n")
+        logger::log_debug("[{session}:{bundle})] Loading data from cache file.\n")
 
         result <- base::unserialize(
           base::charToRaw(
@@ -1315,19 +1363,84 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
     #Compute if the results is still not defined
     if(is.null(result)){
 
-      #logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
-      result <- safe_f(...)
+      #logger::log_debug("[{session}:{bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
+      fres <- .source(...)
+      logger::log_debug(glue::glue("[{session}:{bundle}] {fres$result}"))
     }
 
     #Maybe store the results in cache?
-    #if(!is.null(.cache_connection)){
-    #  objser <- base::rawToChar(base::serialize(result, connection = NULL,ascii = TRUE))
+    if(!is.null(.cache_connection)){
+      objser <- base::rawToChar(base::serialize(fres, connection = NULL,ascii = TRUE))
 
 
-    #  RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(.sl_rowIdx,objser))
-    #}
+      RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(sl_rowIdx,objser))
+    }
 
-    return(result)
+    return(fres)
+  }
+
+  ## Optional cache system setup -----------------------------------------
+
+  .cache_connection <- NULL
+
+  ## Make a date specific cache file if
+  if(!is.null(.cache_file) && ! isFALSE(.cache_file)){
+    if(.cache_file) {
+      #Set a date specific cache file
+      .cache_file <- file.path(tempdir(check=TRUE),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
+    }
+    #Now, since we set up a default file name above if .cache_file is just TRUE
+    # we should be able to use the character string as the file name
+    if(is.character(.cache_file)){
+      #There is no reason for file path normalization to not work in this call
+      # so the warnings given by default for the not yet existing file will just be ignored
+      suppressWarnings(.cache_file <- normalizePath(.cache_file,mustWork = NA))
+      cacheFileExists <- file.exists(.cache_file)
+
+      #Clear cache file if indicated
+      if(.clear_cache && cacheFileExists){
+
+        suppressWarnings( unlink(.cache_file))
+        cacheFileExists <- file.exists(.cache_file)
+      }
+      suppressWarnings(
+        .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
+                                            user="root",
+                                            password="",
+                                            host="localhost",
+                                            dbname=.cache_file,
+                                            flags=RSQLite::SQLITE_RWC,
+                                            loadable.extensions=FALSE)
+      )
+      #
+      #       if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
+      #                                                                   "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
+      #Check table format requirements
+      if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
+         (! "cache" %in% RSQLite::dbListTables(.cache_connection) || ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))
+      ){
+
+        cli::cli_alert_info("Initializing cache file {.file {(.cache_file)}}")
+
+        RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
+
+      }else{
+        cli::cli_alert_info("Using existing cache file {.file {(.cache_file)}}")
+      }
+
+      RSQLite::dbExecute(.cache_connection,"CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
+
+    }else{
+      #The cache file is not NULL, not TRUE (auto-generated), and not a character vector
+      cli::cli_abort(c("The cache file name could not be deduced",
+                       "x"="A full path can be given; a value TRUE vill generate a default file name based on the current date.",
+                       "i"="The {.arg .cache_file} provided to the fucntion was {.val {(.cache_file)}}."))
+    }
+
+
+  }else{
+    #the case when no cache file should be used
+    cli::cli_alert_info("Intermediate results are {.strong not} cached.")
   }
 
   # Setup of the first dataset ----------------------------------------------
@@ -1384,10 +1497,16 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
   .what1_name <- purrr::pluck(methods::formalArgs(.source),1)
 
   .what1_df <-.what1   |>
-    dplyr::left_join(signalFiles_what1, by = set_split_by,multiple="all") |>
+    dplyr::left_join(signalFiles_what1, by = set_split_by,multiple="all",relationship = "many-to-many") |>
     tidyr::nest(.by=all_of(set_split_by))
 
   names(.what1_df) <- c(set_split_by,.what1_name)
+
+  ## Error on empty first data set  ---------------------------------------------
+
+  if(nrow(.what1_df) == 0){
+    cli::cli_abort(c("!"="The {.arg .what1} tibble contains no rows."))
+  }
 
 
   # Setup of the second dataset ----------------------------------------------
@@ -1449,10 +1568,20 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
 
   names(.what2_df) <- c(set_split_by,.what2_name)
 
+  ## Error on empty second data set  ---------------------------------------------
+
+  if(nrow(.what2_df) == 0){
+    cli::cli_abort(c("!"="The {.arg .what2} tibble contains no rows."))
+  }
+
+
+  # Join first and second data sets -----------------------------------------
+
 
   .what_df <- .what1_df |>
     dplyr::inner_join(.what2_df,by = set_split_by) |>
     dplyr::rowwise()
+
 
 
   # Check result set compatibility ------------------------------------------
@@ -1476,6 +1605,9 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
   }
 
 
+
+
+
   ## Report on incompatibilities ---------------------------------------------
 
 
@@ -1489,36 +1621,36 @@ quantify2 <- function(.what1, .what2, .source,...,.glue_arguments=TRUE,.by_bundl
     cli::cli_alert_warning(c("!"="The {.field {(.what1_name)}} argument of the function given as {.arg .source} has {nrow(only_in_df2)} rows with no mathch in {.field {(.what2_name)}} and will be ignored."))
   }
 
-  # Do the actual processing work -------------------------------------------
 
 
-  ## Final preparations -------------------------------------------------------
-
+  ## Insert explicit arguments  -------------------------------------------------------
 
   .what_df <- .what_df |>
     dplyr::ungroup() |>
-    tibble::rownames_to_column(var = ".sl_rowIdx")  |>
-    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))  |>
-    dplyr::mutate(!!!rlang::enexprs(...)) |> #Here we pass on the ... arguments to mutate so that we can set both a=session,b="dsds" and a will be a copy of session and b will be a string
-    dplyr::glimpse() |>
-    dplyr::rename_with( ~ stringr::str_replace(.x,"^","."),dplyr::all_of(set_split_by)) |>
-    dplyr::rowwise() # Row-wise processing is assumed post-nesting
+    tibble::rownames_to_column(var = "sl_rowIdx")  |>
+    #dplyr::rename_with( ~ stringr::str_replace(.x,"^","."),dplyr::all_of(set_split_by)) |> #This line hides the session and bundle columns so that they do not interfere with later processing steps
+    dplyr::mutate(!!!rlang::enexprs(...))  |> #Here we pass on the ... arguments to mutate so that we can set both a=session,b="dsds" and a will be a copy of session and b will be a string
+    dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
 
-  if(.glue_arguments){
-    .what_df <- .what_df |>
-      dplyr::mutate_if(is.character, glue)
-  }
+
+  # Do the actual processing work -------------------------------------------
+
 
   ## Apply the DSP function -------------------------------------------------------
   .what_df <- .what_df |>
-    purrr::pmap(.f=innerMapFunction,.progress = TRUE) # This is the busy line
+    dplyr::select(-sl_rowIdx,-session,-bundle)|>
+    dplyr::glimpse() |>
+    dplyr::rowwise() %>%
+    mutate(temp =purrr::pmap(.,.f=.source,.progress = list(format=paste0("Applying '",funName,"' {cli::pb_bar} {cli::pb_current}/{cli::pb_total} collections | {cli::pb_eta_str}"))))  # This is the busy line
+   # dplyr::glimpse()
+
 
 
 
   # Finalize function -------------------------------------------------------
 
 
-  return(.what_df)
+  return(.what_df  )
 
 }
 
@@ -1535,13 +1667,16 @@ library(furrr)
 library(progress)
 library(reindeer)
 
-
-ask_for(ae,"Phonetic = @|I|E")  -> svDF
-ask_for(ae,"Word =~ .*") -> csDF
+reindeer:::create_ae_db() -> ae
 
 
-quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = TRUE) -> to_checkBundle
-quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") |> glimpse() -> to_checkSession
+ask_for(ae,"Phonetic = V|E|a|A") |>
+  mutate(start=100,end=2100) -> svDF
+ask_for(ae,"Word != ''") -> csDF
+
+#quantify2(svDF,csDF,.source=superassp::praat_avqi,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") -> to_checkSession
+
+quantify2(svDF,csDF,.source=praat_avqi,.by_bundle = TRUE,.naively = FALSE) -> to_checkBundle
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
