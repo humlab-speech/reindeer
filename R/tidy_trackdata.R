@@ -1318,15 +1318,16 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
       #Just leave .source unmodified
     }else{
       funName <- .source
-      .f <- purrr::safely(get)(.source)$result
+      .source <- purrr::safely(get)(.source)$result
 
-      cli::cli_inform("Applying the function {.fun {funName}} to the segment list.")
     }
 
-    ddd <- rlang::list2(...)
+    cli::cli_inform("Applying the function {.fun {funName}} to the segment list.")
+
+    ddd <- rlang::dots_list(...,.named=TRUE)
     ! names(ddd) %in% methods::formalArgs(.source) -> isNotValidArgs
-    willRemove <- ddd[isNotValidArgs]
-    cli::cli_alert_info(c("w"="Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}"))
+    willRemove <- names(ddd)
+    cli::cli_alert_info(c("w"="Ignoring the {willRemove} arguments as they are not used by {.fun {funName}}"))
 
     #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
     safe_f <- purrr::safely(.source, otherwise=NA)
@@ -1364,7 +1365,7 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
     if(is.null(result)){
 
       #logger::log_debug("[{session}:{bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
-      fres <- .source(...)
+      fres <- safe_f(...)
       logger::log_debug(glue::glue("[{session}:{bundle}] {fres$result}"))
     }
 
@@ -1614,11 +1615,13 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   only_in_df1 <- dplyr::anti_join(.what1_df,.what2_df,by=set_split_by)
   only_in_df2 <- dplyr::anti_join(.what2_df,.what1_df,by=set_split_by)
   if(nrow(only_in_df1) > 0 ){
-    cli::cli_alert_warning(c("!"="The {.field {(.what2_name)}} argument of the function given as {.arg .source} has {nrow(only_in_df1)} rows with no mathch in {.field {(.what1_name)}} and will be ignored."))
+    cli::cli_alert_warning(c("!"="The {.field {(.what2_name)}} argument to {.fn {funName}} has {nrow(only_in_df1)} rows with no mathch in {.field {(.what1_name)}}",
+                             ">"="Missing fields will be ignored."))
   }
-
+  set_split_by
   if(nrow(only_in_df2) > 0 ){
-    cli::cli_alert_warning(c("!"="The {.field {(.what1_name)}} argument of the function given as {.arg .source} has {nrow(only_in_df2)} rows with no mathch in {.field {(.what2_name)}} and will be ignored."))
+    cli::cli_alert_warning(c("!"="The {.field {(.what1_name)}} argument to {.fn {funName}} has {nrow(only_in_df2)} rows with no mathch in {.field {(.what2_name)}}."))
+    cli::cli_alert(c(">"="The incomplete {tail(set_split_by,1)} sets will be ignored."))
   }
 
 
@@ -1638,11 +1641,11 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
   ## Apply the DSP function -------------------------------------------------------
   .what_df <- .what_df |>
-    dplyr::select(-sl_rowIdx,-session,-bundle)|>
+    dplyr::select(-tidyselect::any_of(c(set_split_by)), -sl_rowIdx)|>
     dplyr::glimpse() |>
-    dplyr::rowwise() %>%
-    mutate(temp =purrr::pmap(.,.f=.source,.progress = list(format=paste0("Applying '",funName,"' {cli::pb_bar} {cli::pb_current}/{cli::pb_total} collections | {cli::pb_eta_str}"))))  # This is the busy line
-   # dplyr::glimpse()
+    #dplyr::rowwise() |>
+    purrr::pmap(.f=.source,.progress = list(format=paste("Applying",funName," {cli::pb_bar} {cli::pb_current}/{cli::pb_total} collections | {cli::pb_eta_str}"))) |> # This is the busy line
+    dplyr::glimpse()
 
 
 
@@ -1650,7 +1653,7 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   # Finalize function -------------------------------------------------------
 
 
-  return(.what_df  )
+  return(.what_df)
 
 }
 
@@ -1667,16 +1670,21 @@ library(furrr)
 library(progress)
 library(reindeer)
 
-reindeer:::create_ae_db() -> ae
+# reindeer:::create_ae_db() -> ae
+#
+#
+# ask_for(ae,"Phonetic = V|E|a|A") |>
+#   mutate(start=100,end=2100) -> svDF
+# ask_for(ae,"Word != ''") -> csDF
+#
+# #quantify2(svDF,csDF,.source=superassp::praat_avqi,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") -> to_checkSession
 
+load_emuDB("tests/signalfiles/VISP_emuDB/") -> VISP
 
-ask_for(ae,"Phonetic = V|E|a|A") |>
-  mutate(start=100,end=2100) -> svDF
-ask_for(ae,"Word != ''") -> csDF
+VISP |> ask_for("Production= /a/") -> svDF
+VISP |> ask_for("Production= S") -> csDF
 
-#quantify2(svDF,csDF,.source=superassp::praat_avqi,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") -> to_checkSession
-
-quantify2(svDF,csDF,.source=praat_avqi,.by_bundle = TRUE,.naively = FALSE) -> to_checkBundle
+quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = FALSE,.naively = TRUE) -> to_checkSession
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)

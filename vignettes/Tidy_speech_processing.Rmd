@@ -119,9 +119,11 @@ reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose = FALSE) -> ae
 
 #TODO: explicitExt ses inte längre som ett argument till forest
+logger::log_threshold(logger::INFO)
 
-furnish(ae,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",nominalF1=533,.force=TRUE, .really_force=TRUE,.parameter_log_excel = "~/Desktop/1.xlsx",.recompute = TRUE) #%>%
-#furnish("fms",FORMANTS="fm","bw","dft","fm",explicitExt="fms",.force=TRUE,.parameter_log_excel = "~/Desktop/2.xlsx")
+furnish(ae$basePath,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",nominalF1=533,.force=TRUE, .really_force=TRUE,.parameter_log_excel = "~/Desktop/1.xlsx",.recompute = TRUE) 
+#|>
+#furnish("fms")
 
 ```
 
@@ -169,7 +171,7 @@ words |>
 ```{r Accessing data from a pre-computed track}
 
 segments_following |>
-  quantify("fm")
+  quantify("fm", .where=0.5, .n_preceeding=2,.n_following=1) 
 
 ```
 
@@ -177,7 +179,8 @@ segments_following |>
 ```{r Acquiring track data on the fly for segments}
 
 segments_following |>
-  quantify(forest, windowShift=10,nominalF1 = 522,.recompute = FALSE, .naively = FALSE,.cache_file = TRUE,.clear_cache = TRUE,.parameter_log_excel = "~/Desktop/1.xlsx")
+  quantify(forest, windowShift=5,nominalF1 = 522,.recompute = FALSE, .naively = TRUE,.parameter_log_excel="~/Desktop/forest.xlsx",.cache_file=TRUE) |>
+  glimpse()
 
 ```
 
@@ -185,8 +188,9 @@ segments_following |>
 ```{r Using quantify to acquire summary acoustic data}
 
 segments_following |>
-  quantify(praat_voice_report)
-  #quantify(forest)
+  quantify(praat_voice_report,.parameter_log_excel="~/Desktop/vt.xlsx",.cache_file=TRUE) 
+
+
 
 ```
 
