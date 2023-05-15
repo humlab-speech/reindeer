@@ -1,4 +1,58 @@
+library(S7)
 
+segments <- new_class("segments",
+                      class_data.frame,
+                      properties = list(
+                        basePath = class_character
+                      ),
+                      validator=function(self){
+                        mandatoryNames <- c("labels", "start", "end", "db_uuid", "session", "bundle", "start_item_id",
+                                            "end_item_id", "level", "attribute", "start_item_seq_idx", "end_item_seq_idx",
+                                            "type", "sample_start", "sample_end", "sample_rate")
+                        if(is.null(self@basePath) ){
+                          "@basePath is not set"
+                        }else if(!dir.exists(self@basePath)){
+                          "@basePath must point to an existing database directory"
+                        }else if(! all(mandatoryNames %in% names(self) )){
+                          "Not all mandatory columns are present in the data.frame and is not a valid segments class"
+                        }
+                      },
+                      constructor=function(x,basePath,fileExtension=NULL){
+                        if(is.null(fileExtension)){
+                          emuDBhandle <- emuR::load_emuDB(basePath)
+                        }
+                        emuR:::load_DBconfig(emuDBhandle)$mediafileExtension
+                        x[,"listOfFiles"] <- file.path(.inside_of$basePath,
+                                                       paste0(x[["session"]],emuR:::session.suffix),
+                                                       paste0(x[["bundle"]],emuR:::bundle.dir.suffix),
+                                                       paste(x[["bundle"]],fileExtension,sep="."))
+                        new_object(x,basePath=basePath)
+
+                      })
+
+
+bundles <- new_class("bundles",
+                     class_data.frame,
+                     properties = list(
+                       basePath = class_character
+                     ),
+                     validator=function(self){
+                       mandatoryNames <- c("session","name")
+                       if(is.null(self@basePath) ){
+                         "@basePath is not set"
+                       }else if(!dir.exists(self@basePath)){
+                         "@basePath must point to an existing database directory"
+                       }else if(! all(mandatoryNames %in% names(self) )){
+                         "Not all mandatory columns are present in the data.frame and is not a valid segments class"
+                       }
+                     },
+                     constructor=function(x,basePath){
+                       x[,"listOfFiles"] <- file.path(basePath,
+                                                      x[["session"]],
+                                                      x[["bundle"]])
+                       new_object(x,basePath=basePath)
+
+                     })
 
 ITEM <- TRUE
 
@@ -1668,7 +1722,6 @@ library(tibble)
 library(superassp)
 library(furrr)
 library(progress)
-library(reindeer)
 
 # reindeer:::create_ae_db() -> ae
 #
@@ -1679,7 +1732,7 @@ library(reindeer)
 #
 # #quantify2(svDF,csDF,.source=superassp::praat_avqi,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") -> to_checkSession
 
-load_emuDB("tests/signalfiles/VISP_emuDB/") -> VISP
+emuR::load_emuDB("tests/signalfiles/VISP_emuDB/") -> VISP
 
 VISP |> ask_for("Production= /a/") -> svDF
 VISP |> ask_for("Production= S") -> csDF
