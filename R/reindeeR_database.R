@@ -31,7 +31,9 @@ import_recordings <- function (emuDBhandle, dir, media_pattern=".*",targetSessio
 {
   emuR:::check_emuDBhandle(emuDBhandle)
   dbCfg = emuR:::load_DBconfig(emuDBhandle)
+
   mediafileExtension <- dbCfg[["mediafileExtension"]]
+
   if(!is.null(downsample.to) && !is.numeric(downsample.to)){
     stop("Expecting a numeric sampling frequency to downsample to.")
   }
@@ -121,10 +123,12 @@ import_recordings <- function (emuDBhandle, dir, media_pattern=".*",targetSessio
   return(invisible(NULL))
 }
 
+
 #INTERACTIVE TESTING
 #   reindeer::create_emuDB("~/Desktop/",name="test")
 #  reindeer::load_emuDB("~/Desktop/test_emuDB/") -> VISP
 # import_recordings(VISP,dir = "~/Desktop/input/",targetSessionName = "0000",downsample.to = 16000)
+
 
 #' Save the state of a speech database
 #'
