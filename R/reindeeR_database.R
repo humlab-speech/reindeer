@@ -16,51 +16,42 @@
 #' The function also makes sure that 'OSCI' and 'SPEC' perspectives are defined
 #' for the database.
 #'
-#' The user may also indicate that an additional channel of the speech
-#' recording, containing an electroglottography (EGG) track, should be stored in
-#' an '.egg' file by indicating its channel number in the `egg.channel`
-#' argument. The EGG track is often stored in the second channel of the speech
-#' recording file, which means that `egg.channel=2` is usually appropriate. The
-#' user should however verify this and a sound editor before importing speech
-#' recordings.
-#'
 #'
 #' @param emuDBhandle The Emu database handle.
 #' @param dir The directory containing speech recordings or session directories.
 #' @param targetSessionName The default session name, if not specified using sub-directories in the import folder.
-#' @param speech.channel The channel number containing the audio track to be stored in the database.
-#' @param egg.channel An optional electroglottography channel number, which will
-#'   be stored in a separate ".egg" file.
+#' @param downsample.to Set the sampling frequency to downsample the input file to before writing to the database. A `NULL` indicates
+#' that the original sampling frequency of the file will be left intact.
 #' @param verbose Should additional information and progress bar be displayed to the user?
 #'
 #' @export
 #'
 
-import_recordings <- function (emuDBhandle, dir, targetSessionName = "0000", speech.channel=1,egg.channel=NULL, verbose = TRUE)
+import_recordings <- function (emuDBhandle, dir, media_pattern=".*",targetSessionName = "0000", downsample.to=NULL,verbose = TRUE)
 {
   emuR:::check_emuDBhandle(emuDBhandle)
   dbCfg = emuR:::load_DBconfig(emuDBhandle)
-
-  #Prepare an extension to channel list
-  split.to <- list("wav"=speech.channel)
-  if(!is.null(egg.channel)){
-    split.to$egg <- egg.channel
+  mediafileExtension <- dbCfg[["mediafileExtension"]]
+  if(!is.null(downsample.to) && !is.numeric(downsample.to)){
+    stop("Expecting a numeric sampling frequency to downsample to.")
   }
 
-  #In this case, the user has opted to rely on the definition "mediafileExtension" in selecting which
-  # file extension to use for speech signal files. "wav" is by far the most common case.
-  if (is.null(dbCfg[["mediafileExtension"]])) {
-    #If no definition is present, revert to "wav"
-    pattern = ".*[.]wav$"
-    warning("Using \'wav\' as the signal file extension since no definition was found in the database file or in the user arguments to this function. Please use the split.to argument to provide a default.")
+  safe_info <- purrr::safely(av::av_media_info,otherwise = NA,quiet = TRUE)
+  quiet_convert <- purrr::quietly(av::av_audio_convert)
+
+  mediaFiles = data.frame(file=list.files(dir, pattern = media_pattern),
+                          sample_rate=NA)
+  for(i in 1:nrow(mediaFiles)){
+    mediaFiles[i,"sample_rate"] <- safe_info(file.path(dir,mediaFiles[[i,"file"]]))[["result"]][[1]]
+
   }
-  else {
-    pattern = paste0(".*[.]", dbCfg[["mediafileExtension"]],
-                     "$")
+  nMediaFiles <- nrow(mediaFiles)
+  mediaFiles <- na.omit(mediaFiles)
+  if(nMediaFiles > nrow(mediaFiles )){
+    stop(paste(nMediaFiles - nrow(mediaFiles)," duplicate media files exists (in different file formants). Please clean the import directory from duplicates!"))
   }
 
-  mfList = list.files(dir, pattern = pattern)
-  if (length(mfList) > 0) {
+  if (nrow(mediaFiles) > 0) {
     sessDir = file.path(emuDBhandle$basePath, paste0(targetSessionName,
                                                      emuR:::session.suffix))
     if (!file.exists(sessDir)) {
@@ -77,40 +68,22 @@ import_recordings <- function (emuDBhandle, dir, targetSessionName = "0000", spe
   mediaAdded = FALSE
   progress = 0
   if (verbose) {
-    cat("INFO: Importing ", length(mfList), " media files...\n")
-    pb = utils::txtProgressBar(min = 0, max = length(mfList),
+    cat("INFO: Importing ", nrow(mediaFiles), " media files...\n")
+    pb = utils::txtProgressBar(min = 0, max = nrow(mediaFiles),
                                initial = progress, style = 3)
     utils::setTxtProgressBar(pb, progress)
   }
-  for (mf in mfList) {
+  for (i in 1:nrow(mediaFiles)) {
+    mf <- mediaFiles[[i,"file"]]
+
     mfFullPath = file.path(dir, mf)
     bundleName = sub("[.][^.]*$", "", mf)
     bundleDir = file.path(sessDir, paste0(bundleName, emuR:::bundle.dir.suffix))
     dir.create(bundleDir)
-    newMediaFileFullPath = file.path(bundleDir, mf)
+    newMediaFileFullPath = file.path(bundleDir, paste0(tools::file_path_sans_ext(mf),".",mediafileExtension))
 
-    #file.copy(from = mfFullPath, to = newMediaFileFullPath)
-    pfAssp = wrassp::read.AsspDataObj(mfFullPath)
-    sampleRate = attr(pfAssp, "sampleRate")
-
-
-    if(as.numeric(split.to$wav) > ncol(pfAssp$audio)){
-      stop("The channel number indicating the WAV track data does not exist.")
-    }
-    # Separate out an EGG track if available
-    if(! is.null(split.to$egg) && as.numeric(split.to$egg) <= ncol(pfAssp$audio) ){
-      eggAssp <- pfAssp # Make an EGG signal track
-      eggAssp$audio[,as.numeric(split.to$egg)] -> eggAssp$audio
-      dim(eggAssp$audio) <- c(length(eggAssp$audio),1)
-      eggFileFullPath <- paste0(tools::file_path_sans_ext(newMediaFileFullPath),".egg")
-      wrassp::write.AsspDataObj(eggAssp,eggFileFullPath)
-    }
-    # Now finally write the wave file track
-    if(! is.null(split.to$wav) && as.numeric(split.to$wav) <= ncol(pfAssp$audio) ){
-      pfAssp$audio[,as.numeric(split.to$wav)] -> pfAssp$audio
-      dim(pfAssp$audio) <- c(length(pfAssp$audio),1)
-      wrassp::write.AsspDataObj(pfAssp,newMediaFileFullPath)
-    }
+    quiet_convert(audio = mfFullPath, output = newMediaFileFullPath, channels = 1,sample_rate=downsample.to,verbose=FALSE)
+    sampleRate <- av::av_media_info(newMediaFileFullPath)[["audio"]][["sample_rate"]]
 
 
 
@@ -147,6 +120,11 @@ import_recordings <- function (emuDBhandle, dir, targetSessionName = "0000", spe
   }
   return(invisible(NULL))
 }
+
+#INTERACTIVE TESTING
+#   reindeer::create_emuDB("~/Desktop/",name="test")
+#  reindeer::load_emuDB("~/Desktop/test_emuDB/") -> VISP
+# import_recordings(VISP,dir = "~/Desktop/input/",targetSessionName = "0000",downsample.to = 16000)
 
 #' Save the state of a speech database
 #'

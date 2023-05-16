@@ -7,9 +7,9 @@
 import_recordings(
   emuDBhandle,
   dir,
+  media_pattern = ".*",
   targetSessionName = "0000",
-  speech.channel = 1,
-  egg.channel = NULL,
+  downsample.to = NULL,
   verbose = TRUE
 )
 }
@@ -20,10 +20,8 @@ import_recordings(
 
 \item{targetSessionName}{The default session name, if not specified using sub-directories in the import folder.}
 
-\item{speech.channel}{The channel number containing the audio track to be stored in the database.}
-
-\item{egg.channel}{An optional electroglottography channel number, which will
-be stored in a separate ".egg" file.}
+\item{downsample.to}{Set the sampling frequency to downsample the input file to before writing to the database. A \code{NULL} indicates
+that the original sampling frequency of the file will be left intact.}
 
 \item{verbose}{Should additional information and progress bar be displayed to the user?}
 }
@@ -43,12 +41,4 @@ and stored in the database.
 
 The function also makes sure that 'OSCI' and 'SPEC' perspectives are defined
 for the database.
-
-The user may also indicate that an additional channel of the speech
-recording, containing an electroglottography (EGG) track, should be stored in
-an '.egg' file by indicating its channel number in the \code{egg.channel}
-argument. The EGG track is often stored in the second channel of the speech
-recording file, which means that \code{egg.channel=2} is usually appropriate. The
-user should however verify this and a sound editor before importing speech
-recordings.
 }

@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: This package extends the capabilities of emuR to work with speech data in a nordic climate
-Version: 0.0.15
+Version: 0.0.16
 Authors@R:
     person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se", role = c("aut", "cre"))
 Maintainer: Fredrik Karlsson <fredrik.k.karlsson@umu.se>
@@ -35,13 +35,14 @@ Imports:
     reticulate,
     tidyselect,
     openssl,
-    cli
+    cli,
+    av
 Remotes:
   github::tjmahr/tjm.praat,
   github::humlab-speech/superassp
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.3
 Depends: 
     R (>= 2.10)
 Config/testthat/edition: 3
