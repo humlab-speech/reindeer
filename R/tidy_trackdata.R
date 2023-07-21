@@ -1,5 +1,11 @@
 library(S7)
 
+eql <- new_class("eql",
+                  class_character,
+                  properties = list(
+                    query_string = class_character
+                  ))
+
 segments <- new_class("segments",
                       class_data.frame,
                       properties = list(
@@ -1330,8 +1336,6 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE, .cache_file=NULL,.inside_of=NULL){
 
-
-
   # Basic checks of input ---------------------------------------------------
 
   if(missing(.source) || !is.function(.source)) {
@@ -1715,13 +1719,13 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
 ## INTERACTIVE TESTING
 #
-library(tidyverse)
-library(purrr)
-library(progressr)
-library(tibble)
-library(superassp)
-library(furrr)
-library(progress)
+# library(tidyverse)
+# library(purrr)
+# library(progressr)
+# library(tibble)
+# library(superassp)
+# library(furrr)
+# library(progress)
 
 # reindeer:::create_ae_db() -> ae
 #
@@ -1732,12 +1736,12 @@ library(progress)
 #
 # #quantify2(svDF,csDF,.source=superassp::praat_avqi,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") -> to_checkSession
 
-emuR::load_emuDB("tests/signalfiles/VISP_emuDB/") -> VISP
+#emuR::load_emuDB("tests/signalfiles/VISP_emuDB/") -> VISP
 
-VISP |> ask_for("Production= /a/") -> svDF
-VISP |> ask_for("Production= S") -> csDF
+#VISP |> ask_for("Production= /a/") -> svDF
+#VISP |> ask_for("Production= S") -> csDF
 
-quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = FALSE,.naively = TRUE) -> to_checkSession
+#quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = FALSE,.naively = TRUE) -> to_checkSession
 
 # reindeer:::create_ae_db() -> ae
 # reindeer:::make_dummy_metafiles(ae)
