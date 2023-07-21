@@ -6,6 +6,8 @@ eql <- new_class("eql",
                     query_string = class_character
                   ))
 
+
+
 segments <- new_class("segments",
                       class_data.frame,
                       properties = list(
