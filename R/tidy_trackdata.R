@@ -1,68 +1,4 @@
-library(S7)
 
-eql <- new_class("eql",
-                  class_character,
-                  properties = list(
-                    query_string = class_character
-                  ))
-
-
-
-segments <- new_class("segments",
-                      class_data.frame,
-                      properties = list(
-                        basePath = class_character
-                      ),
-                      validator=function(self){
-                        mandatoryNames <- c("labels", "start", "end", "db_uuid", "session", "bundle", "start_item_id",
-                                            "end_item_id", "level", "attribute", "start_item_seq_idx", "end_item_seq_idx",
-                                            "type", "sample_start", "sample_end", "sample_rate")
-                        if(is.null(self@basePath) ){
-                          "@basePath is not set"
-                        }else if(!dir.exists(self@basePath)){
-                          "@basePath must point to an existing database directory"
-                        }else if(! all(mandatoryNames %in% names(self) )){
-                          "Not all mandatory columns are present in the data.frame and is not a valid segments class"
-                        }
-                      },
-                      constructor=function(x,basePath,fileExtension=NULL){
-                        if(is.null(fileExtension)){
-                          emuDBhandle <- emuR::load_emuDB(basePath)
-                        }
-                        emuR:::load_DBconfig(emuDBhandle)$mediafileExtension
-                        x[,"listOfFiles"] <- file.path(.inside_of$basePath,
-                                                       paste0(x[["session"]],emuR:::session.suffix),
-                                                       paste0(x[["bundle"]],emuR:::bundle.dir.suffix),
-                                                       paste(x[["bundle"]],fileExtension,sep="."))
-                        new_object(x,basePath=basePath)
-
-                      })
-
-
-bundles <- new_class("bundles",
-                     class_data.frame,
-                     properties = list(
-                       basePath = class_character
-                     ),
-                     validator=function(self){
-                       mandatoryNames <- c("session","name")
-                       if(is.null(self@basePath) ){
-                         "@basePath is not set"
-                       }else if(!dir.exists(self@basePath)){
-                         "@basePath must point to an existing database directory"
-                       }else if(! all(mandatoryNames %in% names(self) )){
-                         "Not all mandatory columns are present in the data.frame and is not a valid segments class"
-                       }
-                     },
-                     constructor=function(x,basePath){
-                       x[,"listOfFiles"] <- file.path(basePath,
-                                                      x[["session"]],
-                                                      x[["bundle"]])
-                       new_object(x,basePath=basePath)
-
-                     })
-
-ITEM <- TRUE
 
 fake_two_df_fun <- function( svDF,
                               csDF,
@@ -220,11 +156,12 @@ ask_for <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*"
   res <- emuR::query(emuDBhandle=inside_of, query=query,sessionPattern = sessions_regex, bundlePattern = bundles_regex ,timeRefSegmentLevel = times_from, calcTimes = calculate_times,verbose = interactive, resultType = "tibble")
 
   attr(res,"basePath") <- inside_of$basePath #This ensures that we can reattach the database later
+  class(res) <- c("segmentlist","tbl_df", "tbl","data.frame")
 
   return(res)
 }
 
-anchor <- function(inside_of, segment_list,anchor_against=NULL){
+relate_to <- function(inside_of, segment_list,anchor_against=NULL){
   if(missing(inside_of)) cli::cli_abort("Missing {.args inside_of} argument.")
   if(missing(segment_list)) cli::cli_abort("A segment list is required")
 
@@ -244,7 +181,7 @@ anchor <- function(inside_of, segment_list,anchor_against=NULL){
 }
 
 
-climb_to <- function(.data,  .attribute_name ,.collapse = TRUE, .skip_times = FALSE, .times_from = NULL, .interactive=FALSE, .inside_of=NULL) {
+ascend_to <- function(.data,  .attribute_name ,.collapse = TRUE, .skip_times = FALSE, .times_from = NULL, .interactive=FALSE, .inside_of=NULL) {
 
   if(is.null(.inside_of) && ! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
     # We then need to create a handle object
@@ -264,6 +201,8 @@ climb_to <- function(.data,  .attribute_name ,.collapse = TRUE, .skip_times = FA
   }
   return(res)
 }
+
+descend_to <- ascend_to
 
 #skip_forward
 #skip_backward
@@ -345,9 +284,9 @@ peek_sessions <- purrr::partial(peek_at, what="sessions")
 peek_perspectives <- purrr::partial(peek_at, what="perspectives")
 peek_attributes <- purrr::partial(peek_at, what="attributes")
 
+# Setter functions
 
-
-define <- function(.x, what=c("level","link","global_lg","track","bundle","session","perspective","file","attribute","local_lg"),...){
+define <- function(.x, what=c("level","link","global_lg","perspective","attribute","local_lg","legals"),...){
 
   if("emuDBhandle" %in% class(.x)){
     .inside_of <- .x
@@ -363,7 +302,7 @@ define <- function(.x, what=c("level","link","global_lg","track","bundle","sessi
     }
   }
 
-  what <- match.arg(what, c("level","link","global_lg","track","bundle","session","perspective","files","attributes","local_lg"))
+  what <- match.arg(what, c("level","link","global_lg","bundle","session","perspective","files","attributes","local_lg"))
 
   al <- list(...)
   if(what == "level" ) {
@@ -388,6 +327,14 @@ define <- function(.x, what=c("level","link","global_lg","track","bundle","sessi
   return(res)
 }
 
+add_tier <- purrr::partial(define,what="level")
+add_link <- purrr::partial(define,what="link")
+add_perspective <- purrr::partial(define,what="perspective")
+add_attribute <- purrr::partial(define,what="attribute")
+add_labelgroup <- purrr::partial(define,what="labelgroup")
+add_glabelgroup <- purrr::partial(define,what="glabelgroup")
+
+
 describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   type <- head(type,1)
   if(is.null(type)) stop("Missing level type")
@@ -396,13 +343,28 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   res <- define(.x,what="level",name=name,type=toupper(type))
 }
 
-quantify <- function(...){
+quantify <- function(...) {
   UseMethod("quantify")
 }
 
-quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.inside_of=NULL){
+quantify.data.frame <- function(.what,...,.inside_of){
+  mandatory <- c("labels", "start", "end", "db_uuid", "session", "bundle", "start_item_id",
+                 "end_item_id", "level", "attribute", "start_item_seq_idx", "end_item_seq_idx",
+                 "type", "sample_start", "sample_end", "sample_rate")
+  if(! base::setequal(mandatory,names(.what))) {
+    cli::cli_abort(c("The {.arg .what} does not contain the columns required to make a {.cls segmentlist}.",
+                   "i"="Missing field{?s} {.val {base::setdiff(mandatory,names(.what))}}."))
+  }
+  attr(.what,"basePath") <- .inside_of$basePath
+  class(.what) <- c("segmentlist",class(.what) )
+  quantify(.what,...)
+}
+
+
+quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.inside_of=NULL,.input_signal_file_extension=NULL,.verbose=FALSE,.quiet=FALSE){
 
   fcall <- match.call(expand.dots = FALSE)
+
   fcallS <- toString(fcall)
   idCols <- c("Gender","Age")
 
@@ -411,28 +373,33 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
 
 
-  dotArgs <- list(...)
-  dotArgsNames <- names(dotArgs)
+  dotdotArgs <- rlang::list2(...)
+  dotArgsNames <- names(dotdotArgs)
   if("toFile" %in% dotArgsNames){
-    cli::cli_alert_info("Ignoring {.arg toFile} argument given to {.fun quantify}.")
+   if(.verbose) cli::cli_alert_info(c("The function {.fun quantify} returns an acoustic summary of segments and never changes the database",
+                                    "x"="Ignoring the {.arg toFile} argument to the DSP function."))
+    dotdotArgs["toFile"] <- NULL
   }
-  #We will use this list later for filling in arguments before applying a function  in .source
-  explicitOrDefaultParams <- utils::modifyList(dotArgs,list(toFile=FALSE))
 
   # Initial check of arguments ----------------------------------------------
 
 
   #Check for the special case where the function was called by furnish
+  # TODO Remove and instead use a special bundlelist class / object
   calledByFurnish <- FALSE
   if(setequal(names(.what),c("start_item_id","bundle", "end", "end_item_id", "session", "start"))){
     calledByFurnish <- TRUE
     #Now check for strange arguments
-    if(! is.null(.n_preceeding) || ! is.null(.n_preceeding) ||! is.null(.where)){
-      cli::cli_alert_info(c("Ignoring {.arg .where}, {.arg .n_preceeding}, and {.arg .n_follwing} arguments",
+    if(! is.null(.where) || ! is.null(.n_preceeding) ||! is.null(.n_follwing)){
+      if(.verbose) cli::cli_alert_info(c("Ignoring {.arg .where}, {.arg .n_preceeding}, and {.arg .n_follwing} arguments",
                             "i"="Specifying a subset of data points to be returned does not make sense for {.fun furnish}."
                             )
                           )
     }
+    #Clear erroneous args
+    if(! is.null(.where) ) dotdotArgs[".where"] <- NULL
+    if(! is.null(.n_preceeding) ) dotdotArgs[".n_preceeding"] <- NULL
+    if(! is.null(.n_follwing) ) dotdotArgs[".n_follwing"] <- NULL
   }
 
 
@@ -441,7 +408,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     #Nonsense segment list
     cli::cli_abort(c("Erroneous segment list argument",
                      "i"="The list of segments or signals is empty",
-                     "x"="The .what argument contains {nrow(.what)} rows."))
+                     "x"="The {.arg .what} segmentlist contains {nrow(.what)} rows."))
   }
   if(any(is.na(.what[c("start","end")]))){
     #We need to have all start and end times specified to proceed
@@ -459,6 +426,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
   #The first possible case is when we have no explicitly set .inside_of argument, but a segment list with a
   # valid "basePath" attribute set. We then create the database handle from that basePath.
+  # REWIEW Do we need to do this check here?
   if(is.null(.inside_of)) {
     if(! is.null(attr(.what,"basePath")) && dir.exists(attr(.what,"basePath"))) {
       logger::log_debug("No explicit .inside_of argument found")
@@ -493,46 +461,55 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
   #function is called to compute a list or SSFF track result based on a wave file
   # This variable will then be set to something else if
   # we want to read in a pre-computed SSFF track stored on disk instead.
-  inputSignalsExtension <- emuR:::load_DBconfig(.inside_of)$mediafileExtension
+
+  inputSignalsExtension <- ifelse(is.null(.input_signal_file_extension),
+                                  emuR:::load_DBconfig(.inside_of)$mediafileExtension,
+                                  .input_signal_file_extension)
 
 
   ## Source setup ------------------------------------------------------------
 
 
   # This section handles the case where we want to compute signals or a
-  # list of results from the wave file directly??
+  # list of results from the input media file directly
   if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
-    if(is.function(.source)){
-      .f <- .source
-    }else{
-      .f <- purrr::safely(get)(.source)$result
 
-      cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
+
+    if(is.function(.source)){
+      #Just need to establish the name of the function from the call
+      funName <- as.character(rlang::call_args(rlang::current_call())$.source)
+      .f <- .source #The reason why we need to split off .source into a separate .f is that is needed to make the readtrack application case below behave identically parameter-wise to this case when we apply a DSP function
+    }else{
+      funName <- .source
+      .f <- purrr::safely(get)(.source)$result
     }
 
-    funName <- fcall[".source"]
-    willRemove <- setdiff(names(explicitOrDefaultParams),formalArgs(.source))
-    cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun .source}")
+    if(! .quiet) cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
+
+    willRemove <- setdiff(names(dotdotArgs),formalArgs(.source))
+    if(.verbose) cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}")
 
     explicitOrDefaultParams <- explicitOrDefaultParams[ intersect(names(explicitOrDefaultParams),formalArgs(.source)) ]
 
   }else{
+    # REVIEW This does not currently work
     # Ok, so not a function, so we need to make sure that the .source argument is a string
     # and the name of a track in the database
-    if(is.character(.source) && .source %in% emuR::list_ssffTrackDefinitions(.inside_of)$name){
+    definedTracks <- emuR::list_ssffTrackDefinitions(.inside_of)
+    if(is.character(.source) && .source %in% definedTracks$name){
       #The string should here be the name of a track
       logger::log_debug("We got a SSFF track field in the .source argument : {(.source)}")
       .f <- readtrack
       funName <- "readtrack"
-      inputSignalsExtension <- emuR::list_ssffTrackDefinitions(ae)  |>
+      inputSignalsExtension <- definedTracks  |>
         dplyr::filter(name==.source)  |>
         dplyr::select(fileExtension)  |>
         purrr::pluck(1)
 
 
-      cli::cli_alert_info("Reading data from the {.field {(.source)}} in {.val {inputSignalsExtension}} signal files.")
+      if(! .quiet) cli::cli_alert_info("Reading data from the {.field {(.source)}} in {.val {inputSignalsExtension}} signal files.")
 
-      explicitOrDefaultParams <- utils::modifyList(explicitOrDefaultParams,list(field=.source))
+      dotdotArgs <- utils::modifyList(dotdotArgs,list(field=.source))
 
       #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
       if(!.naively || .recompute ) {
@@ -542,7 +519,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
       }
       .naively <- TRUE
       .recompute <- FALSE
-    }else{
+    }else{ #Meaning that the string given as .source argument is not the name of a registered track in the database
       cli::abort(c("Cannot use the indicated .source",
                    "i"="The .source argument contains {(.source)} and is of class {class(.source)}",
                    "i"="The .source is reported to be able to return the columns {superassp::get_definedtracks(.source)} when converted to a tibble",
@@ -614,9 +591,6 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     #the case when no cache file should be used
     cli::cli_alert_info("Intermediate results are {.strong not} cached.")
   }
-
-
-
 
   ## Definition and setup directly related to the inner applied funct --------
 
@@ -819,7 +793,7 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     format = "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} {cli::pb_percent} | ETA: {cli::pb_eta}",
     clear = TRUE)
 
-  explicitOrDefaultParamsDF <- as_tibble(explicitOrDefaultParams)
+  explicitOrDefaultParamsDF <- tibble::as_tibble(dotdotArgs)
 
 
   # Here we apply the DSP function once per row and with settings comming from
@@ -864,32 +838,33 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
     ##  [default] The case in which we are processing a segment list --------------------------------------------
 
     resTibble <- appliedDFResultInList  |>
-      purrr::map_dfr(as_tibble, .id="sl_rowIdx") |>
+      purrr::map_dfr(tibble::as_tibble, .id="sl_rowIdx") |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
 
     ### Perform 'cut' extraction ------------------------------------------------
 
     if(!is.null(.where)){
-      if(is.null(.n_preceeding) && is.null(.n_following)){
-        cli::cli_inform(c("i"="Extracting one data point nearest the {(.where*100)}% time point for each segment"))
-        .n_preceeding <- 0
-        .n_following <- 0
+
+      .n_preceeding <- ifelse(is.null(.n_preceeding),0, .n_preceeding)
+      .n_following <- ifelse(is.null(.n_following),0, .n_following)
+
+      if(.n_preceeding == 0 && .n_following == 0){
+        if(!.quiet) cli::cli_inform(c("i"="Extracting measurements at the time point corresponding to {(.where*100)}% of each segment's duration"))
+
       }else{
-        .n_preceeding <- ifelse(is.null(.n_preceeding),0, .n_preceeding)
-        .n_following <- ifelse(is.null(.n_following),0, .n_following)
-
-        cli::cli_inform(c("i"="Extracting the data point nearest the {(.where*100)}% time point and at most {.val {(.n_preceeding)}} before and {.val {(.n_following)}} points following."))
+        #We extract multiple measures centered around a time point
+        if(!.quiet) cli::cli_inform(
+          c("i"="Extracting measurements at {.val {(.n_preceeding)}} points before and {.val {(.n_following)}} after the time point nearest {(.where*100)}% of each segment's duration.")
+          )
       }
-
       resTibble <- resTibble |>
         dplyr::group_by(sl_rowIdx) |>
         dplyr::mutate(dist = (frame_time / max(frame_time)) -.where) |>
         dplyr::mutate(ind_of_min = which.min(abs(dist) ),
                       maxind=which.max(dist)) |>
-        dplyr::slice(seq(max(first(ind_of_min) - .n_preceeding ,0),min(first(maxind),first(ind_of_min) + .n_following))) |>
+        dplyr::slice(seq(max(dplyr::first(ind_of_min) - .n_preceeding ,0),min(dplyr::first(maxind),dplyr::first(ind_of_min) + .n_following))) |>
         dplyr::select(-dist,-ind_of_min,-maxind)
-      #cat("blopp")
-      return(resTibble)
+
     }
 
     ### Prepare return set  ------------------------------------------------
@@ -909,39 +884,45 @@ quantify.data.frame <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL
 
 quantify_naively <- purrr:::partial(quantify, .naively=TRUE)
 
+
+# furnish.data.frame <- function(.inside_of,...){
+#   if(!"basePath" %in% attr(.inside_of)){
+#     cli::cli_abort(c("Unable to deduce databse path",
+#                      "x"="The function {.fun furnish} has to derive a database path to perform processing",
+#                      "i"="The function was given a {.cls {class(.inside_of)}} with the attributes {.field {attributes(.inside_of)}}",
+#                      "x"="The {.arg .inside_of} {.cls data.frame} needs to have a {.field basePath} attribute attached to it with the full path."))
+#   }
+#   utils::capture.output(
+#     .inside_of <- emuR::load_emuDB(attr(.inside_of,"basePath"),verbose = FALSE)
+#   ) -> dbload.info
+#   logger::log_info(paste(dbload.info,collapse = "\n"))
+#   furnish(.inside_of,...)
+# }
+
 furnish <- function(...) {
   UseMethod("furnish")
 }
 
 furnish.character <- function(.inside_of,...){
-  .inside_of <- normalizePath(.inside_of)
-  if(! stringr::str_ends(.inside_of,"_emuDB") || ! dir.exists(.inside_of)){
-    cli::cli_abort(c("Non-existing database path",
-                     "x"="A database path was given as the {.arg .inside_of} argument but the location does not exist.")
-    )
+  if(missing(.inside_of)) cli::cli_abort("Missing manditory argument {.arg .inside_of}.")
+  if(! file.info(path.expand(.inside_of))[["isdir"]] || ! dir.exists(path.expand(.inside_of))){
+    cli::cli_abort(c("The {.arg .inside_of} is not a valid path.",
+                     "i"="The database path searched was {.path {path.expand(.inside_of)}}"))
   }
-  utils::capture.output(
-    .inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
-  ) -> dbload.info
-  logger::log_info(paste(dbload.info,collapse = "\n"))
-  furnish(.inside_of,...)
+  if(! stringr::str_ends(basename(path.expand(.inside_of)), emuR:::emuDB.suffix)){
+    cli::cli_abort(c("The {.arg .inside_of} does not seem to point to the location of a database",
+                     "x"="The database directory should end with {.val {emuR:::emuDB.suffix}}.",
+                     "i"="The database path searched was {.path {path.expand(.inside_of)}}"))
+  }
+    utils::capture.output(
+      .inside_of <- emuR::load_emuDB(attr(.inside_of,"basePath"),verbose = FALSE)
+    ) -> dbload.info
+    logger::log_info(paste(dbload.info,collapse = "\n"))
+    #Now of class emuDBhandle
+    furnish(.inside_of,...)
 }
 
-furnish.data.frame <- function(.inside_of,...){
-  if(!"basePath" %in% attr(.inside_of)){
-    cli::cli_abort(c("Unable to deduce databse path",
-                     "x"="The function {.fun furnish} has to derine a database path to perform processing",
-                     "i"="The function was given a {.cls {class(.inside_of)}} with the attributes {.field {attributes(.inside_of)}}",
-                     "x"="The {.arg .inside_of} {.cls data.frame} needs to have a {.field basePath} attribute attached to it with the full path."))
-  }
-  utils::capture.output(
-    .inside_of <- emuR::load_emuDB(attr(.inside_of,"basePath"),verbose = FALSE)
-  ) -> dbload.info
-  logger::log_info(paste(dbload.info,collapse = "\n"))
-  furnish(.inside_of,...)
-}
-
-furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL){
+furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL,.verbose=TRUE,.quiet=FALSE){
 
 
   # Check inputs ------------------------------------------------------------
@@ -956,19 +937,21 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
   # Investigate what is already in the database -----------------------------
 
-  ## Available extensions of track files in the database -----------------------------
-
+  ## File extensions of track files in the database that the user can attach a track specification to -----------------------------
 
   availableDataFileExtensions <- emuR::list_files(.inside_of)  |>
-    dplyr::mutate(file=stringr::str_replace(file,"^.*[.]",""))  |>
-    dplyr::filter(!file %in% c("json",emuR:::load_DBconfig(.inside_of)$mediafileExtension,reindeer:::metadata.extension))  |>
-    dplyr::select(file)  |>
+    dplyr::mutate(ext=tools::file_ext(absolute_file_path) ) |>
+    dplyr::filter(!ext %in% c("json",
+                              emuR:::load_DBconfig(.inside_of)$mediafileExtension,
+                              reindeer:::metadata.extension))  |>
+    dplyr::select(ext)  |>
     dplyr::distinct()  |>
-    purrr::pluck("file")
+    purrr::pluck("ext")
 
 
   ## Check that track specifications given in ... are ok
   dotdotArgs <- rlang::dots_list(...,.named = TRUE, .homonyms="error", .check_assign=TRUE)
+
   #Overwrite the file extension used by the default by the function is the user said so
 
 
@@ -1026,15 +1009,11 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
   #If we have a function, then we should use it to create new tracks
   if(is.function(.source) || ( ! is.null(get0(.source)) && is.function( get0(.source)))){
 
-
-
     ### SSFF functions ----------------------------------------------------------
 
-
-    # First check that we have an SSFF track returining funciton
+    # First check that we have an SSFF track returning funciton
 
     if(!is.null(attr(.source,"outputType")) &&  attr(.source,"outputType") =="SSFF"){
-
 
       #### Really make sure that we do not overwrite signal files unless intended -------------------------------------------
 
@@ -1054,13 +1033,11 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
                            "i"="The {.fun furnish} commant was called with {.arg .force={(.force)}} and {.arg .really_force={(.really_force)}}"))
         }
 
-        }
+      }
 
+      if(.verbose) cli::cli_alert_info("Using the {.val {fileExtension}} file extension for stored signal files.")
 
-      cli::cli_alert_info("Using the {.val {fileExtension}} file extension for stored signal files.")
-
-      #### Prepare the segment list that quantify needs -------------------------------------------
-
+      #### Prepare the segment list that "quantify" will need -------------------------------------------
 
       # We here make a fake segment list with start and end times that suggest whole file processing
       # so that we can reuse quantify to deduce parameters, optionally log parameters, do the DSP work, and all that stuff.
@@ -1082,10 +1059,10 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
       if(nrow(bundles) < 1){
         #We deliberately do not raise an error here since we want to be able to continue processing even when
         # nothing needs to be done
-        cli::cli_alert_success("Skipping the signal processing")
-        cli::cli_alert_info("No signal files needs updating and updating is not forced.")
-        cli::cli_alert_info("The database contains {.val {nrow(emuR::list_bundles(.inside_of))}} bundles")
-        cli::cli_alert_info("There are {.val {nrow(emuR::list_files(.inside_of,fileExtension))}} signal files with the file extension {.val {fileExtension}}")
+        if(!.quiet) cli::cli_alert_success("Skipping the signal processing")
+        if(!.quiet) cli::cli_alert_info("No signal files needs updating and updating is not forced.")
+        if(!.quiet && .verbose) cli::cli_alert_info("The database contains {.val {nrow(emuR::list_bundles(.inside_of))}} bundles")
+        if(!.quiet && .verbose ) cli::cli_alert_info("There are {.val {nrow(emuR::list_files(.inside_of,fileExtension))}} signal files with the file extension {.val {fileExtension}}")
 
         # In this case we are not doing any DSP and all that is left is to return the database handle.
         return(.inside_of)
@@ -1149,12 +1126,10 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
       # we have a file extension only
 
-      cli::cli_alert_info("Considering signal files with the {.val {fileExtension}} file extension.")
+      if(!.quiet ||.verbose) cli::cli_alert_info("Considering signal files with the {.val {fileExtension}} file extension.")
 
       #First check that the files actually exist
-      allSignalfiles <- emuR::list_files(.inside_of)
-      wantedSignalfiles <- allSignalfiles  |>
-        dplyr::filter(stringr::str_detect(file,paste0(".",.source,"$")))
+      wantedSignalfiles <- emuR::list_files(.inside_of,fileExtension = fileExtension)
 
       nbundles <- nrow(emuR::list_bundles(.inside_of))
       if(nrow(wantedSignalfiles) < nbundles ) {
@@ -1162,7 +1137,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
           #There are indeed some bundles that should have signal files
           cli::cli_abort(c("Missing signal files for some bundles",
                            "x"="Some bundles do not have the required signal files. Please generate them first by supplying a DSP function as .source.",
-                           "i"= "There are {.val {nrow(signalfiles)}} signal files with the file extension {.arg {(.source)}}.",
+                           "i"= "There are {.val {nrow(wantedSignalfiles)}} signal files with the file extension {.arg {(.source)}}.",
                            "i"="The database contains {.val {nbundles}} bundles which should have signal files.",
                            "i"="Data files with the extensions {availableDataFileExtensions} have been computed and are available for attachement to a track name.")
                          )
@@ -1338,7 +1313,7 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
 quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE, .cache_file=NULL,.inside_of=NULL){
 
-  # Basic checks of input ---------------------------------------------------
+  # Check existence of inputs ---------------------------------------------------
 
   if(missing(.source) || !is.function(.source)) {
     cli::cli_abort(c("Missing or not appropriate {.arg .source} argument",
@@ -1719,7 +1694,9 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
 
 
-## INTERACTIVE TESTING
+# Testing code
+
+# INTERACTIVE TESTING
 #
 # library(tidyverse)
 # library(purrr)
@@ -1729,36 +1706,13 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 # library(furrr)
 # library(progress)
 
-# reindeer:::create_ae_db() -> ae
 #
+# reindeer:::unlink_emuRDemoDir()
+# reindeer:::create_ae_db() -> ae
 #
 # ask_for(ae,"Phonetic = V|E|a|A") |>
-#   mutate(start=100,end=2100) -> svDF
-# ask_for(ae,"Word != ''") -> csDF
+#   quantify("fm") -> outfm
 #
-# #quantify2(svDF,csDF,.source=superassp::praat_avqi,.by_bundle = FALSE,speaker.name=session,speaker.dob="dsd") -> to_checkSession
-
-#emuR::load_emuDB("tests/signalfiles/VISP_emuDB/") -> VISP
-
-#VISP |> ask_for("Production= /a/") -> svDF
-#VISP |> ask_for("Production= S") -> csDF
-
-#quantify2(svDF,csDF,.source=fake_two_df_fun,.by_bundle = FALSE,.naively = TRUE) -> to_checkSession
-
-# reindeer:::create_ae_db() -> ae
-# reindeer:::make_dummy_metafiles(ae)
-# q1 <- "Utterance != ''"
-# q2 <- "Phonetic = V"
-# reindeer::query(ae, q2) |>
-#   group_by(session,bundle) |>
-#   nest()
-# (quantify2(q1,
-#           q2,
-#           .source=fake_two_df_fun,
-#           .inside_of = ae,
-#           .by_bundle = TRUE) -> out)
-#
-#
-# df <- data.frame(time=seq(0,1,0.1),label=as.character(1:11))
-
+# ask_for(ae,"Phonetic = V|E|a|A") |>
+#   quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1) -> cutfm
 
