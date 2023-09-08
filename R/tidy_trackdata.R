@@ -363,20 +363,19 @@ quantify.data.frame <- function(.what,...,.inside_of){
 
 quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.inside_of=NULL,.input_signal_file_extension=NULL,.verbose=FALSE,.quiet=FALSE){
 
-  fcall <- match.call(expand.dots = FALSE)
+#  fcall <- match.call(expand.dots = FALSE)
 
-  fcallS <- toString(fcall)
+#  fcallS <- toString(fcall)
+
   idCols <- c("Gender","Age")
 
 
   ## Explicit and Hard coded arguments ----------------------------------------------------
 
-
-
   dotdotArgs <- rlang::list2(...)
   dotArgsNames <- names(dotdotArgs)
   if("toFile" %in% dotArgsNames){
-   if(.verbose) cli::cli_alert_info(c("The function {.fun quantify} returns an acoustic summary of segments and never changes the database",
+   if(.verbose && ! .quiet) cli::cli_alert_info(c("The function {.fun quantify} returns an acoustic summary of segments and never changes the database",
                                     "x"="Ignoring the {.arg toFile} argument to the DSP function."))
     dotdotArgs["toFile"] <- NULL
   }
@@ -391,7 +390,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     calledByFurnish <- TRUE
     #Now check for strange arguments
     if(! is.null(.where) || ! is.null(.n_preceeding) ||! is.null(.n_follwing)){
-      if(.verbose) cli::cli_alert_info(c("Ignoring {.arg .where}, {.arg .n_preceeding}, and {.arg .n_follwing} arguments",
+      if(.verbose && ! .quiet) cli::cli_alert_info(c("Ignoring {.arg .where}, {.arg .n_preceeding}, and {.arg .n_follwing} arguments",
                             "i"="Specifying a subset of data points to be returned does not make sense for {.fun furnish}."
                             )
                           )
@@ -407,55 +406,41 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
   if(nrow(.what ) < 1){
     #Nonsense segment list
     cli::cli_abort(c("Erroneous segment list argument",
-                     "i"="The list of segments or signals is empty",
-                     "x"="The {.arg .what} segmentlist contains {nrow(.what)} rows."))
+                     "x"="The list of segments or signals is empty",
+                     "i"="The {.arg .what} segmentlist contains {nrow(.what)} rows."))
   }
   if(any(is.na(.what[c("start","end")]))){
     #We need to have all start and end times specified to proceed
-    cli::cli_alert_info(c("Missing time references",
+    if(!.quiet) cli::cli_alert_info(c("Missing time references",
                      "x"="Some start or end times in the segment list supplied as the {.param .what} argument is missing",
                      "i"="I will try to deduce times from associated levels with time information."))
     .what <- anchor(.what)
   }
 
 
-  logger::log_debug("Function quantify called with arguments {fcallS}")
-
-  ## What to compute from (the .what argument and the .inside_of object ) ------------------
-
-
-  #The first possible case is when we have no explicitly set .inside_of argument, but a segment list with a
-  # valid "basePath" attribute set. We then create the database handle from that basePath.
-  # REWIEW Do we need to do this check here?
-  if(is.null(.inside_of)) {
-    if(! is.null(attr(.what,"basePath")) && dir.exists(attr(.what,"basePath"))) {
-      logger::log_debug("No explicit .inside_of argument found")
-      # We then need to create a handle object
+  ## Attach the database ------------------
+  # * Use an expliclitly given .inside_of as the database path
+  # * If the segmentlist has a "basePath" attribute that works, use it
+  # - Otherwise, error out
+  .inside_of <- dplyr::coalesce(.inside_of, attr(.what,"basePath"),NA)
+  if(! is.na(.inside_of) &&
+     dir.exists(path.expand(.inside_of)) &&
+     stringr::str_ends(basename(path.expand(.inside_of)), emuR:::emuDB.suffix)){
       utils::capture.output(
-        .inside_of <- emuR::load_emuDB(attr(.what,"basePath"),verbose = TRUE)
-      ) -> dbload.info
-    }else{
-      logger::log_debug("Got .inside_of={(.inside_of)}")
-      cli::cli_abort(c("Could not derive the database path.",
-                       "x"="Please provide an explicit database handle object in the {.arg .inside_of} argument.",
-                       "x"="See ?emuR::load_emuDB for details on how to load it."))
-    }
-  }else{
-    # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-    if(is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
       .inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
-    }
-    if("emuDBhandle" %in% class(.inside_of)){
-      #reload the database just to make sure that the handle is still valid
-      .inside_of <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
-    }else{
-      cli::cli_abort(c("Not appropriate .inside_of argument",
-                       "i"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                       "x"="The .inside_of argument supplied is a {class(.inside_of)}",
-                       "x"="The database {dplyr::coalesce(.inside_of$basePath,.inside_of)} does not exits."))
-
-    }
+    ) -> dbload.info #Maybe useful later?
+  }else{
+    #Everything failed
+    whatName <- as.character(rlang::call_args(rlang::current_call())$.what)
+    cli::cli_abort(c("Unable to establish a connection to the database from which the segmentlist {.args {whatName}} came from.",
+                     "i"="Tried the {.path {c(attr(.what,\"basePath\"),.inside_of)}} database location{s}.")
+    )
   }
+
+  assertthat::assert_that( "emuDBhandle" %in% class(.inside_of))
+
+
+
 
   # This sets the default input media file extension, which handled the case when a
   #function is called to compute a list or SSFF track result based on a wave file
@@ -487,12 +472,11 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     if(! .quiet) cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
 
     willRemove <- setdiff(names(dotdotArgs),formalArgs(.source))
-    if(.verbose) cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}")
+    if(!.quiet) cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}")
 
-    explicitOrDefaultParams <- explicitOrDefaultParams[ intersect(names(explicitOrDefaultParams),formalArgs(.source)) ]
+    #explicitOrDefaultParams <- explicitOrDefaultParams[ intersect(names(dotdotArgs),formalArgs(.source)) ]
 
   }else{
-    # REVIEW This does not currently work
     # Ok, so not a function, so we need to make sure that the .source argument is a string
     # and the name of a track in the database
     definedTracks <- emuR::list_ssffTrackDefinitions(.inside_of)
@@ -641,8 +625,6 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   # Deduction of DSP processing arguments -----------------------------------
 
-
-
   #Logic that concerns formal arguments
   formalArgsNames <- methods::formalArgs(.f)
   functionDefaults <- as.list(formals(.f))
@@ -658,20 +640,21 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     ## Deduce DSP settings based on metadata -----------------------------------
 
     #If we are just reading a track, the user is already aware that this will be done naively
-    if(!funName =="readtrack") cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
+    if(!.quiet || .verbose) cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
 
     # Make sure that we have a DSP default settings data.frame
     dsp <- reindeer:::dspp_metadataParameters(recompute=.recompute)  |>
-      tidyr::replace_na(list(Gender="Unspecified"))
+      tidyr::replace_na(list("Gender"="Undefined"))
 
-    if(nrow(dsp) > 0 ){
+    if(( !.quiet || .verbose ) && nrow(dsp) > 0 ){
       if(.recompute){
           cli::cli_alert_success(cli::ansi_strwrap("Recomputed DSP settings age and gender appropriate DSP settings based on metanalysis data in the {.file { file.path(system.file(package = \"reindeer\",mustWork = TRUE),\"default_parameters.xlsx\")  }} file."))
       }else{
         cli::cli_alert_success("Loaded precomputed age and gender appropriate DSP settings")
       }
     }
-    #After this we can be sure that parameters set per session or bundle are  available
+
+    #After this we can be sure that parameters set per session or bundle are available
     # but have been overwritten by explicitly set settings given to this function as we proceed
     meta <- reindeer:::get_metadata(.inside_of,manditory=idCols)  |>
       dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0)))  |>
@@ -723,7 +706,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     ## Naive DSP arm -----------------------------------
 
     #If we are just reading a track, the user is already aware that this will be done naively
-    if(!funName =="readtrack") cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata.")
+    if(!funName =="readtrack" && ( !.quiet || .verbose)) cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata.")
 
     sessionBundleDSPSettingsDF <- signalFiles
     # The names of columns to keep are now the columns that are defined  in signalFiles and which will be used by the DSP function
@@ -758,7 +741,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
     #There is no reason for file path normalization to not work in this call
     # so the warnings given by default for the not yet existing file will just be ignored
-    suppressWarnings(.parameter_log_excel <- normalizePath(.parameter_log_excel,mustWork = NA))
+    .parameter_log_excel <- path.expand(.parameter_log_excel)
 
     if(is.character(.parameter_log_excel) && dir.exists(dirname(.parameter_log_excel))){
       #Write a new excel file, named either according to the specified name in
@@ -779,7 +762,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
     }else{
       #Not able to create a parameter file or deduce a name for it
-      cli::cli_warn(c("Unable to write DSP parameter file",
+      cli::cli_abort(c("Unable to write DSP parameter file",
                       "x"= "A parameter file could not be created in {.file {(.parameter_log_excel)}}"))
     }
 
@@ -1694,10 +1677,9 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
 
 
-# Testing code
+# Code used for interactive testing #######
 
-# INTERACTIVE TESTING
-#
+
 # library(tidyverse)
 # library(purrr)
 # library(progressr)
@@ -1706,13 +1688,22 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 # library(furrr)
 # library(progress)
 
-#
-# reindeer:::unlink_emuRDemoDir()
-# reindeer:::create_ae_db() -> ae
-#
-# ask_for(ae,"Phonetic = V|E|a|A") |>
-#   quantify("fm") -> outfm
-#
-# ask_for(ae,"Phonetic = V|E|a|A") |>
-#   quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1) -> cutfm
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db() -> ae
 
+ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
+ae_a |>
+  quantify("fm",.quiet=TRUE, .verbose=FALSE) -> outfm
+ae_a |>
+  quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1,.quiet=TRUE, .verbose=FALSE) -> cutfm
+
+ae_a |>
+  quantify(forest) -> forFM
+
+ae_a_copy <- ae_a
+attr(ae_a_copy,"basePath") <- NULL
+
+ae_a_copy |>
+  quantify(forest,.inside_of="/var/folders/lr/h3mlkmq540d6xjrh3bpdms600000gn/T//RtmpLGfQle/emuR_demoData/ae_emuDB") -> forFM_missingDB
+#ae_a |>
+#  quantify(forest,.where=0.5,.n_preceeding=1,.n_following=1,.quiet) ->forCutFM
