@@ -121,7 +121,7 @@ reindeer:::create_ae_db(verbose = FALSE) -> ae
 #TODO: explicitExt ses inte längre som ett argument till forest
 logger::log_threshold(logger::INFO)
 
-furnish(ae$basePath,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",nominalF1=533,.force=TRUE, .really_force=TRUE,.parameter_log_excel = "~/Desktop/1.xlsx",.recompute = TRUE) 
+furnish(ae,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",nominalF1=533,.force=TRUE, .really_force=TRUE,.parameter_log_excel = "~/Desktop/1.xlsx",.recompute = TRUE) 
 #|>
 #furnish("fms")
 
@@ -155,11 +155,11 @@ library(magrittr)
 
 ae |>
   ask_for("Phonetic = V") |>
-  climb_to("Word") |>
+  ascend_to("Word") |>
   scout(steps_forward = 1, capture = 2) -> words
 
 words |>
-  climb_to("Phonetic") %T>%
+  descend_to("Phonetic") %T>%
   print(.) -> segments_following
   
 
@@ -193,4 +193,24 @@ segments_following |>
 
 
 ```
+
+# Computed-aided annotation
+
+```{r}
+
+ae |>
+  ask_for("Utterances != ''") |>
+  suggest(.algorithm=annotate_INTSINT_MOMEL) |>
+  annotate()
+```
+
+
+```{r}
+
+ae |> 
+  ask_for()
+
+
+```
+
 

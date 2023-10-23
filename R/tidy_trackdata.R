@@ -361,23 +361,21 @@ quantify.data.frame <- function(.what,...,.inside_of){
 }
 
 
-quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_file=NULL,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.recompute=FALSE,.package="superassp",.naively=FALSE,.parameter_log_excel=NULL,.inside_of=NULL,.input_signal_file_extension=NULL,.verbose=FALSE,.quiet=FALSE){
-
-#  fcall <- match.call(expand.dots = FALSE)
-
-#  fcallS <- toString(fcall)
-
-  idCols <- c("Gender","Age")
+quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_in_file=TRUE,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.naively=FALSE,.recompute=FALSE,.dsp_settings_by=c("Gender","Age"),.package="superassp",.parameter_log_excel=NULL,.inside_of=NULL,.input_signal_file_extension=NULL,.verbose=FALSE,.quiet=FALSE){
 
 
   ## Explicit and Hard coded arguments ----------------------------------------------------
 
   dotdotArgs <- rlang::list2(...)
-  dotArgsNames <- names(dotdotArgs)
-  if("toFile" %in% dotArgsNames){
-   if(.verbose && ! .quiet) cli::cli_alert_info(c("The function {.fun quantify} returns an acoustic summary of segments and never changes the database",
+
+  if("toFile" %in% names(dotdotArgs)){
+   if(.verbose || ! .quiet) cli::cli_alert_info(c("The function {.fun quantify} returns an acoustic summary of segments and never changes the database",
                                     "x"="Ignoring the {.arg toFile} argument to the DSP function."))
-    dotdotArgs["toFile"] <- NULL
+  }
+  dotdotArgs["toFile"] <- FALSE
+
+  if(is.null(.cache_in_file)) {
+    .cache_in_file <- FALSE
   }
 
   # Initial check of arguments ----------------------------------------------
@@ -396,10 +394,73 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
                           )
     }
     #Clear erroneous args
-    if(! is.null(.where) ) dotdotArgs[".where"] <- NULL
-    if(! is.null(.n_preceeding) ) dotdotArgs[".n_preceeding"] <- NULL
-    if(! is.null(.n_follwing) ) dotdotArgs[".n_follwing"] <- NULL
+    # TODO will not work now that the inner function needs a .where
+    dotdotArgs[".where"] <- NULL
+    dotdotArgs[".n_preceeding"] <- NULL
+    dotdotArgs[".n_follwing"] <- NULL
   }
+
+  ## Definition and setup directly related to the inner applied funct --------
+
+  innerMapFunction <- function(.sl_rowIdx,.session,.bundle,.where=NULL, .n_preceeding=NULL,.n_following=NULL,...){
+
+    dotdotdot <- list(...)
+    dotdotdotS <- toString(dotdotdot)
+    result <- NULL
+
+    if(!is.null(.cache_connection)){
+      #Check existing values
+
+      cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
+
+      if(nrow(cachedObj) > 0){
+        #Load rather than comput
+        logger::log_debug("[{.session}:{.bundle})] Loading data from cache file.\n")
+
+        result <- base::unserialize(
+          base::charToRaw(
+            cachedObj$obj[[1]])
+          )
+      }
+
+    }
+    #Compute if the results is still not defined
+    if(is.null(result)){
+
+      #logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
+      result <- safe_f(...)
+      #Optionally make the cutout from the result directly, if the result was not NA
+      if(!is.null(.where) && ! is.na(result) && "AsspDataObj" %in% class(result)){
+        .n_preceeding <- ifelse(is.null(.n_preceeding),0,.n_preceeding)
+        .n_following <- ifelse(is.null(.n_following),0,.n_following)
+        result <- cut(result,where=.where,n_preceeding=.n_preceeding,n_following=.n_following)
+      }
+    }
+
+
+    #Maybe store the results in cache?
+    if(!is.null(.cache_connection)){
+      objser <- base::rawToChar(base::serialize(result, connection = NULL,ascii = TRUE))
+      RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(.sl_rowIdx,objser))
+    }
+
+    return(result)
+  }
+  ### Define what information will be given in the spinner -----
+  spinner <- "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}"
+  ## Rewrite the spinner if doing extraction from an AsspDataObj ------------------------------------------------
+  if(!is.null(.where) ){
+    spinner <- ifelse(.n_preceeding == 0 && .n_following == 0,
+                      "{cli::pb_spin} Exctacting from the {(.where*100)}% relative time point from segment {cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}",
+                      "{cli::pb_spin} Extracting from the {(.where*100)}% relative time point (-{(.n_following)} and +{(.n_following)} points) from segment {cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}"
+    )
+  }
+
+
+  pb <- list(
+    type = "iterator",
+    format = spinner,
+    clear = TRUE)
 
 
 
@@ -438,8 +499,83 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
   }
 
   assertthat::assert_that( "emuDBhandle" %in% class(.inside_of))
+  #From now on we can be sure to have a valid database handle in .inside_of
+
+  ## Source setup ------------------------------------------------------------
+
+  definedTracks <- emuR::list_ssffTrackDefinitions(.inside_of)
+  #The reason why we need to split off .source into a separate .f is that is needed to make the readtrack application case below behave identically parameter-wise to this case when we apply a DSP function
+  .f <- NULL
+  if(is.character(.source) && .source %in% definedTracks$name){
+    ### The .source is just the name of a track --------
+    if("fields" %in% names(dotdotArgs)){
+      te <- c(field,.source)
+
+      if(!.quiet) cli::cli_alert("Both a {.args field} and a {.arg {(.source)}} argument was supplied ({.vals {te}}). Reading the {.field field} track in {.val {inputSignalsExtension}} signal files.")
+    } else {
+      dotdotArgs$field <- .source
+      if(! .quiet) cli::cli_alert_info("Reading data from the {.field {(.source)}} in {.val {inputSignalsExtension}} signal files.")
+
+    }
+
+    .f <- readtrack
+    funName <- "readtrack"
+
+    #Get the file extension of the input track
+    inputSignalsExtension <- definedTracks[definedTracks$name == dotdotArgs$field,"fileExtension"]
+
+    #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
+    if(( !.naively || .recompute) && (!.quiet || .verbose)) {
+      cli::cli_bullets(c("Directly reading the {.field .source} track require no DSP parameter deduction.",
+                         ">"="The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}."))
+    }
+    .naively <- TRUE
+    .recompute <- FALSE
+
+    # Disable the automatic cache file
+
+    if(!is.null(.cache_in_file) && isTRUE(.cache_in_file)){
+      cli::cli_alert_warning("A cache file was not specified and will not be auto-generated when reading stored track data.")
+      .cache_in_file <- FALSE
+    }
+
+  }
+
+  ## Preparation of application of .source as a function -------------
+  if(is.null(.f) ){  #Skip if .f it set already
+    if( is.function(.source) ){
+      safe_get <- purrr::safely(get)
+      #Just need to establish the name of the function from the call
+      funName <- as.character(rlang::call_args(rlang::current_call())$.source)
+      .f <- .source
+    }else{
+      if(is.character(.source) && ! .source %in% definedTracks$name && is.function(safe_get(.source)$result)){
+
+        funName <- .source
+        .f <- safe_get(.source)$result
+      }else{
+
+        cli::cli_abort(c("Unable to deduce the function to apply",
+                         "i"="You indicated {.arg .source={(.source)}} in the call to {.fun quantify}."))
+      }
+    }
+  }
 
 
+
+  #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
+  safe_f <- purrr::possibly(.f, otherwise=NA)
+
+  if(! .quiet) cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
+
+  #Logic that concerns formal arguments
+  formalArgsNames <- methods::formalArgs(.f)
+  functionDefaults <- as.list(formals(.f))
+  #toFile can never be TRUE in this function
+  if("toFile" %in% formalArgsNames) functionDefaults$toFile <- FALSE
+
+  if(! "listOfFiles" %in%  formalArgsNames) cli::cli_abort(c("No method to supply input files to {.fun {funName}}",
+                                                             "x"="Functions provided as {.arg .source} to {.fun quantify} is assumed to have a {.arg listOfFiles} formal argument where file paths are given"))
 
 
   # This sets the default input media file extension, which handled the case when a
@@ -451,195 +587,63 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
                                   emuR:::load_DBconfig(.inside_of)$mediafileExtension,
                                   .input_signal_file_extension)
 
-
-  ## Source setup ------------------------------------------------------------
-
-
-  # This section handles the case where we want to compute signals or a
-  # list of results from the input media file directly
-  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
-
-
-    if(is.function(.source)){
-      #Just need to establish the name of the function from the call
-      funName <- as.character(rlang::call_args(rlang::current_call())$.source)
-      .f <- .source #The reason why we need to split off .source into a separate .f is that is needed to make the readtrack application case below behave identically parameter-wise to this case when we apply a DSP function
-    }else{
-      funName <- .source
-      .f <- purrr::safely(get)(.source)$result
-    }
-
-    if(! .quiet) cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
-
-    willRemove <- setdiff(names(dotdotArgs),formalArgs(.source))
-    if(!.quiet) cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}")
-
-    #explicitOrDefaultParams <- explicitOrDefaultParams[ intersect(names(dotdotArgs),formalArgs(.source)) ]
-
-  }else{
-    # Ok, so not a function, so we need to make sure that the .source argument is a string
-    # and the name of a track in the database
-    definedTracks <- emuR::list_ssffTrackDefinitions(.inside_of)
-    if(is.character(.source) && .source %in% definedTracks$name){
-      #The string should here be the name of a track
-      logger::log_debug("We got a SSFF track field in the .source argument : {(.source)}")
-      .f <- readtrack
-      funName <- "readtrack"
-      inputSignalsExtension <- definedTracks  |>
-        dplyr::filter(name==.source)  |>
-        dplyr::select(fileExtension)  |>
-        purrr::pluck(1)
-
-
-      if(! .quiet) cli::cli_alert_info("Reading data from the {.field {(.source)}} in {.val {inputSignalsExtension}} signal files.")
-
-      dotdotArgs <- utils::modifyList(dotdotArgs,list(field=.source))
-
-      #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
-      if(!.naively || .recompute ) {
-        cli::cli_bullets(c("i"="Directly reading the {.field {(.source)}} track require no DSP parameter deduction.",
-                                 ">"="The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}."))
-        #cli::cli_alert_info(" - The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}.")
-      }
-      .naively <- TRUE
-      .recompute <- FALSE
-    }else{ #Meaning that the string given as .source argument is not the name of a registered track in the database
-      cli::abort(c("Cannot use the indicated .source",
-                   "i"="The .source argument contains {(.source)} and is of class {class(.source)}",
-                   "i"="The .source is reported to be able to return the columns {superassp::get_definedtracks(.source)} when converted to a tibble",
-                   "x"="The .source needs to be the name of a track in the database or a function that should do the signal processing."))
-    }
-  }
-
-
-  ## Optional cache system setup -----------------------------------------
-
-  .cache_connection <- NULL
-
-  ## Make a date specific cache file if
-  if(!is.null(.cache_file) && ! isFALSE(.cache_file)){
-    if(.cache_file) {
-      #Set a date specific cache file
-      .cache_file <- file.path(tempdir(check=TRUE),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
-    }
-    #Now, since we set up a default file name above if .cache_file is just TRUE
-    # we should be able to use the character string as the file name
-    if(is.character(.cache_file)){
-      #There is no reason for file path normalization to not work in this call
-      # so the warnings given by default for the not yet existing file will just be ignored
-      suppressWarnings(.cache_file <- normalizePath(.cache_file,mustWork = NA))
-      cacheFileExists <- file.exists(.cache_file)
-
-      #Clear cache file if indicated
-      if(.clear_cache && cacheFileExists){
-
-        suppressWarnings( unlink(.cache_file))
-        cacheFileExists <- file.exists(.cache_file)
-      }
-      suppressWarnings(
-        .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
-                                            user="root",
-                                            password="",
-                                            host="localhost",
-                                            dbname=.cache_file,
-                                            flags=RSQLite::SQLITE_RWC,
-                                            loadable.extensions=FALSE)
-      )
-#
-#       if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
-#                                                                   "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
-      #Check table format requirements
-      if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
-         (! "cache" %in% RSQLite::dbListTables(.cache_connection) || ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))
-         ){
-
-        cli::cli_alert_info("Initializing cache file {.file {(.cache_file)}}")
-
-        RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
-
-      }else{
-        cli::cli_alert_info("Using existing cache file {.file {(.cache_file)}}")
-      }
-
-      RSQLite::dbExecute(.cache_connection,"CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
-
-    }else{
-      #The cache file is not NULL, not TRUE (auto-generated), and not a character vector
-      cli::cli_abort(c("The cache file name could not be deduced",
-                       "x"="A full path can be given; a value TRUE vill generate a default file name based on the current date.",
-                       "i"="The {.arg .cache_file} provided to the fucntion was {.val {(.cache_file)}}."))
-    }
-
-
-  }else{
-    #the case when no cache file should be used
-    cli::cli_alert_info("Intermediate results are {.strong not} cached.")
-  }
-
-  ## Definition and setup directly related to the inner applied funct --------
-
-
-  #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
-  safe_f <- purrr::possibly(.f, otherwise=NA)
-
-  #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
-  innerMapFunction <- function(.sl_rowIdx,.session,.bundle,...){
-
-    dotdotdot <- list(...)
-    dotdotdotS <- toString(dotdotdot)
-    result <- NULL
-
-    if(!is.null(.cache_connection)){
-      #Check existing values
-
-      cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
-
-      if(nrow(cachedObj) > 0){
-        #Load rather than comput
-        logger::log_debug("[{.session}:{.bundle})] Loading data from cache file.\n")
-
-        result <- base::unserialize(
-          base::charToRaw(
-            cachedObj$obj[[1]]))
-      }
-
-    }
-    #Compute if the results is still not defined
-    if(is.null(result)){
-
-      logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
-      result <- safe_f(...)
-    }
-
-    #Maybe store the results in cache?
-    if(!is.null(.cache_connection)){
-      objser <- base::rawToChar(base::serialize(result, connection = NULL,ascii = TRUE))
-
-
-      RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(.sl_rowIdx,objser))
-    }
-
-    return(result)
-  }
-
-
-  # Deduction of DSP processing arguments -----------------------------------
-
-  #Logic that concerns formal arguments
-  formalArgsNames <- methods::formalArgs(.f)
-  functionDefaults <- as.list(formals(.f))
-
-
-  # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
   signalFiles <- emuR::list_files(.inside_of,inputSignalsExtension)  |>
     dplyr::rename(listOfFiles=absolute_file_path)  |>
     dplyr::select(-file)
 
+  willRemove <- setdiff(names(dotdotArgs),formalArgsNames)
+  if(!.quiet && length(willRemove) > 0) cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}")
+
+  ## Cache system setup -----------------------------------------
+
+  .cache_connection <- NULL
+
+  if(isFALSE(.cache_in_file)){
+    #the case when no cache file should be used
+    cli::cli_alert_info("Intermediate results are {.strong not} cached.")
+  }else{
+    if(isTRUE(.cache_in_file)){
+      .cache_in_file <- file.path(tempdir(check=TRUE),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
+    }
+    .cache_in_file <- path.expand(.cache_in_file)
+    cacheFileExists <- file.exists(.cache_in_file)
+    cli::cli_alert_info("Using  cache file {.file {(.cache_in_file)}}")
+
+    #Clear cache file if indicated
+    if(.clear_cache && cacheFileExists){
+      suppressWarnings( unlink(.cache_in_file))
+      cacheFileExists <- file.exists(.cache_in_file)
+    }
+    suppressWarnings(
+      .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
+                                          user="root",
+                                          password="",
+                                          host="localhost",
+                                          dbname=.cache_in_file,
+                                          flags=RSQLite::SQLITE_RWC,
+                                          loadable.extensions=FALSE)
+    )
+    #Check table format requirements
+    if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
+       (! "cache" %in% RSQLite::dbListTables(.cache_connection) ||
+        ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))
+    ){
+      cli::cli_alert_info("Initializing cache file {.file {(.cache_in_file)}}")
+      RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
+    }
+    RSQLite::dbExecute(.cache_connection,
+                       "CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
+
+
+  }
+
+
+
+
+  ## Prepare the environment for DSP function application
 
   if(! .naively){
-    ## Deduce DSP settings based on metadata -----------------------------------
-
-    #If we are just reading a track, the user is already aware that this will be done naively
+    ### Deduce DSP settings based on metadata -----------------------------------
     if(!.quiet || .verbose) cli::cli_alert_info("Using metadata to derive DSP settings where not explicitly set by the user.")
 
     # Make sure that we have a DSP default settings data.frame
@@ -648,7 +652,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
     if(( !.quiet || .verbose ) && nrow(dsp) > 0 ){
       if(.recompute){
-          cli::cli_alert_success(cli::ansi_strwrap("Recomputed DSP settings age and gender appropriate DSP settings based on metanalysis data in the {.file { file.path(system.file(package = \"reindeer\",mustWork = TRUE),\"default_parameters.xlsx\")  }} file."))
+        cli::cli_alert_success(cli::ansi_strwrap("Recomputed DSP settings age and gender appropriate DSP settings based on metanalysis data in the {.file { file.path(system.file(package = \"reindeer\",mustWork = TRUE),\"default_parameters.xlsx\")  }} file."))
       }else{
         cli::cli_alert_success("Loaded precomputed age and gender appropriate DSP settings")
       }
@@ -656,29 +660,29 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
     #After this we can be sure that parameters set per session or bundle are available
     # but have been overwritten by explicitly set settings given to this function as we proceed
-    meta <- reindeer:::get_metadata(.inside_of,manditory=idCols)  |>
+    meta <- reindeer:::get_metadata(.inside_of,manditory=names(.metadata_defaults))  |>
       dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0)))  |>
       tidyr::replace_na(.metadata_defaults)
 
+#       REVIEW check if these are actually needed
+#       #This variable is used for filling in missing values in arguments explicitly set in metadata
+#       precomputedVariableNames <- intersect(names(meta),names(dsp))
+#       dspColumnsToAdd <- setdiff(names(dsp),names(meta))
+#
+#       filledMeta <- meta  |>
+#         dplyr::rows_update(y=dsp  |>
+#                              dplyr::select(all_of(precomputedVariableNames)),
+#                            by=.dsp_settings_by,unmatched = "ignore")
 
-    #This variable is used for filling in missing values in arguments explicitly set in metadata
-    precomputedVariableNames <- intersect(names(meta),names(dsp))
-    dspColumnsToAdd <- setdiff(names(dsp),names(meta))
 
-    filledMeta <- meta  |>
-      dplyr::rows_update(y=dsp  |>
-                           dplyr::select(all_of(precomputedVariableNames)),
-                         by=idCols,unmatched = "ignore")
-
-
-    # This block will add settings that were set in DSP defaults only
-    completedStoredDSPSettings <- filledMeta  |>
-      dplyr::ungroup()  |>
-      dplyr::left_join(
-        dplyr::select(dsp,all_of(idCols),all_of(dspColumnsToAdd))
-        ,by=idCols)  |>
-      tidyr::replace_na(functionDefaults)   |>
-      dplyr::mutate(toFile=FALSE)  #Forcefully inject a toFile argument
+    # # This block will add settings that were set in DSP defaults only
+    # completedStoredDSPSettings <- filledMeta  |>
+    #   dplyr::ungroup()  |>
+    #   dplyr::left_join()
+    #    dplyr::select(dsp,all_of(.dsp_settings_by),all_of(dspColumnsToAdd))
+    #   ,by=.dsp_settings_by)  |>
+    completedStoredDSPSettings <- meta |>
+      dplyr::left_join(dsp,by = .dsp_settings_by)
 
 
     # We need to choose whether to guide a formant tracker by number of extracted formants in a fixed 0-5000 Hz frequency range
@@ -687,26 +691,23 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     if(.by_maxFormantHz && "numFormants" %in% names(completedStoredDSPSettings)){
       completedStoredDSPSettings <- completedStoredDSPSettings  |>
         dplyr::select(-numFormants)
-
-      # The names of columns to keep are now the columns that are defined either in signalFiles or
-      # in dspCompletedSettings, and which will be used by the DSP function
-      settingsThatWillBeUsed <- intersect(formalArgsNames,
-                                          union(names(completedStoredDSPSettings),
-                                                names(signalFiles))
-      ) # This will be used to remove unwanted columns
-
-      #Here we construct the settings that we want to use when applying the specific DSP
-      # function to bundles (in specific sessions)
-      sessionBundleDSPSettingsDF <-  completedStoredDSPSettings  |>
-        dplyr::left_join(signalFiles,by=c("session","bundle"))  |>
-        dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
-
     }
+    # The names of columns to keep are now the columns that are defined either in signalFiles or
+    # in dspCompletedSettings, and which will be used by the DSP function
+    settingsThatWillBeUsed <- intersect(formalArgsNames,
+                                        union(names(completedStoredDSPSettings),
+                                              names(signalFiles))
+    ) # This will be used to remove unwanted columns
+
+    #Here we construct the settings that we want to use when applying the specific DSP
+    # function to bundles (in specific sessions)
+    sessionBundleDSPSettingsDF <-  completedStoredDSPSettings  |>
+      dplyr::left_join(signalFiles,by=c("session","bundle"))  |>
+      dplyr::select(session,bundle,all_of(settingsThatWillBeUsed))
+
+
   }else{
     ## Naive DSP arm -----------------------------------
-
-    #If we are just reading a track, the user is already aware that this will be done naively
-    if(!funName =="readtrack" && ( !.quiet || .verbose)) cli::cli_alert_info("Using no implicitly derived DSP settings based on metadata.")
 
     sessionBundleDSPSettingsDF <- signalFiles
     # The names of columns to keep are now the columns that are defined  in signalFiles and which will be used by the DSP function
@@ -714,28 +715,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   }
 
-
-  ## Make the environment suitable for collecting quantification parameters --------
-
-  # Now we need to transfer the session / bundle settings to the segment list
-  # to get start and end times into the call also
-  segmentDSPDF <- .what  |>
-    tibble::rownames_to_column(var = "sl_rowIdx")  |>
-    dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle"))  |>
-    dplyr::rename(beginTime=start,endTime=end)  |>
-    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))  |>
-    dplyr::rename(.session=session,.bundle=bundle)  |>
-    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) ## Fix for wrassp functions that expect "numeric" values, not integers
-
-  #Set up the progress bar
-  num_to_do <- nrow(segmentDSPDF)
-
-
-  p <- progressr::progressor(num_to_do)
-
-
   ## Optionally log the parameter table to an Excel output -------------------
-
 
   if(!is.null(.parameter_log_excel)) {
 
@@ -751,52 +731,64 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
                                 file.path(.parameter_log_excel,
                                           paste0(stringr::str_replace_all(format(Sys.time(),usetz = TRUE)," ","_"),".xlsx")),
                                 .parameter_log_excel)
-      parameterData <- segmentDSPDF  |>
-        dplyr::rename(bundle=.bundle,session=.session)
 
-      openxlsx::write.xlsx(x = parameterData,file=excel_filename, asTable=FALSE, overwrite = TRUE)
+
+      openxlsx::write.xlsx(x = sessionBundleDSPSettingsDF,file=excel_filename, asTable=FALSE, overwrite = TRUE)
 
 
       cli::cli_alert_success("Wrote DSP parameters used into {.file {excel_filename}}")
-      cli::cli_bullets(c(">"="Please note that default parameters of the called DSP function are not included in the log as they cannot unambigiously be deduced by {.fun quantify}."))
+      cli::cli_bullets(c(">"="Please note that default parameters of the called DSP function are not included in the log as they cannot unambigiously be deduced."))
 
     }else{
       #Not able to create a parameter file or deduce a name for it
       cli::cli_abort(c("Unable to write DSP parameter file",
-                      "x"= "A parameter file could not be created in {.file {(.parameter_log_excel)}}"))
+                       "x"= "A parameter file could not be created in {.file {(.parameter_log_excel)}}"))
     }
 
-  }
+  } #
+
+  ## End of arm where a DSP function is applied to an input signal
+
+
+
+
+
+
+  ## Finish up creating the environment suitable for collecting quantification parameters --------
+
+  # Now we need to transfer the session / bundle settings to the segment list
+  # to get start and end times into the call also
+  segmentDSPDF <- .what  |>
+    tibble::rownames_to_column(var = "sl_rowIdx")  |>
+    dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle"))  |>
+    dplyr::rename(beginTime=start,endTime=end)  |>
+    dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))  |>
+    dplyr::rename(.session=session,.bundle=bundle)  |>
+    dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) |> ## Fix for wrassp functions that expect "numeric" values, not integers
+    tibble::rownames_to_column(var = ".sl_rowIdx")  |>
+    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx)) |>  #Make sure we have a link back to the segmentlist row
+    dplyr::mutate(tibble::as_tibble(dotdotArgs)) # Set explicitly set arguments
+
+
+  fillableArgs <- intersect(
+    formalArgs(.f), #List of default settings
+    names(which(colSums(is.na(segmentDSPDF)) > 0)) #Columns with NAs that needs to be filled in
+    )
+  defaultArgs <- as.list(formals(.f))[fillableArgs]
+
+  segmentDSPDF <- segmentDSPDF  |>
+    tidyr::replace_na(replace=defaultArgs) |>
+    dplyr::mutate(.where=.where, .n_preceeding=.n_preceeding,.n_following=.n_following) #Attach subset arguments
+
 
 
   # Do the actual quantification  work --------------------------------------------
 
-  pb <- list(
-    type = "iterator",
-    format = "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} {cli::pb_percent} | ETA: {cli::pb_eta}",
-    clear = TRUE)
-
-  explicitOrDefaultParamsDF <- tibble::as_tibble(dotdotArgs)
-
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
-  appliedDFResultInList <- segmentDSPDF  |>
-    tibble::rownames_to_column(var = ".sl_rowIdx")  |>
-    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))
 
-
-
-
-  if(nrow(explicitOrDefaultParamsDF) > 0 && ncol(explicitOrDefaultParamsDF) > 0) {
-    # This row ovewrites all deduced parameters with explicitly set ones, including toFile=FALSE if used by the called function
-    appliedDFResultInList <-  appliedDFResultInList |>
-    dplyr::mutate(explicitOrDefaultParamsDF)
-  }
-
-
-  # Do the final grouping and apply the DSP function inside of a wrapper
-  appliedDFResultInList <- appliedDFResultInList |>
+  appliedDFResultInList <- segmentDSPDF |>
     dplyr::rowwise()  |>
     purrr::pmap(.f=innerMapFunction,.progress = pb) # This is the busy line
 
@@ -824,31 +816,6 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
       purrr::map_dfr(tibble::as_tibble, .id="sl_rowIdx") |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
 
-    ### Perform 'cut' extraction ------------------------------------------------
-
-    if(!is.null(.where)){
-
-      .n_preceeding <- ifelse(is.null(.n_preceeding),0, .n_preceeding)
-      .n_following <- ifelse(is.null(.n_following),0, .n_following)
-
-      if(.n_preceeding == 0 && .n_following == 0){
-        if(!.quiet) cli::cli_inform(c("i"="Extracting measurements at the time point corresponding to {(.where*100)}% of each segment's duration"))
-
-      }else{
-        #We extract multiple measures centered around a time point
-        if(!.quiet) cli::cli_inform(
-          c("i"="Extracting measurements at {.val {(.n_preceeding)}} points before and {.val {(.n_following)}} after the time point nearest {(.where*100)}% of each segment's duration.")
-          )
-      }
-      resTibble <- resTibble |>
-        dplyr::group_by(sl_rowIdx) |>
-        dplyr::mutate(dist = (frame_time / max(frame_time)) -.where) |>
-        dplyr::mutate(ind_of_min = which.min(abs(dist) ),
-                      maxind=which.max(dist)) |>
-        dplyr::slice(seq(max(dplyr::first(ind_of_min) - .n_preceeding ,0),min(dplyr::first(maxind),dplyr::first(ind_of_min) + .n_following))) |>
-        dplyr::select(-dist,-ind_of_min,-maxind)
-
-    }
 
     ### Prepare return set  ------------------------------------------------
 
@@ -917,6 +884,11 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
   }
 
 
+  if(!is.null(.where)){
+    #Correct cutout specification if strange.
+    .n_preceeding <- ifelse(is.null(.n_preceeding) || ceiling(.n_preceeding) < 1 ,0L,.n_preceeding)
+    .n_following <- ifelse(is.null(.n_following) || ceiling(.n_preceeding) < 1 ,0L, .n_following)
+  }
 
   # Investigate what is already in the database -----------------------------
 
@@ -1500,6 +1472,7 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   }
   #Now complete the data set by adding a full path to signal files
   inputSignalsExtension <- emuR:::load_DBconfig(.inside_of1)$mediafileExtension
+
   # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
   signalFiles_what1 <- emuR::list_files(.inside_of1,inputSignalsExtension)  |>
     dplyr::rename(listOfFiles=absolute_file_path)  |>
@@ -1689,21 +1662,28 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 # library(progress)
 
 reindeer:::unlink_emuRDemoDir()
-reindeer:::create_ae_db() -> ae
+reindeer:::create_ae_db(verbose = FALSE) -> ae
+reindeer:::make_dummy_metafiles(ae)
 
 ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
 ae_a |>
-  quantify("fm",.quiet=TRUE, .verbose=FALSE) -> outfm
-ae_a |>
-  quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1,.quiet=TRUE, .verbose=FALSE) -> cutfm
+  quantify("fm",.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/read.xlsx") -> outfm
+
+cat("\n\nsecond\n\n")
 
 ae_a |>
-  quantify(forest) -> forFM
+  quantify(forest,.parameter_log_excel="~/Desktop/for.xlsx") -> forFM
+cat("\n\nthird\n\n")
 
-ae_a_copy <- ae_a
-attr(ae_a_copy,"basePath") <- NULL
+ae_a |>
+  quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1,.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/cut.xlsx") -> cutfm
 
-ae_a_copy |>
-  quantify(forest,.inside_of="/var/folders/lr/h3mlkmq540d6xjrh3bpdms600000gn/T//RtmpLGfQle/emuR_demoData/ae_emuDB") -> forFM_missingDB
+
+
+#ae_a_copy <- ae_a
+#attr(ae_a_copy,"basePath") <- NULL
+
+#ae_a_copy |>
+#  quantify(forest,.inside_of="/var/folders/lr/h3mlkmq540d6xjrh3bpdms600000gn/T//RtmpLGfQle/emuR_demoData/ae_emuDB") -> forFM_missingDB
 #ae_a |>
 #  quantify(forest,.where=0.5,.n_preceeding=1,.n_following=1,.quiet) ->forCutFM
