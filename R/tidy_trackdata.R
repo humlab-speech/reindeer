@@ -402,14 +402,15 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   ## Definition and setup directly related to the inner applied funct --------
 
-  innerMapFunction <- function(.sl_rowIdx,.session,.bundle,.where=NULL, .n_preceeding=NULL,.n_following=NULL,...){
+  processAndStore <- function(.sl_rowIdx,.session,.bundle,.where=NULL, .n_preceeding=NULL,.n_following=NULL,...){
 
     dotdotdot <- list(...)
     dotdotdotS <- toString(dotdotdot)
     result <- NULL
 
+
     if(!is.null(.cache_connection)){
-      #Check existing values
+      #Check existing values)
 
       cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",.sl_rowIdx)
 
@@ -424,28 +425,33 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
       }
 
     }
-    #Compute if the results is still not defined
-    if(is.null(result)){
 
-      #logger::log_debug("[{.session}:{.bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
+
+    #Compute if the results is still not defined
+    if(is.null(result) || is.na(result) ){
+      cat("pong")
       result <- safe_f(...)
+      cat(dput(result,file = ""))
       #Optionally make the cutout from the result directly, if the result was not NA
       if(!is.null(.where) && ! is.na(result) && "AsspDataObj" %in% class(result)){
         .n_preceeding <- ifelse(is.null(.n_preceeding),0,.n_preceeding)
         .n_following <- ifelse(is.null(.n_following),0,.n_following)
         result <- cut(result,where=.where,n_preceeding=.n_preceeding,n_following=.n_following)
+        logger::log_debug("[{.session}:{.bundle})] Extracting points at {.where} {.n_preceeding}--{.n_following}\n")
+
       }
     }
 
 
-    #Maybe store the results in cache?
+    #Store the results in cache, if there is one
     if(!is.null(.cache_connection)){
       objser <- base::rawToChar(base::serialize(result, connection = NULL,ascii = TRUE))
       RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(.sl_rowIdx,objser))
     }
-
     return(result)
   }
+
+
   ### Define what information will be given in the spinner -----
   spinner <- "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}"
   ## Rewrite the spinner if doing extraction from an AsspDataObj ------------------------------------------------
@@ -533,11 +539,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     .recompute <- FALSE
 
     # Disable the automatic cache file
-
-    if(!is.null(.cache_in_file) && isTRUE(.cache_in_file)){
-      cli::cli_alert_warning("A cache file was not specified and will not be auto-generated when reading stored track data.")
-      .cache_in_file <- FALSE
-    }
+    .cache_in_file <- FALSE
 
   }
 
@@ -761,13 +763,14 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
   segmentDSPDF <- .what  |>
     tibble::rownames_to_column(var = "sl_rowIdx")  |>
     dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle"))  |>
+    dplyr::mutate(tibble::as_tibble(dotdotArgs)) |> # Set explicitly set arguments
     dplyr::rename(beginTime=start,endTime=end)  |>
     dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))  |>
     dplyr::rename(.session=session,.bundle=bundle)  |>
     dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) |> ## Fix for wrassp functions that expect "numeric" values, not integers
     tibble::rownames_to_column(var = ".sl_rowIdx")  |>
-    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx)) |>  #Make sure we have a link back to the segmentlist row
-    dplyr::mutate(tibble::as_tibble(dotdotArgs)) # Set explicitly set arguments
+    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))   #Make sure we have a link back to the segmentlist row
+
 
 
   fillableArgs <- intersect(
@@ -778,8 +781,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   segmentDSPDF <- segmentDSPDF  |>
     tidyr::replace_na(replace=defaultArgs) |>
-    dplyr::mutate(.where=.where, .n_preceeding=.n_preceeding,.n_following=.n_following) #Attach subset arguments
-
+    dplyr::mutate(.where=.where, .n_preceeding=.n_preceeding,.n_following=.n_following)
 
 
   # Do the actual quantification  work --------------------------------------------
@@ -787,12 +789,13 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
-
+  return(segmentDSPDF)
   appliedDFResultInList <- segmentDSPDF |>
+    dplyr::slice(1) |>
     dplyr::rowwise()  |>
-    purrr::pmap(.f=innerMapFunction,.progress = pb) # This is the busy line
+    purrr::pmap(.f=processAndStore,.progress = pb) # This is the busy line
 
-
+  return(appliedDFResultInList)
   ## [special] The case where .what is called by furnish() --------------------------------------------
 
   if(calledByFurnish){
@@ -813,7 +816,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     ##  [default] The case in which we are processing a segment list --------------------------------------------
 
     resTibble <- appliedDFResultInList  |>
-      purrr::map_dfr(tibble::as_tibble, .id="sl_rowIdx") |>
+      purrr::map_dfr(as_tibble, .id="sl_rowIdx") |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
 
 
@@ -1208,14 +1211,14 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
   return(res)
 }
 
-readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=0, sample_end=0,toFile=FALSE){
+readtrack <- function(listOfFiles,field=1,beginTime=0, endTime=0,sample_start=0, sample_end=0,toFile=FALSE){
 
-  if(! all(file.exists(listOfFiles))){
-    msg <- paste0("The input files ",paste(listOfFiles,collapse = ", "), " do not exist.")
-    logger::log_error(msg)
-    stop(msg)
-  }
-  if(length(listOfFiles) > 1) stop("The 'readtrack' function is unable to process more than one file at a time")
+  if(is.null(field) || missing(field)) field <- 1
+
+
+  if(length(listOfFiles) > 1) cli::cli_abort("The 'readtrack' function is unable to process more than one file at a time")
+  if(! file.exists(listOfFiles)) cli::cli_abort("The file {.path {listOfFiles}} does not exist")
+
 
   samples <- TRUE
   begin <- sample_start
@@ -1230,19 +1233,16 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
   trackObj <- wrassp::read.AsspDataObj(listOfFiles,begin=begin, end=end,samples=samples)
 
-  if(is.null(field) || length(field) == 0 || missing(field) ){
-    .field <- type.convert(field,as.is = TRUE)
-    field <- names(trackObj)[[.field]]
-  }
-
-  if(!is.character(field)) stop("Please supply a field name as a string.")
-  # Now construct the SSFF data obhect
+  # Now construct the SSFF data object
   outDataObj = list()
 
   fieldTable <- as.data.frame(trackObj[[field]] )
 
+  fieldName <- ifelse(is.numeric(field),names(trackObj)[[field]],as.character(field) )
+
+
   #Copy attributes over
-  attr(outDataObj, "trackFormats") <- attr(trackObj, "trackFormats")[match(field,names(trackObj))]
+  attr(outDataObj, "trackFormats") <- attr(trackObj, "trackFormats")[match(fieldName,names(trackObj))]
   attr(outDataObj,"filePath") <- attr(trackObj,"filePath")
   attr(outDataObj, "sampleRate") <- attr(trackObj, "sampleRate")
   attr(outDataObj, "origFreq") <-  attr(trackObj, "origFreq")
@@ -1258,7 +1258,7 @@ readtrack <- function(listOfFiles,field="1",beginTime=0, endTime=0,sample_start=
 
   names(fieldTable) <- NULL
 
-  outDataObj = wrassp::addTrack(outDataObj,  field, as.matrix(fieldTable), "INT16")
+  outDataObj = wrassp::addTrack(outDataObj,  fieldName , as.matrix(fieldTable), "INT16")
 
 
   return(outDataObj)
@@ -1653,13 +1653,13 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 # Code used for interactive testing #######
 
 
-# library(tidyverse)
-# library(purrr)
-# library(progressr)
-# library(tibble)
-# library(superassp)
-# library(furrr)
-# library(progress)
+library(tidyverse)
+library(purrr)
+library(progressr)
+library(tibble)
+library(superassp)
+library(furrr)
+library(progress)
 
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose = FALSE) -> ae
@@ -1668,12 +1668,12 @@ reindeer:::make_dummy_metafiles(ae)
 ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
 ae_a |>
   quantify("fm",.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/read.xlsx") -> outfm
-
-cat("\n\nsecond\n\n")
-
-ae_a |>
-  quantify(forest,.parameter_log_excel="~/Desktop/for.xlsx") -> forFM
-cat("\n\nthird\n\n")
+#
+# cat("\n\nsecond\n\n")
+#
+# ae_a |>
+#   quantify(forest,.parameter_log_excel="~/Desktop/for.xlsx") -> forFM
+# cat("\n\nthird\n\n")
 
 ae_a |>
   quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1,.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/cut.xlsx") -> cutfm
