@@ -378,8 +378,9 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     .cache_in_file <- FALSE
   }
 
-  # Initial check of arguments ----------------------------------------------
 
+
+  # Initial check of arguments ----------------------------------------------
 
   #Check for the special case where the function was called by furnish
   # TODO Remove and instead use a special bundlelist class / object
@@ -429,16 +430,15 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
     #Compute if the results is still not defined
     if(is.null(result) || is.na(result) ){
-      cat("pong")
+
       result <- safe_f(...)
-      cat(dput(result,file = ""))
+
       #Optionally make the cutout from the result directly, if the result was not NA
       if(!is.null(.where) && ! is.na(result) && "AsspDataObj" %in% class(result)){
         .n_preceeding <- ifelse(is.null(.n_preceeding),0,.n_preceeding)
         .n_following <- ifelse(is.null(.n_following),0,.n_following)
         result <- cut(result,where=.where,n_preceeding=.n_preceeding,n_following=.n_following)
         logger::log_debug("[{.session}:{.bundle})] Extracting points at {.where} {.n_preceeding}--{.n_following}\n")
-
       }
     }
 
@@ -507,6 +507,14 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
   assertthat::assert_that( "emuDBhandle" %in% class(.inside_of))
   #From now on we can be sure to have a valid database handle in .inside_of
 
+  # This sets the default input media file extension, which handled the case when a
+  #function is called to compute a list or SSFF track result based on a wave file
+  # This variable will then be set to something else if
+  # we want to read in a pre-computed SSFF track stored on disk instead.
+
+  inputSignalsExtension <- ifelse(is.null(.input_signal_file_extension),
+                                  emuR:::load_DBconfig(.inside_of)$mediafileExtension,
+                                  .input_signal_file_extension)
   ## Source setup ------------------------------------------------------------
 
   definedTracks <- emuR::list_ssffTrackDefinitions(.inside_of)
@@ -514,7 +522,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
   .f <- NULL
   if(is.character(.source) && .source %in% definedTracks$name){
     ### The .source is just the name of a track --------
-    if("fields" %in% names(dotdotArgs)){
+    if("field" %in% names(dotdotArgs)){
       te <- c(field,.source)
 
       if(!.quiet) cli::cli_alert("Both a {.args field} and a {.arg {(.source)}} argument was supplied ({.vals {te}}). Reading the {.field field} track in {.val {inputSignalsExtension}} signal files.")
@@ -527,7 +535,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     .f <- readtrack
     funName <- "readtrack"
 
-    #Get the file extension of the input track
+    #Get the file extension of the input track , overwriting the default "wav" if
     inputSignalsExtension <- definedTracks[definedTracks$name == dotdotArgs$field,"fileExtension"]
 
     #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
@@ -580,14 +588,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
                                                              "x"="Functions provided as {.arg .source} to {.fun quantify} is assumed to have a {.arg listOfFiles} formal argument where file paths are given"))
 
 
-  # This sets the default input media file extension, which handled the case when a
-  #function is called to compute a list or SSFF track result based on a wave file
-  # This variable will then be set to something else if
-  # we want to read in a pre-computed SSFF track stored on disk instead.
 
-  inputSignalsExtension <- ifelse(is.null(.input_signal_file_extension),
-                                  emuR:::load_DBconfig(.inside_of)$mediafileExtension,
-                                  .input_signal_file_extension)
 
   signalFiles <- emuR::list_files(.inside_of,inputSignalsExtension)  |>
     dplyr::rename(listOfFiles=absolute_file_path)  |>
@@ -789,13 +790,10 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
-  return(segmentDSPDF)
   appliedDFResultInList <- segmentDSPDF |>
-    dplyr::slice(1) |>
     dplyr::rowwise()  |>
     purrr::pmap(.f=processAndStore,.progress = pb) # This is the busy line
 
-  return(appliedDFResultInList)
   ## [special] The case where .what is called by furnish() --------------------------------------------
 
   if(calledByFurnish){
@@ -1652,38 +1650,22 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
 # Code used for interactive testing #######
 
-
-library(tidyverse)
-library(purrr)
-library(progressr)
-library(tibble)
-library(superassp)
-library(furrr)
-library(progress)
-
-reindeer:::unlink_emuRDemoDir()
-reindeer:::create_ae_db(verbose = FALSE) -> ae
-reindeer:::make_dummy_metafiles(ae)
-
-ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
-ae_a |>
-  quantify("fm",.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/read.xlsx") -> outfm
 #
-# cat("\n\nsecond\n\n")
+# library(tidyverse)
+# library(purrr)
+# library(progressr)
+# library(tibble)
+# library(superassp)
+# library(furrr)
+# library(progress)
 #
+# reindeer:::unlink_emuRDemoDir()
+# reindeer:::create_ae_db(verbose = FALSE) -> ae
+# reindeer:::make_dummy_metafiles(ae)
+#
+# ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
 # ae_a |>
-#   quantify(forest,.parameter_log_excel="~/Desktop/for.xlsx") -> forFM
-# cat("\n\nthird\n\n")
+#   quantify("fm",.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/read.xlsx") -> outfm
+# ae_a |>
+#   quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1,.cache_in_file=TRUE,.clear_cache=TRUE) -> cutfm
 
-ae_a |>
-  quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1,.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/cut.xlsx") -> cutfm
-
-
-
-#ae_a_copy <- ae_a
-#attr(ae_a_copy,"basePath") <- NULL
-
-#ae_a_copy |>
-#  quantify(forest,.inside_of="/var/folders/lr/h3mlkmq540d6xjrh3bpdms600000gn/T//RtmpLGfQle/emuR_demoData/ae_emuDB") -> forFM_missingDB
-#ae_a |>
-#  quantify(forest,.where=0.5,.n_preceeding=1,.n_following=1,.quiet) ->forCutFM
