@@ -403,6 +403,9 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   ## Definition and setup directly related to the inner applied funct --------
 
+
+  safe_get <- purrr::safely(get)
+
   processAndStore <- function(.sl_rowIdx,.session,.bundle,.where=NULL, .n_preceeding=NULL,.n_following=NULL,...){
 
     dotdotdot <- list(...)
@@ -454,11 +457,12 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   ### Define what information will be given in the spinner -----
   spinner <- "{cli::pb_spin} Processing ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}"
+  mergespinner = "{cli::pb_spin} Merging track portions a single tibble ({cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}"
   ## Rewrite the spinner if doing extraction from an AsspDataObj ------------------------------------------------
-  if(!is.null(.where) ){
+  if(!is.null(.where) && ! missing(.where) ){
     spinner <- ifelse(.n_preceeding == 0 && .n_following == 0,
-                      "{cli::pb_spin} Exctacting from the {(.where*100)}% relative time point from segment {cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}",
-                      "{cli::pb_spin} Extracting from the {(.where*100)}% relative time point (-{(.n_following)} and +{(.n_following)} points) from segment {cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}"
+                      paste0("{cli::pb_spin} Exctacting from the ",.where*100,"% relative time point from segment {cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}"),
+                      paste0("{cli::pb_spin} Extracting from the ",.where*100,"% relative time point (-",.n_preceeding," and +",.n_following," points) from segment {cli::pb_current} of {cli::pb_total}) {cli::pb_bar} | ETA: {cli::pb_eta}")
     )
   }
 
@@ -468,7 +472,10 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     format = spinner,
     clear = TRUE)
 
-
+  pbmerge <- list(
+    type = "iterator",
+    format = mergespinner,
+    clear = TRUE)
 
   if(nrow(.what ) < 1){
     #Nonsense segment list
@@ -554,7 +561,6 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
   ## Preparation of application of .source as a function -------------
   if(is.null(.f) ){  #Skip if .f it set already
     if( is.function(.source) ){
-      safe_get <- purrr::safely(get)
       #Just need to establish the name of the function from the call
       funName <- as.character(rlang::call_args(rlang::current_call())$.source)
       .f <- .source
@@ -565,8 +571,10 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
         .f <- safe_get(.source)$result
       }else{
 
-        cli::cli_abort(c("Unable to deduce the function to apply",
-                         "i"="You indicated {.arg .source={(.source)}} in the call to {.fun quantify}."))
+        cli::cli_abort(c("Unable to deduce the source of acoustic data",
+                         "x"="The {.arg .source} argument must be either an existing track defined in the database, or the name of a function.",
+                         "i"="You indicated {.arg .source={(.source)}} in the call to {.fun quantify}.",
+                         "i"="Defined tracks {?is/are} {.field {definedTracks$name}}."))
       }
     }
   }
@@ -714,7 +722,10 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
     sessionBundleDSPSettingsDF <- signalFiles
     # The names of columns to keep are now the columns that are defined  in signalFiles and which will be used by the DSP function
-    settingsThatWillBeUsed <- intersect(formalArgsNames,names(signalFiles) )
+    settingsThatWillBeUsed <- intersect(formalArgsNames,
+                                        union(names(signalFiles),
+                                              names(dotdotArgs))
+    )
 
   }
 
@@ -790,6 +801,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
+  return(segmentDSPDF)
   appliedDFResultInList <- segmentDSPDF |>
     dplyr::rowwise()  |>
     purrr::pmap(.f=processAndStore,.progress = pb) # This is the busy line
@@ -812,9 +824,9 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   }else{
     ##  [default] The case in which we are processing a segment list --------------------------------------------
-
+    return(appliedDFResultInList)
     resTibble <- appliedDFResultInList  |>
-      purrr::map_dfr(as_tibble, .id="sl_rowIdx") |>
+      purrr::map_dfr(tibble::as_tibble, .id="sl_rowIdx") |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
 
 
@@ -1209,7 +1221,7 @@ tier <- function(inside_of,tier_name,tier_type, parent_tier=NULL){
   return(res)
 }
 
-readtrack <- function(listOfFiles,field=1,beginTime=0, endTime=0,sample_start=0, sample_end=0,toFile=FALSE){
+readtrack <- function(listOfFiles,field=1,beginTime=0, endTime=0,sample_start=0, sample_end=0){
 
   if(is.null(field) || missing(field)) field <- 1
 
@@ -1655,17 +1667,22 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 # library(purrr)
 # library(progressr)
 # library(tibble)
-# library(superassp)
+library(superassp)
 # library(furrr)
 # library(progress)
 #
-# reindeer:::unlink_emuRDemoDir()
-# reindeer:::create_ae_db(verbose = FALSE) -> ae
-# reindeer:::make_dummy_metafiles(ae)
-#
-# ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
-# ae_a |>
-#   quantify("fm",.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/read.xlsx") -> outfm
-# ae_a |>
-#   quantify("fm",.where=0.5,.n_preceeding=1,.n_following=1,.cache_in_file=TRUE,.clear_cache=TRUE) -> cutfm
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db(verbose = FALSE) -> ae
+reindeer:::make_dummy_metafiles(ae)
+
+ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
+ae_a |>
+  quantify("fm",.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/read.xlsx") -> outfm
+ae_a |>
+  quantify(forest,.where=0.5,.n_preceeding=1,.n_following=1,.cache_in_file=TRUE,.clear_cache=TRUE) -> cutfm
+
+ae_a |>
+  dplyr::slice(1:2) |>
+  quantify(eGeMAPS,.cache_in_file=TRUE,.clear_cache=TRUE) -> egm
+
 
