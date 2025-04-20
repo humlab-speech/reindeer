@@ -9,7 +9,7 @@ fake_two_df_fun <- function( svDF,
                               pdf.path = NULL,
                               simple.output = FALSE,
                               overwrite.pdfs = FALSE){
-  Sys.sleep(.5)
+  Sys.sleep(.1)
   return(list(svDF=paste0(dim(svDF),collapse=","),
                 csDF=paste0(dim(csDF),collapse=","),
                 speaker.name=speaker.name ,
@@ -286,21 +286,40 @@ peek_attributes <- purrr::partial(peek_at, what="attributes")
 
 # Setter functions
 
-define <- function(.x, what=c("level","link","global_lg","perspective","attribute","local_lg","legals"),...){
 
-  if("emuDBhandle" %in% class(.x)){
-    .inside_of <- .x
-  }else{
-    if( ! is.null(attr(.x,"basePath")) && dir.exists(attr(.x,"basePath"))) {
-      # We then need to create a handle object
-      utils::capture.output(
-        .inside_of <- emuR::load_emuDB(attr(.x,"basePath"),verbose = TRUE)
-      ) -> dbload.info
-      logger::log_info(paste(dbload.info,collapse ="\n"))
-    }else{
-      stop("Could not derive the database path. Please provide an explicit database handle object as '.x'. See ?emuR::load_emuDB for details.")
-    }
+prepare <- function(...) {
+  UseMethod("prepare")
+}
+
+prepare.character <- function(.x,...){
+  if(!file.exists(.x)){
+    cli::cli_abort("Unable to find database location {.file {(.x)}}")
   }
+  # We then need to create a handle object
+  utils::capture.output(
+    .inside_of <- emuR::load_emuDB(.x,verbose = TRUE)
+  ) -> dbload.info
+  logger::log_info(paste(dbload.info,collapse ="\n"))
+  prepare(.inside_of,...)
+}
+
+prepare.data.frame <- function(.x,...){
+  if( ! is.null(attr(.x,"basePath")) && dir.exists(attr(.x,"basePath"))) {
+    # We then need to create a handle object
+    utils::capture.output(
+      .inside_of <- emuR::load_emuDB(attr(.x,"basePath"),verbose = TRUE)
+    ) -> dbload.info
+    logger::log_info(paste(dbload.info,collapse ="\n"))
+  }else{
+    cli::cli_abort(c("Could not derive the database path.",
+      "i"= "Please provide an explicit database handle object in {.arg .x}.",
+      "i"= "See ?emuR::load_emuDB for details."))
+
+  }
+  prepare(.inside_of,...)
+}
+
+prepare.emuDBhandle <- function(.inside_of, what=c("level","link","global_lg","perspective","attribute","local_lg","legals"),...){
 
   what <- match.arg(what, c("level","link","global_lg","bundle","session","perspective","files","attributes","local_lg"))
 
@@ -327,12 +346,12 @@ define <- function(.x, what=c("level","link","global_lg","perspective","attribut
   return(res)
 }
 
-add_tier <- purrr::partial(define,what="level")
-add_link <- purrr::partial(define,what="link")
-add_perspective <- purrr::partial(define,what="perspective")
-add_attribute <- purrr::partial(define,what="attribute")
-add_labelgroup <- purrr::partial(define,what="labelgroup")
-add_glabelgroup <- purrr::partial(define,what="glabelgroup")
+add_tier <- purrr::partial(prepare,what="level")
+add_link <- purrr::partial(prepare,what="link")
+add_perspective <- purrr::partial(prepare,what="perspective")
+add_attribute <- purrr::partial(prepare,what="attribute")
+add_labelgroup <- purrr::partial(prepare,what="labelgroup")
+add_glabelgroup <- purrr::partial(prepare,what="glabelgroup")
 
 
 describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
@@ -340,12 +359,35 @@ describe_level <- function(.x,name,type= c("SEGMENT","EVENT","ITEM")){
   if(is.null(type)) stop("Missing level type")
   if(missing(name)) stop("A level name is required")
 
-  res <- define(.x,what="level",name=name,type=toupper(type))
+  res <- prepare(.x,what="level",name=name,type=toupper(type))
 }
+
+
+
 
 quantify <- function(...) {
   UseMethod("quantify")
 }
+
+quantify.character <- function(.what,...){
+  if(missing(.what)) cli::cli_abort("Missing manditory argument {.arg .what}.")
+  if(! file.info(path.expand(.what))[["isdir"]] || ! dir.exists(path.expand(.what))){
+    cli::cli_abort(c("The {.arg .what} is not a valid path.",
+                     "i"="The database path searched was {.path {path.expand(.what)}}"))
+  }
+  if(! stringr::str_ends(basename(path.expand(.what)), emuR:::emuDB.suffix)){
+    cli::cli_abort(c("The {.arg .what} does not seem to point to the location of a database",
+                     "x"="The database directory should end with {.val {emuR:::emuDB.suffix}}.",
+                     "i"="The database path searched was {.path {path.expand(.what)}}"))
+  }
+  utils::capture.output(
+    .what <- emuR::load_emuDB(attr(.what,"basePath"),verbose = FALSE)
+  ) -> dbload.info
+  logger::log_info(paste(dbload.info,collapse = "\n"))
+  #Now of class emuDBhandle
+  quantify(.what,...)
+}
+
 
 quantify.data.frame <- function(.what,...,.inside_of){
   mandatory <- c("labels", "start", "end", "db_uuid", "session", "bundle", "start_item_id",
@@ -361,23 +403,73 @@ quantify.data.frame <- function(.what,...,.inside_of){
 }
 
 
-quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_in_file=TRUE,.clear_cache=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.naively=FALSE,.recompute=FALSE,.dsp_settings_by=c("Gender","Age"),.package="superassp",.parameter_log_excel=NULL,.inside_of=NULL,.input_signal_file_extension=NULL,.verbose=FALSE,.quiet=FALSE){
+quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NULL,.n_following=NULL,.by_maxFormantHz=TRUE,.cache_in_file=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.naively=FALSE,.recompute=FALSE,.dsp_settings_by=c("Gender","Age"),.package="superassp",.parameter_log_excel=NULL,.inside_of=NULL,.input_signal_file_extension=NULL,.verbose=FALSE,.quiet=FALSE){
 
 
   ## Explicit and Hard coded arguments ----------------------------------------------------
 
   dotdotArgs <- rlang::list2(...)
 
-  if("toFile" %in% names(dotdotArgs)){
-   if(.verbose || ! .quiet) cli::cli_alert_info(c("The function {.fun quantify} returns an acoustic summary of segments and never changes the database",
-                                    "x"="Ignoring the {.arg toFile} argument to the DSP function."))
-  }
-  dotdotArgs["toFile"] <- FALSE
+  .cache_connection <- NULL
 
-  if(is.null(.cache_in_file)) {
+  if(is.null(.cache_in_file) || missing(.cache_in_file)) {
     .cache_in_file <- FALSE
+    .cache_connection <- NULL
+  }else{
+    if(is.character(.cache_in_file)){
+      if(file.exists(.cache_in_file)){
+        .cache_in_file <- normalizePath(.cache_in_file)
+        cli::cli_alert_info("I will use the existing cache file {.file {(.cache_in_file)}} to store results.")
+      }
+      if(isTRUE(.cache_in_file)){
+        .cache_in_file <- file.path(tempdir(check=TRUE),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
+      }
+
+    }
+
   }
 
+
+  ## Cache system setup -----------------------------------------
+
+
+
+  if(isFALSE(.cache_in_file)){
+    #the case when no cache file should be used
+    cli::cli_alert_info("Intermediate results are {.strong not} cached.")
+  }else{
+
+    .cache_in_file <- path.expand(.cache_in_file)
+    cacheFileExists <- file.exists(.cache_in_file)
+    cli::cli_alert_info("Using  cache file {.file {(.cache_in_file)}}")
+
+    #Clear cache file if indicated
+    if(.clear_cache && cacheFileExists){
+      suppressWarnings( unlink(.cache_in_file))
+      cacheFileExists <- file.exists(.cache_in_file)
+    }
+    suppressWarnings(
+      .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
+                                          user="root",
+                                          password="",
+                                          host="localhost",
+                                          dbname=.cache_in_file,
+                                          flags=RSQLite::SQLITE_RWC,
+                                          loadable.extensions=FALSE)
+    )
+    #Check table format requirements
+    if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
+       (! "cache" %in% RSQLite::dbListTables(.cache_connection) ||
+        ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))
+    ){
+      cli::cli_alert_info("Initializing cache file {.file {(.cache_in_file)}}")
+      RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
+    }
+    RSQLite::dbExecute(.cache_connection,
+                       "CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
+
+
+  }
 
 
   # Initial check of arguments ----------------------------------------------
@@ -395,16 +487,127 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
                           )
     }
     #Clear erroneous args
-    # TODO will not work now that the inner function needs a .where
     dotdotArgs[".where"] <- NULL
     dotdotArgs[".n_preceeding"] <- NULL
     dotdotArgs[".n_follwing"] <- NULL
+    if("toFile" %in% names(dotdotArgs) && (.verbose || ! .quiet)) {
+      cli::cli_alert_info(c("The function {.fun quantify} returns an acoustic summary of segments and never changes the database",
+                                                                                        "x"="Ignoring the {.arg toFile} argument to the DSP function."))
+    }
+
+  }
+  #To file if furnish, not to file if not furnish
+  dotdotArgs["toFile"] <- calledByFurnish
+
+  logger::log_debug("... args contains : {names(dotdotArgs)}")
+  logger::log_debug("... is a  : {class(dotdotArgs)}")
+
+
+  ## Attach the database ------------------
+  # * Use an expliclitly given .inside_of as the database path
+  # * If the segmentlist has a "basePath" attribute that works, use it
+  # - Otherwise, error out
+  .inside_of <- dplyr::coalesce(.inside_of, attr(.what,"basePath"),NA)
+  if(! is.na(.inside_of) &&
+     dir.exists(path.expand(.inside_of)) &&
+     stringr::str_ends(basename(path.expand(.inside_of)), emuR:::emuDB.suffix)){
+      utils::capture.output(
+      .inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
+    ) -> dbload.info #Maybe useful later?
+  }else{
+    #Everything failed
+    whatName <- as.character(rlang::call_args(rlang::current_call())$.what)
+    cli::cli_abort(c("Unable to establish a connection to the database from which the segmentlist {.args {whatName}} came from.",
+                     "i"="Tried the {.path {c(attr(.what,\"basePath\"),.inside_of)}} database location{s}.")
+    )
   }
 
-  ## Definition and setup directly related to the inner applied funct --------
+  assertthat::assert_that( "emuDBhandle" %in% class(.inside_of))
+  #From now on we can be sure to have a valid database handle in .inside_of
+
+  # This sets the default input media file extension, which handled the case when a
+  #function is called to compute a list or SSFF track result based on a wave file
+  # This variable will then be set to something else if
+  # we want to read in a pre-computed SSFF track stored on disk instead.
+
+  inputSignalsExtension <- ifelse(is.null(.input_signal_file_extension),
+                                  emuR:::load_DBconfig(.inside_of)$mediafileExtension,
+                                  .input_signal_file_extension)
+  ## Source setup ------------------------------------------------------------
 
 
-  safe_get <- purrr::safely(get)
+  definedTracks <- emuR::list_ssffTrackDefinitions(.inside_of)
+  #The reason why we need to split off .source into a separate .f is that is needed to make the readtrack application case below behave identically parameter-wise to this case when we apply a DSP function
+  .f <- NULL
+
+  ### The Block where character .source argument is handled ----
+  if(is.character(.source)) {
+    if(.source %in% definedTracks$name){
+      ### The .source is just the name of a track --------
+      if("field" %in% names(dotdotArgs)){
+        te <- c(field,.source)
+
+        if(!.quiet) cli::cli_warn(c("Both a {.args field} and a {.arg {(.source)}} argument was supplied.",
+                                    "i"="Reading the {.field field} track in {.val {inputSignalsExtension}} signal files."))
+      } else {
+        dotdotArgs$field <- .source
+        if(! .quiet) cli::cli_alert_info("Reading data from the {.field {(.source)}} in {.val {inputSignalsExtension}} signal files.")
+
+      }
+
+      .f <- readtrack
+      funName <- "readtrack"
+
+      #Get the file extension of the input track , overwriting the default "wav" if
+      inputSignalsExtension <- definedTracks[definedTracks$name == dotdotArgs$field,"fileExtension"]
+
+      #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
+      if(( !.naively || .recompute) && (!.quiet || .verbose)) {
+        cli::cli_bullets(c("Directly reading the {.field .source} track require no DSP parameter deduction.",
+                           ">"="The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}."))
+      }
+      .naively <- TRUE
+      .recompute <- FALSE
+
+      # Disable the automatic cache file
+      .cache_in_file <- FALSE
+
+    }else{ ## The character .source is not the name of a track
+      safe_get <- purrr::safely(get)
+
+      if(is.function(safe_get(.source)$result)){
+        funName <- .source
+        .f <- safe_get(.source)$result
+
+      }
+    }
+  }
+
+  ### Preparation of application of .source as a function -----------------
+
+  if(is.null(.f) ){  #Skip if .f it set already
+    if( is.function(.source) ){
+      #Just need to establish the name of the function from the call
+      funName <- as.character(rlang::call_args(rlang::current_call())$.source)
+      .f <- .source
+    }else{ # Not of a function class, and we already concluded before that it is not a track name or a function name in a string
+      cli::cli_abort(c("Unable to deduce the source of acoustic data",
+                       "x"="The {.arg .source} argument must be either an existing track defined in the database, a function (or the name of one in a character string).",
+                       "i"="You indicated {.arg .source={(.source)}} in the call to {.fun quantify}.",
+                       "i"="Defined tracks {?is/are} {.field {definedTracks$name}}."))
+    }
+  }
+
+  assertthat::assert_that(!is.null(.f))
+
+  # This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
+  safe_f <- purrr::possibly(.f, otherwise=NA)
+
+  assertthat::assert_that(!is.null(safe_f) && is.function(safe_f))
+
+  if(! .quiet) cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
+
+  ## Definition and setup directly related to the inner applied function --------
 
   processAndStore <- function(.sl_rowIdx,.session,.bundle,.where=NULL, .n_preceeding=NULL,.n_following=NULL,...){
 
@@ -425,10 +628,13 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
         result <- base::unserialize(
           base::charToRaw(
             cachedObj$obj[[1]])
-          )
+        )
+      }else{
+        logger::log_debug("[{.session}:{.bundle})] No data existing to load from cache file.\n")
       }
 
     }
+    logger::log_trace("[{.session}:{.bundle})] Before applying results.\n")
 
 
     #Compute if the results is still not defined
@@ -436,10 +642,15 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
       result <- safe_f(...)
 
+      glimpse(class(result))
+
+      logger::log_trace("[{.session}:{.bundle})] Result is NULL :: {is.null(result)}")
       #Optionally make the cutout from the result directly, if the result was not NA
-      if(!is.null(.where) && ! is.na(result) && "AsspDataObj" %in% class(result)){
-        .n_preceeding <- ifelse(is.null(.n_preceeding),0,.n_preceeding)
-        .n_following <- ifelse(is.null(.n_following),0,.n_following)
+      if(!is.null(.where) && ! all(is.na(result)) && "AsspDataObj" %in% class(result) ){
+
+        logger::log_debug("[{.session}:{.bundle})] Extracting points at {.where} {.n_preceeding}--{.n_following}\n")
+        .n_preceeding <- ifelse(is.null(.n_preceeding) ||  .n_preceeding < 1 ,0,.n_preceeding)
+        .n_following <- ifelse(is.null(.n_following) || .n_following < 1 ,0,.n_following)
         result <- cut(result,where=.where,n_preceeding=.n_preceeding,n_following=.n_following)
         logger::log_debug("[{.session}:{.bundle})] Extracting points at {.where} {.n_preceeding}--{.n_following}\n")
       }
@@ -486,105 +697,11 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
   if(any(is.na(.what[c("start","end")]))){
     #We need to have all start and end times specified to proceed
     if(!.quiet) cli::cli_alert_info(c("Missing time references",
-                     "x"="Some start or end times in the segment list supplied as the {.param .what} argument is missing",
-                     "i"="I will try to deduce times from associated levels with time information."))
+                                      "x"="Some start or end times in the segment list supplied as the {.param .what} argument is missing",
+                                      "i"="I will try to deduce times from associated levels with time information."))
     .what <- anchor(.what)
   }
 
-
-  ## Attach the database ------------------
-  # * Use an expliclitly given .inside_of as the database path
-  # * If the segmentlist has a "basePath" attribute that works, use it
-  # - Otherwise, error out
-  .inside_of <- dplyr::coalesce(.inside_of, attr(.what,"basePath"),NA)
-  if(! is.na(.inside_of) &&
-     dir.exists(path.expand(.inside_of)) &&
-     stringr::str_ends(basename(path.expand(.inside_of)), emuR:::emuDB.suffix)){
-      utils::capture.output(
-      .inside_of <- emuR::load_emuDB(.inside_of,verbose = FALSE)
-    ) -> dbload.info #Maybe useful later?
-  }else{
-    #Everything failed
-    whatName <- as.character(rlang::call_args(rlang::current_call())$.what)
-    cli::cli_abort(c("Unable to establish a connection to the database from which the segmentlist {.args {whatName}} came from.",
-                     "i"="Tried the {.path {c(attr(.what,\"basePath\"),.inside_of)}} database location{s}.")
-    )
-  }
-
-  assertthat::assert_that( "emuDBhandle" %in% class(.inside_of))
-  #From now on we can be sure to have a valid database handle in .inside_of
-
-  # This sets the default input media file extension, which handled the case when a
-  #function is called to compute a list or SSFF track result based on a wave file
-  # This variable will then be set to something else if
-  # we want to read in a pre-computed SSFF track stored on disk instead.
-
-  inputSignalsExtension <- ifelse(is.null(.input_signal_file_extension),
-                                  emuR:::load_DBconfig(.inside_of)$mediafileExtension,
-                                  .input_signal_file_extension)
-  ## Source setup ------------------------------------------------------------
-
-  definedTracks <- emuR::list_ssffTrackDefinitions(.inside_of)
-  #The reason why we need to split off .source into a separate .f is that is needed to make the readtrack application case below behave identically parameter-wise to this case when we apply a DSP function
-  .f <- NULL
-  if(is.character(.source) && .source %in% definedTracks$name){
-    ### The .source is just the name of a track --------
-    if("field" %in% names(dotdotArgs)){
-      te <- c(field,.source)
-
-      if(!.quiet) cli::cli_alert("Both a {.args field} and a {.arg {(.source)}} argument was supplied ({.vals {te}}). Reading the {.field field} track in {.val {inputSignalsExtension}} signal files.")
-    } else {
-      dotdotArgs$field <- .source
-      if(! .quiet) cli::cli_alert_info("Reading data from the {.field {(.source)}} in {.val {inputSignalsExtension}} signal files.")
-
-    }
-
-    .f <- readtrack
-    funName <- "readtrack"
-
-    #Get the file extension of the input track , overwriting the default "wav" if
-    inputSignalsExtension <- definedTracks[definedTracks$name == dotdotArgs$field,"fileExtension"]
-
-    #It makes no sense to recompute or deduce DSP settings if the data is to be loaded from a stored track
-    if(( !.naively || .recompute) && (!.quiet || .verbose)) {
-      cli::cli_bullets(c("Directly reading the {.field .source} track require no DSP parameter deduction.",
-                         ">"="The processing will ignore the {.arg .recompute} argument and assume {.arg .naively=TRUE}."))
-    }
-    .naively <- TRUE
-    .recompute <- FALSE
-
-    # Disable the automatic cache file
-    .cache_in_file <- FALSE
-
-  }
-
-  ## Preparation of application of .source as a function -------------
-  if(is.null(.f) ){  #Skip if .f it set already
-    if( is.function(.source) ){
-      #Just need to establish the name of the function from the call
-      funName <- as.character(rlang::call_args(rlang::current_call())$.source)
-      .f <- .source
-    }else{
-      if(is.character(.source) && ! .source %in% definedTracks$name && is.function(safe_get(.source)$result)){
-
-        funName <- .source
-        .f <- safe_get(.source)$result
-      }else{
-
-        cli::cli_abort(c("Unable to deduce the source of acoustic data",
-                         "x"="The {.arg .source} argument must be either an existing track defined in the database, or the name of a function.",
-                         "i"="You indicated {.arg .source={(.source)}} in the call to {.fun quantify}.",
-                         "i"="Defined tracks {?is/are} {.field {definedTracks$name}}."))
-      }
-    }
-  }
-
-
-
-  #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
-  safe_f <- purrr::possibly(.f, otherwise=NA)
-
-  if(! .quiet) cli::cli_alert_info("Applying the function {.fun {funName}} to the segment list.")
 
   #Logic that concerns formal arguments
   formalArgsNames <- methods::formalArgs(.f)
@@ -600,55 +717,11 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   signalFiles <- emuR::list_files(.inside_of,inputSignalsExtension)  |>
     dplyr::rename(listOfFiles=absolute_file_path)  |>
-    dplyr::select(-file)
+    dplyr::select(-file) |>
+    dplyr::mutate(tibble::as_tibble(dotdotArgs))  # Set explicitly set arguments
 
   willRemove <- setdiff(names(dotdotArgs),formalArgsNames)
   if(!.quiet && length(willRemove) > 0) cli::cli_alert_info("Ignoring the {.arg {willRemove}} arguments as they are not used by {.fun {funName}}")
-
-  ## Cache system setup -----------------------------------------
-
-  .cache_connection <- NULL
-
-  if(isFALSE(.cache_in_file)){
-    #the case when no cache file should be used
-    cli::cli_alert_info("Intermediate results are {.strong not} cached.")
-  }else{
-    if(isTRUE(.cache_in_file)){
-      .cache_in_file <- file.path(tempdir(check=TRUE),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
-    }
-    .cache_in_file <- path.expand(.cache_in_file)
-    cacheFileExists <- file.exists(.cache_in_file)
-    cli::cli_alert_info("Using  cache file {.file {(.cache_in_file)}}")
-
-    #Clear cache file if indicated
-    if(.clear_cache && cacheFileExists){
-      suppressWarnings( unlink(.cache_in_file))
-      cacheFileExists <- file.exists(.cache_in_file)
-    }
-    suppressWarnings(
-      .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
-                                          user="root",
-                                          password="",
-                                          host="localhost",
-                                          dbname=.cache_in_file,
-                                          flags=RSQLite::SQLITE_RWC,
-                                          loadable.extensions=FALSE)
-    )
-    #Check table format requirements
-    if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
-       (! "cache" %in% RSQLite::dbListTables(.cache_connection) ||
-        ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))
-    ){
-      cli::cli_alert_info("Initializing cache file {.file {(.cache_in_file)}}")
-      RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
-    }
-    RSQLite::dbExecute(.cache_connection,
-                       "CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
-
-
-  }
-
-
 
 
   ## Prepare the environment for DSP function application
@@ -675,23 +748,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
       dplyr::mutate(Gender=as.character(Gender),Age=as.integer(round(Age,digits = 0)))  |>
       tidyr::replace_na(.metadata_defaults)
 
-#       REVIEW check if these are actually needed
-#       #This variable is used for filling in missing values in arguments explicitly set in metadata
-#       precomputedVariableNames <- intersect(names(meta),names(dsp))
-#       dspColumnsToAdd <- setdiff(names(dsp),names(meta))
-#
-#       filledMeta <- meta  |>
-#         dplyr::rows_update(y=dsp  |>
-#                              dplyr::select(all_of(precomputedVariableNames)),
-#                            by=.dsp_settings_by,unmatched = "ignore")
 
-
-    # # This block will add settings that were set in DSP defaults only
-    # completedStoredDSPSettings <- filledMeta  |>
-    #   dplyr::ungroup()  |>
-    #   dplyr::left_join()
-    #    dplyr::select(dsp,all_of(.dsp_settings_by),all_of(dspColumnsToAdd))
-    #   ,by=.dsp_settings_by)  |>
     completedStoredDSPSettings <- meta |>
       dplyr::left_join(dsp,by = .dsp_settings_by)
 
@@ -707,7 +764,11 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     # in dspCompletedSettings, and which will be used by the DSP function
     settingsThatWillBeUsed <- intersect(formalArgsNames,
                                         union(names(completedStoredDSPSettings),
-                                              names(signalFiles))
+                                              union(
+                                                names(signalFiles),
+                                                names(dotdotArgs)
+                                              )
+                                        )
     ) # This will be used to remove unwanted columns
 
     #Here we construct the settings that we want to use when applying the specific DSP
@@ -723,10 +784,25 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     sessionBundleDSPSettingsDF <- signalFiles
     # The names of columns to keep are now the columns that are defined  in signalFiles and which will be used by the DSP function
     settingsThatWillBeUsed <- intersect(formalArgsNames,
-                                        union(names(signalFiles),
-                                              names(dotdotArgs))
+                                        union(
+                                          names(signalFiles),
+                                          names(dotdotArgs)
+                                          )
     )
 
+
+  }
+
+  ### Assert that we have a time window, if it should be defined
+
+  if(all(c("start","end") %in% names(.what))){
+    #From now on, .what is "fixed" so that the name of start and end time specifications are aligned with what
+    #DSP functions (including IO) expects
+
+    .what <- .what |>
+      dplyr::mutate(beginTime = start /1000, endTime = end /1000)
+
+    settingsThatWillBeUsed <- c(settingsThatWillBeUsed, c("beginTime","endTime"))
   }
 
   ## Optionally log the parameter table to an Excel output -------------------
@@ -768,6 +844,8 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
 
 
+
+
   ## Finish up creating the environment suitable for collecting quantification parameters --------
 
   # Now we need to transfer the session / bundle settings to the segment list
@@ -776,13 +854,11 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
     tibble::rownames_to_column(var = "sl_rowIdx")  |>
     dplyr::left_join(sessionBundleDSPSettingsDF,by=c("session","bundle"))  |>
     dplyr::mutate(tibble::as_tibble(dotdotArgs)) |> # Set explicitly set arguments
-    dplyr::rename(beginTime=start,endTime=end)  |>
     dplyr::select(all_of(c("session","bundle",settingsThatWillBeUsed)))  |>
     dplyr::rename(.session=session,.bundle=bundle)  |>
     dplyr::mutate(dplyr::across(where(is.integer), as.numeric)) |> ## Fix for wrassp functions that expect "numeric" values, not integers
     tibble::rownames_to_column(var = ".sl_rowIdx")  |>
-    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx))   #Make sure we have a link back to the segmentlist row
-
+    dplyr::mutate(.sl_rowIdx = as.integer(.sl_rowIdx)) #Make sure we have a link back to the segmentlist row
 
 
   fillableArgs <- intersect(
@@ -793,15 +869,15 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   segmentDSPDF <- segmentDSPDF  |>
     tidyr::replace_na(replace=defaultArgs) |>
-    dplyr::mutate(.where=.where, .n_preceeding=.n_preceeding,.n_following=.n_following)
-
+    dplyr::mutate(.where=.where, .n_preceeding=.n_preceeding,.n_following=.n_following, .after=.bundle)
 
   # Do the actual quantification  work --------------------------------------------
 
 
   # Here we apply the DSP function once per row and with settings comming from
   # the columns in the data frame
-  return(segmentDSPDF)
+
+
   appliedDFResultInList <- segmentDSPDF |>
     dplyr::rowwise()  |>
     purrr::pmap(.f=processAndStore,.progress = pb) # This is the busy line
@@ -824,7 +900,7 @@ quantify.segmentlist <- function(.what,.source,...,.where=NULL,.n_preceeding=NUL
 
   }else{
     ##  [default] The case in which we are processing a segment list --------------------------------------------
-    return(appliedDFResultInList)
+
     resTibble <- appliedDFResultInList  |>
       purrr::map_dfr(tibble::as_tibble, .id="sl_rowIdx") |>
       dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
@@ -862,30 +938,10 @@ quantify_naively <- purrr:::partial(quantify, .naively=TRUE)
 #   furnish(.inside_of,...)
 # }
 
-furnish <- function(...) {
-  UseMethod("furnish")
-}
 
-furnish.character <- function(.inside_of,...){
-  if(missing(.inside_of)) cli::cli_abort("Missing manditory argument {.arg .inside_of}.")
-  if(! file.info(path.expand(.inside_of))[["isdir"]] || ! dir.exists(path.expand(.inside_of))){
-    cli::cli_abort(c("The {.arg .inside_of} is not a valid path.",
-                     "i"="The database path searched was {.path {path.expand(.inside_of)}}"))
-  }
-  if(! stringr::str_ends(basename(path.expand(.inside_of)), emuR:::emuDB.suffix)){
-    cli::cli_abort(c("The {.arg .inside_of} does not seem to point to the location of a database",
-                     "x"="The database directory should end with {.val {emuR:::emuDB.suffix}}.",
-                     "i"="The database path searched was {.path {path.expand(.inside_of)}}"))
-  }
-    utils::capture.output(
-      .inside_of <- emuR::load_emuDB(attr(.inside_of,"basePath"),verbose = FALSE)
-    ) -> dbload.info
-    logger::log_info(paste(dbload.info,collapse = "\n"))
-    #Now of class emuDBhandle
-    furnish(.inside_of,...)
-}
 
-furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL,.verbose=TRUE,.quiet=FALSE){
+
+quantify.emuDBhandle <- function(.what,.source, ... ,.force=FALSE,.really_force=FALSE,.metadata_defaults=list("Gender"="Undefined","Age"=35),.by_maxFormantHz=TRUE,.recompute=FALSE,.naively=FALSE,.parameter_log_excel=NULL,.verbose=TRUE,.quiet=FALSE){
 
 
   # Check inputs ------------------------------------------------------------
@@ -907,10 +963,10 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
   ## File extensions of track files in the database that the user can attach a track specification to -----------------------------
 
-  availableDataFileExtensions <- emuR::list_files(.inside_of)  |>
+  availableDataFileExtensions <- emuR::list_files(.what)  |>
     dplyr::mutate(ext=tools::file_ext(absolute_file_path) ) |>
     dplyr::filter(!ext %in% c("json",
-                              emuR:::load_DBconfig(.inside_of)$mediafileExtension,
+                              emuR:::load_DBconfig(.what)$mediafileExtension,
                               reindeer:::metadata.extension))  |>
     dplyr::select(ext)  |>
     dplyr::distinct()  |>
@@ -966,7 +1022,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
   #This is the base structure which says what is already defined,
   # which we will use later to deduce if the user supplied track specifications are
   # valid or not
-  tracksAlreadyDefined <- emuR::list_ssffTrackDefinitions(.inside_of)
+  tracksAlreadyDefined <- emuR::list_ssffTrackDefinitions(.what)
 
 
 
@@ -1010,10 +1066,10 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
       # We here make a fake segment list with start and end times that suggest whole file processing
       # so that we can reuse quantify to deduce parameters, optionally log parameters, do the DSP work, and all that stuff.
 
-      bundles <- emuR::list_bundles(.inside_of)  |>
+      bundles <- emuR::list_bundles(.what)  |>
         dplyr::rename(bundle=name)  |>
         dplyr::mutate(start=0, end=0,start_item_id=0,end_item_id=0)  |>
-        dplyr::mutate(.file= file.path(.inside_of$basePath,
+        dplyr::mutate(.file= file.path(.what$basePath,
                                       paste0(session,emuR:::session.suffix),
                                       paste0(bundle,emuR:::bundle.dir.suffix),
                                       paste(bundle,fileExtension,sep=".")))
@@ -1022,18 +1078,18 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
         dplyr::filter( .force |  !file.exists(.file))  |>
         dplyr::select(-.file,-.force) #Make sure this variable does not mess up execution of the function
 
-      attr(bundles,"basePath") <- .inside_of$basePath
+      attr(bundles,"basePath") <- .what$basePath
 
       if(nrow(bundles) < 1){
         #We deliberately do not raise an error here since we want to be able to continue processing even when
         # nothing needs to be done
         if(!.quiet) cli::cli_alert_success("Skipping the signal processing")
         if(!.quiet) cli::cli_alert_info("No signal files needs updating and updating is not forced.")
-        if(!.quiet && .verbose) cli::cli_alert_info("The database contains {.val {nrow(emuR::list_bundles(.inside_of))}} bundles")
-        if(!.quiet && .verbose ) cli::cli_alert_info("There are {.val {nrow(emuR::list_files(.inside_of,fileExtension))}} signal files with the file extension {.val {fileExtension}}")
+        if(!.quiet && .verbose) cli::cli_alert_info("The database contains {.val {nrow(emuR::list_bundles(.what))}} bundles")
+        if(!.quiet && .verbose ) cli::cli_alert_info("There are {.val {nrow(emuR::list_files(.what,fileExtension))}} signal files with the file extension {.val {fileExtension}}")
 
         # In this case we are not doing any DSP and all that is left is to return the database handle.
-        return(.inside_of)
+        return(.what)
       }
 
       # We start fuzzing about ... arguments that are not valid function arguments
@@ -1075,7 +1131,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
 
       quantifications <- quantifications  |>
-        dplyr::mutate(file= file.path(.inside_of$basePath,
+        dplyr::mutate(file= file.path(.what$basePath,
                                              paste0(session,emuR:::session.suffix),
                                              paste0(bundle,emuR:::bundle.dir.suffix),
                                              paste(bundle,fileExtension,sep=".")))  |>
@@ -1097,9 +1153,9 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
       if(!.quiet ||.verbose) cli::cli_alert_info("Considering signal files with the {.val {fileExtension}} file extension.")
 
       #First check that the files actually exist
-      wantedSignalfiles <- emuR::list_files(.inside_of,fileExtension = fileExtension)
+      wantedSignalfiles <- emuR::list_files(.what,fileExtension = fileExtension)
 
-      nbundles <- nrow(emuR::list_bundles(.inside_of))
+      nbundles <- nrow(emuR::list_bundles(.what))
       if(nrow(wantedSignalfiles) < nbundles ) {
         if(nbundles > 0){
           #There are indeed some bundles that should have signal files
@@ -1127,7 +1183,7 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
 
     for(track in 1:nrow(tracksToDefine)){
       if(! tracksToDefine[track,"name"] %in% tracksAlreadyDefined$name){
-        emuR::add_ssffTrackDefinition(emuDBhandle = .inside_of,
+        emuR::add_ssffTrackDefinition(emuDBhandle = .what,
                                       columnName = tracksToDefine[[track,"columnName"]],
                                       name = tracksToDefine[[track,"name"]],
                                       fileExtension = tracksToDefine[[track,"fileExtension"]]
@@ -1141,8 +1197,8 @@ furnish.emuDBhandle <- function(.inside_of,.source, ... ,.force=FALSE,.really_fo
       }
     }
   }
-  res <- emuR::list_ssffTrackDefinitions(.inside_of)
-  attr(res,"basePath") <- .inside_of$basePath #This ensures that we can reattach the database later
+  res <- emuR::list_ssffTrackDefinitions(.what)
+  attr(res,"basePath") <- .what$basePath #This ensures that we can reattach the database later
 
   return(res)
 }
@@ -1643,10 +1699,7 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
   ## Apply the DSP function -------------------------------------------------------
   .what_df <- .what_df |>
     dplyr::select(-tidyselect::any_of(c(set_split_by)), -sl_rowIdx)|>
-    dplyr::glimpse() |>
-    #dplyr::rowwise() |>
-    purrr::pmap(.f=.source,.progress = list(format=paste("Applying",funName," {cli::pb_bar} {cli::pb_current}/{cli::pb_total} collections | {cli::pb_eta_str}"))) |> # This is the busy line
-    dplyr::glimpse()
+    purrr::pmap(.f=.source,.progress = list(format=paste("Applying",funName," {cli::pb_bar} {cli::pb_current}/{cli::pb_total} collections | {cli::pb_eta_str}")))  # This is the busy line
 
 
 
@@ -1662,27 +1715,36 @@ quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE
 
 # Code used for interactive testing #######
 
-#
-# library(tidyverse)
-# library(purrr)
-# library(progressr)
-# library(tibble)
+
+library(tidyverse)
+library(purrr)
+library(progressr)
+library(tibble)
 library(superassp)
-# library(furrr)
-# library(progress)
-#
+library(furrr)
+library(progress)
+
+
+
+
 reindeer:::unlink_emuRDemoDir()
 reindeer:::create_ae_db(verbose = FALSE) -> ae
 reindeer:::make_dummy_metafiles(ae)
+#
+# ask_for(ae,"Phonetic = V|E|a|A") |>
+#   slice(1:2)  -> ae_a
+#
+# # ae_a |>
+# #   quantify("fm",.quiet=TRUE, .verbose=FALSE) -> readfm
+#
+#
+#  ae_a |>
+#    quantify(forest,.quiet=TRUE, .verbose=FALSE) -> outfm
+#
+# ae_a |>
+#   quantify(forest,.where=0.5,.n_preceeding=1,.n_following=1) -> cutfm
 
-ask_for(ae,"Phonetic = V|E|a|A") -> ae_a
-ae_a |>
-  quantify("fm",.quiet=TRUE, .verbose=FALSE,.parameter_log_excel="~/Desktop/read.xlsx") -> outfm
-ae_a |>
-  quantify(forest,.where=0.5,.n_preceeding=1,.n_following=1,.cache_in_file=TRUE,.clear_cache=TRUE) -> cutfm
-
-ae_a |>
-  dplyr::slice(1:2) |>
-  quantify(eGeMAPS,.cache_in_file=TRUE,.clear_cache=TRUE) -> egm
+# ae_a |>
+#   quantify(praat_voice_report) -> egm
 
 
