@@ -1,5 +1,42 @@
 
-
+corpus <- S7::new_class(
+  "corpus",
+  parent = S7::new_S3_class("emuDBhandle"),
+  properties = list(
+    dbName = S7::class_character,
+    basePath = S7::class_character,
+    config = S7::class_any
+  ),
+  constructor = function(path, verbose = FALSE) {
+    if (is.character(path)) {
+      if (!dir.exists(path)) {
+        cli::cli_abort("Database path {.path {path}} does not exist")
+      }
+      if (!stringr::str_ends(basename(path), "_emuDB")) {
+        cli::cli_abort("Database directory should end with '_emuDB'")
+      }
+      handle <- emuR::load_emuDB(path, verbose = verbose)
+    } else if ("emuDBhandle" %in% class(path)) {
+      handle <- path
+    } else {
+      cli::cli_abort("Invalid input: expected path or emuDBhandle")
+    }
+    
+    S7::new_object(
+      handle,
+      dbName = handle$dbName,
+      basePath = handle$basePath,
+      config = emuR:::load_DBconfig(handle)
+    )
+  },
+  validator = function(self) {
+    if (!dir.exists(self@basePath)) {
+      "Database path must exist"
+    } else if (is.null(self@dbName) || nchar(self@dbName) == 0) {
+      "Database name must be specified"
+    }
+  }
+)
 
 segments <- S7::new_class("segments",
                       S7::class_data.frame,
