@@ -9,8 +9,9 @@ convert_emu_to_eaf(
   eaf_file = NULL,
   author = "EMU-to-ELAN Converter",
   media_file = NULL,
-  align_items = FALSE,
-  event_duration = 1
+  align_items = TRUE,
+  event_duration = 1,
+  verbose = FALSE
 )
 }
 \arguments{
@@ -21,51 +22,57 @@ to changing the input extension from "_annot.json" to ".eaf".}
 
 \item{author}{The author string to be written into the EAF \code{<ANNOTATION_DOCUMENT>} tag.}
 
-\item{media_file}{Optional path to the media file (e.g., "msajc012.wav"). If \code{NULL},
+\item{media_file}{Optional path to the media file. If \code{NULL},
 it is derived from the \code{annotates} field in the JSON, assuming the media
 file resides in the same directory as the JSON file.}
 
-\item{align_items}{Logical. If \code{TRUE}, ITEM tiers (like 'Word') are calculated
+\item{align_items}{Logical. If \code{TRUE} (the default), ITEM tiers are calculated
 to span the time of their time-aligned children, making them \code{<ALIGNABLE_ANNOTATION>}s.
 If \code{FALSE} (default), they are symbolic \code{<REF_ANNOTATION>}s.}
 
 \item{event_duration}{Integer. The duration (in milliseconds) assigned to EMU 'EVENT' tiers.
 Defaults to 1ms to satisfy the ELAN content validator.}
+
+\item{verbose}{Logical. Should messages be printed during processing.}
 }
 \value{
 The path to the created EAF file (invisibly).
 }
 \description{
-This function converts an EMU-SDMS annotation file (JSON format) into
-an ELAN Annotation Format (EAF) XML file (version 3.0).
+This function converts an EMU-SD annotation file (JSON format) into
+an ELAN Annotation Format (EAF) \insertCite{EAF_v3.0_MPI_2017}{reindeer}.
 }
 \details{
-The function handles the structural differences between EMU-SD and EAF,
+The function handles the structural differences between EMU-SDMS and EAF formats,
 including time calculation, tier structure, and media linking.
 
-\strong{EMU Tier Mapping to EAF:}
+When there are multiple labeltypes associated with a level in the Emu-SDMS annotation, the EAF are constructed
+using a combination of annotation types to signify that they are in some way different in the following way
+
 \itemize{
-\item \strong{SEGMENT/EVENT} tiers are converted into \code{<ALIGNABLE_ANNOTATION>}s.
-\item \strong{ITEM} tiers are converted into \code{<REF_ANNOTATION>}s, linking symbolically to their parents.
+\item The \strong{first label} of a time-aligned EMU ITEM, SEGMENT or EVENT becomes the content for the
+primary \code{<ALIGNABLE_ANNOTATION>} on the base tier.
+\item All \strong{subsequent labels} within the same ITEM, SEGMENT or EVENT generate
+new, symbolically associated tiers that link back to the primary annotation,
+correctly representing multi-layered data.
 }
 
-\strong{Time Alignment and Validation Fixes:}
+When \code{align_items} is \code{FALSE}, Emu ITEM tiers that are structurally linked (not time-aligned) are
+converted into symbolic tiers based on the Emu link hierarchy.
+
+When time alignment of ITEMs is asked for, i.g. \code{align_items} is \code{TRUE}, which is the default,
+they are treated as SEGMENTs, and the start and end times of them are derived from the first and last
+dominated SEGMENTs start and end times.
+
+The time calculations the following considerations have been made to comply with the EAF specifications
 \itemize{
-\item Time points are calculated from EMU sample rates and written to the
+\item Time points are calculated from Eme sample rates and written to the
 \code{<TIME_ORDER>} block, as required by the EAF specification
-(EAF Schema v3.0, section 2.4) \insertCite{EAF_v3.0_MPI_2017}{reindeer}.
-\item For \strong{EVENT} (point-in-time) tiers, a small duration (\code{event_duration},
-default 1ms) is artificially assigned. This is a standard workaround to prevent
-the ELAN content validator from throwing errors for zero-duration annotations
-(i.e., when \code{TIME_SLOT_REF1} time value equals \code{TIME_SLOT_REF2} time value).
-}
-
-\strong{Media Linking and Portability:}
-\itemize{
-\item The header includes both \code{<MEDIA_DESCRIPTOR>} and \code{<LINKED_FILE_DESCRIPTOR>}.
-\item \code{RELATIVE_MEDIA_URL} is used for the media file name, ensuring the EAF file
-can be moved to a different machine, provided the media file remains in the
-same directory as the EAF file.
+(EAF Schema v3.0, section 2.4).
+\item For EVENT (point-in-time) tiers, a small duration (\code{event_duration},
+default 1ms) is artificially assigned. This workaround prevents
+the ELAN EAF validator from throwing errors for zero-duration annotations e.g.
+by looping labels or time references with identical associated time points.
 }
 }
 \references{

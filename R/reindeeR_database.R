@@ -197,57 +197,70 @@ snapshot <- function(emuDBhandle,push.changes=TRUE,remote.name="origin",remote.r
 #' @title Convert EMU-SDMS Annotation to ELAN EAF Format
 #'
 #' @description This function converts an EMU-SDMS annotation file (JSON format) into
-#'   an ELAN Annotation Format (EAF) XML file (version 3.0).
+#'   an ELAN Annotation Format (EAF) \insertCite{EAF_v3.0_MPI_2017}{reindeer}.
 #'
-#' @details The function handles the structural differences between EMU-SD and EAF,
+#' @details The function handles the structural differences between EMU-SDMS and EAF formats,
 #'   including time calculation, tier structure, and media linking.
 #'
-#'   **EMU Tier Mapping to EAF:**
+#'   When there are multiple labeltypes associated with a level in the Emu-SDMS annotation, the EAF are constructed
+#'   using a combination of annotation types to signify that they are in some way different in the following way
+#'
 #'   \itemize{
-#'     \item **SEGMENT/EVENT** tiers are converted into \code{<ALIGNABLE_ANNOTATION>}s.
-#'     \item **ITEM** tiers are converted into \code{<REF_ANNOTATION>}s, linking symbolically to their parents.
+#'     \item The **first label** of a time-aligned EMU ITEM, SEGMENT or EVENT becomes the content for the
+#'       primary \code{<ALIGNABLE_ANNOTATION>} on the base tier.
+#'     \item All **subsequent labels** within the same ITEM, SEGMENT or EVENT generate
+#'       new, symbolically associated tiers that link back to the primary annotation,
+#'       correctly representing multi-layered data.
 #'   }
 #'
-#'   **Time Alignment and Validation Fixes:**
+#'   When \code{align_items} is \code{FALSE}, Emu ITEM tiers that are structurally linked (not time-aligned) are
+#'       converted into symbolic tiers based on the Emu link hierarchy.
+#'
+#'   When time alignment of ITEMs is asked for, i.g. \code{align_items} is \code{TRUE}, which is the default,
+#'   they are treated as SEGMENTs, and the start and end times of them are derived from the first and last
+#'   dominated SEGMENTs start and end times.
+#'
+#'   The time calculations the following considerations have been made to comply with the EAF specifications
 #'   \itemize{
-#'     \item Time points are calculated from EMU sample rates and written to the
+#'     \item Time points are calculated from Eme sample rates and written to the
 #'       \code{<TIME_ORDER>} block, as required by the EAF specification
-#'        (EAF Schema v3.0, section 2.4) \insertCite{EAF_v3.0_MPI_2017}{reindeer}.
-#'     \item For **EVENT** (point-in-time) tiers, a small duration (\code{event_duration},
-#'       default 1ms) is artificially assigned. This is a standard workaround to prevent
-#'       the ELAN content validator from throwing errors for zero-duration annotations
-#'       (i.e., when \code{TIME_SLOT_REF1} time value equals \code{TIME_SLOT_REF2} time value).
-#'   }
-#'
-#'   **Media Linking and Portability:**
-#'   \itemize{
-#'     \item The header includes both \code{<MEDIA_DESCRIPTOR>} and \code{<LINKED_FILE_DESCRIPTOR>}.
-#'     \item \code{RELATIVE_MEDIA_URL} is used for the media file name, ensuring the EAF file
-#'       can be moved to a different machine, provided the media file remains in the
-#'       same directory as the EAF file.
+#'       (EAF Schema v3.0, section 2.4).
+#'     \item For EVENT (point-in-time) tiers, a small duration (\code{event_duration},
+#'       default 1ms) is artificially assigned. This workaround prevents
+#'       the ELAN EAF validator from throwing errors for zero-duration annotations e.g.
+#'       by looping labels or time references with identical associated time points.
 #'   }
 #'
 #' @param json_file Path to the input EMU-SDMS annotation JSON file (e.g., "msajc012_annot.json").
 #' @param eaf_file Optional path for the output EAF file. If \code{NULL}, it defaults
 #'   to changing the input extension from "_annot.json" to ".eaf".
 #' @param author The author string to be written into the EAF \code{<ANNOTATION_DOCUMENT>} tag.
-#' @param media_file Optional path to the media file (e.g., "msajc012.wav"). If \code{NULL},
+#' @param media_file Optional path to the media file. If \code{NULL},
 #'   it is derived from the \code{annotates} field in the JSON, assuming the media
 #'   file resides in the same directory as the JSON file.
-#' @param align_items Logical. If \code{TRUE}, ITEM tiers (like 'Word') are calculated
+#' @param align_items Logical. If \code{TRUE} (the default), ITEM tiers are calculated
 #'   to span the time of their time-aligned children, making them \code{<ALIGNABLE_ANNOTATION>}s.
 #'   If \code{FALSE} (default), they are symbolic \code{<REF_ANNOTATION>}s.
 #' @param event_duration Integer. The duration (in milliseconds) assigned to EMU 'EVENT' tiers.
 #'   Defaults to 1ms to satisfy the ELAN content validator.
+#' @param verbose Logical. Should messages be printed during processing.
 #'
 #' @return The path to the created EAF file (invisibly).
 #' @references
 #'  \insertAllCited{}
+
+
+
 convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
                                author = "EMU-to-ELAN Converter",
                                media_file = NULL,
-                               align_items = FALSE,
-                               event_duration = 1) {
+                               align_items = TRUE,
+                               event_duration = 1,
+                               verbose=FALSE) {
+
+  if (base::is.null(eaf_file)) {
+    eaf_file <- base::sub("_annot\\.json$", ".eaf", json_file)
+  }
 
   get_item_time_range <- function(item_id, emu_data, children_map, time_points_map, level_map, level_type_map, event_duration) {
 
@@ -295,11 +308,6 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
     }
 
     return(base::list(start = min_start, end = max_end))
-  }
-
-
-  if (base::is.null(eaf_file)) {
-    eaf_file <- base::sub("_annot\\.json$", ".eaf", json_file)
   }
 
   # Read JSON
@@ -422,19 +430,30 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
     time_slot_counter <- time_slot_counter + 1
   }
 
-  # Store annotation IDs
+  # Store annotation IDs and TIER XML objects for reuse
   annotation_map <- base::list()
+  eaf_tiers <- base::list()
 
   # 1. Create all tiers with time-aligned annotations (SEGMENT, EVENT, and ITEM if align_items=TRUE)
   for (level in emu_data$levels) {
     if (level$type %in% base::c("SEGMENT", "EVENT") || (level$type == "ITEM" && align_items)) {
 
-      tier <- xml2::xml_add_child(doc, "TIER",
-                                  TIER_ID = level$name,
-                                  LINGUISTIC_TYPE_REF = "default-lt")
+      base_tier_id <- level$name
+
+      # Create the BASE TIER if it doesn't exist
+      if (base::is.null(eaf_tiers[[base_tier_id]])) {
+        eaf_tiers[[base_tier_id]] <- xml2::xml_add_child(doc, "TIER",
+                                                         TIER_ID = base_tier_id,
+                                                         LINGUISTIC_TYPE_REF = "default-lt")
+      }
+      base_tier <- eaf_tiers[[base_tier_id]]
 
       for (item in level$items) {
         item_id <- base::as.character(item$id)
+
+        # Check for labels. If none, skip
+        if (base::is.null(item$labels) || base::length(item$labels) == 0) next
+
         start_ms <- NULL
         end_ms <- NULL
 
@@ -443,7 +462,6 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
           end_ms <- base::round(((item$sampleStart + item$sampleDur) / emu_data$sampleRate) * 1000)
         } else if (level$type == "EVENT") {
           point_ms <- base::round((item$samplePoint / emu_data$sampleRate) * 1000)
-          # Assign a 1ms (or event_duration) span for validation compliance
           start_ms <- point_ms
           end_ms <- point_ms + event_duration
         } else if (level$type == "ITEM" && align_items) {
@@ -455,34 +473,65 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
           next
         }
 
-        annotation <- xml2::xml_add_child(tier, "ANNOTATION")
+        # --- A. BASE ALIGNABLE ANNOTATION (from the first label) ---
+        base_label <- item$labels[[1]]
         ann_id <- base::paste0("a", item_id)
-
-        annot_value <- ""
-        if (!base::is.null(item$labels) && base::length(item$labels) > 0) {
-          label_values <- base::sapply(item$labels, function(l) l$value)
-          annot_value <- base::paste(label_values, collapse = "; ")
-        }
 
         # Use the two now-different time slots
         ref1_ts_id <- time_slot_map[[base::as.character(start_ms)]]
         ref2_ts_id <- time_slot_map[[base::as.character(end_ms)]]
 
+        annotation <- xml2::xml_add_child(base_tier, "ANNOTATION")
         alignable <- xml2::xml_add_child(annotation, "ALIGNABLE_ANNOTATION",
                                          ANNOTATION_ID = ann_id,
                                          TIME_SLOT_REF1 = ref1_ts_id,
                                          TIME_SLOT_REF2 = ref2_ts_id)
 
-        xml2::xml_add_child(alignable, "ANNOTATION_VALUE", annot_value)
+        xml2::xml_add_child(alignable, "ANNOTATION_VALUE", base_label$value)
         annotation_map[[item_id]] <- ann_id
+
+        # --- B. SYMBOLIC REF ANNOTATIONS (from subsequent labels) ---
+        if (base::length(item$labels) > 1) {
+          for (i in 2:base::length(item$labels)) {
+            sub_label <- item$labels[[i]]
+            sub_tier_id <- sub_label$name
+
+            # 1. Ensure the Symbolic Tier object exists or create it
+            if (base::is.null(eaf_tiers[[sub_tier_id]])) {
+              # Create a new Tier for the symbolic label type, linked to the base tier
+              eaf_tiers[[sub_tier_id]] <- xml2::xml_add_child(doc, "TIER",
+                                                              TIER_ID = sub_tier_id,
+                                                              PARENT_REF = base_tier_id,
+                                                              LINGUISTIC_TYPE_REF = "symbolic-association")
+            }
+            sub_tier <- eaf_tiers[[sub_tier_id]]
+
+            # 2. Create the REF ANNOTATION on the symbolic tier
+            # Using a combination ID to ensure global uniqueness across tiers
+            sub_ann_id <- base::paste0("a", item_id, "_", sub_tier_id)
+
+            sub_annotation <- xml2::xml_add_child(sub_tier, "ANNOTATION")
+            ref_annot <- xml2::xml_add_child(sub_annotation, "REF_ANNOTATION",
+                                             ANNOTATION_ID = sub_ann_id,
+                                             ANNOTATION_REF = ann_id) # Links back to the time-aligned annotation
+
+            xml2::xml_add_child(ref_annot, "ANNOTATION_VALUE", sub_label$value)
+          }
+        }
       }
     }
   }
 
-  # 2. Create ITEM tiers with REF_ANNOTATIONs (Symbolic Tiers, only if align_items=FALSE)
+  # 2. Structural Symbolic Tiers (EMU ITEM tiers when align_items=FALSE)
+  # This section handles symbolic links based on EMU's link structure (e.g., Utterance -> Word)
   if (!align_items) {
     for (level in emu_data$levels) {
       if (level$type == "ITEM") {
+
+        tier_id <- level$name
+
+        # Skip if the tier was already created dynamically in the multi-label step
+        if (!base::is.null(eaf_tiers[[tier_id]])) next
 
         parent_tier_name <- NULL
         for (item in level$items) {
@@ -493,12 +542,13 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
           }
         }
 
-        tier_attrs <- base::list(TIER_ID = level$name)
+        tier_attrs <- base::list(TIER_ID = tier_id)
 
         if (!base::is.null(parent_tier_name)) {
           tier_attrs$PARENT_REF <- parent_tier_name
           parent_level_obj <- emu_data$levels[[which(base::sapply(emu_data$levels, function(l) l$name == parent_tier_name))]]
 
+          # Determine symbolic type
           if (!base::is.null(parent_level_obj) && parent_level_obj$type %in% base::c("SEGMENT", "EVENT")) {
             tier_attrs$LINGUISTIC_TYPE_REF <- "symbolic-subdivision"
           } else {
@@ -509,6 +559,7 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
         }
 
         tier <- base::do.call(xml2::xml_add_child, base::c(base::list(doc, "TIER"), tier_attrs))
+        eaf_tiers[[tier_id]] <- tier
 
         prev_annotation_id <- NULL
 
@@ -528,7 +579,9 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
             annot_value <- ""
             if (!base::is.null(item$labels) && base::length(item$labels) > 0) {
               label_values <- base::sapply(item$labels, function(l) l$value)
-              annot_value <- base::paste(label_values, collapse = "; ")
+              # Use only the first label value, as multi-label items should have been
+              # time-aligned or are incorrectly structured as ITEM tiers with multiple labels.
+              annot_value <- label_values[[1]]
             }
 
             ann_id <- base::paste0("a", item_id)
@@ -549,6 +602,7 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
             prev_annotation_id <- ann_id
           }
 
+          # Simplified handling for an orphan structural tier, associating to the first found annotation
           else if (base::is.null(parent_tier_name) && tier_attrs$LINGUISTIC_TYPE_REF == "symbolic-association") {
             if (base::length(annotation_map) > 0) {
               first_ann_id <- annotation_map[[1]]
@@ -558,7 +612,7 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
               annot_value <- ""
               if (!base::is.null(item$labels) && base::length(item$labels) > 0) {
                 label_values <- base::sapply(item$labels, function(l) l$value)
-                annot_value <- base::paste(label_values, collapse = "; ")
+                annot_value <- label_values[[1]]
               }
 
               ann_id <- base::paste0("a", item_id)
@@ -616,6 +670,6 @@ convert_emu_to_eaf <- function(json_file, eaf_file = NULL,
   # Write file
   xml2::write_xml(doc, eaf_file)
 
-  base::message(base::paste("Successfully converted", json_file, "to", eaf_file))
+  if(verbose) cli::cli_inform("Successfully converted {.file json_file} to {.file eaf_file}")
   return(base::invisible(eaf_file))
 }
