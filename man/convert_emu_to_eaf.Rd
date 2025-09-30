@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_database.R
 \name{convert_emu_to_eaf}
 \alias{convert_emu_to_eaf}
-\title{Convert EMU-SDMS Annotation to ELAN EAF Format}
+\title{Convert Emu-SDMS Annotation to ELAN EAF Format}
 \usage{
 convert_emu_to_eaf(
   json_file,
@@ -39,7 +39,7 @@ Defaults to 1ms to satisfy the ELAN content validator.}
 The path to the created EAF file (invisibly).
 }
 \description{
-This function converts an EMU-SD annotation file (JSON format) into
+This function converts an Emu-SDMS annotation file (JSON format) into
 an ELAN Annotation Format (EAF) \insertCite{EAF_v3.0_MPI_2017}{reindeer}.
 }
 \details{
@@ -50,7 +50,7 @@ When there are multiple labeltypes associated with a level in the Emu-SDMS annot
 using a combination of annotation types to signify that they are in some way different in the following way
 
 \itemize{
-\item The \strong{first label} of a time-aligned EMU ITEM, SEGMENT or EVENT becomes the content for the
+\item The \strong{first label} of a time-aligned Emu ITEM, SEGMENT or EVENT becomes the content for the
 primary \code{<ALIGNABLE_ANNOTATION>} on the base tier.
 \item All \strong{subsequent labels} within the same ITEM, SEGMENT or EVENT generate
 new, symbolically associated tiers that link back to the primary annotation,
@@ -60,7 +60,7 @@ correctly representing multi-layered data.
 When \code{align_items} is \code{FALSE}, Emu ITEM tiers that are structurally linked (not time-aligned) are
 converted into symbolic tiers based on the Emu link hierarchy.
 
-When time alignment of ITEMs is asked for, i.g. \code{align_items} is \code{TRUE}, which is the default,
+When time alignment of ITEMs are asked for, i.g. \code{align_items} is \code{TRUE}, which is the default,
 they are treated as SEGMENTs, and the start and end times of them are derived from the first and last
 dominated SEGMENTs start and end times.
 
