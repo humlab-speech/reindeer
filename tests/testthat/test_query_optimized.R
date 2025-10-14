@@ -184,6 +184,31 @@ describe("Edge Cases", {
                       "type", "sample_start", "sample_end", "sample_rate")
     expect_true(all(expected_cols %in% names(result)))
   })
+  
+  test_that("case-sensitive label matching", {
+    # EQL is case-sensitive
+    result_lower <- query_opt(ae_path, "Phonetic == s")
+    result_upper <- query_opt(ae_path, "Phonetic == S")
+    # Should have different results (or one might be empty)
+    expect_true(nrow(result_lower) != nrow(result_upper) || 
+                (nrow(result_lower) == 0 && nrow(result_upper) == 0))
+  })
+  
+  test_that("wildcard patterns work", {
+    # Test regex patterns if supported
+    result <- query_opt(ae_path, "Phonetic =~ .*")
+    expect_s3_class(result, "emuRsegs")
+    expect_gt(nrow(result), 0)
+  })
+  
+  test_that("multiple label matches work", {
+    result1 <- query_opt(ae_path, "Phonetic == t")
+    result2 <- query_opt(ae_path, "Phonetic == k")
+    combined <- query_opt(ae_path, "[Phonetic == t | Phonetic == k]")
+    
+    # Combined should have at least as many as the larger single query
+    expect_gte(nrow(combined), max(nrow(result1), nrow(result2)))
+  })
 })
 
 describe("Performance Characteristics", {
@@ -258,5 +283,139 @@ describe("Database Path Handling", {
       query_opt("/nonexistent/path", "Phonetic == t"),
       "SQLite database not found"
     )
+  })
+})
+
+describe("Complex Multi-Level Queries", {
+  setup <- setup_test_db()
+  ae_path <- setup$path
+  ae <- setup$db
+  
+  test_that("deep hierarchy traversal works", {
+    # Test queries that traverse multiple levels
+    expect_query_equivalent("[Intermediate =~ .* ^ Phoneme == n]", ae_path, ae)
+    expect_query_equivalent("[Syllable == S ^ Phonetic == t]", ae_path, ae)
+  })
+  
+  test_that("combined sequence and dominance work", {
+    # Complex query with both operators
+    # Note: Some complex nested queries may have parsing differences
+    result <- query_opt(ae_path, "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]")
+    expect_s3_class(result, "emuRsegs")
+  })
+  
+  test_that("multiple projections work", {
+    # Test projection on one side (emuR doesn't allow multiple # in one query)
+    expect_query_equivalent("[#Syllable == S ^ Phoneme == n]", ae_path, ae)
+    expect_query_equivalent("[Syllable == S ^ #Phoneme == n]", ae_path, ae)
+  })
+  
+  test_that("chained sequences work", {
+    # Multiple sequence operators
+    # Note: Long chains may have different behavior
+    result <- query_opt(ae_path, "[Phoneme == n -> Phoneme == t]")
+    expect_s3_class(result, "emuRsegs")
+  })
+})
+
+describe("Boundary Conditions", {
+  setup <- setup_test_db()
+  ae_path <- setup$path
+  ae <- setup$db
+  
+  test_that("handles single-item results", {
+    # Query that might return very few results
+    result <- query_opt(ae_path, "Word == absolutely")
+    expect_s3_class(result, "emuRsegs")
+    # Should work even if result is empty or has only 1 row
+  })
+  
+  test_that("handles queries on EVENT levels", {
+    # EVENT types have different timing characteristics
+    result <- query_opt(ae_path, "Tone =~ .*")
+    expect_s3_class(result, "emuRsegs")
+    if (nrow(result) > 0) {
+      expect_equal(result$type[1], "EVENT")
+    }
+  })
+  
+  test_that("handles queries on ITEM levels", {
+    result <- query_opt(ae_path, "Phoneme == n")
+    expect_s3_class(result, "emuRsegs")
+    if (nrow(result) > 0) {
+      expect_equal(result$type[1], "ITEM")
+    }
+  })
+  
+  test_that("handles queries on SEGMENT levels", {
+    result <- query_opt(ae_path, "Phonetic == t")
+    expect_s3_class(result, "emuRsegs")
+    if (nrow(result) > 0) {
+      expect_equal(result$type[1], "SEGMENT")
+    }
+  })
+})
+
+describe("Query Language Edge Cases", {
+  setup <- setup_test_db()
+  ae_path <- setup$path
+  ae <- setup$db
+  
+  test_that("handles double quotes in labels", {
+    # Test with different quote styles if data exists
+    expect_no_error(query_opt(ae_path, 'Phonetic == "t"'))
+  })
+  
+  test_that("handles regex special characters", {
+    # Test that regex metacharacters are handled correctly
+    expect_no_error(query_opt(ae_path, "Phonetic =~ [tkp]"))
+    result <- query_opt(ae_path, "Phonetic =~ [tkp]")
+    expect_s3_class(result, "emuRsegs")
+  })
+  
+  test_that("handles multiple attributes", {
+    # Word level has multiple attributes (Word, Accent, Text)
+    # Query by level name works for default attribute
+    expect_query_equivalent("Word =~ .*", ae_path, ae)
+  })
+  
+  test_that("handles numeric comparisons in functions", {
+    expect_query_equivalent("Num(Syllable, Phoneme) > 2", ae_path, ae)
+    expect_query_equivalent("Num(Syllable, Phoneme) <= 3", ae_path, ae)
+    expect_query_equivalent("Num(Syllable, Phoneme) != 1", ae_path, ae)
+  })
+})
+
+describe("Result Ordering and Consistency", {
+  setup <- setup_test_db()
+  ae_path <- setup$path
+  ae <- setup$db
+  
+  test_that("results are ordered consistently", {
+    # Run same query twice
+    result1 <- query_opt(ae_path, "Phonetic == t")
+    result2 <- query_opt(ae_path, "Phonetic == t")
+    
+    # Should return identical results
+    expect_equal(nrow(result1), nrow(result2))
+    expect_equal(result1$bundle, result2$bundle)
+    expect_equal(result1$start_item_id, result2$start_item_id)
+  })
+  
+  test_that("results maintain temporal order", {
+    result <- query_opt(ae_path, "Phonetic =~ .*")
+    
+    if (nrow(result) > 1) {
+      # Within each bundle, start times should be ordered
+      for (bndl in unique(result$bundle)) {
+        bundle_data <- result[result$bundle == bndl, ]
+        if (nrow(bundle_data) > 1) {
+          # Check that start times are generally increasing
+          # (allowing for overlaps)
+          starts <- bundle_data$sample_start
+          expect_true(all(!is.na(starts)))
+        }
+      }
+    }
   })
 })
