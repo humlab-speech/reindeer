@@ -328,16 +328,27 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
     stop("Sequence queries require both sides to be from the same level")
   }
   
-  # Determine result level based on projection
+  # Determine result level and side based on projection
+  result_side <- "both"  # Track which side to return
   if (is.null(result_level)) {
     # Check if either side has projection marker
     # In EQL: # marks the side TO RETURN
     if (!is.null(left_query$projection) && left_query$projection) {
       result_level <- left_level  # # on left means return left
+      result_side <- "left"
     } else if (!is.null(right_query$projection) && right_query$projection) {
       result_level <- right_level  # # on right means return right
+      result_side <- "right"
     } else {
       result_level <- left_level  # Default: return both as sequence
+      result_side <- "both"
+    }
+  } else {
+    # result_level was provided, determine side based on which matches
+    if (result_level == left_level && (!is.null(left_query$projection) && left_query$projection)) {
+      result_side <- "left"
+    } else if (result_level == right_level && (!is.null(right_query$projection) && right_query$projection)) {
+      result_side <- "right"
     }
   }
   
@@ -345,7 +356,9 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   right_condition <- extract_condition_from_query(right_query)
   
   # Check if we return both elements or just one
-  return_both <- is.null(left_query$projection) && is.null(right_query$projection)
+  # projection is FALSE when no # marker, TRUE when # present
+  return_both <- (is.null(left_query$projection) || !left_query$projection) && 
+                  (is.null(right_query$projection) || !right_query$projection)
   
   if (return_both) {
     # Return sequence span
@@ -389,8 +402,13 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
           AND rm.seq_idx = lm.seq_idx + 1
       )
       SELECT DISTINCT 
-        sp.db_uuid, sp.session, sp.bundle, sp.left_id as item_id, 
-        '%s' as level, 'ITEM' as type, sp.left_seq as seq_idx, sp.sample_rate,
+        sp.db_uuid, sp.session, sp.bundle, 
+        sp.left_id as item_id,
+        sp.right_id as end_item_id,
+        '%s' as level, 'ITEM' as type, 
+        sp.left_seq as seq_idx,
+        sp.right_seq as end_seq_idx,
+        sp.sample_rate,
         NULL as sample_point, sp.start_sample as sample_start, 
         sp.end_sample - sp.start_sample as sample_dur,
         ll.label || '->' || rl.label as label
@@ -465,7 +483,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
       ORDER BY i.session, i.bundle, i.seq_idx",
       left_level, left_condition,
       right_level, right_condition,
-      if(result_level == left_level) "left" else "right",
+      result_side,
       result_attr
     )
   }
@@ -999,16 +1017,24 @@ format_as_emuRsegs <- function(result_df) {
   start_times <- result_df$sample_start / result_df$sample_rate
   end_times <- (result_df$sample_start + result_df$sample_dur) / result_df$sample_rate
   
+  # Check if we have separate end_item_id and end_seq_idx (from sequence queries)
+  has_end_id <- "end_item_id" %in% names(result_df)
+  has_end_seq <- "end_seq_idx" %in% names(result_df)
+  
+  # Match emuR column order exactly
   emuRsegs_df <- data.frame(
     labels = result_df$label,
     start = start_times,
     end = end_times,
+    db_uuid = result_df$db_uuid,
     session = result_df$session,
     bundle = result_df$bundle,
+    start_item_id = result_df$item_id,
+    end_item_id = if(has_end_id) result_df$end_item_id else result_df$item_id,
     level = result_df$level,
     attribute = result_df$level,
-    start_item_id = result_df$item_id,
-    end_item_id = result_df$item_id,
+    start_item_seq_idx = result_df$seq_idx,
+    end_item_seq_idx = if(has_end_seq) result_df$end_seq_idx else result_df$seq_idx,
     type = result_df$type,
     sample_start = result_df$sample_start,
     sample_end = result_df$sample_start + result_df$sample_dur,
@@ -1016,7 +1042,11 @@ format_as_emuRsegs <- function(result_df) {
     stringsAsFactors = FALSE
   )
   
-  class(emuRsegs_df) <- c("emuRsegs", "data.frame")
+  # Convert to tibble to match emuR output
+  if (requireNamespace("dplyr", quietly = TRUE)) {
+    emuRsegs_df <- dplyr::as_tibble(emuRsegs_df)
+  }
+  class(emuRsegs_df) <- c("emuRsegs", class(emuRsegs_df))
   return(emuRsegs_df)
 }
 
@@ -1024,13 +1054,16 @@ create_empty_emuRsegs <- function() {
   empty_df <- data.frame(
     labels = character(0),
     start = numeric(0),
-    end = numeric(0), 
+    end = numeric(0),
+    db_uuid = character(0),
     session = character(0),
     bundle = character(0),
-    level = character(0),
-    attribute = character(0),
     start_item_id = integer(0),
     end_item_id = integer(0),
+    level = character(0),
+    attribute = character(0),
+    start_item_seq_idx = integer(0),
+    end_item_seq_idx = integer(0),
     type = character(0),
     sample_start = integer(0),
     sample_end = integer(0),
@@ -1038,7 +1071,11 @@ create_empty_emuRsegs <- function() {
     stringsAsFactors = FALSE
   )
   
-  class(empty_df) <- c("emuRsegs", "data.frame")
+  # Convert to tibble to match emuR output
+  if (requireNamespace("dplyr", quietly = TRUE)) {
+    empty_df <- dplyr::as_tibble(empty_df)
+  }
+  class(empty_df) <- c("emuRsegs", class(empty_df))
   return(empty_df)
 }
 
