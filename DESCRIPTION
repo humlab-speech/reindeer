@@ -39,7 +39,8 @@ Imports:
     cli,
     S7,
     av,
-    xml2
+    xml2,
+    Rcpp
 Remotes:
   github::humlab-speech/superassp
 RdMacros: Rdpack
@@ -48,3 +49,5 @@ RoxygenNote: 7.3.3
 Depends: 
     R (>= 2.10)
 Config/testthat/edition: 3
+LinkingTo: 
+    Rcpp
