@@ -1,23 +1,23 @@
 "query","query_type","category","median_emuR","median_optimized","mem_alloc_emuR","mem_alloc_optimized","speedup","time_saved","mem_reduction"
-"Num(Word, Syllable) >= 2","Function","functions",37.3ms, 1.71ms,  2.82MB,11.91KB,21.8034917953013,0.0355421415006276,2946136
-"Num(Syllable, Phoneme) == 2","Function","functions",37.7ms, 1.93ms,  3.12MB,14.42KB,19.5632133133097,0.0357617989648134,3259136
-"Num(Syllable, Phoneme) >= 3","Function","functions",39.3ms, 2.1ms,  3.12MB,14.81KB,18.6982256732271,0.0371981929929461,3259744
-"[Syllable == S -> Syllable == W]","Sequence","sequence",45.8ms, 2.47ms,  3.08MB,12.67KB,18.5744895922646,0.0433651055354858,3216464
-"Syllable == S","Simple","simple",26.8ms, 1.54ms,  2.78MB,13.73KB,17.4231097324325,0.0253084390133154,2902472
-"Start(Syllable, Phoneme) == 1","Function","functions",33.9ms, 1.96ms,  2.03MB, 3.44KB,17.3307120072771,0.0319259210082237,2120936
-"Word == F","Simple","simple",24.4ms, 1.49ms,  2.48MB,11.16KB,16.4025614373728,0.0229267899994738,2584888
-"End(Syllable, Phoneme) == 1","Function","functions",33.7ms, 2.05ms,  2.02MB, 3.44KB,16.3907814537795,0.0316179905057652,2113848
-"[Phoneme == n -> Phoneme == t]","Sequence","sequence",36.9ms, 2.3ms,  1.97MB,10.55KB,16.0650847054907,0.0345919050305383,2052488
-"[Phoneme == k -> Phoneme == s]","Sequence","sequence",36.9ms, 2.34ms,  1.96MB,10.55KB,15.7589632433155,0.0345906339935027,2043096
-"Phoneme == n","Simple","simple",22.1ms, 1.56ms,  1.66MB, 9.34KB,14.1375289980481,0.0205657639744459,1726352
-"[#Syllable == S ^ Phoneme == n]","Dominance","dominance",56.5ms, 4.21ms,  3.46MB,11.32KB,13.4027409425264,0.0522425279777963,3618272
-"[Syllable == S ^ Phoneme == n]","Dominance","dominance",53.4ms, 4.16ms,  3.44MB,14.56KB,12.8460313959723,0.0492805034882622,3587800
-"Phoneme =~ n","Regex","regex",22.8ms, 1.8ms,  1.65MB, 9.34KB,12.6578099386793,0.0209757229458774,1720056
-"[Syllable == S ^ #Phoneme == n]","Dominance","dominance",49.6ms, 4.61ms,  2.35MB,14.56KB,10.7606572476479,0.0450326369900722,2449344
-"Phonetic == t","Simple","simple",14.7ms, 1.58ms,598.58KB,11.33KB,9.28626509737104,0.01312471498386,601344
-"Phonetic =~ t","Regex","regex",15.1ms, 1.64ms,599.62KB,11.98KB,9.20640069234753,0.013493489503162,601744
-"Phonetic != t","Simple","simple",16.8ms, 2.12ms,662.38KB,48.59KB,7.93791590856845,0.0147028870123904,628512
-"[Phonetic == t & Phonetic == t]","Conjunction","boolean",18.2ms, 4.37ms,870.28KB,36.82KB,4.16585749471766,0.0138488979864633,853464
-"[Word == F ^ Phoneme == t]","Dominance","dominance",50.7ms,12.47ms,  3.13MB,18.71KB,4.07005599115759,0.0382804084947566,3267216
-"[Intermediate == L- ^ Phoneme == n]","Dominance","dominance",52.2ms,15.13ms,  3.21MB,21.33KB,3.45054463160542,0.0370894610241521,3348264
-"[Word == F ^ Phonetic == t]","Dominance","dominance",51.4ms,15.12ms,  3.13MB,19.91KB,3.39962499002806,0.0362837084830971,3266000
+"Num(Syllable, Phoneme) >= 3","Function","functions",42ms, 2.8ms,  3.15MB, 15.88KB,15.0173465725217,0.0392269139556447,3282320
+"Num(Syllable, Phoneme) == 2","Function","functions",38.8ms, 2.64ms,  3.15MB, 15.48KB,14.7095235935382,0.0361595605645562,3281712
+"Num(Word, Syllable) >= 2","Function","functions",38.7ms, 2.69ms,  2.84MB, 12.97KB,14.4144099242368,0.0360378725308692,2963648
+"End(Syllable, Phoneme) == 1","Function","functions",36.1ms, 2.69ms,  2.04MB,  4.51KB,13.42736109046,0.0334396614925936,2136424
+"Syllable == S","Simple","simple",25.3ms, 2.18ms,  2.8MB, 14.8KB,11.6015367662691,0.0230801709840307,2922232
+"[Phoneme == k -> Phoneme == s]","Sequence","sequence",36.5ms, 3.2ms,  2MB, 13.09KB,11.4111378827036,0.033288843012997,2084544
+"[Phoneme == n -> Phoneme == t]","Sequence","sequence",36.1ms, 3.2ms,  2.01MB, 13.09KB,11.2722390500453,0.0328643084940268,2091384
+"[Syllable == S -> Syllable == W]","Sequence","sequence",40.1ms, 3.78ms,  3.13MB, 15.2KB,10.601048253598,0.0363088414742379,3264928
+"[#Syllable == S ^ Phoneme == n]","Dominance","dominance",55ms, 5.24ms,  3.5MB, 11.73KB,10.490958005919,0.049717297006282,3658352
+"[Syllable == S ^ Phoneme == n]","Dominance","dominance",49.4ms, 4.74ms,  3.48MB, 15.62KB,10.4179390397329,0.0446337890025461,3630752
+"Start(Syllable, Phoneme) == 1","Function","functions",34.8ms, 3.59ms,  2.05MB,  4.5KB,9.7012195669631,0.031239170988556,2143512
+"[Syllable == S ^ #Phoneme == n]","Dominance","dominance",47.7ms, 5.07ms,  2.39MB, 12.38KB,9.40947589406525,0.0426148259430192,2494304
+"Word == F","Simple","simple",23.4ms, 2.58ms,  2.5MB, 12.23KB,9.05561110367378,0.0208106160134776,2604648
+"Phoneme == n","Simple","simple",19.9ms, 2.22ms,  1.68MB, 10.41KB,8.97056568332911,0.0176862109947251,1746112
+"Phoneme =~ n","Regex","regex",19.6ms, 2.22ms,  1.67MB, 10.41KB,8.84696068469987,0.0173897399654379,1739816
+"Phonetic == t","Simple","simple",14.1ms, 2.29ms,628.07KB, 68.85KB,6.14916174517302,0.0117870080284774,572640
+"Phonetic =~ t","Regex","regex",14.5ms, 2.38ms,625.25KB, 13.04KB,6.08288149521595,0.0121081404795405,626904
+"Phonetic != t","Simple","simple",16.7ms, 2.75ms,682.73KB, 49.66KB,6.05138843961779,0.013916342984885,648272
+"[Word == F ^ Phoneme == t]","Dominance","dominance",47.7ms,12.82ms,  3.18MB, 19.77KB,3.71574586450076,0.0348270604590653,3315816
+"[Intermediate == L- ^ Phoneme == n]","Dominance","dominance",50.9ms,15.34ms,  3.26MB, 22.39KB,3.32088704730764,0.0356057529570535,3391216
+"[Word == F ^ Phonetic == t]","Dominance","dominance",49.2ms,15.12ms,  3.18MB, 20.98KB,3.25625237500827,0.0341033899894683,3308952
+"[Phonetic == t & Phonetic == t]","Conjunction","boolean",17.8ms, 6.76ms,900.43KB,153.6KB,2.63741799468582,0.0110732389730401,764752

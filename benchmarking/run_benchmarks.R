@@ -23,7 +23,7 @@ suppressPackageStartupMessages({
 
 cat("Sourcing implementation...\n")
 source("R/reindeer_query_optimized.r")
-source("inst/benchmarks/benchmark_queries.R")
+source("benchmarking/benchmark_queries.R")
 
 cat("\n")
 cat("Running benchmarks (this may take a few minutes)...\n\n")
