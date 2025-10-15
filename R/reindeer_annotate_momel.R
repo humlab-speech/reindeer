@@ -9,7 +9,7 @@
 #' that is more portable and easier to maintain.
 #'
 #' @param corpus A corpus object created with [corpus()]
-#' @param bundle_list A bundle_list object (or segment list from query_opt)
+#' @param bundle_list A bundle_list object (or segment_list from ask_for/query)
 #' @param windowSize The window size (in ms) used when extracting f0
 #' @param minF The low end of the fundamental frequency range
 #' @param maxF The high end of the fundamental frequency range

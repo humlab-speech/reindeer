@@ -230,9 +230,11 @@ harvest <- function() {1}
 
 
 
-peek_at <- function(.x, what=c("levels","links","labelgroups","tracks","bundles","sessions","perspectives","files","attributes"),...){
+peek_at <- function(.x, what=c("levels","links","labelgroups","tracks","bundles","sessions","perspectives","files","attributes","signals"),...){
 
   if("emuDBhandle" %in% class(.x)){
+    .inside_of <- .x
+  }else if("corpus" %in% class(.x)){
     .inside_of <- .x
   }else{
     if( ! is.null(attr(.x,"basePath")) && dir.exists(attr(.x,"basePath"))) {
@@ -246,11 +248,15 @@ peek_at <- function(.x, what=c("levels","links","labelgroups","tracks","bundles"
   }
  al <- list(...)
 
-  what <- match.arg(what, c("levels","links","labelgroups","tracks","bundles","sessions","perspectives","files","attributes"))
+  what <- match.arg(what, c("levels","links","labelgroups","tracks","bundles","sessions","perspectives","files","attributes","signals"))
 
   if(what == "labelgroups") {
     #A label can be globally or locally defined, so we need to check whether extra arguments were given.
     what <- ifelse(length(al) == 0, "global_lg","local_lg")
+  }
+
+  if(what == "signals") {
+    return(peek_signals(.inside_of, ...))
   }
 
   res <- switch(what,
@@ -278,6 +284,75 @@ peek_at <- function(.x, what=c("levels","links","labelgroups","tracks","bundles"
 peek_levels <- purrr::partial(peek_at, what="levels")
 peek_links <- purrr::partial(peek_at, what="links")
 peek_labelgroups <- purrr::partial(peek_at, what="labelgroups")
+peek_tracks <- purrr::partial(peek_at, what="tracks")
+peek_bundles <- purrr::partial(peek_at, what="bundles")
+peek_sessions <- purrr::partial(peek_at, what="sessions")
+peek_perspectives <- purrr::partial(peek_at, what="perspectives")
+peek_attributes <- purrr::partial(peek_at, what="attributes")
+
+#' List signal files in an emuDB or corpus
+#' 
+#' Returns a tibble with session, bundle, filename, extension, and full_path
+#' for all signal files (audio files) in the database. Filters to only include
+#' files with common audio extensions and the mediafileExtension from config.
+#' 
+#' @param .x An emuDBhandle, corpus object, or object with basePath attribute
+#' @param ... Additional arguments passed to list_files
+#' @return A tibble with columns: session, bundle, name, extension, full_path
+#' @export
+#' @examples
+#' \dontrun{
+#' signals <- peek_signals(corpus_obj)
+#' # Or use peek_at
+#' signals <- peek_at(corpus_obj, "signals")
+#' }
+peek_signals <- function(.x, ...) {
+  
+  # Get database handle or load from path
+  if ("corpus" %in% class(.x)) {
+    .inside_of <- .x
+    basePath <- .x@basePath
+    config <- .x@config
+  } else if ("emuDBhandle" %in% class(.x)) {
+    .inside_of <- .x
+    basePath <- .x$basePath
+    config <- load_DBconfig(basePath)
+  } else {
+    if (!is.null(attr(.x, "basePath")) && dir.exists(attr(.x, "basePath"))) {
+      basePath <- attr(.x, "basePath")
+      utils::capture.output(
+        .inside_of <- emuR::load_emuDB(basePath, verbose = TRUE)
+      ) -> dbload.info
+      config <- load_DBconfig(basePath)
+    } else {
+      stop("Could not derive the database path. Please provide an explicit database handle object as '.x'.")
+    }
+  }
+  
+  # Get all files
+  all_files <- tibble::as_tibble(emuR::list_files(.inside_of, ...))
+  
+  # Common audio extensions plus mediafileExtension from config
+  audio_exts <- c("wav", "WAV", "mp3", "MP3", "flac", "FLAC", "ogg", "OGG", 
+                   "aiff", "AIFF", "aif", "AIF")
+  if (!is.null(config$mediafileExtension)) {
+    audio_exts <- c(audio_exts, config$mediafileExtension)
+  }
+  
+  # Filter to signal files and add columns
+  signal_files <- all_files %>%
+    dplyr::mutate(
+      name = tools::file_path_sans_ext(file),
+      extension = tools::file_ext(file),
+      full_path = absolute_file_path
+    ) %>%
+    dplyr::filter(extension %in% audio_exts) %>%
+    dplyr::select(session, bundle, name, extension, full_path)
+  
+  attr(signal_files, "basePath") <- basePath
+  
+  return(signal_files)
+}
 peek_tracks <- purrr::partial(peek_at, what="tracks")
 peek_bundles <- purrr::partial(peek_at, what="bundles")
 peek_sessions <- purrr::partial(peek_at, what="sessions")

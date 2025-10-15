@@ -725,22 +725,12 @@ import_media_to_bundle <- function(corpus_obj, session_name, bundle_name,
     cli::cli_abort("Media file not found: {.path {file_path}}")
   }
   
-  if (!requireNamespace("wrassp", quietly = TRUE)) {
-    cli::cli_abort("Package {.pkg wrassp} required for media import")
+  if (!requireNamespace("av", quietly = TRUE)) {
+    cli::cli_abort("Package {.pkg av} required for media import")
   }
   
-  # Read audio file
-  audio_data <- wrassp::read.AsspDataObj(file_path)
-  sample_rate <- attr(audio_data, "sampleRate")
-  n_channels <- ncol(audio_data$audio)
-  
-  # Validate channel numbers
-  requested_channels <- unique(unlist(channel_map))
-  if (any(requested_channels > n_channels)) {
-    cli::cli_abort(
-      "File has {n_channels} channel{?s}, but channel {max(requested_channels)} was requested"
-    )
-  }
+  # Get target extension from config or default to wav
+  target_ext <- corpus_obj@config$mediafileExtension %||% "wav"
   
   # Create bundle directory if it doesn't exist
   bundle_dir <- file.path(
@@ -755,17 +745,68 @@ import_media_to_bundle <- function(corpus_obj, session_name, bundle_name,
     )
   }
   
-  # Write each channel to its designated file
+  # Get audio info
+  audio_info <- av::av_media_info(file_path)
+  n_channels <- audio_info$audio$channels
+  sample_rate <- audio_info$audio$sample_rate
+  
+  if (is.null(n_channels) || n_channels == 0) {
+    cli::cli_abort("No audio channels found in {.path {file_path}}")
+  }
+  
+  # Validate channel numbers
+  requested_channels <- unique(unlist(channel_map))
+  if (any(requested_channels > n_channels)) {
+    cli::cli_abort(
+      "File has {n_channels} channel{?s}, but channel {max(requested_channels)} was requested"
+    )
+  }
+  
+  # Convert and extract channels
   for (ext in names(channel_map)) {
     channel_num <- channel_map[[ext]]
     
-    # Extract channel
-    channel_data <- audio_data
-    channel_data$audio <- audio_data$audio[, channel_num, drop = FALSE]
-    
-    # Write to file
+    # Determine output file
     output_file <- file.path(bundle_dir, paste0(bundle_name, ".", ext))
-    wrassp::write.AsspDataObj(channel_data, output_file)
+    
+    # For single channel files, can convert directly
+    if (n_channels == 1 && channel_num == 1) {
+      # Direct conversion
+      av::av_audio_convert(
+        audio = file_path,
+        output = output_file,
+        format = target_ext,
+        sample_rate = sample_rate,
+        channels = 1
+      )
+    } else {
+      # For multi-channel, need to extract specific channel
+      # Use av to convert to temporary wav, then extract channel with av filters
+      temp_wav <- tempfile(fileext = ".wav")
+      on.exit(unlink(temp_wav), add = TRUE)
+      
+      # Convert to wav with all channels
+      av::av_audio_convert(
+        audio = file_path,
+        output = temp_wav,
+        format = "wav",
+        sample_rate = sample_rate
+      )
+      
+      # Extract specific channel using av audio filter
+      # The format is: channelmap=map=FL filter extracts left (first) channel
+      # For channel N, use: pan=mono|c0=c{N-1}
+      channel_filter <- sprintf("pan=mono|c0=c%d", channel_num - 1)
+      
+      av::av_audio_convert(
+        audio = temp_wav,
+        output = output_file,
+        format = target_ext,
+        sample_rate = sample_rate,
+        channels = 1,
+        audio_filters = channel_filter
+      )
+    }
     
     cli::cli_alert_success("Wrote channel {channel_num} to {.file {basename(output_file)}}")
   }
@@ -775,7 +816,7 @@ import_media_to_bundle <- function(corpus_obj, session_name, bundle_name,
   if (file.exists(annot_file)) {
     annot <- jsonlite::read_json(annot_file, simplifyVector = FALSE)
     annot$sampleRate <- sample_rate
-    annot$annotates <- paste0(bundle_name, ".", corpus_obj@config$mediafileExtension %||% "wav")
+    annot$annotates <- paste0(bundle_name, ".", target_ext)
     jsonlite::write_json(annot, annot_file, auto_unbox = TRUE, pretty = TRUE)
   }
   

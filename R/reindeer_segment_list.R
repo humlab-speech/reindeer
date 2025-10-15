@@ -160,3 +160,152 @@ as_segment_list <- function(x, db_uuid = NULL, db_path = NULL) {
 is_segment_list <- function(x) {
   inherits(x, "segment_list")
 }
+
+#' Quantify method for segment_list - Apply DSP to query results
+#' 
+#' Applies a DSP function to all segments in a segment_list, extracting
+#' acoustic measurements for each segment. This is equivalent to emuR::get_trackdata()
+#' but allows for custom DSP functions with metadata-driven parameters.
+#' 
+#' @param segment_list A segment_list object (from ask_for/query)
+#' @param dsp_function A DSP function from superassp or similar
+#' @param ... Additional arguments passed to the DSP function
+#' @param .use_metadata Logical; whether to use bundle metadata for parameter derivation
+#' @param .verbose Logical; show progress messages
+#' 
+#' @return A data frame with segment information and DSP-derived measurements
+#' 
+#' @examples
+#' \dontrun{
+#' segs <- query(corpus, "Phonetic == t")
+#' formants <- quantify(segs, superassp::forest)
+#' }
+#' 
+#' @export
+S7::method(quantify, segment_list) <- function(object, dsp_function, ..., 
+                                                .use_metadata = TRUE,
+                                                .verbose = FALSE) {
+  
+  if (!inherits(object, "segment_list")) {
+    cli::cli_abort("{.arg object} must be a segment_list")
+  }
+  
+  if (nrow(object) == 0) {
+    cli::cli_alert_warning("Empty segment list")
+    return(tibble::tibble())
+  }
+  
+  # Try to get corpus connection from db_path
+  corpus_obj <- NULL
+  if (!is.null(object@db_path) && object@db_path != "") {
+    basePath <- dirname(object@db_path)
+    if (dir.exists(basePath)) {
+      tryCatch({
+        corpus_obj <- corpus(basePath, verbose = FALSE)
+      }, error = function(e) {
+        if (.verbose) {
+          cli::cli_alert_info("Could not load corpus from db_path")
+        }
+      })
+    }
+  }
+  
+  # Get metadata if requested
+  bundle_metadata <- NULL
+  if (.use_metadata && !is.null(corpus_obj)) {
+    con <- get_corpus_connection(corpus_obj)
+    bundle_metadata <- DBI::dbReadTable(con, "bundle_metadata")
+    DBI::dbDisconnect(con)
+  }
+  
+  # Process each segment
+  if (.verbose) {
+    cli::cli_progress_bar("Processing segments", total = nrow(object))
+  }
+  
+  results <- list()
+  
+  for (i in seq_len(nrow(object))) {
+    seg <- object[i, ]
+    
+    # Derive parameters from metadata if available
+    dsp_params <- list(...)
+    if (.use_metadata && !is.null(bundle_metadata)) {
+      meta <- bundle_metadata %>%
+        dplyr::filter(session == seg$session, bundle == seg$bundle)
+      
+      if (nrow(meta) > 0) {
+        dsp_params <- derive_dsp_parameters(
+          dsp_fun = dsp_function,
+          metadata = meta,
+          metadata_fields = c("Gender", "Age"),
+          user_params = dsp_params
+        )
+      }
+    }
+    
+    # Get signal file path
+    signal_file <- file.path(
+      dirname(dirname(object@db_path)),
+      paste0(seg$session, "_ses"),
+      paste0(seg$bundle, "_bndl"),
+      paste0(seg$bundle, ".wav")  # TODO: get from config
+    )
+    
+    if (!file.exists(signal_file)) {
+      if (.verbose) {
+        cli::cli_alert_warning("Signal file not found: {basename(signal_file)}")
+      }
+      next
+    }
+    
+    # Apply DSP function to segment
+    tryCatch({
+      result <- do.call(dsp_function, c(
+        list(
+          listOfFiles = signal_file,
+          beginTime = seg$start / 1000,  # Convert ms to s
+          endTime = seg$end / 1000
+        ),
+        dsp_params,
+        list(toFile = FALSE, verbose = FALSE)
+      ))
+      
+      # Combine with segment info
+      result_df <- if (is.data.frame(result)) {
+        result
+      } else if (is.list(result)) {
+        as.data.frame(result)
+      } else {
+        data.frame(value = result)
+      }
+      
+      result_df <- dplyr::bind_cols(
+        tibble::as_tibble(seg),
+        result_df
+      )
+      
+      results[[i]] <- result_df
+      
+      if (.verbose) {
+        cli::cli_progress_update()
+      }
+    }, error = function(e) {
+      if (.verbose) {
+        cli::cli_alert_warning("Error processing segment {i}: {e$message}")
+      }
+    })
+  }
+  
+  if (.verbose) {
+    cli::cli_progress_done()
+  }
+  
+  # Combine all results
+  if (length(results) > 0) {
+    dplyr::bind_rows(results)
+  } else {
+    tibble::tibble()
+  }
+}
+
