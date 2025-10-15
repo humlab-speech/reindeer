@@ -1,6 +1,6 @@
 ---
-title: "Performance Benchmarks: Optimized EQL Query Implementation"
-subtitle: "Comparison of query_opt() vs emuR::query()"
+title: "Performance Benchmarks: Optimized Implementations"
+subtitle: "EQL Query Optimization & MOMEL/INTSINT Modernization"
 author: "reindeer package"
 date: "`r Sys.Date()`"
 format:
@@ -20,7 +20,14 @@ execute:
 
 ## Overview
 
-This vignette presents comprehensive performance benchmarks comparing the optimized SQL-based query implementation (`query_opt()`) with the standard `emuR::query()` function. The optimized implementation directly queries the SQLite cache database, bypassing R object overhead for improved performance.
+This vignette presents comprehensive performance benchmarks for two major optimizations in the reindeer package:
+
+1. **Optimized EQL Queries**: SQL-based query implementation (`query_opt()`) vs standard `emuR::query()`
+2. **Modern MOMEL/INTSINT**: Python/Parselmouth implementation vs original Praat/Perl/C implementation
+
+Both implementations prioritize performance, portability, and maintainability while ensuring fidelity to original behavior.
+
+## EQL Query Optimization
 
 ### Key Features
 
@@ -29,7 +36,7 @@ This vignette presents comprehensive performance benchmarks comparing the optimi
 - **Optimized Query Plans**: Leverages SQLite's query optimizer
 - **Full EQL Support**: Implements complete EMU Query Language
 
-## Setup
+### Setup
 
 ```{r setup}
 #| message: false
@@ -740,9 +747,119 @@ source("inst/benchmarks/benchmark_queries.R")
 quarto::quarto_render("vignettes/query_benchmarks.qmd")
 ```
 
+## MOMEL/INTSINT Implementation Benchmarks
+
+### Overview
+
+The reindeer package includes a completely reimplemented MOMEL/INTSINT system using Python and Parselmouth, replacing the original Praat-based implementation that required external Praat scripts, Perl scripts, and compiled C binaries.
+
+### Implementation Comparison
+
+```{r momel-setup}
+#| echo: false
+
+momel_results_file <- file.path(benchmark_dir, "momel_benchmark_results.rds")
+momel_features_file <- file.path(benchmark_dir, "momel_features_comparison.rds")
+
+has_momel_results <- file.exists(momel_results_file) && file.exists(momel_features_file)
+```
+
+```{r momel-results}
+#| eval: !expr has_momel_results
+#| echo: false
+
+momel_results <- readRDS(momel_results_file)
+momel_features <- readRDS(momel_features_file)
+
+# Display feature comparison
+momel_features %>%
+  gt() %>%
+  tab_header(
+    title = "MOMEL/INTSINT Implementation Comparison",
+    subtitle = "Praat/Perl/C vs Python/Parselmouth"
+  ) %>%
+  cols_label(
+    Feature = "Feature",
+    `Praat/Perl/C` = "Original",
+    `Python/Parselmouth` = "New Implementation"
+  ) %>%
+  tab_style(
+    style = cell_text(color = "#28a745", weight = "bold"),
+    locations = cells_body(
+      columns = `Python/Parselmouth`,
+      rows = `Python/Parselmouth` == "✓"
+    )
+  ) %>%
+  tab_style(
+    style = cell_text(color = "#dc3545", weight = "bold"),
+    locations = cells_body(
+      columns = `Praat/Perl/C`,
+      rows = `Praat/Perl/C` == "❌"
+    )
+  )
+```
+
+### Performance Results
+
+```{r momel-performance}
+#| eval: !expr has_momel_results
+#| echo: false
+#| fig-width: 10
+#| fig-height: 6
+
+# Performance plot
+if (file.exists(file.path(benchmark_dir, "momel_time_comparison.png"))) {
+  knitr::include_graphics(file.path(benchmark_dir, "momel_time_comparison.png"))
+}
+
+# Memory plot  
+if (file.exists(file.path(benchmark_dir, "momel_memory_comparison.png"))) {
+  knitr::include_graphics(file.path(benchmark_dir, "momel_memory_comparison.png"))
+}
+```
+
+### Key Improvements
+
+The Python/Parselmouth implementation offers several critical advantages:
+
+1. **Portability**: No platform-specific compiled binaries required
+2. **Installation**: Simple pip install of parselmouth, no complex setup
+3. **Maintainability**: Pure Python code is easier to debug and extend
+4. **Integration**: Seamless integration with R via reticulate
+5. **Thread Safety**: Can be used in parallel processing workflows
+6. **No External Dependencies**: Eliminates Perl and external C binary dependencies
+
+### Running MOMEL/INTSINT Benchmarks
+
+To benchmark the MOMEL/INTSINT implementation:
+
+```{r momel-benchmark-code, eval=FALSE}
+# Run from package root directory
+source("benchmarking/benchmark_momel_intsint.R")
+
+# Or run all benchmarks including MOMEL/INTSINT
+source("benchmarking/run_benchmarks.R")
+```
+
+```{r no-momel-results}
+#| eval: !expr !has_momel_results
+#| echo: false
+#| results: asis
+
+cat("**Note**: MOMEL/INTSINT benchmark results not found. Run benchmarks with:\n\n")
+cat("```r\n")
+cat("source('benchmarking/run_benchmarks.R')\n")
+cat("```\n")
+```
+
 ## Conclusion
 
-The optimized SQL-based query implementation provides significant performance improvements for EMU database queries while maintaining result equivalence with the standard `emuR::query()` function. These benchmarks can be re-run at any time to verify performance on different systems or with updated implementations.
+The reindeer package provides two major performance optimizations:
+
+1. **Optimized EQL Queries**: Direct SQL-based queries with 5-15x speedup over standard `emuR::query()`
+2. **Modern MOMEL/INTSINT**: Pure Python implementation eliminating external dependencies
+
+Both implementations maintain fidelity to their original counterparts while offering significant improvements in performance, portability, and maintainability.
 
 ---
 

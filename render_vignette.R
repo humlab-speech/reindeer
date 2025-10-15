@@ -9,7 +9,7 @@ if (!file.exists("DESCRIPTION")) {
 
 cat("\n")
 cat("╔════════════════════════════════════════════════════════════════════╗\n")
-cat("║          RENDERING QUERY BENCHMARKS VIGNETTE                       ║\n")
+cat("║          RENDERING BENCHMARK VIGNETTE                              ║\n")
 cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
 
 # Check for required packages
