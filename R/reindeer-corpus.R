@@ -47,6 +47,11 @@ corpus <- S7::new_class(
     .connection_valid = S7::class_logical
   ),
   constructor = function(path, verbose = FALSE) {
+    # Validate input
+    if (length(path) == 0 || is.null(path)) {
+      cli::cli_abort("Path cannot be NULL or empty")
+    }
+    
     if (is.character(path)) {
       if (!dir.exists(path)) {
         cli::cli_abort("Database path {.path {path}} does not exist")
@@ -166,7 +171,7 @@ bundle_list <- S7::new_class(
 #' @param j bundle pattern (regex or literal)
 #' @return bundle_list object (tibble with session, bundle, and metadata columns)
 #' @export
-S7::method(`[`, corpus) <- function(x, i = NULL, j = NULL, ...) {
+S7::method(`[`, corpus) <- function(x, i, j, ..., drop = FALSE) {
   # Handle various indexing patterns
   session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"
   bundle_pattern <- if (!missing(j) && !is.null(j)) j else ".*"
@@ -207,7 +212,7 @@ S7::method(`[`, corpus) <- function(x, i = NULL, j = NULL, ...) {
 #' @param j bundle pattern
 #' @param value Either a named list (metadata) or character vector (media files)
 #' @export
-S7::method(`[<-`, corpus) <- function(x, i = NULL, j = NULL, value) {
+S7::method(`[<-`, corpus) <- function(x, i, j, ..., value) {
   # Determine what type of assignment this is
   if (is.list(value) && !is.null(names(value))) {
     # Metadata assignment
@@ -267,6 +272,128 @@ S7::method(print, corpus) <- function(x, ...) {
   })
 
   invisible(x)
+}
+
+#' Summary method for corpus - comprehensive database overview
+#' @export
+S7::method(summary, corpus) <- function(object, ...) {
+  con <- get_corpus_connection(object)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  cli::cli_rule("Summary of emuDB")
+  cli::cli_text("")
+  
+  # Basic info
+  session_count <- DBI::dbGetQuery(con, sprintf(
+    "SELECT COUNT(*) as n FROM session WHERE db_uuid = '%s'", object@.uuid
+  ))$n
+  
+  bundle_count <- DBI::dbGetQuery(con, sprintf(
+    "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = '%s'", object@.uuid
+  ))$n
+  
+  item_count <- DBI::dbGetQuery(con, sprintf(
+    "SELECT COUNT(*) as n FROM items WHERE db_uuid = '%s'", object@.uuid
+  ))$n
+  
+  label_count <- DBI::dbGetQuery(con, sprintf(
+    "SELECT COUNT(*) as n FROM labels WHERE db_uuid = '%s'", object@.uuid
+  ))$n
+  
+  link_count <- DBI::dbGetQuery(con, sprintf(
+    "SELECT COUNT(*) as n FROM links WHERE db_uuid = '%s'", object@.uuid
+  ))$n
+  
+  cli::cli_text("Name:            {.field {object@dbName}}")
+  cli::cli_text("UUID:            {.val {object@.uuid}}")
+  cli::cli_text("Directory:       {.path {object@basePath}}")
+  cli::cli_text("Session count:   {.val {session_count}}")
+  cli::cli_text("Bundle count:    {.val {bundle_count}}")
+  cli::cli_text("Annotation item count:  {.val {item_count}}")
+  cli::cli_text("Label count:     {.val {label_count}}")
+  cli::cli_text("Link count:      {.val {link_count}}")
+  cli::cli_text("")
+  
+  # Database configuration
+  cli::cli_rule("Database configuration")
+  cli::cli_text("")
+  
+  # SSFF track definitions
+  if (!is.null(object@config$ssffTrackDefinitions) && 
+      length(object@config$ssffTrackDefinitions) > 0) {
+    cli::cli_h3("SSFF track definitions")
+    cli::cli_text("")
+    
+    track_df <- purrr::map_dfr(object@config$ssffTrackDefinitions, function(track) {
+      tibble::tibble(
+        name = track$name,
+        columnName = track$columnName,
+        fileExtension = track$fileExtension,
+        fileFormat = track$format %||% "ssff"
+      )
+    })
+    
+    print(track_df)
+    cli::cli_text("")
+  }
+  
+  # Level definitions
+  if (!is.null(object@config$levelDefinitions) && 
+      length(object@config$levelDefinitions) > 0) {
+    cli::cli_h3("Level definitions")
+    cli::cli_text("")
+    
+    level_df <- purrr::map_dfr(object@config$levelDefinitions, function(level) {
+      attr_defs <- if (!is.null(level$attributeDefinitions)) {
+        paste(purrr::map_chr(level$attributeDefinitions, ~.x$name), collapse = "; ")
+      } else {
+        ""
+      }
+      
+      attr_defs <- paste0(attr_defs, ";")
+      
+      tibble::tibble(
+        name = level$name,
+        type = level$type,
+        nrOfAttrDefs = length(level$attributeDefinitions %||% list()),
+        attrDefNames = attr_defs
+      )
+    })
+    
+    print(level_df)
+    cli::cli_text("")
+  }
+  
+  # Link definitions
+  if (!is.null(object@config$linkDefinitions) && 
+      length(object@config$linkDefinitions) > 0) {
+    cli::cli_h3("Link definitions")
+    cli::cli_text("")
+    
+    link_df <- purrr::map_dfr(object@config$linkDefinitions, function(link) {
+      tibble::tibble(
+        type = link$type,
+        superlevelName = link$superlevelName,
+        sublevelName = link$sublevelName
+      )
+    })
+    
+    print(link_df)
+    cli::cli_text("")
+  }
+  
+  # Metadata summary
+  fields_query <- "SELECT DISTINCT field_name FROM metadata_fields ORDER BY field_name"
+  fields <- DBI::dbGetQuery(con, fields_query)
+  
+  if (nrow(fields) > 0) {
+    cli::cli_h3("Metadata fields defined")
+    cli::cli_text("")
+    cli::cli_text(paste(fields$field_name, collapse = ", "))
+    cli::cli_text("")
+  }
+  
+  invisible(object)
 }
 
 #' Print method for bundle_list
