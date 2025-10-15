@@ -13,13 +13,13 @@ setup_test_db <- function() {
   ae_path <- file.path(temp_dir, 'emuR_demoData', 'ae_emuDB')
   ae <- load_emuDB(ae_path, verbose = FALSE)
   
-  # Ensure cache exists by running a simple query
-  suppressMessages(query(ae, "Phonetic == t"))
+  # Ensure cache exists by running a simple query with emuR::query
+  suppressMessages(emuR::query(ae, "Phonetic == t"))
   
   list(path = ae_path, db = ae)
 }
 
-test_that("query_opt loads successfully", {
+test_that("ask_for loads successfully", {
   expect_no_error(source("../../R/reindeer_query_optimized.r"))
 })
 
@@ -28,8 +28,8 @@ source("../../R/reindeer_query_optimized.r")
 
 # Test helper function
 expect_query_equivalent <- function(query_str, ae_path, ae_db, tolerance = 0) {
-  result_opt <- query_opt(ae_path, query_str)
-  result_emuR <- query(ae_db, query_str)
+  result_opt <- ask_for(ae_path, query_str)
+  result_emuR <- emuR::query(ae_db, query_str)
   
   expect_equal(
     nrow(result_opt), 
@@ -121,15 +121,15 @@ describe("Boolean Operations", {
     # expect_query_equivalent("[Phoneme == n | Phoneme == m]", ae_path, ae)
   })
   
-  test_that("disjunction works in query_opt", {
+  test_that("disjunction works in ask_for", {
     # Test that our implementation handles disjunction correctly
-    result <- query_opt(ae_path, "[Phonetic == t | Phonetic == k]")
+    result <- ask_for(ae_path, "[Phonetic == t | Phonetic == k]")
     expect_s3_class(result, "emuRsegs")
     expect_gt(nrow(result), 0)
     
     # Should have results from both queries
-    result_t <- query_opt(ae_path, "Phonetic == t")
-    result_k <- query_opt(ae_path, "Phonetic == k")
+    result_t <- ask_for(ae_path, "Phonetic == t")
+    result_k <- ask_for(ae_path, "Phonetic == k")
     expect_gte(nrow(result), max(nrow(result_t), nrow(result_k)))
   })
 })
@@ -142,7 +142,7 @@ describe("Function Queries", {
   test_that("Start function works", {
     # Note: Position functions may have different counting logic
     # Test that it at least executes without error
-    result <- query_opt(ae_path, "Start(Syllable, Phoneme) == 1")
+    result <- ask_for(ae_path, "Start(Syllable, Phoneme) == 1")
     expect_s3_class(result, "emuRsegs")
     # Should return some results (exact count may differ from emuR)
     # expect_query_equivalent("Start(Syllable, Phoneme) == 1", ae_path, ae)
@@ -150,7 +150,7 @@ describe("Function Queries", {
   
   test_that("End function works", {
     # Note: Position functions may have different counting logic
-    result <- query_opt(ae_path, "End(Syllable, Phoneme) == 1")
+    result <- ask_for(ae_path, "End(Syllable, Phoneme) == 1")
     expect_s3_class(result, "emuRsegs")
     # Should return some results (exact count may differ from emuR)
     # expect_query_equivalent("End(Syllable, Phoneme) == 1", ae_path, ae)
@@ -174,7 +174,7 @@ describe("Edge Cases", {
   })
   
   test_that("queries return proper emuRsegs object", {
-    result <- query_opt(ae_path, "Phonetic == t")
+    result <- ask_for(ae_path, "Phonetic == t")
     expect_s3_class(result, "emuRsegs")
     expect_s3_class(result, "data.frame")
     
@@ -187,8 +187,8 @@ describe("Edge Cases", {
   
   test_that("case-sensitive label matching", {
     # EQL is case-sensitive
-    result_lower <- query_opt(ae_path, "Phonetic == s")
-    result_upper <- query_opt(ae_path, "Phonetic == S")
+    result_lower <- ask_for(ae_path, "Phonetic == s")
+    result_upper <- ask_for(ae_path, "Phonetic == S")
     # Should have different results (or one might be empty)
     expect_true(nrow(result_lower) != nrow(result_upper) || 
                 (nrow(result_lower) == 0 && nrow(result_upper) == 0))
@@ -196,15 +196,15 @@ describe("Edge Cases", {
   
   test_that("wildcard patterns work", {
     # Test regex patterns if supported
-    result <- query_opt(ae_path, "Phonetic =~ .*")
+    result <- ask_for(ae_path, "Phonetic =~ .*")
     expect_s3_class(result, "emuRsegs")
     expect_gt(nrow(result), 0)
   })
   
   test_that("multiple label matches work", {
-    result1 <- query_opt(ae_path, "Phonetic == t")
-    result2 <- query_opt(ae_path, "Phonetic == k")
-    combined <- query_opt(ae_path, "[Phonetic == t | Phonetic == k]")
+    result1 <- ask_for(ae_path, "Phonetic == t")
+    result2 <- ask_for(ae_path, "Phonetic == k")
+    combined <- ask_for(ae_path, "[Phonetic == t | Phonetic == k]")
     
     # Combined should have at least as many as the larger single query
     expect_gte(nrow(combined), max(nrow(result1), nrow(result2)))
@@ -220,8 +220,8 @@ describe("Performance Characteristics", {
     skip_if_not_installed("bench")
     
     bm <- bench::mark(
-      emuR = query(ae, "Phonetic == t"),
-      optimized = query_opt(ae_path, "Phonetic == t"),
+      emuR = emuR::query(ae, "Phonetic == t"),
+      optimized = ask_for(ae_path, "Phonetic == t"),
       iterations = 10,
       check = FALSE
     )
@@ -242,7 +242,7 @@ describe("Result Format Consistency", {
   ae <- setup$db
   
   test_that("timing information is correct for SEGMENT types", {
-    result_opt <- query_opt(ae_path, "Phonetic == t")
+    result_opt <- ask_for(ae_path, "Phonetic == t")
     result_emuR <- query(ae, "Phonetic == t")
     
     # Both should have valid timing
@@ -252,7 +252,7 @@ describe("Result Format Consistency", {
   })
   
   test_that("sample information is consistent", {
-    result <- query_opt(ae_path, "Phonetic == t")
+    result <- ask_for(ae_path, "Phonetic == t")
     
     if (nrow(result) > 0) {
       # Sample start and end should be consistent with timing
@@ -268,19 +268,19 @@ describe("Database Path Handling", {
   ae <- setup$db
   
   test_that("works with path string", {
-    result <- query_opt(ae_path, "Phonetic == t")
+    result <- ask_for(ae_path, "Phonetic == t")
     expect_s3_class(result, "emuRsegs")
     expect_gt(nrow(result), 0)
   })
   
   test_that("handles cache file variations", {
     # Should work with both _emuDB.sqlite and _emuDBcache.sqlite
-    expect_no_error(query_opt(ae_path, "Phonetic == t"))
+    expect_no_error(ask_for(ae_path, "Phonetic == t"))
   })
   
   test_that("gives informative error for missing database", {
     expect_error(
-      query_opt("/nonexistent/path", "Phonetic == t"),
+      ask_for("/nonexistent/path", "Phonetic == t"),
       "SQLite database not found"
     )
   })
@@ -300,7 +300,7 @@ describe("Complex Multi-Level Queries", {
   test_that("combined sequence and dominance work", {
     # Complex query with both operators
     # Note: Some complex nested queries may have parsing differences
-    result <- query_opt(ae_path, "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]")
+    result <- ask_for(ae_path, "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]")
     expect_s3_class(result, "emuRsegs")
   })
   
@@ -313,7 +313,7 @@ describe("Complex Multi-Level Queries", {
   test_that("chained sequences work", {
     # Multiple sequence operators
     # Note: Long chains may have different behavior
-    result <- query_opt(ae_path, "[Phoneme == n -> Phoneme == t]")
+    result <- ask_for(ae_path, "[Phoneme == n -> Phoneme == t]")
     expect_s3_class(result, "emuRsegs")
   })
 })
@@ -325,14 +325,14 @@ describe("Boundary Conditions", {
   
   test_that("handles single-item results", {
     # Query that might return very few results
-    result <- query_opt(ae_path, "Word == absolutely")
+    result <- ask_for(ae_path, "Word == absolutely")
     expect_s3_class(result, "emuRsegs")
     # Should work even if result is empty or has only 1 row
   })
   
   test_that("handles queries on EVENT levels", {
     # EVENT types have different timing characteristics
-    result <- query_opt(ae_path, "Tone =~ .*")
+    result <- ask_for(ae_path, "Tone =~ .*")
     expect_s3_class(result, "emuRsegs")
     if (nrow(result) > 0) {
       expect_equal(result$type[1], "EVENT")
@@ -340,7 +340,7 @@ describe("Boundary Conditions", {
   })
   
   test_that("handles queries on ITEM levels", {
-    result <- query_opt(ae_path, "Phoneme == n")
+    result <- ask_for(ae_path, "Phoneme == n")
     expect_s3_class(result, "emuRsegs")
     if (nrow(result) > 0) {
       expect_equal(result$type[1], "ITEM")
@@ -348,7 +348,7 @@ describe("Boundary Conditions", {
   })
   
   test_that("handles queries on SEGMENT levels", {
-    result <- query_opt(ae_path, "Phonetic == t")
+    result <- ask_for(ae_path, "Phonetic == t")
     expect_s3_class(result, "emuRsegs")
     if (nrow(result) > 0) {
       expect_equal(result$type[1], "SEGMENT")
@@ -363,13 +363,13 @@ describe("Query Language Edge Cases", {
   
   test_that("handles double quotes in labels", {
     # Test with different quote styles if data exists
-    expect_no_error(query_opt(ae_path, 'Phonetic == "t"'))
+    expect_no_error(ask_for(ae_path, 'Phonetic == "t"'))
   })
   
   test_that("handles regex special characters", {
     # Test that regex metacharacters are handled correctly
-    expect_no_error(query_opt(ae_path, "Phonetic =~ [tkp]"))
-    result <- query_opt(ae_path, "Phonetic =~ [tkp]")
+    expect_no_error(ask_for(ae_path, "Phonetic =~ [tkp]"))
+    result <- ask_for(ae_path, "Phonetic =~ [tkp]")
     expect_s3_class(result, "emuRsegs")
   })
   
@@ -393,8 +393,8 @@ describe("Result Ordering and Consistency", {
   
   test_that("results are ordered consistently", {
     # Run same query twice
-    result1 <- query_opt(ae_path, "Phonetic == t")
-    result2 <- query_opt(ae_path, "Phonetic == t")
+    result1 <- ask_for(ae_path, "Phonetic == t")
+    result2 <- ask_for(ae_path, "Phonetic == t")
     
     # Should return identical results
     expect_equal(nrow(result1), nrow(result2))
@@ -403,7 +403,7 @@ describe("Result Ordering and Consistency", {
   })
   
   test_that("results maintain temporal order", {
-    result <- query_opt(ae_path, "Phonetic =~ .*")
+    result <- ask_for(ae_path, "Phonetic =~ .*")
     
     if (nrow(result) > 1) {
       # Within each bundle, start times should be ordered

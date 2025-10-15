@@ -27,20 +27,27 @@
 #' @examples
 #' \dontrun{
 #' # Simple query
-#' query_opt(emuDB, "Phonetic == t")
+#' ask_for(corpus, "Phonetic == t")
+#' query(corpus, "Phonetic == t")  # alias
 #' 
 #' # Sequence with projection
-#' query_opt(emuDB, "[#Phoneme == n -> Phoneme == t]")
+#' ask_for(corpus, "[#Phoneme == n -> Phoneme == t]")
 #' 
 #' # Dominance query
-#' query_opt(emuDB, "[Word == the ^ Phoneme == D]")
+#' ask_for(corpus, "[Word == the ^ Phoneme == D]")
 #' 
 #' # Count function
-#' query_opt(emuDB, "Num(Syllable, Phoneme) >= 3")
+#' ask_for(corpus, "Num(Syllable, Phoneme) >= 3")
 #' }
 
-# Main user-facing function
-query_opt <- function(emuDB, query, ...) {
+#' Query EMU database using optimized SQLite backend
+#' 
+#' @param emuDB Either a path to an emuDB directory, an emuDBhandle, or a corpus object
+#' @param query EQL query string
+#' @param ... Additional arguments passed to query execution
+#' @return A segment_list object (subclass of tibble)
+#' @export
+ask_for <- function(emuDB, query, ...) {
   if (is.character(emuDB)) {
     # emuDB is a path to the database directory
     # Extract the database name from the path (remove _emuDB suffix if present)
@@ -83,8 +90,18 @@ query_opt <- function(emuDB, query, ...) {
   }
   
   result <- execute_query(db_path, query, ...)
+  
+  # Convert to segment_list if result is a data.frame
+  if (is.data.frame(result) && !inherits(result, "segment_list")) {
+    # Extract db_uuid and db_path for segment_list
+    db_uuid <- if ("db_uuid" %in% names(result)) unique(result$db_uuid)[1] else ""
+    result <- segment_list(result, db_uuid = db_uuid, db_path = db_path)
+  }
+  
   return(result)
 }
+
+# Note: query() is an alias for ask_for() defined in reindeeR_emuR_re-export.R
 
 # Main execution dispatcher
 execute_query <- function(db_path, query_string, result_level = NULL) {
@@ -1109,8 +1126,8 @@ create_empty_emuRsegs <- function() {
 }
 
 # Success message
-cat("Complete query_opt() implementation loaded successfully!\n")
-cat("Usage: result <- query_opt(emuDB, 'Phonetic == t')\n")
+cat("Optimized EQL query implementation loaded successfully!\n")
+cat("Usage: result <- ask_for(emuDB, 'Phonetic == t')  # or query() as alias\n")
 cat("\nSupported EQL features:\n")
 cat("  - Simple queries: Level == value, Level != value\n")
 cat("  - Regex queries: Level =~ pattern, Level !~ pattern\n")
@@ -1122,3 +1139,4 @@ cat("  - Conjunction: [query1 & query2]\n")
 cat("  - Disjunction: [query1 | query2]\n")
 cat("  - Position functions: Start(parent, child), End(parent, child), Medial(parent, child)\n")
 cat("  - Count function: Num(parent, child) >= n\n")
+cat("\nReturns: segment_list object (compatible with emuR::query results)\n")

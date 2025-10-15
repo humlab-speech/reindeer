@@ -1,5 +1,5 @@
 # Comprehensive Benchmarking Suite for Optimized EQL Implementation
-# Compare performance of query_opt() vs emuR::query()
+# Compare performance of ask_for() vs emuR::query()
 
 library(emuR)
 library(bench)
@@ -34,7 +34,7 @@ benchmark_query <- function(query_str, ae_path, ae_db, iterations = 50) {
   tryCatch({
     bm <- bench::mark(
       emuR = query(ae_db, query_str),
-      optimized = query_opt(ae_path, query_str),
+      optimized = ask_for(ae_path, query_str),
       iterations = iterations,
       check = FALSE,
       memory = TRUE

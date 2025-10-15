@@ -228,12 +228,24 @@ delete_itemsInLevel = emuR::delete_itemsInLevel
 #' @seealso [emuR::create_itemsInLevel]
 create_itemsInLevel = emuR::create_itemsInLevel
 
-#' Query an emuDB. (A copy of the emuR function)
+#' Query an emuDB using optimized SQLite backend
+#' 
+#' This function provides an optimized query implementation that directly accesses
+#' the SQLite cache database for improved performance. It is fully compatible with
+#' emuR::query() and returns the same results as a segment_list object.
+#' 
+#' This is an alias for [ask_for()].
+#' 
+#' @param emuDB Either a path to an emuDB directory, an emuDBhandle, or a corpus object
+#' @param query EQL query string
+#' @param ... Additional arguments (for compatibility with emuR::query)
+#' @return A segment_list object containing query results
+#' @seealso [ask_for()], [emuR::query()]
 #' @export
-#' @inheritParams emuR::query
-#' @inherit emuR::query return references description details sections seealso
-#' @seealso [emuR::query]
-query <- emuR::query
+query <- function(emuDB, query, ...) {
+  ask_for(emuDB, query, ...)
+}
+
 
 
 # query <- function(...){

@@ -22,7 +22,7 @@ execute:
 
 This vignette presents comprehensive performance benchmarks for two major optimizations in the reindeer package:
 
-1. **Optimized EQL Queries**: SQL-based query implementation (`query_opt()`) vs standard `emuR::query()`
+1. **Optimized EQL Queries**: SQL-based query implementation (`ask_for()`) vs standard `emuR::query()`
 2. **Modern MOMEL/INTSINT**: Python/Parselmouth implementation vs original Praat/Perl/C implementation
 
 Both implementations prioritize performance, portability, and maintainability while ensuring fidelity to original behavior.
@@ -699,7 +699,7 @@ For detailed test results, run `devtools::test(filter = 'query_optimized')`.
 
 3. **Memory Usage**: The optimized implementation typically uses less memory by avoiding intermediate R object creation.
 
-### When to Use `query_opt()`
+### When to Use `ask_for()`
 
 **Best suited for:**
 - Large databases where performance matters (5-15x speedup)

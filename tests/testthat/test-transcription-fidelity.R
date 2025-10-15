@@ -131,8 +131,8 @@ test_that("Transcription to existing SEGMENT level maintains emuR compatibility"
     ae_reload <- corpus(test_path, verbose = FALSE)
   })
   
-  # Query using query_opt should also work
-  query_result <- query_opt(test_path, "Phonetic =~ test_.*")
+  # Query using ask_for should also work
+  query_result <- ask_for(test_path, "Phonetic =~ test_.*")
   expect_equal(nrow(query_result), 3)
   
   # Clean up
@@ -565,7 +565,7 @@ test_that("Corpus object reflects same state as emuR after transcription", {
   
   # Query results should match
   emur_query <- emuR::query(ae_emur, "CorpusTestLevel =~ .*")
-  corpus_query <- query_opt(test_path, "CorpusTestLevel =~ .*")
+  corpus_query <- ask_for(test_path, "CorpusTestLevel =~ .*")
   
   expect_equal(nrow(emur_query), nrow(corpus_query))
   expect_equal(nrow(emur_query), 2)
