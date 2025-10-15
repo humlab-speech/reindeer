@@ -116,7 +116,9 @@ double_fake_voice_report <- function(listOfFiles,
 # $ sample_end         <int> 5138, 8533, 40748
 # $ sample_rate        <int> 20000, 20000, 20000
 
-ask_for <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*",times_from = NULL, calculate_times = TRUE,interactive=FALSE){
+# Legacy function - replaced by ask_for in reindeer_query_optimized.r
+# Keeping for backward compatibility but not exporting
+ask_for_legacy <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*",times_from = NULL, calculate_times = TRUE,interactive=FALSE){
   if(missing(inside_of)) cli::cli_abort("Please provide an Emu database handle or the full path to an Emu database in the {.args inside_of}  argument")
   if(missing(query)) cli::cli_abort("Please specify a query in the Emu Query Language.")
 
@@ -137,7 +139,7 @@ ask_for <- function(inside_of, query,sessions_regex = ".*", bundles_regex = ".*"
       if(! is.null(strAttr) && stringr::str_ends(strAttr,"_emuDB") && dir.exists(strAttr)){
         # We then need to create a handle object
         utils::capture.output(
-          inside_of <- emuR::load_emuDB(attr(strAttr,"basePath"),verbose = FALSE)
+          inside_of <- emuR::load_emuDB(strAttr, verbose = FALSE)
         ) -> dbload.info
         logger::log_info(paste(dbload.info,collapse = "\n"))
 

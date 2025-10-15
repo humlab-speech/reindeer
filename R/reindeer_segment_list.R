@@ -110,37 +110,121 @@ segment_list <- S7::new_class(
 
 #' Print method for segment_list
 #' @export
-S7::method(print, segment_list) <- function(x, ...) {
-  cat("Segment List\n")
-  cat("============\n")
-  cat(sprintf("Database: %s\n", x@db_uuid))
-  cat(sprintf("Segments: %d\n", nrow(x)))
+S7::method(print, segment_list) <- function(x, ..., n = 10) {
+  # Header with styling
+  cli::cli_rule(left = "Segment List", right = "{nrow(x)} segment{?s}")
+  
   if (nrow(x) > 0) {
-    cat(sprintf("Level: %s\n", paste(unique(x$level), collapse = ", ")))
-    cat(sprintf("Type: %s\n", paste(unique(x$type), collapse = ", ")))
-    cat("\n")
+    # Database info
+    cli::cli_alert_info("Database: {.val {x@db_uuid}}")
+    if (nchar(x@db_path) > 0) {
+      cli::cli_alert_info("Path: {.path {x@db_path}}")
+    }
+    
+    # Key statistics in a compact format
+    cli::cli_text("")
+    cli::cli_text("{.strong Levels:} {paste(unique(x$level), collapse = ', ')}")
+    cli::cli_text("{.strong Types:} {paste(unique(x$type), collapse = ', ')}")
+    cli::cli_text("{.strong Sessions:} {length(unique(x$session))}")
+    cli::cli_text("{.strong Bundles:} {length(unique(x$bundle))}")
+    
+    # Duration statistics
+    durations <- x$end - x$start
+    cli::cli_text("{.strong Duration:} {round(min(durations), 1)} - {round(max(durations), 1)} ms (total: {round(sum(durations)/1000, 2)} s)")
+    
+    # Label distribution
+    label_counts <- table(x$labels)
+    top_labels <- head(sort(label_counts, decreasing = TRUE), 5)
+    if (length(top_labels) > 0) {
+      label_summary <- paste(names(top_labels), " (", top_labels, ")", sep = "", collapse = ", ")
+      cli::cli_text("{.strong Top labels:} {label_summary}")
+      if (length(label_counts) > 5) {
+        cli::cli_text("{.emph ... and {length(label_counts) - 5} more}")
+      }
+    }
+    
+    cli::cli_text("")
+    cli::cli_rule()
+    
+    # Show data
+    print(tibble::as_tibble(as.data.frame(x)), n = n, ...)
+  } else {
+    cli::cli_alert_warning("Empty segment list")
   }
-  print(tibble::as_tibble(as.data.frame(x)))
+  
   invisible(x)
 }
 
 #' Summary method for segment_list  
 #' @export
 S7::method(summary, segment_list) <- function(object, ...) {
-  cat("Segment List Summary\n")
-  cat("===================\n")
-  cat(sprintf("Database UUID: %s\n", object@db_uuid))
-  cat(sprintf("Number of segments: %d\n", nrow(object)))
+  cli::cli_h1("Segment List Summary")
+  
+  # Database info
+  cli::cli_h2("Database Information")
+  cli::cli_dl(c(
+    "UUID" = object@db_uuid,
+    "Path" = if (nchar(object@db_path) > 0) object@db_path else "(not specified)",
+    "Segments" = as.character(nrow(object))
+  ))
   
   if (nrow(object) > 0) {
-    cat(sprintf("Levels: %s\n", paste(unique(object$level), collapse = ", ")))
-    cat(sprintf("Types: %s\n", paste(unique(object$type), collapse = ", ")))
-    cat(sprintf("Sessions: %d\n", length(unique(object$session))))
-    cat(sprintf("Bundles: %d\n", length(unique(object$bundle))))
-    cat(sprintf("Duration range: %.3f - %.3f ms\n", 
-                min(object$end - object$start),
-                max(object$end - object$start)))
-    cat(sprintf("Total duration: %.3f s\n", sum(object$end - object$start) / 1000))
+    # Structure info
+    cli::cli_h2("Structure")
+    cli::cli_dl(c(
+      "Levels" = paste(unique(object$level), collapse = ", "),
+      "Types" = paste(unique(object$type), collapse = ", "),
+      "Attributes" = paste(unique(object$attribute), collapse = ", "),
+      "Sessions" = as.character(length(unique(object$session))),
+      "Bundles" = as.character(length(unique(object$bundle)))
+    ))
+    
+    # Temporal info
+    cli::cli_h2("Temporal Characteristics")
+    durations <- object$end - object$start
+    cli::cli_dl(c(
+      "Duration range" = sprintf("%.3f - %.3f ms", min(durations), max(durations)),
+      "Mean duration" = sprintf("%.3f ms", mean(durations)),
+      "Median duration" = sprintf("%.3f ms", median(durations)),
+      "Total duration" = sprintf("%.3f s", sum(durations) / 1000),
+      "Sample rate" = if (length(unique(object$sample_rate)) == 1) {
+        sprintf("%.0f Hz", unique(object$sample_rate))
+      } else {
+        sprintf("%.0f - %.0f Hz", min(object$sample_rate), max(object$sample_rate))
+      }
+    ))
+    
+    # Label distribution
+    cli::cli_h2("Label Distribution")
+    label_counts <- sort(table(object$labels), decreasing = TRUE)
+    n_show <- min(10, length(label_counts))
+    
+    if (n_show > 0) {
+      label_df <- data.frame(
+        Label = names(label_counts)[1:n_show],
+        Count = as.integer(label_counts[1:n_show]),
+        Percentage = sprintf("%.1f%%", 100 * as.numeric(label_counts[1:n_show]) / nrow(object))
+      )
+      print(knitr::kable(label_df, format = "simple", align = c("l", "r", "r")))
+      
+      if (length(label_counts) > n_show) {
+        cli::cli_text("{.emph ... and {length(label_counts) - n_show} more label{?s}}")
+      }
+    }
+    
+    # Session/Bundle breakdown
+    cli::cli_h2("Distribution by Session/Bundle")
+    session_counts <- table(object$session)
+    bundle_counts <- table(object$bundle)
+    cli::cli_dl(c(
+      "Segments per session" = sprintf("%.1f (range: %d - %d)", 
+                                        mean(session_counts), 
+                                        min(session_counts), 
+                                        max(session_counts)),
+      "Unique bundles" = as.character(length(unique(object$bundle)))
+    ))
+  } else {
+    cli::cli_alert_warning("Empty segment list")
   }
   
   invisible(object)
@@ -159,6 +243,240 @@ as_segment_list <- function(x, db_uuid = NULL, db_path = NULL) {
 #' @export
 is_segment_list <- function(x) {
   inherits(x, "segment_list")
+}
+
+#' Extended Segment List S7 Class
+#' 
+#' An S7 class representing a segment list with DSP-derived measurements.
+#' This extends segment_list with additional columns from DSP processing
+#' (e.g., formants, pitch, intensity).
+#' 
+#' @section Structure:
+#' An extended_segment_list contains all segment_list columns plus
+#' additional columns added by DSP processing via quantify().
+#' 
+#' @examples
+#' \dontrun{
+#' # Query and quantify
+#' segs <- query(corpus, "Phonetic == t")
+#' extended <- quantify(segs, superassp::forest)
+#' 
+#' # Extended segment list contains formant measurements
+#' print(extended)
+#' summary(extended)
+#' }
+#' 
+#' @export
+extended_segment_list <- S7::new_class(
+  "extended_segment_list",
+  parent = segment_list,
+  properties = list(
+    dsp_function = class_character,
+    dsp_columns = class_character
+  ),
+  validator = function(self) {
+    # Inherits validation from segment_list
+    NULL
+  },
+  constructor = function(data, db_uuid = NULL, db_path = NULL, 
+                        dsp_function = "", dsp_columns = character(0)) {
+    # Convert to data.frame if needed
+    if (inherits(data, "tbl_df") || inherits(data, "tbl")) {
+      data <- as.data.frame(data)
+    } else if (!is.data.frame(data)) {
+      data <- as.data.frame(data)
+    }
+    
+    # Extract db_uuid from data if not provided
+    if (is.null(db_uuid) && "db_uuid" %in% names(data)) {
+      db_uuid_vals <- unique(data$db_uuid)
+      if (length(db_uuid_vals) > 1) {
+        warning("Multiple db_uuids found; using first")
+        db_uuid <- as.character(db_uuid_vals[1])
+      } else {
+        db_uuid <- as.character(db_uuid_vals[1])
+      }
+    }
+    
+    if (is.null(db_uuid) || length(db_uuid) == 0) {
+      db_uuid <- ""
+    }
+    
+    if (is.null(db_path) || length(db_path) == 0) {
+      db_path <- ""
+    }
+    
+    S7::new_object(
+      .parent = data,
+      db_uuid = as.character(db_uuid),
+      db_path = as.character(db_path),
+      dsp_function = as.character(dsp_function),
+      dsp_columns = as.character(dsp_columns)
+    )
+  }
+)
+
+#' Print method for extended_segment_list
+#' @export
+S7::method(print, extended_segment_list) <- function(x, ..., n = 10) {
+  # Header with styling
+  cli::cli_rule(left = "Extended Segment List", right = "{nrow(x)} row{?s}")
+  
+  if (nrow(x) > 0) {
+    # Database info
+    cli::cli_alert_info("Database: {.val {x@db_uuid}}")
+    if (nchar(x@db_path) > 0) {
+      cli::cli_alert_info("Path: {.path {x@db_path}}")
+    }
+    
+    # DSP info
+    if (nchar(x@dsp_function) > 0) {
+      cli::cli_alert_info("DSP function: {.fn {x@dsp_function}}")
+    }
+    if (length(x@dsp_columns) > 0) {
+      cli::cli_alert_info("DSP columns: {paste(x@dsp_columns, collapse = ', ')}")
+    }
+    
+    # Key statistics in a compact format
+    cli::cli_text("")
+    
+    # Count unique segments (by start_item_id)
+    n_unique_segments <- length(unique(x$start_item_id))
+    rows_per_segment <- nrow(x) / n_unique_segments
+    
+    cli::cli_text("{.strong Unique segments:} {n_unique_segments}")
+    cli::cli_text("{.strong Total rows:} {nrow(x)} ({round(rows_per_segment, 1)} per segment)")
+    cli::cli_text("{.strong Levels:} {paste(unique(x$level), collapse = ', ')}")
+    cli::cli_text("{.strong Sessions:} {length(unique(x$session))}")
+    cli::cli_text("{.strong Bundles:} {length(unique(x$bundle))}")
+    
+    # Show numeric column ranges if DSP columns exist
+    if (length(x@dsp_columns) > 0) {
+      cli::cli_text("")
+      cli::cli_text("{.strong DSP measurement ranges:}")
+      for (col in x@dsp_columns) {
+        if (col %in% names(x) && is.numeric(x[[col]])) {
+          vals <- x[[col]]
+          cli::cli_text("  {col}: {round(min(vals, na.rm = TRUE), 2)} - {round(max(vals, na.rm = TRUE), 2)}")
+        }
+      }
+    }
+    
+    cli::cli_text("")
+    cli::cli_rule()
+    
+    # Show data
+    print(tibble::as_tibble(as.data.frame(x)), n = n, ...)
+  } else {
+    cli::cli_alert_warning("Empty extended segment list")
+  }
+  
+  invisible(x)
+}
+
+#' Summary method for extended_segment_list
+#' @export
+S7::method(summary, extended_segment_list) <- function(object, ...) {
+  cli::cli_h1("Extended Segment List Summary")
+  
+  # Database info
+  cli::cli_h2("Database Information")
+  cli::cli_dl(c(
+    "UUID" = object@db_uuid,
+    "Path" = if (nchar(object@db_path) > 0) object@db_path else "(not specified)",
+    "Total rows" = as.character(nrow(object))
+  ))
+  
+  if (nrow(object) > 0) {
+    # Count unique segments
+    n_unique_segments <- length(unique(object$start_item_id))
+    rows_per_segment <- nrow(object) / n_unique_segments
+    
+    # Structure info
+    cli::cli_h2("Structure")
+    cli::cli_dl(c(
+      "Unique segments" = as.character(n_unique_segments),
+      "Rows per segment" = sprintf("%.2f", rows_per_segment),
+      "Levels" = paste(unique(object$level), collapse = ", "),
+      "Types" = paste(unique(object$type), collapse = ", "),
+      "Sessions" = as.character(length(unique(object$session))),
+      "Bundles" = as.character(length(unique(object$bundle)))
+    ))
+    
+    # DSP info
+    if (nchar(object@dsp_function) > 0 || length(object@dsp_columns) > 0) {
+      cli::cli_h2("DSP Information")
+      info_list <- list()
+      if (nchar(object@dsp_function) > 0) {
+        info_list[["Function"]] <- object@dsp_function
+      }
+      if (length(object@dsp_columns) > 0) {
+        info_list[["Columns"]] <- paste(object@dsp_columns, collapse = ", ")
+      }
+      cli::cli_dl(info_list)
+    }
+    
+    # Temporal info (computed on unique segments)
+    cli::cli_h2("Temporal Characteristics")
+    unique_segs <- object[!duplicated(object$start_item_id), ]
+    durations <- unique_segs$end - unique_segs$start
+    cli::cli_dl(c(
+      "Duration range" = sprintf("%.3f - %.3f ms", min(durations), max(durations)),
+      "Mean duration" = sprintf("%.3f ms", mean(durations)),
+      "Total duration" = sprintf("%.3f s", sum(durations) / 1000)
+    ))
+    
+    # DSP measurement statistics
+    if (length(object@dsp_columns) > 0) {
+      cli::cli_h2("DSP Measurements")
+      
+      for (col in object@dsp_columns) {
+        if (col %in% names(object) && is.numeric(object[[col]])) {
+          vals <- object[[col]]
+          vals_clean <- vals[!is.na(vals)]
+          
+          if (length(vals_clean) > 0) {
+            cli::cli_h3(col)
+            cli::cli_dl(c(
+              "Range" = sprintf("%.2f - %.2f", min(vals_clean), max(vals_clean)),
+              "Mean" = sprintf("%.2f", mean(vals_clean)),
+              "Median" = sprintf("%.2f", median(vals_clean)),
+              "SD" = sprintf("%.2f", sd(vals_clean)),
+              "NA count" = as.character(sum(is.na(vals)))
+            ))
+          }
+        }
+      }
+    }
+    
+    # Label distribution (on unique segments)
+    cli::cli_h2("Label Distribution (unique segments)")
+    label_counts <- sort(table(unique_segs$labels), decreasing = TRUE)
+    n_show <- min(5, length(label_counts))
+    
+    if (n_show > 0) {
+      label_df <- data.frame(
+        Label = names(label_counts)[1:n_show],
+        Count = as.integer(label_counts[1:n_show]),
+        Percentage = sprintf("%.1f%%", 100 * as.numeric(label_counts[1:n_show]) / n_unique_segments)
+      )
+      print(knitr::kable(label_df, format = "simple", align = c("l", "r", "r")))
+      
+      if (length(label_counts) > n_show) {
+        cli::cli_text("{.emph ... and {length(label_counts) - n_show} more label{?s}}")
+      }
+    }
+  } else {
+    cli::cli_alert_warning("Empty extended segment list")
+  }
+  
+  invisible(object)
+}
+
+#' Check if object is an extended_segment_list
+#' @export
+is_extended_segment_list <- function(x) {
+  inherits(x, "extended_segment_list")
 }
 
 #' Quantify generic - Apply DSP to segments
@@ -413,6 +731,46 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     cli::cli_alert_success("Processed {n_segs} segment{?s} ({n_rows} row{?s} total)")
   }
   
-  combined
+  # Identify DSP columns (those not in original segment_list)
+  segment_cols <- c(
+    "labels", "start", "end", "db_uuid", "session", "bundle",
+    "start_item_id", "end_item_id", "level", "attribute",
+    "start_item_seq_idx", "end_item_seq_idx", "type",
+    "sample_start", "sample_end", "sample_rate"
+  )
+  
+  # Also exclude metadata columns if present
+  metadata_pattern <- "^(Gender|Age|windowSize)"
+  
+  dsp_cols <- setdiff(
+    names(combined), 
+    c(segment_cols, grep(metadata_pattern, names(combined), value = TRUE))
+  )
+  
+  # Get function name
+  dsp_fun_name <- tryCatch({
+    if (is.function(dsp_function)) {
+      # Try to get function name
+      fun_name <- deparse(substitute(dsp_function))
+      if (length(fun_name) == 1 && !grepl("^function", fun_name)) {
+        fun_name
+      } else {
+        "custom_function"
+      }
+    } else {
+      as.character(dsp_function)
+    }
+  }, error = function(e) "unknown")
+  
+  # Create extended_segment_list
+  result <- extended_segment_list(
+    data = combined,
+    db_uuid = object@db_uuid,
+    db_path = object@db_path,
+    dsp_function = dsp_fun_name,
+    dsp_columns = dsp_cols
+  )
+  
+  result
 }
 

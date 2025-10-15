@@ -48,7 +48,26 @@
 #' @return A segment_list object (subclass of tibble)
 #' @export
 ask_for <- function(emuDB, query, ...) {
-  if (is.character(emuDB)) {
+  # Handle corpus objects
+  if (inherits(emuDB, "reindeer::corpus")) {
+    base_path <- emuDB@basePath
+    db_name <- emuDB@dbName
+    
+    # Try both naming conventions
+    db_path1 <- file.path(base_path, paste0(db_name, "_emuDB.sqlite"))
+    db_path2 <- file.path(base_path, paste0(db_name, "_emuDBcache.sqlite"))
+    
+    if (file.exists(db_path1)) {
+      db_path <- db_path1
+    } else if (file.exists(db_path2)) {
+      db_path <- db_path2
+    } else {
+      stop("SQLite database not found at: ", db_path1, " or ", db_path2)
+    }
+    
+    database_dir <- base_path
+    
+  } else if (is.character(emuDB)) {
     # emuDB is a path to the database directory
     # Extract the database name from the path (remove _emuDB suffix if present)
     base_name <- basename(emuDB)
@@ -65,6 +84,9 @@ ask_for <- function(emuDB, query, ...) {
     } else {
       stop("SQLite database not found at: ", db_path1, " or ", db_path2)
     }
+    
+    database_dir <- emuDB
+    
   } else {
     base_path <- attr(emuDB, "basePath")
     db_name <- attr(emuDB, "dbName")
@@ -83,6 +105,8 @@ ask_for <- function(emuDB, query, ...) {
     } else {
       stop("SQLite database not found at: ", db_path1, " or ", db_path2)
     }
+    
+    database_dir <- base_path
   }
   
   if (!file.exists(db_path)) {
@@ -95,7 +119,7 @@ ask_for <- function(emuDB, query, ...) {
   if (is.data.frame(result) && !inherits(result, "segment_list")) {
     # Extract db_uuid and db_path for segment_list
     db_uuid <- if ("db_uuid" %in% names(result)) unique(result$db_uuid)[1] else ""
-    result <- segment_list(result, db_uuid = db_uuid, db_path = db_path)
+    result <- segment_list(result, db_uuid = db_uuid, db_path = database_dir)
   }
   
   return(result)
