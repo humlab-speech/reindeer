@@ -14,6 +14,8 @@
 #'        Default: NULL (uses mediafileExtension from corpus config)
 #' @param .force Logical; if TRUE, recompute even if track files exist
 #' @param .verbose Logical; show progress and diagnostic messages
+#' @param .parallel Logical; use parallel processing (default TRUE)
+#' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
 #' 
 #' @return The corpus object (invisibly), with new SSFF track files created
 #' 
@@ -30,6 +32,9 @@
 #' - Other metadata fields are matched by name to function formals
 #' - Database-level defaults apply unless overridden at session or bundle level
 #' 
+#' Parallel processing is used by default for improved performance on multi-core systems.
+#' Set .parallel = FALSE to disable parallel processing (useful for debugging).
+#' 
 #' @examples
 #' \dontrun{
 #' # Enrich corpus with formant tracks
@@ -39,6 +44,9 @@
 #' corp %>% enrich(.using = superassp::ksvF0, 
 #'                 minF = 75, maxF = 500,
 #'                 .force = TRUE)
+#' 
+#' # Disable parallel processing
+#' corp %>% enrich(.using = superassp::forest, .parallel = FALSE)
 #' }
 #' 
 #' @seealso [quantify()], [peek_signals()]
@@ -47,7 +55,9 @@ enrich <- function(corpus_obj, .using, ...,
                    .metadata_fields = c("Gender", "Age"),
                    .signal_extension = NULL,
                    .force = FALSE,
-                   .verbose = TRUE) {
+                   .verbose = TRUE,
+                   .parallel = TRUE,
+                   .workers = NULL) {
   
   if (!inherits(corpus_obj, "corpus")) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
@@ -95,27 +105,42 @@ enrich <- function(corpus_obj, .using, ...,
   bundle_metadata <- DBI::dbReadTable(con, "bundle_metadata")
   DBI::dbDisconnect(con)
   
-  # Process each bundle
-  if (.verbose) {
-    cli::cli_progress_bar("Processing bundles", total = nrow(signal_files))
+  # Pre-join metadata with signal files for efficiency
+  signal_files_with_meta <- signal_files %>%
+    dplyr::left_join(bundle_metadata, by = c("session", "bundle"))
+  
+  # Determine number of workers
+  if (.parallel) {
+    if (is.null(.workers)) {
+      .workers <- max(1, parallel::detectCores() - 1)
+    }
+    
+    if (.verbose) {
+      cli::cli_alert_info("Using parallel processing with {.workers} worker{?s}")
+    }
+    
+    # Set up parallel processing
+    old_plan <- future::plan()
+    on.exit(future::plan(old_plan), add = TRUE)
+    future::plan(future::multisession, workers = .workers)
   }
   
-  for (i in seq_len(nrow(signal_files))) {
-    bundle_row <- signal_files[i, ]
-    
-    # Get metadata for this bundle (with inheritance)
-    bundle_meta <- bundle_metadata %>%
-      dplyr::filter(
-        session == bundle_row$session,
-        bundle == bundle_row$bundle
-      )
+  # Process bundles
+  if (.verbose) {
+    cli::cli_progress_bar("Processing bundles", total = nrow(signal_files_with_meta))
+  }
+  
+  # Define processing function
+  process_bundle <- function(i, signal_files_with_meta, dsp_fun, 
+                             metadata_fields, user_params, verbose = FALSE) {
+    bundle_row <- signal_files_with_meta[i, ]
     
     # Derive DSP parameters from metadata
     dsp_params <- derive_dsp_parameters(
       dsp_fun = dsp_fun,
-      metadata = bundle_meta,
-      metadata_fields = .metadata_fields,
-      user_params = list(...)
+      metadata = bundle_row,
+      metadata_fields = metadata_fields,
+      user_params = user_params
     )
     
     # Apply DSP function
@@ -126,21 +151,51 @@ enrich <- function(corpus_obj, .using, ...,
         list(toFile = TRUE, verbose = FALSE)
       ))
       
-      if (.verbose) {
-        cli::cli_progress_update()
-      }
+      list(success = TRUE, bundle = bundle_row$bundle, session = bundle_row$session)
     }, error = function(e) {
-      cli::cli_alert_warning(
-        "Error processing {bundle_row$session}/{bundle_row$bundle}: {e$message}"
+      list(success = FALSE, bundle = bundle_row$bundle, session = bundle_row$session,
+           error = e$message)
+    })
+  }
+  
+  # Execute processing (parallel or sequential)
+  if (.parallel) {
+    results <- furrr::future_map(
+      seq_len(nrow(signal_files_with_meta)),
+      process_bundle,
+      signal_files_with_meta = signal_files_with_meta,
+      dsp_fun = dsp_fun,
+      metadata_fields = .metadata_fields,
+      user_params = list(...),
+      verbose = FALSE,
+      .progress = .verbose,
+      .options = furrr::furrr_options(seed = TRUE)
+    )
+  } else {
+    results <- list()
+    for (i in seq_len(nrow(signal_files_with_meta))) {
+      results[[i]] <- process_bundle(
+        i, signal_files_with_meta, dsp_fun,
+        .metadata_fields, list(...), FALSE
       )
       if (.verbose) {
         cli::cli_progress_update()
       }
-    })
+    }
   }
   
   if (.verbose) {
     cli::cli_progress_done()
+    
+    # Report any errors
+    errors <- purrr::keep(results, ~!.x$success)
+    if (length(errors) > 0) {
+      cli::cli_alert_warning("{length(errors)} bundle{?s} failed processing")
+      for (err in errors) {
+        cli::cli_alert_info("{err$session}/{err$bundle}: {err$error}")
+      }
+    }
+    
     cli::cli_alert_success("Enrichment complete")
   }
   

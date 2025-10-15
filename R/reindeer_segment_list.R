@@ -161,6 +161,10 @@ is_segment_list <- function(x) {
   inherits(x, "segment_list")
 }
 
+#' Quantify generic - Apply DSP to segments
+#' @export
+quantify <- S7::new_generic("quantify", "object")
+
 #' Quantify method for segment_list - Apply DSP to query results
 #' 
 #' Applies a DSP function to all segments in a segment_list, extracting
@@ -172,6 +176,8 @@ is_segment_list <- function(x) {
 #' @param ... Additional arguments passed to the DSP function
 #' @param .use_metadata Logical; whether to use bundle metadata for parameter derivation
 #' @param .verbose Logical; show progress messages
+#' @param .parallel Logical; use parallel processing (default TRUE)
+#' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
 #' 
 #' @return A data frame with segment information and DSP-derived measurements
 #' 
@@ -179,12 +185,17 @@ is_segment_list <- function(x) {
 #' \dontrun{
 #' segs <- query(corpus, "Phonetic == t")
 #' formants <- quantify(segs, superassp::forest)
+#' 
+#' # Disable parallel processing
+#' formants <- quantify(segs, superassp::forest, .parallel = FALSE)
 #' }
 #' 
 #' @export
 S7::method(quantify, segment_list) <- function(object, dsp_function, ..., 
                                                 .use_metadata = TRUE,
-                                                .verbose = FALSE) {
+                                                .verbose = FALSE,
+                                                .parallel = TRUE,
+                                                .workers = NULL) {
   
   if (!inherits(object, "segment_list")) {
     cli::cli_abort("{.arg object} must be a segment_list")
@@ -210,53 +221,66 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     }
   }
   
-  # Get metadata if requested
+  # Get metadata if requested and pre-join with segments
   bundle_metadata <- NULL
+  object_with_meta <- object
   if (.use_metadata && !is.null(corpus_obj)) {
     con <- get_corpus_connection(corpus_obj)
     bundle_metadata <- DBI::dbReadTable(con, "bundle_metadata")
     DBI::dbDisconnect(con)
+    
+    # Pre-join metadata for efficiency
+    object_with_meta <- as.data.frame(object) %>%
+      dplyr::left_join(bundle_metadata, by = c("session", "bundle"))
   }
   
-  # Process each segment
+  # Determine number of workers
+  if (.parallel) {
+    if (is.null(.workers)) {
+      .workers <- max(1, parallel::detectCores() - 1)
+    }
+    
+    if (.verbose) {
+      cli::cli_alert_info("Using parallel processing with {.workers} worker{?s}")
+    }
+    
+    # Set up parallel processing
+    old_plan <- future::plan()
+    on.exit(future::plan(old_plan), add = TRUE)
+    future::plan(future::multisession, workers = .workers)
+  }
+  
+  # Process segments
   if (.verbose) {
-    cli::cli_progress_bar("Processing segments", total = nrow(object))
+    cli::cli_progress_bar("Processing segments", total = nrow(object_with_meta))
   }
   
-  results <- list()
-  
-  for (i in seq_len(nrow(object))) {
-    seg <- object[i, ]
+  # Define processing function
+  process_segment <- function(i, seg_data, dsp_function, use_metadata, 
+                              user_params, db_path, verbose = FALSE) {
+    seg <- seg_data[i, ]
     
     # Derive parameters from metadata if available
-    dsp_params <- list(...)
-    if (.use_metadata && !is.null(bundle_metadata)) {
-      meta <- bundle_metadata %>%
-        dplyr::filter(session == seg$session, bundle == seg$bundle)
-      
-      if (nrow(meta) > 0) {
-        dsp_params <- derive_dsp_parameters(
-          dsp_fun = dsp_function,
-          metadata = meta,
-          metadata_fields = c("Gender", "Age"),
-          user_params = dsp_params
-        )
-      }
+    dsp_params <- user_params
+    if (use_metadata && !is.null(seg$Gender)) {
+      dsp_params <- derive_dsp_parameters(
+        dsp_fun = dsp_function,
+        metadata = seg,
+        metadata_fields = c("Gender", "Age"),
+        user_params = user_params
+      )
     }
     
     # Get signal file path
     signal_file <- file.path(
-      dirname(dirname(object@db_path)),
+      dirname(dirname(db_path)),
       paste0(seg$session, "_ses"),
       paste0(seg$bundle, "_bndl"),
       paste0(seg$bundle, ".wav")  # TODO: get from config
     )
     
     if (!file.exists(signal_file)) {
-      if (.verbose) {
-        cli::cli_alert_warning("Signal file not found: {basename(signal_file)}")
-      }
-      next
+      return(NULL)
     }
     
     # Apply DSP function to segment
@@ -285,27 +309,60 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
         result_df
       )
       
-      results[[i]] <- result_df
-      
+      result_df
+    }, error = function(e) {
+      NULL
+    })
+  }
+  
+  # Execute processing (parallel or sequential)
+  if (.parallel) {
+    results <- furrr::future_map(
+      seq_len(nrow(object_with_meta)),
+      process_segment,
+      seg_data = object_with_meta,
+      dsp_function = dsp_function,
+      use_metadata = .use_metadata,
+      user_params = list(...),
+      db_path = object@db_path,
+      verbose = FALSE,
+      .progress = .verbose,
+      .options = furrr::furrr_options(seed = TRUE)
+    )
+  } else {
+    results <- list()
+    for (i in seq_len(nrow(object_with_meta))) {
+      results[[i]] <- process_segment(
+        i, object_with_meta, dsp_function, .use_metadata,
+        list(...), object@db_path, FALSE
+      )
       if (.verbose) {
         cli::cli_progress_update()
       }
-    }, error = function(e) {
-      if (.verbose) {
-        cli::cli_alert_warning("Error processing segment {i}: {e$message}")
-      }
-    })
+    }
   }
   
   if (.verbose) {
     cli::cli_progress_done()
   }
   
-  # Combine all results
-  if (length(results) > 0) {
-    dplyr::bind_rows(results)
-  } else {
-    tibble::tibble()
+  # Remove NULL results and combine
+  results <- purrr::compact(results)
+  
+  if (length(results) == 0) {
+    if (.verbose) {
+      cli::cli_alert_warning("No results generated")
+    }
+    return(tibble::tibble())
   }
+  
+  # Combine all results
+  combined <- dplyr::bind_rows(results)
+  
+  if (.verbose) {
+    cli::cli_alert_success("Processed {nrow(combined)} segment{?s}")
+  }
+  
+  combined
 }
 
