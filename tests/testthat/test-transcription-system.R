@@ -2,16 +2,22 @@
 # TEST TRANSCRIPTION SYSTEM
 # ==============================================================================
 
+# Helper function to create demo database for tests
+setup_demo_corpus <- function() {
+  temp_dir <- tempdir()
+  suppressMessages({
+    emuR::create_emuRdemoData(dir = temp_dir)
+  })
+  ae_path <- file.path(temp_dir, "emuR_demoData", "ae_emuDB")
+  suppressMessages({
+    corpus(ae_path, verbose = FALSE)
+  })
+}
+
 test_that("Suggestion classes can be created", {
   skip_if_not_installed("emuR")
   
-  # Create test corpus
-  ae_path <- system.file("extdata/emu/DBs/ae", package = "emuR", mustWork = TRUE)
-  
-  # Load database
-  suppressMessages({
-    ae <- corpus(ae_path, verbose = FALSE)
-  })
+  ae <- setup_demo_corpus()
   
   # Create simple suggestions data
   suggestions_df <- data.frame(
@@ -61,7 +67,12 @@ test_that("Suggestion classes can be created", {
 test_that("Suggestion validation detects errors", {
   skip_if_not_installed("emuR")
   
-  ae_path <- system.file("extdata/emu/DBs/ae", package = "emuR", mustWork = TRUE)
+  # Create demo database
+  temp_dir <- tempdir()
+  suppressMessages({
+    emuR::create_emuRdemoData(dir = temp_dir)
+  })
+  ae_path <- file.path(temp_dir, "emuR_demoData", "ae_emuDB")
   
   suppressMessages({
     ae <- corpus(ae_path, verbose = FALSE)
@@ -94,7 +105,12 @@ test_that("Suggestion validation detects errors", {
 test_that("assess() performs comprehensive validation", {
   skip_if_not_installed("emuR")
   
-  ae_path <- system.file("extdata/emu/DBs/ae", package = "emuR", mustWork = TRUE)
+  # Create demo database
+  temp_dir <- tempdir()
+  suppressMessages({
+    emuR::create_emuRdemoData(dir = temp_dir)
+  })
+  ae_path <- file.path(temp_dir, "emuR_demoData", "ae_emuDB")
   
   suppressMessages({
     ae <- corpus(ae_path, verbose = FALSE)

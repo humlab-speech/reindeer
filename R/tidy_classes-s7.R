@@ -5,7 +5,9 @@ corpus <- S7::new_class(
   properties = list(
     dbName = S7::class_character,
     basePath = S7::class_character,
-    config = S7::class_any
+    config = S7::class_any,
+    .uuid = S7::class_character,
+    .connection = S7::class_any
   ),
   constructor = function(path, verbose = FALSE) {
     if (is.character(path)) {
@@ -26,7 +28,9 @@ corpus <- S7::new_class(
       handle,
       dbName = handle$dbName,
       basePath = handle$basePath,
-      config = emuR:::load_DBconfig(handle)
+      config = emuR:::load_DBconfig(handle),
+      .uuid = handle$UUID,
+      .connection = handle$connection
     )
   },
   validator = function(self) {

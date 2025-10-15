@@ -44,7 +44,7 @@ Suggestion <- S7::new_class(
                         min_duration = 0.01, remove_empty = TRUE) {
     
     # Validate inputs
-    if (!inherits(corpus, "corpus")) {
+    if (!S7::S7_inherits(corpus) || !grepl("corpus", class(corpus)[1])) {
       cli::cli_abort("corpus must be a corpus object")
     }
     
@@ -166,6 +166,9 @@ TranscriptionLog <- S7::new_class(
     operation = S7::class_character,  # "create_level", "add_items", etc.
     items_added = S7::class_data.frame,
     items_removed = S7::class_data.frame,
+    n_items_added = S7::class_integer,
+    n_items_modified = S7::class_integer,
+    n_items_removed = S7::class_integer,
     level_created = S7::class_logical,
     attribute_created = S7::class_logical,
     backup_path = S7::class_character,
@@ -183,6 +186,9 @@ TranscriptionLog <- S7::new_class(
       operation = operation,
       items_added = data.frame(),
       items_removed = data.frame(),
+      n_items_added = 0L,
+      n_items_modified = 0L,
+      n_items_removed = 0L,
       level_created = FALSE,
       attribute_created = FALSE,
       backup_path = character(0),
@@ -809,6 +815,9 @@ S7::method(transcribe, Suggestion) <- function(suggestion, force = FALSE, verbos
     DBI::dbWriteTable(con, "labels", labels_to_add, append = TRUE)
     
     log@items_added <- items_to_add
+    log@n_items_added <- as.integer(nrow(items_to_add))
+    log@n_items_modified <- 0L
+    log@n_items_removed <- 0L
     log@success <- TRUE
     
     # Rewrite annotation file for this bundle
