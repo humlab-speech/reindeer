@@ -16,5 +16,5 @@
 \item{value}{Named list of metadata values}
 }
 \description{
-mycorpus["Session1", "Bundle1"] <- list(Age = 25, Sex = "Male")
+mycorpus\link{"Session1", "Bundle1"} <- list(Age = 25, Sex = "Male")
 }

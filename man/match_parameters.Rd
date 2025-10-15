@@ -31,7 +31,7 @@ A \link[tibble:tibble]{tibble::tibble} with one row per bundle / session and wit
 }
 \description{
 This function takes an Emu database handle and a function defined in
-\link{superassp} or a named package, and outputs a \link[tibble:tibble]{tibble::tibble} containing
+\link[superassp:superassp-package]{superassp::superassp} or a named package, and outputs a \link[tibble:tibble]{tibble::tibble} containing
 function paramers to use for each bundle. The function parameters are derived
 from the database of age and gender specific settings obtained from in the
 literature based Gender and Age metadata information set for the bundle.
