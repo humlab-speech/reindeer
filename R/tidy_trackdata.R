@@ -163,73 +163,473 @@ ask_for_legacy <- function(inside_of, query,sessions_regex = ".*", bundles_regex
   return(res)
 }
 
-relate_to <- function(inside_of, segment_list,anchor_against=NULL){
-  if(missing(inside_of)) cli::cli_abort("Missing {.args inside_of} argument.")
-  if(missing(segment_list)) cli::cli_abort("A segment list is required")
-
-  if("character" %in% class(source) ){
-    # We then need to create a handle object
-    utils::capture.output(
-      handle <- emuR::load_emuDB(attr(inside_of,"basePath"),verbose = FALSE)
-    ) -> dbload.info
-    logger::log_info(paste(dbload.info,collapse = "\n"))
+#' Requery Sequential Segments  
+#'
+#' Find segments that are sequentially related to those in a segment list.
+#' This is a wrapper around emuR::requery_seq that works with corpus and segment_list objects.
+#'
+#' @param .segments segment_list object or data.frame with segment information
+#' @param .from corpus object or NULL (derived from segment list)
+#' @param anchor_against Optional time reference segment level
+#' @param offset Offset from reference (0 = same position, 1 = next, -1 = previous)
+#' @param count_from Reference point: "START" or "END"
+#' @param capture Number of segments to capture
+#' @param ignore_boundaries Logical; ignore bundle boundaries
+#' @param calculate_times Logical; calculate time information
+#' @param .quiet Logical; suppress messages
+#'
+#' @return A new segment_list object
+#' @export
+relate_to <- function(.segments, .from = NULL, 
+                     anchor_against = NULL,
+                     offset = 0,
+                     count_from = "START",
+                     capture = 1,
+                     ignore_boundaries = FALSE,
+                     calculate_times = TRUE,
+                     .quiet = FALSE) {
+  
+  # Validate inputs
+  if (missing(.segments)) {
+    cli::cli_abort(c(
+      "Missing segment list",
+      "x" = "The {.arg .segments} argument is required"
+    ))
   }
-  if( "emuDBhandle" %in% class(inside_of)){
-    handle <- inside_of
+  
+  # Get corpus
+  corp <- NULL
+  if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
+    corp <- .from
+  } else if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    db_path <- S7::prop(.segments, "db_path")
+    if (nzchar(db_path) && dir.exists(db_path)) {
+      corp <- corpus(db_path)
+    }
   }
-
-  res <- emuR::requery_seq(inside_of,seglist = segment_list,calcTimes = TRUE,offset=0,offsetRef = "START",length=1,resultType = "tibble",timeRefSegmentLevel = anchor_against)
-  attr(res,"basePath") <- .inside_of$basePath #This ensures that we can reattach the database later
+  
+  if (is.null(corp)) {
+    cli::cli_abort(c(
+      "Cannot determine corpus",
+      "x" = "Please provide a corpus via {.arg .from} argument or ensure segment list has valid db_path"
+    ))
+  }
+  
+  # Load emuR handle for requery operation
+  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
+  
+  # Convert segment_list to data.frame for emuR
+  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    seglist_df <- as.data.frame(S7::S7_data(.segments))
+  } else {
+    seglist_df <- as.data.frame(.segments)
+  }
+  
+  # Perform requery
+  res <- emuR::requery_seq(
+    emuDBhandle = handle,
+    seglist = seglist_df,
+    offset = offset,
+    offsetRef = count_from,
+    length = capture,
+    ignoreOutOfBounds = ignore_boundaries,
+    timeRefSegmentLevel = anchor_against,
+    calcTimes = calculate_times,
+    verbose = !.quiet,
+    resultType = "tibble"
+  )
+  
+  # Convert back to segment_list
+  result <- segment_list(
+    data = res,
+    db_path = corp@basePath
+  )
+  
+  return(result)
 }
 
 
-ascend_to <- function(.data,  .attribute_name ,.collapse = TRUE, .skip_times = FALSE, .times_from = NULL, .interactive=FALSE, .inside_of=NULL) {
-
-  if(is.null(.inside_of) && ! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
-    # We then need to create a handle object
-    utils::capture.output(
-      .source  <- emuR::load_emuDB(attr(.data,"basePath"),verbose = FALSE)
-    ) -> dbload.info
-  }else{
-    logger::log_error("Could not derive the database path from the segment list.\n Please provide an explicit database handle object .source the .inside_of argument. See ?emuR::load_emuDB for details.")
+#' Requery Hierarchically Related Segments
+#'
+#' Find segments on a different hierarchical level that are linked to segments
+#' in the input list. Works for both ascending (parent) and descending (child) relationships.
+#'
+#' @param .segments segment_list object or data.frame with segment information
+#' @param .level Name of the target level/attribute to requery to
+#' @param .from corpus object or NULL (derived from segment list)
+#' @param collapse Logical; collapse results (currently unused by emuR)
+#' @param calculate_times Logical; calculate time information (default: TRUE)
+#' @param times_from Optional time reference segment level
+#' @param .quiet Logical; suppress messages (default: TRUE)
+#'
+#' @return A new segment_list object with segments from the target level
+#' @export
+ascend_to <- function(.segments, .level, .from = NULL,
+                     collapse = TRUE,
+                     calculate_times = TRUE,
+                     times_from = NULL,
+                     .quiet = TRUE) {
+  
+  # Validate inputs
+  if (missing(.segments)) {
+    cli::cli_abort(c(
+      "Missing segment list",
+      "x" = "The {.arg .segments} argument is required"
+    ))
   }
-
-  res <- emuR::requery_hier(emuDBhandle = .source,seglist= .data,level=.attribute_name,timeRefSegmentLevel = .times_from, calcTimes = !.skip_times,verbose = .interactive, resultType = "tibble")
-  attr(res,"basePath") <- .source$basePath #This ensures that we can reattach the database later
-  if( is.null(.inside_of) ) {
-    #This means that we created the emuDB database handlere here
-    DBI::dbDisconnect(.source$connection) # Gracefully disconnect the connection
-    rm(.source)
+  
+  if (missing(.level)) {
+    cli::cli_abort(c(
+      "Missing target level",
+      "x" = "The {.arg .level} argument specifying the target level is required"
+    ))
   }
-  return(res)
+  
+  # Get corpus
+  corp <- NULL
+  if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
+    corp <- .from
+  } else if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    db_path <- S7::prop(.segments, "db_path")
+    if (nzchar(db_path) && dir.exists(db_path)) {
+      corp <- corpus(db_path)
+    }
+  }
+  
+  if (is.null(corp)) {
+    cli::cli_abort(c(
+      "Cannot determine corpus",
+      "x" = "Please provide a corpus via {.arg .from} argument or ensure segment list has valid db_path"
+    ))
+  }
+  
+  # Load emuR handle for requery operation
+  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
+  
+  # Convert segment_list to data.frame for emuR
+  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    seglist_df <- as.data.frame(S7::S7_data(.segments))
+  } else {
+    seglist_df <- as.data.frame(.segments)
+  }
+  
+  # Perform hierarchical requery
+  res <- emuR::requery_hier(
+    emuDBhandle = handle,
+    seglist = seglist_df,
+    level = .level,
+    timeRefSegmentLevel = times_from,
+    calcTimes = calculate_times,
+    verbose = !.quiet,
+    resultType = "tibble"
+  )
+  
+  # Convert back to segment_list
+  result <- segment_list(
+    data = res,
+    db_path = corp@basePath
+  )
+  
+  return(result)
 }
 
+#' @rdname ascend_to
+#' @export
 descend_to <- ascend_to
 
-#skip_forward
-#skip_backward
-
-scout <- function(.data,  steps_forward, count_from="START" , capture=1, ignore_bundle_boundaries=FALSE, calculate_times = TRUE, times_from = NULL, interactive=FALSE, .inside_of=NULL) {
-
-  if(is.null(.inside_of) && ! is.null(attr(.data,"basePath")) && dir.exists(attr(.data,"basePath"))) {
-    # We then need to create a handle object
-    utils::capture.output(
-      .inside_of <- emuR::load_emuDB(attr(.data,"basePath"),verbose = TRUE)
-    ) -> dbload.info
-  }else{
-    stop("Could not derive the database path. Please provide an explicit database handle object .source the .inside_of argument. See ?emuR::load_emuDB for details.")
+#' Scout Forward or Backward in Sequence
+#'
+#' Move forward or backward in a sequence from the current segments, capturing
+#' one or more segments at the target position.
+#'
+#' @param .segments segment_list object or data.frame with segment information
+#' @param steps_forward Number of steps to move (positive = forward, negative = backward)
+#' @param count_from Reference point: "START" or "END" (default: "START")
+#' @param capture Number of segments to capture at target position (default: 1)
+#' @param ignore_bundle_boundaries Logical; if TRUE, can cross bundle boundaries (default: FALSE)
+#' @param calculate_times Logical; calculate time information (default: TRUE)
+#' @param times_from Optional time reference segment level
+#' @param .from corpus object or NULL (derived from segment list)
+#' @param .quiet Logical; suppress messages (default: TRUE)
+#'
+#' @return A new segment_list object
+#' @export
+#' @examples
+#' \dontrun{
+#' # Get next phoneme
+#' next_phone <- scout(vowels, steps_forward = 1)
+#' 
+#' # Get previous 2 phonemes
+#' prev_phones <- scout(vowels, steps_forward = -1, capture = 2)
+#' 
+#' # Get context around segment (previous and next)
+#' context <- scout(vowels, steps_forward = -1, capture = 3)
+#' }
+scout <- function(.segments, steps_forward, 
+                 count_from = "START",
+                 capture = 1,
+                 ignore_bundle_boundaries = FALSE,
+                 calculate_times = TRUE,
+                 times_from = NULL,
+                 .from = NULL,
+                 .quiet = TRUE) {
+  
+  # Validate inputs
+  if (missing(.segments)) {
+    cli::cli_abort(c(
+      "Missing segment list",
+      "x" = "The {.arg .segments} argument is required"
+    ))
   }
-
-  res <- emuR::requery_seq(emuDBhandle = .inside_of,seglist= .data,offset=steps_forward, offsetRef=count_from,length=capture, ignoreOutOfBounds = ignore_bundle_boundaries, timeRefSegmentLevel = times_from, calcTimes = calculate_times,verbose = interactive, resultType = "tibble")
-  attr(res,"basePath") <- .inside_of$basePath #This ensures that we can reattach the database later
-  #DBI::dbDisconnect(.inside_of$connection) # Gracefully disconnect the connection
-  return(res)
+  
+  if (missing(steps_forward)) {
+    cli::cli_abort(c(
+      "Missing offset",
+      "x" = "The {.arg steps_forward} argument specifying how many steps to move is required"
+    ))
+  }
+  
+  # Get corpus
+  corp <- NULL
+  if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
+    corp <- .from
+  } else if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    db_path <- S7::prop(.segments, "db_path")
+    if (nzchar(db_path) && dir.exists(db_path)) {
+      corp <- corpus(db_path)
+    }
+  }
+  
+  if (is.null(corp)) {
+    cli::cli_abort(c(
+      "Cannot determine corpus",
+      "x" = "Please provide a corpus via {.arg .from} argument or ensure segment list has valid db_path"
+    ))
+  }
+  
+  # Load emuR handle for requery operation
+  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
+  
+  # Convert segment_list to data.frame for emuR
+  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    seglist_df <- as.data.frame(S7::S7_data(.segments))
+  } else {
+    seglist_df <- as.data.frame(.segments)
+  }
+  
+  # Perform sequential requery
+  res <- emuR::requery_seq(
+    emuDBhandle = handle,
+    seglist = seglist_df,
+    offset = steps_forward,
+    offsetRef = count_from,
+    length = capture,
+    ignoreOutOfBounds = ignore_bundle_boundaries,
+    timeRefSegmentLevel = times_from,
+    calcTimes = calculate_times,
+    verbose = !.quiet,
+    resultType = "tibble"
+  )
+  
+  # Convert back to segment_list
+  result <- segment_list(
+    data = res,
+    db_path = corp@basePath
+  )
+  
+  return(result)
 }
 
-retreat <- function() {1}
+#' @rdname scout
+#' @export
+retreat <- function(.segments, steps_backward, ...) {
+  scout(.segments, steps_forward = -abs(steps_backward), ...)
+}
 
-harvest <- function() {1}
+#' Get Time-Aligned Segment Information
+#'
+#' Calculate time information for segments if not already present. This is useful
+#' when segments from ITEM levels need time alignment.
+#'
+#' @param .segments segment_list object
+#' @param .from corpus object or NULL
+#' @param times_from Reference segment level for time calculation
+#' @param .quiet Logical; suppress messages
+#'
+#' @return segment_list with time information added/updated
+#' @export
+anchor <- function(.segments, .from = NULL, times_from = NULL, .quiet = TRUE) {
+  
+  if (missing(.segments)) {
+    cli::cli_abort(c(
+      "Missing segment list",
+      "x" = "The {.arg .segments} argument is required"
+    ))
+  }
+  
+  # Check if times are already present
+  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    data <- S7::S7_data(.segments)
+    if (all(c("start", "end") %in% names(data)) && 
+        !anyNA(data$start) && !anyNA(data$end)) {
+      if (!.quiet) {
+        cli::cli_inform("Time information already present")
+      }
+      return(.segments)
+    }
+  }
+  
+  # Get corpus
+  corp <- NULL
+  if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
+    corp <- .from
+  } else if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    db_path <- S7::prop(.segments, "db_path")
+    if (nzchar(db_path) && dir.exists(db_path)) {
+      corp <- corpus(db_path)
+    }
+  }
+  
+  if (is.null(corp)) {
+    cli::cli_abort(c(
+      "Cannot determine corpus",
+      "x" = "Please provide a corpus via {.arg .from} argument"
+    ))
+  }
+  
+  # Load handle and requery with time calculation
+  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
+  
+  # Convert to data.frame
+  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    seglist_df <- as.data.frame(S7::S7_data(.segments))
+  } else {
+    seglist_df <- as.data.frame(.segments)
+  }
+  
+  # Use requery_hier to get time information
+  # This requeries to the same level but forces time calculation
+  level_name <- unique(seglist_df$level)
+  if (length(level_name) != 1) {
+    cli::cli_abort("Segment list must contain segments from a single level")
+  }
+  
+  res <- emuR::requery_hier(
+    emuDBhandle = handle,
+    seglist = seglist_df,
+    level = level_name,
+    timeRefSegmentLevel = times_from,
+    calcTimes = TRUE,
+    verbose = !.quiet,
+    resultType = "tibble"
+  )
+  
+  # Convert back to segment_list
+  result <- segment_list(
+    data = res,
+    db_path = corp@basePath
+  )
+  
+  return(result)
+}
 
+#' Combine Multiple Segment Lists
+#'
+#' Combine two or more segment lists into a single segment_list object.
+#' All segment lists must come from the same database.
+#'
+#' @param ... segment_list objects to combine
+#' @param .unique Logical; remove duplicate segments (default: FALSE)
+#' @param .sort Logical; sort by session, bundle, start time (default: TRUE)
+#'
+#' @return A combined segment_list object
+#' @export
+harvest <- function(..., .unique = FALSE, .sort = TRUE) {
+  
+  seg_lists <- rlang::list2(...)
+  
+  if (length(seg_lists) == 0) {
+    cli::cli_abort(c(
+      "No segment lists provided",
+      "x" = "At least one segment_list must be provided"
+    ))
+  }
+  
+  # Check all are segment_lists or can be converted
+  db_paths <- character()
+  dfs <- list()
+  
+  for (i in seq_along(seg_lists)) {
+    sl <- seg_lists[[i]]
+    
+    if (S7::S7_inherits(sl, reindeer::segment_list)) {
+      db_paths[i] <- S7::prop(sl, "db_path")
+      dfs[[i]] <- as.data.frame(S7::S7_data(sl))
+    } else if (is.data.frame(sl)) {
+      # Check for required columns
+      required <- c("session", "bundle", "start", "end", "labels", "level")
+      if (!all(required %in% names(sl))) {
+        cli::cli_abort(c(
+          "Invalid segment list {i}",
+          "x" = "Missing required columns: {setdiff(required, names(sl))}"
+        ))
+      }
+      dfs[[i]] <- sl
+      # Try to get db_path from attributes
+      if (!is.null(attr(sl, "basePath"))) {
+        db_paths[i] <- attr(sl, "basePath")
+      } else {
+        db_paths[i] <- NA_character_
+      }
+    } else {
+      cli::cli_abort(c(
+        "Invalid input {i}",
+        "x" = "Each argument must be a segment_list or data.frame"
+      ))
+    }
+  }
+  
+  # Check all come from same database
+  valid_paths <- db_paths[!is.na(db_paths)]
+  if (length(unique(valid_paths)) > 1) {
+    cli::cli_warn(c(
+      "!" = "Segment lists come from different databases",
+      "i" = "Databases: {unique(valid_paths)}"
+    ))
+  }
+  
+  # Use first valid path as the db_path for result
+  result_db_path <- if (length(valid_paths) > 0) valid_paths[1] else ""
+  
+  # Combine data frames
+  combined_df <- dplyr::bind_rows(dfs)
+  
+  # Remove duplicates if requested
+  if (.unique) {
+    before_count <- nrow(combined_df)
+    combined_df <- dplyr::distinct(combined_df)
+    after_count <- nrow(combined_df)
+    if (before_count != after_count) {
+      cli::cli_inform(
+        "Removed {before_count - after_count} duplicate segment{?s}"
+      )
+    }
+  }
+  
+  # Sort if requested
+  if (.sort) {
+    combined_df <- combined_df |>
+      dplyr::arrange(session, bundle, start)
+  }
+  
+  # Create segment_list
+  result <- segment_list(
+    data = combined_df,
+    db_path = result_db_path
+  )
+  
+  return(result)
+}
 
 
 peek_at <- function(.x, what=c("levels","links","labelgroups","tracks","bundles","sessions","perspectives","files","attributes","signals"),...){
