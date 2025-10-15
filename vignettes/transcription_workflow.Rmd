@@ -1,0 +1,442 @@
+---
+title: "Automatic Transcription with reindeeR"
+author: "reindeeR Team"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Automatic Transcription with reindeeR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+
+library(reindeeR)
+```
+
+## Introduction
+
+The reindeeR transcription system provides a comprehensive workflow for integrating automatic annotation (e.g., from ASR systems) into Emu-SDMS databases. The workflow consists of five key stages:
+
+1. **Draft**: Create transcription suggestions from automatic annotation
+2. **Assess**: Validate suggestions against database constraints
+3. **Correct**: Manually adjust specific suggestions
+4. **Prepare**: Create/update levels and label types as needed
+5. **Transcribe**: Apply suggestions to database with logging
+
+This approach ensures data integrity while providing flexibility for manual correction and quality control.
+
+## Basic Workflow
+
+### Step 1: Load Database as Corpus
+
+```{r load-corpus, eval=FALSE}
+library(reindeeR)
+
+# Load an Emu-SDMS database as a corpus object
+my_corpus <- corpus("path/to/database_emuDB")
+```
+
+### Step 2: Draft Transcription Suggestions
+
+The `draft()` function takes a corpus and an annotation function that generates automatic transcriptions:
+
+```{r draft-example, eval=FALSE}
+# Define an annotation function
+# This could call an ASR API, run a local model, etc.
+my_annotator <- function(corpus, session, bundle, ...) {
+  # Your automatic annotation logic here
+  # Must return a data.frame with columns: start_time, end_time, label
+  
+  # Example: Mock annotation output
+  data.frame(
+    start_time = c(0.0, 1.2, 2.5),
+    end_time = c(1.0, 2.3, 3.8),
+    label = c("hello", "world", "speech")
+  )
+}
+
+# Create suggestions
+suggestions <- draft(
+  corpus = my_corpus,
+  annotation_func = my_annotator,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Word",
+  level_type = "ITEM"
+)
+
+# View suggestions
+print(suggestions)
+```
+
+### Step 3: Assess Suggestions
+
+Before applying suggestions, validate them against database constraints:
+
+```{r assess-example, eval=FALSE}
+# Run comprehensive assessment
+suggestions <- assess(suggestions, verbose = TRUE)
+
+# The assessment checks:
+# - Level and attribute existence
+# - Temporal overlap detection
+# - Duration constraints
+# - Bundle timing boundaries
+# - Label validity (if defined in database)
+```
+
+### Step 4: Correct Suggestions (Optional)
+
+Manually adjust any problematic suggestions:
+
+```{r correct-example, eval=FALSE}
+# Correct the first suggestion
+suggestions <- correct(
+  suggestions,
+  index = 1,
+  start_time = 0.05,  # Adjust start time
+  label = "Hello"     # Capitalize label
+)
+
+# Correct multiple suggestions
+suggestions <- correct(
+  suggestions,
+  index = c(2, 3),
+  label = c("World", "Speech")
+)
+
+# Reassess after corrections
+suggestions <- assess(suggestions, verbose = TRUE)
+```
+
+### Step 5: Prepare Database
+
+If the suggestions require new levels or attributes, create them:
+
+```{r prepare-example, eval=FALSE}
+# Create required levels/attributes
+# This updates the database configuration and rewrites annotation files
+updated_config <- prepare(suggestions, force = FALSE, verbose = TRUE)
+
+# force=FALSE will prompt for confirmation
+# force=TRUE will proceed without prompting
+```
+
+### Step 6: Transcribe
+
+Apply the suggestions to the database and create a log:
+
+```{r transcribe-example, eval=FALSE}
+# Apply suggestions
+log <- transcribe(suggestions, force = FALSE, verbose = TRUE)
+
+# View log summary
+summary(log)
+
+# The log tracks:
+# - Items added/removed
+# - Levels/attributes created
+# - Success/failure status
+# - Error messages (if any)
+```
+
+## Advanced Features
+
+### Working with Different Level Types
+
+#### Segments
+
+Segments have explicit start and end times and durations:
+
+```{r segments-example, eval=FALSE}
+phoneme_suggestions <- SuggestedSegments(
+  corpus = my_corpus,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Phoneme",
+  suggestions = data.frame(
+    start_time = c(0.0, 0.1, 0.2),
+    end_time = c(0.1, 0.2, 0.3),
+    label = c("p", "ɑ", "t")
+  ),
+  phonetic_alphabet = "IPA",
+  min_duration = 0.01  # Minimum 10ms
+)
+```
+
+#### Events
+
+Events are time points without duration:
+
+```{r events-example, eval=FALSE}
+tone_suggestions <- SuggestedEvents(
+  corpus = my_corpus,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Tone",
+  suggestions = data.frame(
+    start_time = c(0.5, 1.2, 2.0),
+    end_time = c(0.5, 1.2, 2.0),  # Same as start for events
+    label = c("H*", "L-", "H%")
+  ),
+  event_categories = c("pitch_accent", "phrase_accent", "boundary_tone")
+)
+```
+
+#### Items
+
+Items can have associated confidence scores:
+
+```{r items-example, eval=FALSE}
+word_suggestions <- SuggestedItems(
+  corpus = my_corpus,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Word",
+  suggestions = data.frame(
+    start_time = c(0.0, 1.0, 2.0),
+    end_time = c(0.9, 1.9, 2.9),
+    label = c("first", "second", "third")
+  ),
+  confidence_scores = c(0.95, 0.88, 0.92)
+)
+```
+
+### Reversing Transcriptions
+
+If you need to undo a transcription:
+
+```{r reverse-example, eval=FALSE}
+# Reverse the changes
+reverse(log, verbose = TRUE)
+
+# This removes all items added by the transcription
+# and restores the annotation file to its previous state
+```
+
+### Batch Processing
+
+Process multiple bundles:
+
+```{r batch-example, eval=FALSE}
+# Get all bundles in a session
+bundles <- my_corpus["session.*", ".*"]
+
+# Process each bundle
+logs <- list()
+for (i in 1:nrow(bundles)) {
+  session <- bundles$session_name[i]
+  bundle <- bundles$bundle_name[i]
+  
+  # Draft
+  sugg <- draft(
+    corpus = my_corpus,
+    annotation_func = my_annotator,
+    session = session,
+    bundle = bundle,
+    level_name = "Word",
+    level_type = "ITEM"
+  )
+  
+  # Assess
+  sugg <- assess(sugg, verbose = FALSE)
+  
+  # Only transcribe if no errors
+  if (length(sugg@assessment_results$errors) == 0) {
+    logs[[i]] <- transcribe(sugg, verbose = FALSE)
+  }
+}
+
+# Check results
+success_count <- sum(sapply(logs, function(x) x@success))
+cat(sprintf("Successfully transcribed %d/%d bundles\n", success_count, length(logs)))
+```
+
+## Quality Control
+
+### Inspecting Suggestions
+
+```{r inspect-example, eval=FALSE}
+# View suggestion data
+head(suggestions@suggestions)
+
+# Check specific fields
+suggestions@session
+suggestions@bundle
+suggestions@level_name
+suggestions@level_type
+
+# View assessment results
+suggestions@assessment_results$errors
+suggestions@assessment_results$warnings
+suggestions@assessment_results$info
+```
+
+### Filtering by Confidence
+
+```{r filter-confidence, eval=FALSE}
+# For items with confidence scores
+high_confidence <- word_suggestions@suggestions[
+  word_suggestions@suggestions$confidence > 0.9,
+]
+
+# Create new suggestion object with filtered data
+filtered_suggestions <- SuggestedItems(
+  corpus = my_corpus,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Word",
+  suggestions = high_confidence,
+  confidence_scores = high_confidence$confidence
+)
+```
+
+### Duration Filtering
+
+```{r filter-duration, eval=FALSE}
+# Set a higher minimum duration
+phoneme_suggestions <- SuggestedSegments(
+  corpus = my_corpus,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Phoneme",
+  suggestions = phoneme_data,
+  min_duration = 0.02  # 20ms minimum
+)
+
+# Suggestions shorter than this will be filtered during transcription
+```
+
+## Error Handling
+
+The transcription system provides detailed error messages:
+
+```{r error-handling, eval=FALSE}
+# Assessment errors prevent transcription
+suggestions <- assess(suggestions)
+
+if (length(suggestions@assessment_results$errors) > 0) {
+  cat("Errors found:\n")
+  for (err in suggestions@assessment_results$errors) {
+    cat("  -", err, "\n")
+  }
+  
+  # Fix errors before proceeding
+  # e.g., create missing levels with prepare()
+}
+
+# Transcription errors are logged
+log <- transcribe(suggestions)
+
+if (!log@success) {
+  cat("Transcription failed:", log@error_message, "\n")
+}
+```
+
+## Integration with ASR Systems
+
+### Example: Whisper Integration
+
+```{r whisper-example, eval=FALSE}
+library(reticulate)
+
+# Initialize Whisper (requires Python setup)
+whisper <- import("whisper")
+model <- whisper$load_model("base")
+
+# Create annotation function
+whisper_annotator <- function(corpus, session, bundle, language = "en") {
+  # Get audio file path
+  audio_file <- signal_files(corpus) %>%
+    filter(session == !!session, bundle == !!bundle) %>%
+    pull(full_path) %>%
+    first()
+  
+  # Run Whisper
+  result <- model$transcribe(
+    audio_file,
+    language = language,
+    word_timestamps = TRUE
+  )
+  
+  # Convert to reindeeR format
+  segments <- result$segments
+  
+  data.frame(
+    start_time = sapply(segments, function(s) s$start),
+    end_time = sapply(segments, function(s) s$end),
+    label = sapply(segments, function(s) s$text)
+  )
+}
+
+# Use with draft()
+suggestions <- draft(
+  corpus = my_corpus,
+  annotation_func = whisper_annotator,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Word",
+  level_type = "ITEM",
+  language = "en"
+)
+```
+
+### Example: Montreal Forced Aligner
+
+```{r mfa-example, eval=FALSE}
+# Assume MFA outputs TextGrid files
+library(rPraat)
+
+mfa_annotator <- function(corpus, session, bundle, textgrid_path) {
+  # Read TextGrid
+  tg <- tg.read(textgrid_path)
+  
+  # Extract tier
+  tier <- tg.getTier(tg, "phones")
+  
+  # Convert to data.frame
+  data.frame(
+    start_time = tier$t1,
+    end_time = tier$t2,
+    label = tier$label
+  )
+}
+
+# Use with draft()
+suggestions <- draft(
+  corpus = my_corpus,
+  annotation_func = mfa_annotator,
+  session = "session001",
+  bundle = "bundle001",
+  level_name = "Phoneme",
+  level_type = "SEGMENT",
+  textgrid_path = "path/to/alignment.TextGrid"
+)
+```
+
+## Summary
+
+The reindeeR transcription system provides:
+
+- **Type safety**: S7 classes ensure consistent data structures
+- **Validation**: Comprehensive checks before applying changes
+- **Flexibility**: Manual correction of automatic annotations
+- **Logging**: Track all changes for reproducibility and rollback
+- **Integration**: Easy connection to any annotation tool or API
+
+This workflow bridges the gap between automatic annotation and curated linguistic databases, making it practical to leverage modern speech technologies while maintaining data quality.
+
+## See Also
+
+- `?corpus` - Corpus object documentation
+- `?draft` - Create transcription suggestions
+- `?assess` - Validate suggestions
+- `?transcribe` - Apply suggestions to database
+- `vignette("query_benchmarks")` - Query optimization benchmarks
