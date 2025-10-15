@@ -1452,383 +1452,330 @@ readtrack <- function(listOfFiles,field=1,beginTime=0, endTime=0,sample_start=0,
 }
 
 
-quantify2 <- function(.what1, .what2, .source,...,.by_bundle=FALSE,.naively=TRUE, .cache_file=NULL,.inside_of=NULL){
-
-  # Check existence of inputs ---------------------------------------------------
-
-  if(missing(.source) || !is.function(.source)) {
-    cli::cli_abort(c("Missing or not appropriate {.arg .source} argument",
-                     "x"="The {.arg .source} argument should be a function",
-                     "i"="{.arg .source} is a {.cls {class(.source)}}. It needs to be a {.cls function}."))
+#' Apply DSP Function to Two Segment Lists
+#'
+#' Apply a DSP function that requires two segment lists as input, processing
+#' them by session (default) or by bundle. This function is useful for analyses
+#' that compare two different segmentation levels or annotations.
+#'
+#' @param .what1 Either a segment_list object, an EQL query string, or a corpus object
+#' @param .what2 Either a segment_list object or an EQL query string
+#' @param .from corpus object (required if .what1 or .what2 are EQL queries)
+#' @param .using DSP function to apply (must accept two data frame arguments)
+#' @param ... Additional arguments passed to the DSP function
+#' @param .by_bundle Logical; if TRUE, process by bundle instead of by session (default: FALSE)
+#' @param .quiet Logical; suppress messages (default: FALSE)
+#' @param .parallel Logical; use parallel processing (default: FALSE)
+#'
+#' @return A list of results from applying the DSP function
+#'
+#' @details
+#' The function processes segments by merging two segment lists on a per-session
+#' (or per-bundle if `.by_bundle = TRUE`) basis, then applying the DSP function
+#' to each group. The DSP function must accept at least two data frame arguments.
+#'
+#' If EQL query strings are provided, they are evaluated against the corpus to
+#' generate segment lists.
+#'
+#' @examples
+#' \dontrun{
+#' # Using segment lists
+#' vowels <- ask_for(corpus, "Phonetic = V")
+#' consonants <- ask_for(corpus, "Phonetic = C")
+#' results <- quantify2(vowels, consonants, .using = my_comparison_func)
+#'
+#' # Using EQL queries directly
+#' results <- quantify2("Phonetic = V", "Phonetic = C", 
+#'                      .from = corpus, .using = my_comparison_func)
+#'
+#' # Process by bundle instead of by session
+#' results <- quantify2(vowels, consonants, .using = my_func, .by_bundle = TRUE)
+#' }
+#'
+#' @export
+quantify2 <- function(.what1, .what2, .from = NULL, .using, ...,
+                      .by_bundle = FALSE, .quiet = FALSE, .parallel = FALSE) {
+  
+  # Validate inputs ----
+  if (missing(.using) || !is.function(.using)) {
+    cli::cli_abort(c(
+      "Missing or invalid {.arg .using} argument",
+      "x" = "The {.arg .using} argument must be a function"
+    ))
   }
-
-  if(!.naively){
-    cli::cli_alert_warning(c("!"="Metadata informed processing is currently not implmented"))
-    cli::cli_alert_warning(c("i"="Using speaker naive DSP parameters."))
-    .naively <- TRUE
+  
+  # Get function name for messages
+  fun_name <- deparse(substitute(.using))
+  
+  # Check function has at least 2 parameters
+  formal_args <- methods::formalArgs(.using)
+  if (length(formal_args) < 2) {
+    cli::cli_abort(c(
+      "Invalid DSP function",
+      "x" = "The function {.fn {fun_name}} must accept at least 2 arguments",
+      "i" = "Found only {length(formal_args)} formal argument{?s}"
+    ))
   }
-
-
-
-  # Base setup --------------------------------------------------------------
-
-  quiet_query <- purrr::quietly(emuR::query)
-
-  #Define how the two datasets will be split before the function .source is applied
-
-  set_split_by <- "session" #Default: A session is usually a record of speech of a person in a specific state
-  if(.by_bundle) set_split_by <- c("session", "bundle") # This case applies when a session directory is used keep e.g. recordings of a specific speaker together
-
-
-
-  required_fields <- c("labels", "start", "end", "db_uuid", "sample_start", "sample_end", "sample_rate", "listOfFiles")
-
-  ## Source setup ------------------------------------------------------------
-
-
-  # This section handles the case where we want to compute signals or a
-  # list of results from the wave file directly??
-  if(is.function(.source) || is.function(purrr::safely(get)(.source)$result)){
-    if(is.function(.source)){
-      funName <- as.character(rlang::call_args(rlang::current_call())$.source)
-      #Just leave .source unmodified
-    }else{
-      funName <- .source
-      .source <- purrr::safely(get)(.source)$result
-
+  
+  # Determine grouping variable
+  group_by_vars <- if (.by_bundle) c("session", "bundle") else "session"
+  
+  if (!.quiet) {
+    cli::cli_inform(c(
+      "i" = "Applying {.fn {fun_name}} to segment lists",
+      "i" = "Processing by: {.field {group_by_vars}}"
+    ))
+  }
+  
+  # Handle corpus and queries ----
+  corp <- NULL
+  
+  # Detect if .what1 is a corpus
+  if (S7::S7_inherits(.what1, reindeer::corpus)) {
+    corp <- .what1
+    if (is.null(.from)) {
+      .from <- corp
     }
-
-    cli::cli_inform("Applying the function {.fun {funName}} to the segment list.")
-
-    ddd <- rlang::dots_list(...,.named=TRUE)
-    ! names(ddd) %in% methods::formalArgs(.source) -> isNotValidArgs
-    willRemove <- names(ddd)
-    cli::cli_alert_info(c("w"="Ignoring the {willRemove} arguments as they are not used by {.fun {funName}}"))
-
-    #This version of the original function .f that is guarantee to return a list of $result (which is possibly NA) and $error
-    safe_f <- purrr::safely(.source, otherwise=NA)
-
-  }else{
-    cli::cli_abort(c("The {.arg .source} argument needs to be a function or the name of a function."))
+  } else if (!is.null(.from)) {
+    if (S7::S7_inherits(.from, reindeer::corpus)) {
+      corp <- .from
+    }
   }
-
-  ## Definition and setup directly related to the inner applied funct --------
-
-
-  #This function wraps a call so that the call parameters may be logged and so that we get a progress bar
-  innerMapFunction <- function(sl_rowIdx,session,bundle=NULL,...){
-
-
-    result <- NULL
-    .cache_connection <- NULL
-
-    if(!is.null(.cache_connection)){
-      #Check existing values
-
-      cachedObj <- RSQLite::dbGetQuery(.cache_connection,"select obj from cache where sl_rowIdx = ?",sl_rowIdx)
-
-      if(nrow(cachedObj) > 0){
-        #Load rather than comput
-        logger::log_debug("[{session}:{bundle})] Loading data from cache file.\n")
-
-        result <- base::unserialize(
-          base::charToRaw(
-            cachedObj$obj[[1]]))
+  
+  # Convert queries to segment lists if needed
+  if (is.character(.what1)) {
+    if (is.null(corp)) {
+      cli::cli_abort(c(
+        "Missing corpus",
+        "x" = "When using EQL query strings, provide a corpus in {.arg .from}"
+      ))
+    }
+    .what1 <- ask_for(corp, .what1)
+  }
+  
+  if (is.character(.what2)) {
+    if (is.null(corp)) {
+      cli::cli_abort(c(
+        "Missing corpus",
+        "x" = "When using EQL query strings, provide a corpus in {.arg .from}"
+      ))
+    }
+    .what2 <- ask_for(corp, .what2)
+  }
+  
+  # Validate segment lists
+  if (!S7::S7_inherits(.what1, reindeer::segment_list)) {
+    if (!all(c("session", "bundle", "start", "end") %in% names(.what1))) {
+      missing_cols <- setdiff(c("session", "bundle", "start", "end"), names(.what1))
+      cli::cli_abort(c(
+        "Invalid first segment list",
+        "x" = "First argument must be a segment_list or have required columns",
+        "i" = "Missing: {paste(missing_cols, collapse = ', ')}"
+      ))
+    }
+  }
+  
+  if (!S7::S7_inherits(.what2, reindeer::segment_list)) {
+    if (!all(c("session", "bundle", "start", "end") %in% names(.what2))) {
+      missing_cols <- setdiff(c("session", "bundle", "start", "end"), names(.what2))
+      cli::cli_abort(c(
+        "Invalid second segment list",
+        "x" = "Second argument must be a segment_list or have required columns",
+        "i" = "Missing: {paste(missing_cols, collapse = ', ')}"
+      ))
+    }
+  }
+  
+  # Get corpus if not already available
+  if (is.null(corp)) {
+    # Try to get from segment list properties
+    if (S7::S7_inherits(.what1, reindeer::segment_list)) {
+      db_path <- S7::prop(.what1, "db_path")
+      if (nzchar(db_path) && dir.exists(db_path)) {
+        corp <- corpus(db_path)
       }
-
     }
-    #Compute if the results is still not defined
-    if(is.null(result)){
-
-      #logger::log_debug("[{session}:{bundle}] .source settings \n{dotdotdotS}\n when applying the function {funName}.\n")
-      fres <- safe_f(...)
-      logger::log_debug(glue::glue("[{session}:{bundle}] {fres$result}"))
-    }
-
-    #Maybe store the results in cache?
-    if(!is.null(.cache_connection)){
-      objser <- base::rawToChar(base::serialize(fres, connection = NULL,ascii = TRUE))
-
-
-      RSQLite::dbExecute(.cache_connection,"INSERT OR REPLACE INTO cache (sl_rowIdx,obj) VALUES (?,?);", c(sl_rowIdx,objser))
-    }
-
-    return(fres)
   }
-
-  ## Optional cache system setup -----------------------------------------
-
-  .cache_connection <- NULL
-
-  ## Make a date specific cache file if
-  if(!is.null(.cache_file) && ! isFALSE(.cache_file)){
-    if(.cache_file) {
-      #Set a date specific cache file
-      .cache_file <- file.path(tempdir(check=TRUE),format(Sys.time(), paste0(funName,"%Y%m%d.sqlite")))
+  
+  if (is.null(corp)) {
+    cli::cli_abort(c(
+      "Cannot determine corpus",
+      "x" = "Please provide a corpus via {.arg .from} argument"
+    ))
+  }
+  
+  # Add file paths to segment lists ----
+  media_ext <- corp@config$mediafileExtension
+  
+  # Get signal files for corpus
+  signal_files <- peek_signals(corp) |>
+    dplyr::select(session, bundle, listOfFiles = full_path)
+  
+  # Prepare first dataset
+  param1_name <- formal_args[1]
+  
+  # Convert S7 segment_list to data.frame if needed
+  df1_base <- .what1
+  if (S7::S7_inherits(.what1, reindeer::segment_list)) {
+    df1_base <- as.data.frame(S7::S7_data(.what1))
+  } else if (!is.data.frame(.what1)) {
+    df1_base <- as.data.frame(.what1)
+  }
+  
+  df1 <- df1_base |>
+    as.data.frame() |>
+    dplyr::left_join(signal_files, by = c("session", "bundle"), multiple = "all") |>
+    tidyr::nest(.by = dplyr::all_of(group_by_vars), .key = param1_name)
+  
+  # Prepare second dataset  
+  param2_name <- formal_args[2]
+  
+  # Convert S7 segment_list to data.frame if needed
+  df2_base <- .what2
+  if (S7::S7_inherits(.what2, reindeer::segment_list)) {
+    df2_base <- as.data.frame(S7::S7_data(.what2))
+  } else if (!is.data.frame(.what2)) {
+    df2_base <- as.data.frame(.what2)
+  }
+  
+  df2 <- df2_base |>
+    as.data.frame() |>
+    dplyr::left_join(signal_files, by = c("session", "bundle"), multiple = "all") |>
+    tidyr::nest(.by = dplyr::all_of(group_by_vars), .key = param2_name)
+  
+  # Check for empty datasets
+  if (nrow(df1) == 0) {
+    cli::cli_abort("First segment list contains no rows after processing")
+  }
+  if (nrow(df2) == 0) {
+    cli::cli_abort("Second segment list contains no rows after processing")
+  }
+  
+  # Merge datasets ----
+  combined_df <- dplyr::inner_join(df1, df2, by = group_by_vars)
+  
+  # Warn about non-matching groups
+  only_in_1 <- dplyr::anti_join(df1, df2, by = group_by_vars)
+  only_in_2 <- dplyr::anti_join(df2, df1, by = group_by_vars)
+  
+  if (nrow(only_in_1) > 0 && !.quiet) {
+    cli::cli_warn(c(
+      "!" = "{nrow(only_in_1)} group{?s} in first list not found in second list",
+      "i" = "These groups will be excluded from processing"
+    ))
+  }
+  
+  if (nrow(only_in_2) > 0 && !.quiet) {
+    cli::cli_warn(c(
+      "!" = "{nrow(only_in_2)} group{?s} in second list not found in first list",
+      "i" = "These groups will be excluded from processing"
+    ))
+  }
+  
+  if (nrow(combined_df) == 0) {
+    cli::cli_abort(c(
+      "No matching groups found",
+      "x" = "The two segment lists have no overlapping {group_by_vars}"
+    ))
+  }
+  
+  # Add explicit arguments from ...
+  dots <- rlang::list2(...)
+  if (length(dots) > 0) {
+    # Check which arguments are valid for the function
+    invalid_args <- setdiff(names(dots), formal_args)
+    if (length(invalid_args) > 0 && !.quiet) {
+      cli::cli_warn(c(
+        "!" = "Ignoring invalid arguments: {.arg {invalid_args}}",
+        "i" = "Function {.fn {fun_name}} accepts: {.arg {formal_args}}"
+      ))
     }
-    #Now, since we set up a default file name above if .cache_file is just TRUE
-    # we should be able to use the character string as the file name
-    if(is.character(.cache_file)){
-      #There is no reason for file path normalization to not work in this call
-      # so the warnings given by default for the not yet existing file will just be ignored
-      suppressWarnings(.cache_file <- normalizePath(.cache_file,mustWork = NA))
-      cacheFileExists <- file.exists(.cache_file)
-
-      #Clear cache file if indicated
-      if(.clear_cache && cacheFileExists){
-
-        suppressWarnings( unlink(.cache_file))
-        cacheFileExists <- file.exists(.cache_file)
+    
+    # Add valid arguments as columns
+    valid_dots <- dots[names(dots) %in% formal_args]
+    for (arg_name in names(valid_dots)) {
+      combined_df[[arg_name]] <- valid_dots[[arg_name]]
+    }
+  }
+  
+  # Apply DSP function ----
+  if (!.quiet) {
+    cli::cli_progress_step(
+      "Processing {nrow(combined_df)} group{?s}",
+      msg_done = "Processed {nrow(combined_df)} group{?s}"
+    )
+  }
+  
+  # Create safe version of function
+  safe_fun <- purrr::safely(.using, otherwise = NULL, quiet = .quiet)
+  
+  # Prepare data for mapping
+  map_data <- combined_df |>
+    dplyr::select(-dplyr::all_of(group_by_vars))
+  
+  # Apply function
+  if (.parallel) {
+    if (!requireNamespace("furrr", quietly = TRUE)) {
+      cli::cli_warn(c(
+        "!" = "Package {.pkg furrr} not available",
+        "i" = "Falling back to sequential processing"
+      ))
+      .parallel <- FALSE
+    }
+  }
+  
+  if (.parallel) {
+    # Set up parallel processing
+    future::plan(future::multisession)
+    on.exit(future::plan(future::sequential), add = TRUE)
+    
+    results <- furrr::future_pmap(
+      map_data,
+      safe_fun,
+      .options = furrr::furrr_options(seed = TRUE),
+      .progress = !.quiet
+    )
+  } else {
+    results <- purrr::pmap(
+      map_data,
+      safe_fun,
+      .progress = !.quiet
+    )
+  }
+  
+  # Check for errors
+  errors <- purrr::map_lgl(results, ~ !is.null(.x$error))
+  if (any(errors)) {
+    error_indices <- which(errors)
+    cli::cli_warn(c(
+      "!" = "{sum(errors)} error{?s} occurred during processing",
+      "i" = "Failed groups: {error_indices}"
+    ))
+    
+    if (!.quiet) {
+      # Show first few errors
+      first_errors <- head(results[errors], 3)
+      for (i in seq_along(first_errors)) {
+        cli::cli_alert_danger(
+          "Group {error_indices[i]}: {first_errors[[i]]$error$message}"
+        )
       }
-      suppressWarnings(
-        .cache_connection <- DBI::dbConnect(RSQLite::SQLite(),
-                                            user="root",
-                                            password="",
-                                            host="localhost",
-                                            dbname=.cache_file,
-                                            flags=RSQLite::SQLITE_RWC,
-                                            loadable.extensions=FALSE)
-      )
-      #
-      #       if(!RSQLite::dbIsValid(.cache_connection)) cli::cli_abort(c("Could not connect to the cache file",
-      #                                                                   "i","The {arg {(.cache_file)}} argument you cave was {.file {(.cache_file)}}."))
-      #Check table format requirements
-      if(length(RSQLite::dbListObjects(.cache_connection)) > 0 &&
-         (! "cache" %in% RSQLite::dbListTables(.cache_connection) || ! setequal(c("sl_rowIdx","obj"),RSQLite::dbListFields(.cache_connection,"cache")))
-      ){
-
-        cli::cli_alert_info("Initializing cache file {.file {(.cache_file)}}")
-
-        RSQLite::dbExecute(.cache_connection,"DROP TABLE IF EXISTS cache;")
-
-      }else{
-        cli::cli_alert_info("Using existing cache file {.file {(.cache_file)}}")
-      }
-
-      RSQLite::dbExecute(.cache_connection,"CREATE TABLE IF NOT EXISTS cache(sl_rowIdx INTEGER PRIMARY KEY, obj BLOB );")
-
-    }else{
-      #The cache file is not NULL, not TRUE (auto-generated), and not a character vector
-      cli::cli_abort(c("The cache file name could not be deduced",
-                       "x"="A full path can be given; a value TRUE vill generate a default file name based on the current date.",
-                       "i"="The {.arg .cache_file} provided to the fucntion was {.val {(.cache_file)}}."))
-    }
-
-
-  }else{
-    #the case when no cache file should be used
-    cli::cli_alert_info("Intermediate results are {.strong not} cached.")
-  }
-
-  # Setup of the first dataset ----------------------------------------------
-
-
-  #The first possible case is when we have no explicitly set .inside_of argument, but a segment list with a
-  # valid "basePath" attribute set. We then create the database handle from that basePath.
-  if(is.null(.inside_of)) {
-    logger::log_debug("No explicit .inside_of argument found")
-
-    if(! is.null(attr(.what1,"basePath")) && dir.exists(normalizePath(attr(.what1,"basePath")))) {
-
-      # We have a database path but need to create a handle object
-      utils::capture.output(
-        .inside_of1 <- emuR::load_emuDB(attr(.what1,"basePath"),verbose = TRUE)
-      ) -> dbload.info
-    }else{
-      logger::log_debug("Got .inside_of={(.inside_of)}")
-      cli::cli_abort(c("Could not derive the database path.",
-                       "x"="Please provide an explicit database handle object in the {.arg .inside_of} argument.See {.help emuR::load_emuDB} for details.",
-                       "i"="The {.obj_type_friendly {(.what1)}} supplied in the {.arg .what1} argument did not have an attached attribute {.field basePath}."))
-    }
-  }else{
-    # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-    if(is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
-      .inside_of1 <- emuR::load_emuDB(.inside_of,verbose = FALSE)
-    }
-    if("emuDBhandle" %in% class(.inside_of)){
-      #reload the database just to make sure that the handle is still valid
-      .inside_of1 <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
-    }else{
-      cli::cli_abort(c("Not appropriate {.arg .inside_of} argument",
-                       "x"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                       "i"="The .inside_of argument supplied is a {class(.inside_of)}",
-                       "i"="The database {dplyr::first(.inside_of$basePath,.inside_of)} does not exits."))
-
     }
   }
-  #Now complete the data set by adding a full path to signal files
-  inputSignalsExtension <- emuR:::load_DBconfig(.inside_of1)$mediafileExtension
-
-  # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
-  signalFiles_what1 <- emuR::list_files(.inside_of1,inputSignalsExtension)  |>
-    dplyr::rename(listOfFiles=absolute_file_path)  |>
-    dplyr::select(-file)
-
-  # Now replace the query with the result of the query
-  if(is.character(.what1)){
-    .what1 <- emuR::query(emuDBhandle = .inside_of1,
-                          query = .what1,
-                          calcTimes = TRUE,
-                          verbose=FALSE)
+  
+  # Extract successful results
+  results <- purrr::map(results, "result")
+  
+  # Add grouping information back
+  results_df <- combined_df |>
+    dplyr::select(dplyr::all_of(group_by_vars)) |>
+    dplyr::mutate(result = results)
+  
+  if (!.quiet) {
+    cli::cli_progress_done()
   }
-
-  .what1_name <- purrr::pluck(methods::formalArgs(.source),1)
-
-  .what1_df <-.what1   |>
-    dplyr::left_join(signalFiles_what1, by = set_split_by,multiple="all",relationship = "many-to-many") |>
-    tidyr::nest(.by=all_of(set_split_by))
-
-  names(.what1_df) <- c(set_split_by,.what1_name)
-
-  ## Error on empty first data set  ---------------------------------------------
-
-  if(nrow(.what1_df) == 0){
-    cli::cli_abort(c("!"="The {.arg .what1} tibble contains no rows."))
-  }
-
-
-  # Setup of the second dataset ----------------------------------------------
-
-
-  #The first possible case is when we have no explicitly set .inside_of argument, but a segment list with a
-  # valid "basePath" attribute set. We then create the database handle from that basePath.
-  if(is.null(.inside_of)) {
-    logger::log_debug("No explicit .inside_of argument found")
-
-    if(! is.null(attr(.what2,"basePath")) && dir.exists(normalizePath(attr(.what2,"basePath")))) {
-
-      # We have a database path but need to create a handle object
-      utils::capture.output(
-        .inside_of2 <- emuR::load_emuDB(attr(.what2,"basePath"),verbose = TRUE)
-      ) -> dbload.info
-    }else{
-      logger::log_debug("Got .inside_of={(.inside_of)}")
-      cli::cli_abort(c("Could not derive the database path.",
-                       "x"="Please provide an explicit database handle object in the {.arg .inside_of} argument.See {.help emuR::load_emuDB} for details.",
-                       "i"="The {.obj_type_friendly {(.what2)}} supplied in the {.arg .what2} argument did not have an attached attribute {.field basePath}."))
-    }
-  }else{
-    # we have an explicitly given database handle, but we don not know if it is a path or if the SQLite connection is still valid
-    if(is.character(.inside_of) && stringr::str_ends(.inside_of,"_emuDB") && dir.exists(.inside_of)){
-      .inside_of2 <- emuR::load_emuDB(.inside_of,verbose = FALSE)
-    }
-    if("emuDBhandle" %in% class(.inside_of)){
-      #reload the database just to make sure that the handle is still valid
-      .inside_of2 <- emuR::load_emuDB(.inside_of$basePath,verbose = FALSE)
-    }else{
-      cli::cli_abort(c("Not appropriate {.arg .inside_of} argument",
-                       "x"="The 'handle' argument can only be either a character vector indicating the path to the database, or an emuR database handle.",
-                       "i"="The .inside_of argument supplied is a {class(.inside_of)}",
-                       "i"="The database {dplyr::first(.inside_of$basePath,.inside_of)} does not exits."))
-
-    }
-  }
-  #Now complete the data set by adding a full path to signal files
-  inputSignalsExtension <- emuR:::load_DBconfig(.inside_of2)$mediafileExtension
-  # What we now need is an 'listOfFiles' to supply to the DSP functionŒ
-  signalFiles_what2 <- emuR::list_files(.inside_of2,inputSignalsExtension)  |>
-    dplyr::rename(listOfFiles=absolute_file_path)  |>
-    dplyr::select(-file)
-
-  # Now replace the query with the result of the query
-  if(is.character(.what2)){
-    .what2 <- emuR::query(emuDBhandle = .inside_of2,
-                          query = .what2,
-                          calcTimes = TRUE,
-                          verbose=FALSE)
-  }
-
-  .what2_name <- purrr::pluck(methods::formalArgs(.source),2)
-
-  .what2_df <-.what2   |>
-    dplyr::left_join(signalFiles_what2, by = c("session", "bundle")) |>
-    tidyr::nest(.by=all_of(set_split_by))
-
-  names(.what2_df) <- c(set_split_by,.what2_name)
-
-  ## Error on empty second data set  ---------------------------------------------
-
-  if(nrow(.what2_df) == 0){
-    cli::cli_abort(c("!"="The {.arg .what2} tibble contains no rows."))
-  }
-
-
-  # Join first and second data sets -----------------------------------------
-
-
-  .what_df <- .what1_df |>
-    dplyr::inner_join(.what2_df,by = set_split_by) |>
-    dplyr::rowwise()
-
-
-
-  # Check result set compatibility ------------------------------------------
-
-
-  ## Check that all required fields are returned in the tibbles in list columns ----
-  to_check <- .what_df |>
-   dplyr::ungroup()|>
-   dplyr::slice(1)
-
-
-  # Check that all required fields are returned in the tibbles in list columns
-  if(length(setdiff(required_fields, names(purrr::pluck(to_check,.what1_name,1)))) > 0 ||
-     length(setdiff(required_fields, names(purrr::pluck(to_check,.what2_name,1)))) > 0
-    ){
-    cli::cli_abort(c("Missing required fields",
-                     "!"="The {.cls tibble} / {.cls data.frame} needs to have some required fields for them to be passed to the function given as the {.arg .source} argument.",
-                     "i"="Required fields are {.field {required_fields}}.",
-                     "i"="The first data set has the columns {.field {names(purrr::pluck(to_check,3,1))}}",
-                     "i"="The second data set has the columns {.field {names(purrr::pluck(to_check,4,1))}}"))
-  }
-
-
-
-
-
-  ## Report on incompatibilities ---------------------------------------------
-
-
-  only_in_df1 <- dplyr::anti_join(.what1_df,.what2_df,by=set_split_by)
-  only_in_df2 <- dplyr::anti_join(.what2_df,.what1_df,by=set_split_by)
-  if(nrow(only_in_df1) > 0 ){
-    cli::cli_alert_warning(c("!"="The {.field {(.what2_name)}} argument to {.fn {funName}} has {nrow(only_in_df1)} rows with no mathch in {.field {(.what1_name)}}",
-                             ">"="Missing fields will be ignored."))
-  }
-  set_split_by
-  if(nrow(only_in_df2) > 0 ){
-    cli::cli_alert_warning(c("!"="The {.field {(.what1_name)}} argument to {.fn {funName}} has {nrow(only_in_df2)} rows with no mathch in {.field {(.what2_name)}}."))
-    cli::cli_alert(c(">"="The incomplete {tail(set_split_by,1)} sets will be ignored."))
-  }
-
-
-
-  ## Insert explicit arguments  -------------------------------------------------------
-
-  .what_df <- .what_df |>
-    dplyr::ungroup() |>
-    tibble::rownames_to_column(var = "sl_rowIdx")  |>
-    #dplyr::rename_with( ~ stringr::str_replace(.x,"^","."),dplyr::all_of(set_split_by)) |> #This line hides the session and bundle columns so that they do not interfere with later processing steps
-    dplyr::mutate(!!!rlang::enexprs(...))  |> #Here we pass on the ... arguments to mutate so that we can set both a=session,b="dsds" and a will be a copy of session and b will be a string
-    dplyr::mutate(sl_rowIdx = as.integer(sl_rowIdx))
-
-
-  # Do the actual processing work -------------------------------------------
-
-
-  ## Apply the DSP function -------------------------------------------------------
-  .what_df <- .what_df |>
-    dplyr::select(-tidyselect::any_of(c(set_split_by)), -sl_rowIdx)|>
-    purrr::pmap(.f=.source,.progress = list(format=paste("Applying",funName," {cli::pb_bar} {cli::pb_current}/{cli::pb_total} collections | {cli::pb_eta_str}")))  # This is the busy line
-
-
-
-
-  # Finalize function -------------------------------------------------------
-
-
-  return(.what_df)
-
+  
+  return(results_df)
 }
 
 
