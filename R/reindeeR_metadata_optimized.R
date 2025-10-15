@@ -179,53 +179,67 @@ gather_metadata <- function(corpus_obj, verbose = TRUE) {
   invisible(corpus_obj)
 }
 
-#' Process and insert metadata list into appropriate table
+#' Process and insert metadata list into appropriate table - OPTIMIZED BULK INSERT
 #' @keywords internal
 process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, level) {
   
   if (length(meta_list) == 0) return(invisible(NULL))
   
+  # Prepare all data first, then do bulk insert
+  field_names <- names(meta_list)
+  n_fields <- length(field_names)
+  
+  # Pre-allocate vectors for bulk operations
+  field_values <- character(n_fields)
+  field_types <- character(n_fields)
+  
+  # Serialize all values at once
+  for (i in seq_along(field_names)) {
+    field_info <- serialize_metadata_value(meta_list[[field_names[i]]])
+    field_values[i] <- field_info$value
+    field_types[i] <- field_info$type
+  }
+  
   DBI::dbWithTransaction(con, {
-    for (field_name in names(meta_list)) {
-      value <- meta_list[[field_name]]
-      
-      # Determine type and serialize value
-      field_info <- serialize_metadata_value(value)
-      
-      # Register field if new
-      register_metadata_field(con, field_name, field_info$type)
-      
-      # Insert into appropriate table
-      if (level == "database") {
-        sql <- sprintf(
-          "INSERT OR REPLACE INTO metadata_database (db_uuid, field_name, field_value, field_type) 
-           VALUES ('%s', '%s', '%s', '%s')",
-          db_uuid, 
-          DBI::dbQuoteString(con, field_name),
-          DBI::dbQuoteString(con, field_info$value),
-          field_info$type
-        )
-      } else if (level == "session") {
-        sql <- sprintf(
-          "INSERT OR REPLACE INTO metadata_session (db_uuid, session, field_name, field_value, field_type) 
-           VALUES ('%s', '%s', '%s', '%s', '%s')",
-          db_uuid, session,
-          DBI::dbQuoteString(con, field_name),
-          DBI::dbQuoteString(con, field_info$value),
-          field_info$type
-        )
-      } else if (level == "bundle") {
-        sql <- sprintf(
-          "INSERT OR REPLACE INTO metadata_bundle (db_uuid, session, bundle, field_name, field_value, field_type) 
-           VALUES ('%s', '%s', '%s', '%s', '%s', '%s')",
-          db_uuid, session, bundle,
-          DBI::dbQuoteString(con, field_name),
-          DBI::dbQuoteString(con, field_info$value),
-          field_info$type
-        )
-      }
-      
-      DBI::dbExecute(con, sql)
+    # Register all fields at once
+    for (i in seq_along(field_names)) {
+      register_metadata_field(con, field_names[i], field_types[i])
+    }
+    
+    # Build data frame for bulk insert
+    if (level == "database") {
+      insert_df <- data.frame(
+        db_uuid = rep(db_uuid, n_fields),
+        field_name = field_names,
+        field_value = field_values,
+        field_type = field_types,
+        stringsAsFactors = FALSE
+      )
+      DBI::dbWriteTable(con, "metadata_database", insert_df, 
+                       append = TRUE, overwrite = FALSE)
+    } else if (level == "session") {
+      insert_df <- data.frame(
+        db_uuid = rep(db_uuid, n_fields),
+        session = rep(session, n_fields),
+        field_name = field_names,
+        field_value = field_values,
+        field_type = field_types,
+        stringsAsFactors = FALSE
+      )
+      DBI::dbWriteTable(con, "metadata_session", insert_df,
+                       append = TRUE, overwrite = FALSE)
+    } else if (level == "bundle") {
+      insert_df <- data.frame(
+        db_uuid = rep(db_uuid, n_fields),
+        session = rep(session, n_fields),
+        bundle = rep(bundle, n_fields),
+        field_name = field_names,
+        field_value = field_values,
+        field_type = field_types,
+        stringsAsFactors = FALSE
+      )
+      DBI::dbWriteTable(con, "metadata_bundle", insert_df,
+                       append = TRUE, overwrite = FALSE)
     }
   })
 }

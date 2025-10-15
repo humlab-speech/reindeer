@@ -221,12 +221,19 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     }
   }
   
-  # Get metadata if requested and pre-join with segments
+  # Get metadata if requested and pre-join with segments - optimized
   bundle_metadata <- NULL
   object_with_meta <- object
   if (.use_metadata && !is.null(corpus_obj)) {
     con <- get_corpus_connection(corpus_obj)
-    bundle_metadata <- DBI::dbReadTable(con, "bundle_metadata")
+    
+    # Only fetch metadata for the specific bundles in this segment list
+    unique_bundles <- unique(as.data.frame(object)[, c("session", "bundle")])
+    
+    # More efficient: fetch only needed metadata
+    bundle_metadata <- DBI::dbReadTable(con, "bundle_metadata") %>%
+      dplyr::semi_join(unique_bundles, by = c("session", "bundle"))
+    
     DBI::dbDisconnect(con)
     
     # Pre-join metadata for efficiency

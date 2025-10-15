@@ -329,25 +329,68 @@ peek_signals <- function(.x, ...) {
     }
   }
   
-  # Get all files
-  all_files <- tibble::as_tibble(emuR::list_files(.inside_of, ...))
+  # OPTIMIZED: Use direct file system scan instead of emuR::list_files
+  # This is much faster for large databases
   
   # Common audio extensions plus mediafileExtension from config
   audio_exts <- c("wav", "WAV", "mp3", "MP3", "flac", "FLAC", "ogg", "OGG", 
                    "aiff", "AIFF", "aif", "AIF")
   if (!is.null(config$mediafileExtension)) {
-    audio_exts <- c(audio_exts, config$mediafileExtension)
+    audio_exts <- unique(c(audio_exts, config$mediafileExtension))
   }
   
-  # Filter to signal files and add columns
-  signal_files <- all_files %>%
-    dplyr::mutate(
-      name = tools::file_path_sans_ext(file),
-      extension = tools::file_ext(file),
-      full_path = absolute_file_path
-    ) %>%
-    dplyr::filter(extension %in% audio_exts) %>%
-    dplyr::select(session, bundle, name, extension, full_path)
+  # Scan file system directly
+  sessions <- list.dirs(basePath, full.names = TRUE, recursive = FALSE)
+  sessions <- sessions[grepl("_ses$", sessions)]
+  
+  signal_files_list <- list()
+  idx <- 1
+  
+  for (session_dir in sessions) {
+    session_name <- sub("_ses$", "", basename(session_dir))
+    bundles <- list.dirs(session_dir, full.names = TRUE, recursive = FALSE)
+    bundles <- bundles[grepl("_bndl$", bundles)]
+    
+    for (bundle_dir in bundles) {
+      bundle_name <- sub("_bndl$", "", basename(bundle_dir))
+      
+      # Get all files in bundle
+      files <- list.files(bundle_dir, full.names = TRUE)
+      
+      for (file_path in files) {
+        ext <- tools::file_ext(file_path)
+        if (ext %in% audio_exts) {
+          signal_files_list[[idx]] <- list(
+            session = session_name,
+            bundle = bundle_name,
+            name = tools::file_path_sans_ext(basename(file_path)),
+            extension = ext,
+            full_path = file_path
+          )
+          idx <- idx + 1
+        }
+      }
+    }
+  }
+  
+  # Convert to tibble
+  if (length(signal_files_list) > 0) {
+    signal_files <- tibble::tibble(
+      session = vapply(signal_files_list, `[[`, character(1), "session"),
+      bundle = vapply(signal_files_list, `[[`, character(1), "bundle"),
+      name = vapply(signal_files_list, `[[`, character(1), "name"),
+      extension = vapply(signal_files_list, `[[`, character(1), "extension"),
+      full_path = vapply(signal_files_list, `[[`, character(1), "full_path")
+    )
+  } else {
+    signal_files <- tibble::tibble(
+      session = character(),
+      bundle = character(),
+      name = character(),
+      extension = character(),
+      full_path = character()
+    )
+  }
   
   attr(signal_files, "basePath") <- basePath
   

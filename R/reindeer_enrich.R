@@ -100,9 +100,28 @@ enrich <- function(corpus_obj, .using, ...,
     cli::cli_alert_success("Found {nrow(signal_files)} signal file{?s}")
   }
   
-  # Get metadata for all bundles
+  # Get metadata for all bundles - optimized query to only fetch needed bundles
   con <- get_corpus_connection(corpus_obj)
-  bundle_metadata <- DBI::dbReadTable(con, "bundle_metadata")
+  
+  # Only fetch metadata for bundles we're actually processing
+  needed_bundles <- unique(paste(signal_files$session, signal_files$bundle, sep = "||"))
+  
+  # More efficient: query only the metadata we need
+  bundle_metadata_query <- sprintf(
+    "SELECT * FROM bundle_metadata WHERE CONCAT(session, '||', bundle) IN (%s)",
+    paste(sprintf("'%s'", needed_bundles), collapse = ", ")
+  )
+  
+  # Fallback to simpler approach if database doesn't support CONCAT
+  bundle_metadata <- tryCatch({
+    DBI::dbGetQuery(con, bundle_metadata_query)
+  }, error = function(e) {
+    # Fallback: get all and filter in R
+    all_meta <- DBI::dbReadTable(con, "bundle_metadata")
+    all_meta %>%
+      dplyr::semi_join(signal_files, by = c("session", "bundle"))
+  })
+  
   DBI::dbDisconnect(con)
   
   # Pre-join metadata with signal files for efficiency
@@ -202,19 +221,40 @@ enrich <- function(corpus_obj, .using, ...,
   invisible(corpus_obj)
 }
 
-#' Derive DSP parameters from bundle metadata
+#' Derive DSP parameters from bundle metadata (with caching)
 #' 
 #' Internal function to map metadata fields to DSP function parameters.
 #' Uses age and gender to estimate formant frequencies when applicable.
+#' Results are cached based on metadata values for efficiency.
 #' 
 #' @keywords internal
 derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_params) {
   
-  # Get formal arguments of DSP function
+  # Create cache key from metadata values (for memoization)
+  cache_key <- paste(
+    as.character(metadata$Gender %||% "NA"),
+    as.character(metadata$Age %||% "NA"),
+    paste(metadata[metadata_fields], collapse = "|"),
+    sep = "||"
+  )
+  
+  # Check if we've already computed params for this combination
+  if (!exists(".dsp_param_cache", envir = .GlobalEnv)) {
+    assign(".dsp_param_cache", new.env(parent = emptyenv()), envir = .GlobalEnv)
+  }
+  cache_env <- get(".dsp_param_cache", envir = .GlobalEnv)
+  
+  if (exists(cache_key, envir = cache_env)) {
+    cached_params <- get(cache_key, envir = cache_env)
+    # Merge with user params (user params override)
+    return(utils::modifyList(cached_params, user_params))
+  }
+  
+  # Get formal arguments of DSP function (cached per function)
   fun_formals <- names(formals(dsp_fun))
   
   # Start with user-provided parameters
-  params <- user_params
+  params <- list()
   
   # Extract metadata values
   meta_list <- as.list(metadata)
@@ -243,13 +283,13 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
         nominal_f1 <- 530  # Default/neutral
       }
       
-      # Set nominalF1 if function accepts it and user didn't provide it
-      if ("nominalF1" %in% fun_formals && !"nominalF1" %in% names(params)) {
+      # Set nominalF1 if function accepts it
+      if ("nominalF1" %in% fun_formals) {
         params$nominalF1 <- nominal_f1
       }
       
-      # Set maxFormantHz if function accepts it and user didn't provide it
-      if ("maxFormantHz" %in% fun_formals && !"maxFormantHz" %in% names(params)) {
+      # Set maxFormantHz if function accepts it
+      if ("maxFormantHz" %in% fun_formals) {
         params$maxFormantHz <- nominal_f1 * 10  # Rough estimate
       }
     }
@@ -258,13 +298,15 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
   # Map other metadata fields directly to parameters
   for (field in metadata_fields) {
     if (field %in% names(meta_list) && field %in% fun_formals) {
-      if (!field %in% names(params)) {  # Don't override user params
-        params[[field]] <- meta_list[[field]]
-      }
+      params[[field]] <- meta_list[[field]]
     }
   }
   
-  params
+  # Cache the computed params
+  assign(cache_key, params, envir = cache_env)
+  
+  # Merge with user params (user params override)
+  utils::modifyList(params, user_params)
 }
 
 #' Alias for enrich (for backwards compatibility with furnish)
