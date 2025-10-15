@@ -3,14 +3,14 @@
 %   R/reindeer-corpus.R
 \name{process_metadata_list}
 \alias{process_metadata_list}
-\title{Process and insert metadata list into appropriate table}
+\title{Process and insert metadata list into appropriate table - OPTIMIZED BULK INSERT}
 \usage{
 process_metadata_list(con, db_uuid, session, bundle, meta_list, level)
 
 process_metadata_list(con, db_uuid, session, bundle, meta_list, level)
 }
 \description{
-Process and insert metadata list into appropriate table
+Process and insert metadata list into appropriate table - OPTIMIZED BULK INSERT
 
 Process and insert metadata list
 }
