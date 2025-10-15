@@ -28,8 +28,8 @@ four equal intervals, and linear interpolation is used with the 'approx'
 function to obtain the dB values at those frequencies.
 }
 \references{
-Traunmueller, H. (1990) \\"Analytical expressions for the
-tonotopic sensory scale\\" J. Acoust. Soc. Am. 88: 97-100.
+Traunmueller, H. (1990) "Analytical expressions for the
+tonotopic sensory scale" J. Acoust. Soc. Am. 88: 97-100.
 }
 \seealso{
 \link[emuR:mel]{emuR::mel}

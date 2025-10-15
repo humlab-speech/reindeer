@@ -14,7 +14,7 @@ annotate_voiceactivity(
 )
 }
 \arguments{
-\item{emuDBhandle}{An \link{emuR} database handle.}
+\item{emuDBhandle}{An \link[emuR:emuR-package]{emuR::emuR} database handle.}
 
 \item{levelname}{The name of fhe segmentation level (and attribute) to create
 to hold the annotations of speech.}

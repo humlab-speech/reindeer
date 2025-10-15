@@ -77,7 +77,7 @@ members of the 'Relative_tones' label group.}
 required.}
 }
 \value{
-A \link{tibble} containing computed INTSINT (and MOMEL) information for
+A \link[tibble:tibble]{tibble::tibble} containing computed INTSINT (and MOMEL) information for
 each bundle, with \code{start} time relative to the start of the bundle media
 file.
 }

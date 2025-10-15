@@ -268,22 +268,42 @@ split_on_operator <- function(string, operator) {
 }
 
 parse_function_query <- function(query_string) {
-  pattern <- "^(Start|End|Medial|Num)\\(([A-Za-z_]+),\\s*([A-Za-z_]+)\\)\\s*(==|!=|=|>|<|>=|<=)\\s*([0-9]+)$"
-  match <- regexec(pattern, query_string)
-  matches <- regmatches(query_string, match)[[1]]
+  # Try 3-parameter pattern first (for Medial with position)
+  pattern_3param <- "^(Medial)\\(([A-Za-z_]+),\\s*([A-Za-z_]+),\\s*([0-9]+)\\)$"
+  match_3 <- regexec(pattern_3param, query_string)
+  matches_3 <- regmatches(query_string, match_3)[[1]]
   
-  if (length(matches) != 6) {
-    stop("Cannot parse function query: ", query_string)
+  if (length(matches_3) == 5) {
+    # Medial(parent, child, position) - special case
+    return(list(
+      type = "function",
+      func_name = matches_3[2],
+      level1 = matches_3[3],
+      level2 = matches_3[4],
+      operator = "==",  # Implicit equality for position
+      value = matches_3[5],
+      position = as.numeric(matches_3[5])
+    ))
   }
   
-  return(list(
-    type = "function",
-    func_name = matches[2],
-    level1 = matches[3],
-    level2 = matches[4],
-    operator = matches[5],
-    value = matches[6]
-  ))
+  # Try 2-parameter pattern with comparison
+  pattern_2param <- "^(Start|End|Medial|Num)\\(([A-Za-z_]+),\\s*([A-Za-z_]+)\\)\\s*(==|!=|=|>|<|>=|<=)\\s*([0-9]+)$"
+  match_2 <- regexec(pattern_2param, query_string)
+  matches_2 <- regmatches(query_string, match_2)[[1]]
+  
+  if (length(matches_2) == 6) {
+    return(list(
+      type = "function",
+      func_name = matches_2[2],
+      level1 = matches_2[3],
+      level2 = matches_2[4],
+      operator = matches_2[5],
+      value = matches_2[6],
+      position = NULL
+    ))
+  }
+  
+  stop("Cannot parse function query: ", query_string)
 }
 
 # Simple query execution
@@ -541,9 +561,10 @@ execute_function_query_corrected <- function(db_path, parsed_query) {
   level2 <- parsed_query$level2
   operator <- parsed_query$operator
   value <- as.numeric(parsed_query$value)
+  position <- parsed_query$position  # May be NULL
   
   if (func_name %in% c("Start", "End", "Medial")) {
-    return(execute_position_function(con, func_name, level1, level2, operator, value))
+    return(execute_position_function(con, func_name, level1, level2, operator, value, position))
   } else if (func_name == "Num") {
     return(execute_count_function(con, level1, level2, operator, value))
   } else {
@@ -830,12 +851,20 @@ build_recursive_dominance_chain <- function(path) {
 }
 
 # Position function
-execute_position_function <- function(con, func_name, child_level, parent_level, operator, value) {
-  position_condition <- switch(func_name,
-    "Start" = "child_rank = 1",
-    "End" = "child_rank = max_rank",
-    "Medial" = "child_rank > 1 AND child_rank < max_rank"
-  )
+execute_position_function <- function(con, func_name, parent_level, child_level, operator, value, position = NULL) {
+  # Position functions: Start(parent, child), End(parent, child), Medial(parent, child, [n])
+  # Returns children in specific positions within their parent
+  
+  # Handle Medial with specific position
+  if (func_name == "Medial" && !is.null(position)) {
+    position_condition <- sprintf("child_rank = %d", position)
+  } else {
+    position_condition <- switch(func_name,
+      "Start" = "child_rank = 1",
+      "End" = "child_rank = max_rank",
+      "Medial" = "child_rank > 1 AND child_rank < max_rank"
+    )
+  }
   
   # For position functions, the value should always be 1 (true/false concept)
   # The operator determines if we want or don't want items in that position
@@ -858,10 +887,10 @@ execute_position_function <- function(con, func_name, child_level, parent_level,
         c.level, c.type, c.seq_idx, c.sample_rate,
         c.sample_point, c.sample_start, c.sample_dur,
         ROW_NUMBER() OVER (
-          PARTITION BY p.item_id 
+          PARTITION BY p.db_uuid, p.session, p.bundle, p.item_id
           ORDER BY c.seq_idx
         ) as child_rank,
-        COUNT(*) OVER (PARTITION BY p.item_id) as max_rank
+        COUNT(*) OVER (PARTITION BY p.db_uuid, p.session, p.bundle, p.item_id) as max_rank
       FROM items p
       INNER JOIN links lnk ON p.db_uuid = lnk.db_uuid 
         AND p.session = lnk.session 

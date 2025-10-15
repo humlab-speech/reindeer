@@ -8,14 +8,15 @@
 #'loaded, it also loads many functions from the emuR package, and makes them
 #'available for the user.
 #'
-#'@docType package
 #'@name reindeer
 #'
 #'
 #' @importFrom Rdpack reprompt
+#' @importFrom Rcpp sourceCpp
+#' @useDynLib reindeer, .registration = TRUE
+
 NULL
-PRAAT_DEVEL <- FALSE
-#> NULL
+
 
 
 

@@ -7,7 +7,7 @@
 list_untranscribedBundles(emuDBhandle)
 }
 \arguments{
-\item{emuDBhandle}{The database handle of an \link{emuR} database.}
+\item{emuDBhandle}{The database handle of an \link[emuR:emuR-package]{emuR::emuR} database.}
 }
 \value{
 A vector of bundle names

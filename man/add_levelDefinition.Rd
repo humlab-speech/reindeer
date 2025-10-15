@@ -5,7 +5,7 @@
 \title{Add a level definition. (A copy of the emuR function)}
 \usage{
 add_levelDefinition(
-  emuDBhandle,
+  corpusObj,
   name,
   type,
   rewriteAllAnnots = TRUE,
@@ -13,8 +13,6 @@ add_levelDefinition(
 )
 }
 \arguments{
-\item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
-
 \item{name}{name of level definition}
 
 \item{type}{type of level definition ("SEGMENT","EVENT","ITEM")}

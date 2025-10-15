@@ -4,12 +4,7 @@
 \alias{add_perspective}
 \title{Add a new perspective to an emuDB. (A copy of the emuR function)}
 \usage{
-add_perspective(emuDBhandle, name)
-}
-\arguments{
-\item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
-
-\item{name}{name of perspective}
+add_perspective(...)
 }
 \description{
 Add / List / Remove perspective to / of / from emuDB. The EMU-webApp subdivides different ways 

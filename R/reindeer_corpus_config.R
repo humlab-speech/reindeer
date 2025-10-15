@@ -16,21 +16,30 @@ if(! exists("database.schema.suffix")){
 
 ###########################################
 # Optimized DBconfig file handling
-# Define generic and method first before using it
 
-load_DBconfig <- S7::new_generic("load_DBconfig", dispatch_args = "corpus")
-
-# Method implementation for character (basePath)
-S7::method(load_DBconfig, S7::class_character)  <- function(corpus) {
-  # corpus is actually a basePath string
-  basePath <- corpus
+#' Load database configuration
+#'
+#' @param obj Either a character (basePath) or corpus object
+#' @return List with database configuration
+#' @export
+load_DBconfig <- function(obj) {
+  # Determine basePath based on input type
+  if (is.character(obj)) {
+    basePath <- obj
+  } else if (inherits(obj, "corpus") || (is.list(obj) && !is.null(obj$basePath))) {
+    basePath <- if (inherits(obj, "corpus")) obj@basePath else obj$basePath
+  } else if (is.list(obj) && !is.null(obj@basePath)) {
+    basePath <- obj@basePath  
+  } else {
+    stop("obj must be a basePath (character) or corpus/emuDBhandle object")
+  }
   
   # Find the DBconfig file
-  emuDB_files <- list.files(basePath, pattern = "_DBconfig\\.json$", full.names = TRUE)
-  if(length(emuDB_files) == 0) {
+  config_files <- list.files(basePath, pattern = "_DBconfig\\.json$", full.names = TRUE)
+  if(length(config_files) == 0) {
     stop("No DBconfig file found in ", basePath)
   }
-  dbCfgPath <- emuDB_files[1]
+  dbCfgPath <- config_files[1]
   
   # Check cache first
   cache_key <- dbCfgPath
@@ -235,13 +244,29 @@ get_levelDefinition <- function(corpusObj, name) {
 }
 
 # Store function with cache invalidation
-store_DBconfig <- function(corpusObj, dbConfig, basePath = NULL) {
-  if(is.null(basePath)) {
-    basePath <- corpusObj@basePath
+#' Store database configuration
+#' @param obj corpus object or emuDBhandle
+#' @param dbConfig configuration list
+#' @param basePath optional basePath override
+#' @export
+store_DBconfig <- function(obj, dbConfig, basePath = NULL) {
+  # Extract basePath and dbName
+  if (is.null(basePath)) {
+    if (inherits(obj, "corpus")) {
+      basePath <- obj@basePath
+      dbName <- obj@dbName
+    } else if (is.list(obj) && !is.null(obj$basePath)) {
+      basePath <- obj$basePath
+      dbName <- obj$dbName
+    } else {
+      stop("Cannot extract basePath from obj")
+    }
+  } else {
+    # Extract dbName from basePath
+    dbName <- sub("_emuDB$", "", basename(basePath))
   }
 
-  dbCfgPath <- file.path(basePath,
-                         paste0(corpusObj@dbName, database.schema.suffix))
+  dbCfgPath <- file.path(basePath, paste0(dbName, database.schema.suffix))
 
   # Use more efficient JSON writing
   json <- jsonlite::toJSON(dbConfig, auto_unbox = TRUE,
@@ -250,8 +275,8 @@ store_DBconfig <- function(corpusObj, dbConfig, basePath = NULL) {
   writeLines(json, dbCfgPath, useBytes = TRUE)
 
   # Invalidate cache
-  cache_key <- corpusObj@UUID
-  if(!is.null(cache_key) && exists(cache_key, .dbConfigCache)) {
+  cache_key <- dbCfgPath
+  if(exists(cache_key, .dbConfigCache)) {
     rm(list = cache_key, envir = .dbConfigCache)
   }
 }

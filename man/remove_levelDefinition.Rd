@@ -5,7 +5,7 @@
 \title{Remove a level definition. (A copy of the emuR function)}
 \usage{
 remove_levelDefinition(
-  emuDBhandle,
+  corpusObj,
   name,
   rewriteAllAnnots = TRUE,
   force = FALSE,
@@ -13,8 +13,6 @@ remove_levelDefinition(
 )
 }
 \arguments{
-\item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
-
 \item{name}{name of level definition}
 
 \item{rewriteAllAnnots}{should changes be written to file system (_annot.json files) (intended for expert use only)}

@@ -4,10 +4,7 @@
 \alias{list_levelDefinitions}
 \title{List level definitions. (A copy of the emuR function)}
 \usage{
-list_levelDefinitions(emuDBhandle)
-}
-\arguments{
-\item{emuDBhandle}{emuDB handle as returned by \code{\link[emuR]{load_emuDB}}}
+list_levelDefinitions(corpusObj)
 }
 \description{
 Add / List / Remove database operation functions for level definitions. 

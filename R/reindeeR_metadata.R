@@ -148,14 +148,15 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE, manditor
     dplyr::left_join(sessJSONFilesDF,by="session",suffix=c("","_sessionmetadatafile")) -> metafiles
 
 
-  # Now check and load metadata set at the database level
+  # Now check and load metadata set at the database level from <dbname>.meta_json
 
-  emuR:::load_DBconfig(emuDBhandle) -> dbCfg
+  basePath <- emuDBhandle$basePath
+  db_name <- basename(basePath)
+  db_name <- sub("_emuDB$", "", db_name)
+  db_meta_file <- file.path(basePath, paste0(db_name, ".", metadata.extension))
 
-  if(is.null(dbCfg$metadataDefaults)){
-    dbMeta <- data.frame()
-  }else{
-    dbDefaults <- as.data.frame(dbCfg$metadataDefaults,stringsAsFactors=FALSE)
+  if(file.exists(db_meta_file)){
+    dbDefaults <- jsonlite::read_json(db_meta_file, simplifyVector = TRUE)
     if(length(dbDefaults) > 0){
       #This means that the field is not just empty
       # Repeat the rows so that the columns may be merged
@@ -166,9 +167,11 @@ export_metadata <- function(emuDBhandle,Excelfile=NULL,overwrite=FALSE, manditor
         dplyr::mutate_if(is.factor,as.character)%>%
         dplyr::left_join(dbMeta,by="bundle",suffix=c("","_database")) %>%
         dplyr::distinct() ## This is needed since duplicate rows are introduced by the join by dbMeta
-
-
+    } else {
+      dbMeta <- data.frame()
     }
+  } else {
+    dbMeta <- data.frame()
   }
 
   #Now, there may be a metadata X column set at the bundle level, an X_sessionmetadatafile
@@ -335,12 +338,15 @@ import_metadata <- function(emuDBhandle,Excelfile){
     sFiles <- ifelse(exists("sFiles"),c(sFiles,outFile),c(outFile))
   }
 
-  # Now inject database wide metadata
+  # Now inject database wide metadata into <dbname>.meta_json
 
-  emuR:::load_DBconfig(emuDBhandle) -> dbCfg
+  basePath <- emuDBhandle$basePath
+  db_name <- basename(basePath)
+  db_name <- sub("_emuDB$", "", db_name)
+  db_meta_file <- file.path(basePath, paste0(db_name, ".", metadata.extension))
+  
   openxlsx::read.xlsx(Excelfile,sheet="database") -> dbMeta
-  dbCfg$metadataDefaults <- as.list(dbMeta)
-  emuR:::store_DBconfig(emuDBhandle,dbCfg)
+  jsonlite::write_json(as.list(dbMeta), db_meta_file, auto_unbox = TRUE, pretty = TRUE)
 
   return(c(sFiles,bFiles))
 }
@@ -399,21 +405,23 @@ add_metadata <- function(emuDBhandle,metadataList,bundle=NULL,session=NULL, rese
 
   if(is.null(bundle) && is.null(session)){
 
-    #Database wide injection
-
-    emuR:::load_DBconfig(emuDBhandle) -> dbCfg
-
-    if(reset.before.add){
-      dbCfg$metadataDefaults <- as.list(metadataList)
+    # Database-wide injection - store in <dbname>.meta_json
+    basePath <- emuDBhandle$basePath
+    db_name <- basename(basePath)
+    db_name <- sub("_emuDB$", "", db_name)
+    meta_file <- file.path(basePath, paste0(db_name, ".", metadata.extension))
+    
+    if(reset.before.add || !file.exists(meta_file)){
+      # Start fresh
+      jsonmetaList <- list()
     } else {
-      #Append data
-      prev <- dbCfg$metadataDefaults
-      prev[names(metadataList)] <- metadataList
-      dbCfg$metadataDefaults <- prev
+      # Read existing
+      jsonmetaList <- as.list(jsonlite::read_json(meta_file, simplifyVector = TRUE))
     }
-
-
-    emuR:::store_DBconfig(emuDBhandle,dbCfg)
+    
+    # Update metadata
+    jsonmetaList <- utils::modifyList(jsonmetaList, metadataList, keep.null = FALSE)
+    jsonlite::write_json(jsonmetaList, meta_file, auto_unbox = TRUE, pretty = TRUE)
 
   } else {
     # Here we store metadata in either session wide or bundle specific metadata files

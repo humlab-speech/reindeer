@@ -1,12 +1,49 @@
 
-#' Corpus Class - Represents an EmuR database with persistent connection management
+# ==============================================================================
+# CORPUS S7 CLASS DEFINITION
+# ==============================================================================
+
+#' Corpus Class - Represents an EmuR database with persistent connection and metadata management
+#' 
+#' An S7 class representing a speech corpus that provides efficient access to
+#' annotations, metadata, and signal data stored in an Emu-SDMS database.
+#'
+#' @param path Either a file path ending in '_emuDB' or an emuDBhandle object
+#' @param verbose Show progress messages during construction
+#'
+#' @returns A corpus object with access to database contents
+#'
+#' @section Properties:
+#' \describe{
+#'   \item{dbName}{The database name (without _emuDB suffix)}
+#'   \item{basePath}{Full path to the database directory}
+#'   \item{config}{Database configuration (DBconfig) loaded from JSON}
+#'   \item{.uuid}{Database UUID for identification}
+#'   \item{.connection}{Cached SQLite database connection}
+#'   \item{.connection_valid}{Whether the cached connection is valid}
+#' }
+#'
+#' @section Usage:
+#' \describe{
+#'   \item{`corpus(path)`}{Create corpus from path or emuDBhandle}
+#'   \item{`corp["Session","Bundle"]`}{Get bundle metadata}
+#'   \item{`corp["Session",]`}{Get all bundles in session}
+#'   \item{`corp[,"Bundle"]`}{Get bundle across sessions (if unique)}
+#'   \item{`corp["Sess.*","Bund.*"]`}{Use regex patterns}
+#'   \item{`corp["Session","Bundle"] <- list(Age=25)`}{Set metadata}
+#'   \item{`corp["Session","Bundle"] <- "path/to/audio.mp3"`}{Import media}
+#'   \item{`summary(corp)`}{Display comprehensive database summary}
+#' }
+#'
+#' @export
 corpus <- S7::new_class(
   "corpus",
   properties = list(
     dbName = S7::class_character,
     basePath = S7::class_character,
     config = S7::class_any,
-    .connection = S7::class_any,  # Private property for active connection
+    .uuid = S7::class_character,
+    .connection = S7::class_any,
     .connection_valid = S7::class_logical
   ),
   constructor = function(path, verbose = FALSE) {
@@ -18,70 +55,263 @@ corpus <- S7::new_class(
         cli::cli_abort("Database directory should end with '_emuDB'")
       }
       basePath <- path
-      dbName <- stringr::str_remove(basename(basePath),"_emuDB$")
-      build_emuDB_cache(basePath)
-      # config <- emuR:::load_DBconfig(handle) #Implment later
-      # Close the initial connection since we'll manage it ourselves
-      #if (!is.null(handle$connection) && DBI::dbIsValid(handle$connection)) {
-      #  DBI::dbDisconnect(handle$connection)
-      #}
+      dbName <- stringr::str_remove(basename(basePath), "_emuDB$")
+      
+      # Build/update cache with progress display
+      build_emuDB_cache(basePath, verbose = verbose)
+      
+      # Gather metadata into cache
+      if (verbose) {
+        cli::cli_h2("Gathering metadata")
+      }
+      
     } else if ("emuDBhandle" %in% class(path)) {
       handle <- path
       dbName <- handle$dbName
       basePath <- handle$basePath
-      config <- emuR:::load_DBconfig(handle)
-      # Don't close an existing handle connection - just reference it
+      
+      # Ensure cache exists
+      cache_file <- file.path(basePath, paste0(dbName, "_emuDBcache.sqlite"))
+      if (!file.exists(cache_file)) {
+        build_emuDB_cache(basePath, verbose = verbose)
+      }
     } else {
       cli::cli_abort("Invalid input: expected path or emuDBhandle")
     }
 
-
+    # Load configuration
     config <- load_DBconfig(basePath)
-
-    S7::new_object(
+    
+    # Create corpus object
+    corpus_obj <- S7::new_object(
       S7::S7_object(),
       dbName = dbName,
       basePath = basePath,
       config = config,
+      .uuid = config$UUID,
       .connection = NULL,
       .connection_valid = FALSE
     )
+    
+    # Gather metadata after object creation
+    con <- get_corpus_connection(corpus_obj)
+    initialize_metadata_schema(con)
+    DBI::dbDisconnect(con)
+    
+    # Gather from .meta_json files (ground truth)
+    gather_metadata_internal(corpus_obj, verbose = verbose)
+    
+    corpus_obj
   },
   validator = function(self) {
     if (!dir.exists(self@basePath)) {
       "Database path must exist"
     } else if (is.null(self@dbName) || nchar(self@dbName) == 0) {
       "Database name must be specified"
+    } else if (is.null(self@.uuid) || nchar(self@.uuid) == 0) {
+      "Database UUID must be specified"
     }
   }
 )
 
+# ==============================================================================
+# BUNDLE_LIST S7 CLASS - Result of corpus subsetting
+# ==============================================================================
+
+#' Bundle List Class - Tibble with session/bundle information and metadata
+#'
+#' An S7 class that extends tibble to represent a list of bundles with
+#' their associated metadata following inheritance rules.
+#'
+#' @export
+bundle_list <- S7::new_class(
+  "bundle_list",
+  parent = S7::new_S3_class("tbl_df"),
+  properties = list(
+    .data = S7::class_any
+  ),
+  constructor = function(.data = tibble::tibble()) {
+    # Ensure required columns exist
+    if (!all(c("session", "bundle") %in% names(.data))) {
+      .data <- tibble::tibble(session = character(), bundle = character())
+    }
+    
+    # Convert to tibble if needed
+    if (!inherits(.data, "tbl_df")) {
+      .data <- tibble::as_tibble(.data)
+    }
+    
+    S7::new_object(
+      S7::S7_object(),
+      .data = .data
+    )
+  },
+  validator = function(self) {
+    required_cols <- c("session", "bundle")
+    if (!all(required_cols %in% names(self@.data))) {
+      sprintf("bundle_list must contain columns: %s", 
+              paste(required_cols, collapse = ", "))
+    }
+  }
+)
+
+# ==============================================================================
+# CORPUS SUBSETTING OPERATORS - corpus[i, j]
+# ==============================================================================
+
+#' Subset corpus to get bundle list with metadata
+#'
+#' @param x corpus object
+#' @param i session pattern (regex or literal)
+#' @param j bundle pattern (regex or literal)
+#' @return bundle_list object (tibble with session, bundle, and metadata columns)
+#' @export
+S7::method(`[`, corpus) <- function(x, i = NULL, j = NULL, ...) {
+  # Handle various indexing patterns
+  session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"
+  bundle_pattern <- if (!missing(j) && !is.null(j)) j else ".*"
+  
+  # If only one index provided and not named, it could be bundle name
+  if (!missing(i) && missing(j)) {
+    # Check if i looks like a session (contains "ses" or matches existing session)
+    con <- get_corpus_connection(x)
+    sessions <- list_sessions_from_cache(con, x@.uuid)
+    DBI::dbDisconnect(con)
+    
+    # If i matches any session name, treat as session pattern
+    if (any(grepl(i, sessions$name, ignore.case = TRUE))) {
+      session_pattern <- i
+      bundle_pattern <- ".*"
+    } else {
+      # Otherwise treat as bundle pattern across all sessions
+      session_pattern <- ".*"
+      bundle_pattern <- i
+    }
+  }
+  
+  # Get metadata for matching bundles
+  metadata_df <- get_metadata_for_patterns(x, session_pattern, bundle_pattern)
+  
+  # Convert to bundle_list
+  if (nrow(metadata_df) == 0) {
+    cli::cli_alert_warning("No bundles match pattern session={.val {session_pattern}}, bundle={.val {bundle_pattern}}")
+  }
+  
+  bundle_list(.data = metadata_df)
+}
+
+#' Assign values to corpus bundles - metadata or media import
+#'
+#' @param x corpus object
+#' @param i session pattern
+#' @param j bundle pattern
+#' @param value Either a named list (metadata) or character vector (media files)
+#' @export
+S7::method(`[<-`, corpus) <- function(x, i = NULL, j = NULL, value) {
+  # Determine what type of assignment this is
+  if (is.list(value) && !is.null(names(value))) {
+    # Metadata assignment
+    corpus_assign_metadata(x, i, j, value)
+  } else if (is.character(value)) {
+    # Media file import
+    corpus_import_media(x, i, j, value)
+  } else {
+    cli::cli_abort("Value must be a named list (metadata) or character vector (media files)")
+  }
+  
+  invisible(x)
+}
+
+# ==============================================================================
+# PRINT AND SUMMARY METHODS
+# ==============================================================================
+
 #' Print method for corpus
-S7::method(print, corpus) <- function(corpus_obj, ...) {
-  cli::cli_h1("EmuR Speech Corpus")
-  cli::cli_bullets(c(
-    "Database: {.field {corpus_obj@dbName}}",
-    "Path: {.path {corpus_obj@basePath}}",
-    "Connection: {if(corpus_obj@.connection_valid) 'Active' else 'Inactive'}"
+#' @export
+S7::method(print, corpus) <- function(x, ...) {
+  cli::cli_h1("Emu Speech Corpus")
+  cli::cli_dl(c(
+    "Database" = x@dbName,
+    "UUID" = x@.uuid,
+    "Path" = x@basePath
   ))
 
-  # Show basic database info
+  # Show basic database info from cache
   tryCatch({
-    handle <- get_handle(corpus_obj, verbose = FALSE)
-    sessions <- emuR::list_sessions(handle)
-    bundles <- emuR::list_bundles(handle)
-    levels <- emuR::list_levelDefinitions(handle)
-
-    cli::cli_bullets(c(
-      "Sessions: {.val {nrow(sessions)}}",
-      "Bundles: {.val {nrow(bundles)}}",
-      "Levels: {.val {nrow(levels)}}"
+    con <- get_corpus_connection(x)
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
+    
+    session_count <- DBI::dbGetQuery(con, sprintf(
+      "SELECT COUNT(*) as n FROM session WHERE db_uuid = '%s'", x@.uuid
+    ))$n
+    
+    bundle_count <- DBI::dbGetQuery(con, sprintf(
+      "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = '%s'", x@.uuid
+    ))$n
+    
+    item_count <- DBI::dbGetQuery(con, sprintf(
+      "SELECT COUNT(*) as n FROM items WHERE db_uuid = '%s'", x@.uuid
+    ))$n
+    
+    cli::cli_dl(c(
+      "Sessions" = session_count,
+      "Bundles" = bundle_count,
+      "Items" = item_count
     ))
+    
+    cli::cli_text("")
+    cli::cli_text("Use {.code summary(corpus)} for detailed information")
+    cli::cli_text("Use {.code corpus[session, bundle]} to access bundles")
   }, error = function(e) {
     cli::cli_alert_warning("Could not load database info: {e$message}")
   })
 
-  invisible(corpus_obj)
+  invisible(x)
+}
+
+#' Print method for bundle_list
+#' @export
+S7::method(print, bundle_list) <- function(x, ...) {
+  cli::cli_text("{.strong Bundle List} ({nrow(x@.data)} bundle{?s})")
+  print(tibble::as_tibble(x@.data))
+  invisible(x)
+}
+
+# ==============================================================================
+# INTERACTIVE TESTING
+# ==============================================================================
+
+if (FALSE) {
+  # Test corpus construction and usage
+  library(reindeer)
+  
+  # Create test database
+  reindeer:::create_ae_db(verbose = FALSE) -> ae
+  
+  # Construct corpus
+  VISP <- corpus(ae$basePath, verbose = TRUE)
+  
+  # Print corpus
+  print(VISP)
+  
+  # Summary
+  summary(VISP)
+  
+  # Test subsetting
+  VISP["0000", "msajc003"]  # Specific bundle
+  VISP["0000", ]            # All bundles in session
+  VISP[, "msajc003"]        # Bundle across sessions (if unique)
+  VISP[".*", "msajc.*"]     # Regex patterns
+  
+  # Test metadata assignment
+  VISP["0000", "msajc003"] <- list(Age = 25, Gender = "Male")
+  VISP["0000", ] <- list(Age = 30, Gender = "Female")
+  VISP <- corpus(ae$basePath)  # Reload
+  VISP["0000", "msajc003"]  # Check metadata
+  
+  # Test media import (if media files available)
+  # VISP["0000", "msajc003"] <- "path/to/audio.wav"
+  # VISP["0000", "msajc003"] <- c("path/to/audio.wav", "egg", NULL, "flow")
 }
 
 #' Get or restore database handle for corpus
@@ -113,6 +343,443 @@ get_handle <- function(corpus_obj, verbose = FALSE) {
   corpus_obj@.connection_valid <- TRUE
 
   return(handle)
+}
+
+# ==============================================================================
+# HELPER FUNCTIONS FOR CORPUS OPERATIONS
+# ==============================================================================
+
+#' Get SQLite connection for corpus cache
+#' @keywords internal
+get_corpus_connection <- function(corpus_obj) {
+  cache_path <- file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, "_emuDBcache.sqlite"))
+  
+  if (!file.exists(cache_path)) {
+    cli::cli_abort("Cache file not found at {.path {cache_path}}. Run corpus(path) to rebuild.")
+  }
+  
+  DBI::dbConnect(RSQLite::SQLite(), cache_path)
+}
+
+#' Get metadata for bundles matching patterns
+#' @keywords internal
+get_metadata_for_patterns <- function(corpus_obj, session_pattern, bundle_pattern) {
+  con <- get_corpus_connection(corpus_obj)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Get all bundles
+  bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)
+  
+  if (nrow(bundles) == 0) {
+    return(tibble::tibble(session = character(), bundle = character()))
+  }
+  
+  # Filter by patterns (support both literal and regex)
+  session_matches <- grepl(session_pattern, bundles$session)
+  bundle_matches <- grepl(bundle_pattern, bundles$name)
+  
+  filtered_bundles <- bundles[session_matches & bundle_matches, ]
+  
+  if (nrow(filtered_bundles) == 0) {
+    return(tibble::tibble(session = character(), bundle = character()))
+  }
+  
+  # Start with session and bundle columns
+  result <- tibble::tibble(
+    session = filtered_bundles$session,
+    bundle = filtered_bundles$name
+  )
+  
+  # Get all metadata fields
+  fields_query <- "SELECT DISTINCT field_name FROM metadata_fields ORDER BY field_name"
+  fields <- DBI::dbGetQuery(con, fields_query)
+  
+  if (nrow(fields) > 0) {
+    # For each field, get values with proper precedence
+    for (field_name in fields$field_name) {
+      field_values <- get_metadata_field_values(
+        con, corpus_obj@.uuid, field_name, 
+        result$session, result$bundle
+      )
+      result[[field_name]] <- field_values
+    }
+  }
+  
+  result
+}
+
+#' Get values for a metadata field with inheritance
+#' @keywords internal
+get_metadata_field_values <- function(con, db_uuid, field_name, sessions, bundles) {
+  values <- character(length(sessions))
+  types <- character(length(sessions))
+  
+  for (i in seq_along(sessions)) {
+    session <- sessions[i]
+    bundle <- bundles[i]
+    
+    # Try bundle level first
+    bundle_val <- DBI::dbGetQuery(con, sprintf(
+      "SELECT field_value, field_type FROM metadata_bundle 
+       WHERE db_uuid = '%s' AND session = '%s' AND bundle = '%s' AND field_name = %s",
+      db_uuid, session, bundle, DBI::dbQuoteString(con, field_name)
+    ))
+    
+    if (nrow(bundle_val) > 0) {
+      values[i] <- bundle_val$field_value[1]
+      types[i] <- bundle_val$field_type[1]
+      next
+    }
+    
+    # Try session level
+    session_val <- DBI::dbGetQuery(con, sprintf(
+      "SELECT field_value, field_type FROM metadata_session 
+       WHERE db_uuid = '%s' AND session = '%s' AND field_name = %s",
+      db_uuid, session, DBI::dbQuoteString(con, field_name)
+    ))
+    
+    if (nrow(session_val) > 0) {
+      values[i] <- session_val$field_value[1]
+      types[i] <- session_val$field_type[1]
+      next
+    }
+    
+    # Try database level
+    db_val <- DBI::dbGetQuery(con, sprintf(
+      "SELECT field_value, field_type FROM metadata_database 
+       WHERE db_uuid = '%s' AND field_name = %s",
+      db_uuid, DBI::dbQuoteString(con, field_name)
+    ))
+    
+    if (nrow(db_val) > 0) {
+      values[i] <- db_val$field_value[1]
+      types[i] <- db_val$field_type[1]
+    } else {
+      values[i] <- NA_character_
+      types[i] <- "character"
+    }
+  }
+  
+  # Deserialize values based on type
+  result <- vector("list", length(values))
+  for (i in seq_along(values)) {
+    result[[i]] <- deserialize_metadata_value(values[i], types[i])
+  }
+  
+  # Try to simplify to vector if possible
+  tryCatch({
+    unlist(result)
+  }, error = function(e) {
+    result
+  })
+}
+
+#' Assign metadata to corpus bundles/sessions
+#' @keywords internal
+corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, metadata_list) {
+  if (!is.list(metadata_list) || is.null(names(metadata_list))) {
+    cli::cli_abort("Metadata must be a named list")
+  }
+  
+  # Determine level based on patterns
+  is_session_all <- is.null(session_pattern) || session_pattern == ".*"
+  is_bundle_all <- is.null(bundle_pattern) || bundle_pattern == ".*"
+  
+  if (is_session_all && is_bundle_all) {
+    # Database level
+    set_metadata_database(corpus_obj, metadata_list)
+  } else if (!is_session_all && is_bundle_all) {
+    # Session level
+    set_metadata_session(corpus_obj, session_pattern, metadata_list)
+  } else if (!is_session_all && !is_bundle_all) {
+    # Bundle level
+    set_metadata_bundle(corpus_obj, session_pattern, bundle_pattern, metadata_list)
+  } else {
+    cli::cli_abort("Invalid pattern combination: bundle requires session")
+  }
+}
+
+#' Set database-level metadata
+#' @keywords internal
+set_metadata_database <- function(corpus_obj, metadata_list) {
+  # Write to <dbname>.meta_json
+  db_meta_file <- file.path(corpus_obj@basePath, 
+                            paste0(corpus_obj@dbName, ".meta_json"))
+  
+  # Read existing
+  if (file.exists(db_meta_file)) {
+    existing <- jsonlite::read_json(db_meta_file, simplifyVector = TRUE)
+  } else {
+    existing <- list()
+  }
+  
+  # Merge
+  updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
+  
+  # Write
+  jsonlite::write_json(updated, db_meta_file, auto_unbox = TRUE, pretty = TRUE)
+  
+  # Update cache
+  con <- get_corpus_connection(corpus_obj)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  process_metadata_list(con, corpus_obj@.uuid, NULL, NULL, metadata_list, "database")
+  
+  cli::cli_alert_success("Database metadata updated")
+}
+
+#' Set session-level metadata
+#' @keywords internal
+set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
+  con <- get_corpus_connection(corpus_obj)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Find matching sessions
+  sessions <- list_sessions_from_cache(con, corpus_obj@.uuid)
+  matches <- grepl(session_pattern, sessions$name)
+  matching_sessions <- sessions$name[matches]
+  
+  if (length(matching_sessions) == 0) {
+    cli::cli_abort("No sessions match pattern {.val {session_pattern}}")
+  }
+  
+  if (length(matching_sessions) > 1 && !grepl("[.*+?^${}()|\\[\\]]", session_pattern)) {
+    # Looks like literal match but got multiple - warn user
+    cli::cli_alert_warning("Pattern {.val {session_pattern}} matches {length(matching_sessions)} sessions")
+  }
+  
+  # Update each matching session
+  for (session_name in matching_sessions) {
+    session_meta_file <- file.path(
+      corpus_obj@basePath,
+      paste0(session_name, "_ses"),
+      paste0(session_name, ".meta_json")
+    )
+    
+    # Read existing
+    if (file.exists(session_meta_file)) {
+      existing <- jsonlite::read_json(session_meta_file, simplifyVector = TRUE)
+    } else {
+      existing <- list()
+    }
+    
+    # Merge
+    updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
+    
+    # Ensure directory exists
+    session_dir <- dirname(session_meta_file)
+    if (!dir.exists(session_dir)) {
+      dir.create(session_dir, recursive = TRUE)
+    }
+    
+    # Write
+    jsonlite::write_json(updated, session_meta_file, auto_unbox = TRUE, pretty = TRUE)
+    
+    # Update cache
+    process_metadata_list(con, corpus_obj@.uuid, session_name, NULL, metadata_list, "session")
+  }
+  
+  cli::cli_alert_success("Metadata updated for {length(matching_sessions)} session{?s}")
+}
+
+#' Set bundle-level metadata
+#' @keywords internal
+set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, metadata_list) {
+  con <- get_corpus_connection(corpus_obj)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Find matching bundles
+  bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)
+  session_matches <- grepl(session_pattern, bundles$session)
+  bundle_matches <- grepl(bundle_pattern, bundles$name)
+  
+  matching_bundles <- bundles[session_matches & bundle_matches, ]
+  
+  if (nrow(matching_bundles) == 0) {
+    cli::cli_abort("No bundles match session={.val {session_pattern}}, bundle={.val {bundle_pattern}}")
+  }
+  
+  # Update each matching bundle
+  for (i in seq_len(nrow(matching_bundles))) {
+    session_name <- matching_bundles$session[i]
+    bundle_name <- matching_bundles$name[i]
+    
+    bundle_meta_file <- file.path(
+      corpus_obj@basePath,
+      paste0(session_name, "_ses"),
+      paste0(bundle_name, "_bndl"),
+      paste0(bundle_name, ".meta_json")
+    )
+    
+    # Read existing
+    if (file.exists(bundle_meta_file)) {
+      existing <- jsonlite::read_json(bundle_meta_file, simplifyVector = TRUE)
+    } else {
+      existing <- list()
+    }
+    
+    # Merge
+    updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
+    
+    # Ensure directory exists
+    bundle_dir <- dirname(bundle_meta_file)
+    if (!dir.exists(bundle_dir)) {
+      dir.create(bundle_dir, recursive = TRUE)
+    }
+    
+    # Write
+    jsonlite::write_json(updated, bundle_meta_file, auto_unbox = TRUE, pretty = TRUE)
+    
+    # Update cache
+    process_metadata_list(con, corpus_obj@.uuid, session_name, bundle_name, metadata_list, "bundle")
+  }
+  
+  cli::cli_alert_success("Metadata updated for {nrow(matching_bundles)} bundle{?s}")
+}
+
+#' Import media files to corpus bundles
+#' @keywords internal
+corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, media_spec) {
+  # media_spec can be:
+  # - Single file path: imports to mediafileExtension
+  # - Vector with channel assignments: c("egg", "path.mp3", NULL, "flow")
+  # - Vector with file first: c("path.mp3", "egg", NULL, "flow")
+  
+  if (grepl("[.*+?^${}()|\\[\\]]", session_pattern) || 
+      grepl("[.*+?^${}()|\\[\\]]", bundle_pattern)) {
+    cli::cli_abort("Regex patterns not allowed for media import. Specify exact session and bundle names.")
+  }
+  
+  # Find the unique bundle
+  con <- get_corpus_connection(corpus_obj)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)
+  session_matches <- bundles$session == session_pattern
+  bundle_matches <- bundles$name == bundle_pattern
+  
+  matching_bundles <- bundles[session_matches & bundle_matches, ]
+  
+  if (nrow(matching_bundles) == 0) {
+    cli::cli_abort("Bundle {.val {bundle_pattern}} not found in session {.val {session_pattern}}")
+  }
+  
+  if (nrow(matching_bundles) > 1) {
+    cli::cli_abort("Multiple bundles found. Be more specific.")
+  }
+  
+  # Parse media specification
+  file_path <- NULL
+  channel_map <- list()
+  
+  if (length(media_spec) == 1) {
+    # Simple case: just a file path
+    file_path <- media_spec
+    channel_map[[corpus_obj@config$mediafileExtension %||% "wav"]] <- 1
+  } else {
+    # Complex case: channel mappings
+    # Find the file path (should be the only element that exists as a file)
+    for (elem in media_spec) {
+      if (!is.null(elem) && file.exists(elem)) {
+        file_path <- elem
+        break
+      }
+    }
+    
+    if (is.null(file_path)) {
+      cli::cli_abort("No valid file path found in media specification")
+    }
+    
+    # Build channel map
+    channel_num <- 1
+    for (elem in media_spec) {
+      if (!is.null(elem)) {
+        if (elem == file_path) {
+          # This is the file path - assign to mediafileExtension
+          channel_map[[corpus_obj@config$mediafileExtension %||% "wav"]] <- channel_num
+        } else {
+          # This is a track extension
+          channel_map[[elem]] <- channel_num
+        }
+      }
+      channel_num <- channel_num + 1
+    }
+  }
+  
+  # Now import the media file
+  import_media_to_bundle(
+    corpus_obj = corpus_obj,
+    session_name = session_pattern,
+    bundle_name = bundle_pattern,
+    file_path = file_path,
+    channel_map = channel_map
+  )
+}
+
+#' Import media file to a specific bundle
+#' @keywords internal
+import_media_to_bundle <- function(corpus_obj, session_name, bundle_name, 
+                                  file_path, channel_map) {
+  
+  if (!file.exists(file_path)) {
+    cli::cli_abort("Media file not found: {.path {file_path}}")
+  }
+  
+  if (!requireNamespace("wrassp", quietly = TRUE)) {
+    cli::cli_abort("Package {.pkg wrassp} required for media import")
+  }
+  
+  # Read audio file
+  audio_data <- wrassp::read.AsspDataObj(file_path)
+  sample_rate <- attr(audio_data, "sampleRate")
+  n_channels <- ncol(audio_data$audio)
+  
+  # Validate channel numbers
+  requested_channels <- unique(unlist(channel_map))
+  if (any(requested_channels > n_channels)) {
+    cli::cli_abort(
+      "File has {n_channels} channel{?s}, but channel {max(requested_channels)} was requested"
+    )
+  }
+  
+  # Create bundle directory if it doesn't exist
+  bundle_dir <- file.path(
+    corpus_obj@basePath,
+    paste0(session_name, "_ses"),
+    paste0(bundle_name, "_bndl")
+  )
+  
+  if (!dir.exists(bundle_dir)) {
+    cli::cli_abort(
+      "Bundle directory does not exist: {.path {bundle_dir}}. Create bundle first."
+    )
+  }
+  
+  # Write each channel to its designated file
+  for (ext in names(channel_map)) {
+    channel_num <- channel_map[[ext]]
+    
+    # Extract channel
+    channel_data <- audio_data
+    channel_data$audio <- audio_data$audio[, channel_num, drop = FALSE]
+    
+    # Write to file
+    output_file <- file.path(bundle_dir, paste0(bundle_name, ".", ext))
+    wrassp::write.AsspDataObj(channel_data, output_file)
+    
+    cli::cli_alert_success("Wrote channel {channel_num} to {.file {basename(output_file)}}")
+  }
+  
+  # Update bundle annotation if needed (sample rate, annotates field)
+  annot_file <- file.path(bundle_dir, paste0(bundle_name, "_annot.json"))
+  if (file.exists(annot_file)) {
+    annot <- jsonlite::read_json(annot_file, simplifyVector = FALSE)
+    annot$sampleRate <- sample_rate
+    annot$annotates <- paste0(bundle_name, ".", corpus_obj@config$mediafileExtension %||% "wav")
+    jsonlite::write_json(annot, annot_file, auto_unbox = TRUE, pretty = TRUE)
+  }
+  
+  cli::cli_alert_success("Media imported to {.val {session_name}/{bundle_name}}")
 }
 
 
@@ -220,6 +887,12 @@ build_emuDB_cache <- function(database_dir,
       }
     }
   }
+  
+  # Initialize metadata schema
+  if (verbose) {
+    cli::cli_h2("Initializing metadata schema")
+  }
+  initialize_metadata_schema(con)
 
   # Close the connection we created (the corpus will create its own)
   DBI::dbDisconnect(con)
@@ -629,24 +1302,206 @@ insert_batch_results <- function(con, results, db_uuid) {
     DBI::dbRollback(con)
     stop(e)
   })
+}#' Gather all metadata from .meta_json files (internal, called during construction)
+#' @keywords internal
+gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
+  if (verbose) {
+    cli::cli_alert_info("Scanning .meta_json files...")
+  }
+  
+  basePath <- corpus_obj@basePath
+  db_uuid <- corpus_obj@.uuid
+  con <- get_corpus_connection(corpus_obj)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Clear existing metadata
+  DBI::dbExecute(con, sprintf("DELETE FROM metadata_bundle WHERE db_uuid = '%s'", db_uuid))
+  DBI::dbExecute(con, sprintf("DELETE FROM metadata_session WHERE db_uuid = '%s'", db_uuid))
+  DBI::dbExecute(con, sprintf("DELETE FROM metadata_database WHERE db_uuid = '%s'", db_uuid))
+  
+  # 1. Database-level metadata
+  db_meta_file <- file.path(basePath, paste0(corpus_obj@dbName, ".meta_json"))
+  
+  if (file.exists(db_meta_file)) {
+    if (verbose) cli::cli_alert_info("Loading database defaults")
+    db_meta <- jsonlite::read_json(db_meta_file, simplifyVector = TRUE)
+    if (length(db_meta) > 0) {
+      process_metadata_list(con, db_uuid, NULL, NULL, db_meta, "database")
+    }
+  }
+  
+  # 2. Session-level metadata
+  sessions <- list_sessions_from_cache(con, db_uuid)
+  
+  for (i in seq_len(nrow(sessions))) {
+    session_name <- sessions$name[i]
+    session_meta_file <- file.path(basePath, paste0(session_name, "_ses"),
+                                   paste0(session_name, ".meta_json"))
+    
+    if (file.exists(session_meta_file)) {
+      meta_data <- jsonlite::read_json(session_meta_file, simplifyVector = TRUE)
+      if (length(meta_data) > 0) {
+        process_metadata_list(con, db_uuid, session_name, NULL, meta_data, "session")
+      }
+    }
+  }
+  
+  # 3. Bundle-level metadata
+  bundles <- list_bundles_from_cache(con, db_uuid)
+  
+  for (i in seq_len(nrow(bundles))) {
+    session_name <- bundles$session[i]
+    bundle_name <- bundles$name[i]
+    
+    bundle_meta_file <- file.path(
+      basePath, 
+      paste0(session_name, "_ses"),
+      paste0(bundle_name, "_bndl"),
+      paste0(bundle_name, ".meta_json")
+    )
+    
+    if (file.exists(bundle_meta_file)) {
+      meta_data <- jsonlite::read_json(bundle_meta_file, simplifyVector = TRUE)
+      if (length(meta_data) > 0) {
+        process_metadata_list(con, db_uuid, session_name, bundle_name, meta_data, "bundle")
+      }
+    }
+  }
+  
+  if (verbose) {
+    cli::cli_alert_success("Metadata loaded")
+  }
 }
 
 # ==============================================================================
-# INTERACTIVE TESTING
+# METADATA HELPER FUNCTIONS (from reindeeR_metadata_optimized.R)
 # ==============================================================================
 
-
-if (FALSE) {
-
-  reindeer:::create_ae_db(verbose=FALSE) -> ae
-
-  unlink(file.path(ae$basePath,"ae_emuDBcache.sqlite"))
-
-  # Example: Build cache for an emuDB
-  corpus_obj <- corpus(ae$basePath)
-
-  # The returned corpus object is ready to use
-  print(corpus_obj)
-
-
+#' Process and insert metadata list
+#' @keywords internal
+process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, level) {
+  if (length(meta_list) == 0) return(invisible(NULL))
+  
+  DBI::dbWithTransaction(con, {
+    for (field_name in names(meta_list)) {
+      value <- meta_list[[field_name]]
+      
+      # Serialize value
+      field_info <- serialize_metadata_value(value)
+      
+      # Register field
+      register_metadata_field(con, field_name, field_info$type)
+      
+      # Insert into appropriate table
+      if (level == "database") {
+        # Remove quotes from field_name in SQL
+        field_name_clean <- gsub("'", "''", field_name)
+        value_clean <- gsub("'", "''", field_info$value)
+        
+        sql <- sprintf(
+          "INSERT OR REPLACE INTO metadata_database (db_uuid, field_name, field_value, field_type) 
+           VALUES ('%s', '%s', '%s', '%s')",
+          db_uuid, field_name_clean, value_clean, field_info$type
+        )
+      } else if (level == "session") {
+        field_name_clean <- gsub("'", "''", field_name)
+        value_clean <- gsub("'", "''", field_info$value)
+        session_clean <- gsub("'", "''", session)
+        
+        sql <- sprintf(
+          "INSERT OR REPLACE INTO metadata_session (db_uuid, session, field_name, field_value, field_type) 
+           VALUES ('%s', '%s', '%s', '%s', '%s')",
+          db_uuid, session_clean, field_name_clean, value_clean, field_info$type
+        )
+      } else if (level == "bundle") {
+        field_name_clean <- gsub("'", "''", field_name)
+        value_clean <- gsub("'", "''", field_info$value)
+        session_clean <- gsub("'", "''", session)
+        bundle_clean <- gsub("'", "''", bundle)
+        
+        sql <- sprintf(
+          "INSERT OR REPLACE INTO metadata_bundle (db_uuid, session, bundle, field_name, field_value, field_type) 
+           VALUES ('%s', '%s', '%s', '%s', '%s', '%s')",
+          db_uuid, session_clean, bundle_clean, field_name_clean, value_clean, field_info$type
+        )
+      }
+      
+      DBI::dbExecute(con, sql)
+    }
+  })
 }
+
+#' Serialize metadata value
+#' @keywords internal
+serialize_metadata_value <- function(value) {
+  if (is.null(value)) {
+    return(list(value = "NULL", type = "NULL"))
+  } else if (is.logical(value)) {
+    return(list(value = as.character(value), type = "logical"))
+  } else if (is.numeric(value) && !is.integer(value)) {
+    return(list(value = as.character(value), type = "numeric"))
+  } else if (is.integer(value)) {
+    return(list(value = as.character(value), type = "integer"))
+  } else if (inherits(value, "Date")) {
+    return(list(value = as.character(value), type = "date"))
+  } else if (inherits(value, "POSIXt")) {
+    return(list(value = format(value, "%Y-%m-%dT%H:%M:%S"), type = "datetime"))
+  } else {
+    return(list(value = as.character(value), type = "character"))
+  }
+}
+
+#' Deserialize metadata value
+#' @keywords internal
+deserialize_metadata_value <- function(value_str, type_str) {
+  if (is.na(value_str) || value_str == "NULL" || value_str == "NA") {
+    return(NA)
+  }
+  
+  tryCatch({
+    switch(type_str,
+      "logical" = as.logical(value_str),
+      "numeric" = as.numeric(value_str),
+      "integer" = as.integer(value_str),
+      "date" = as.Date(value_str),
+      "datetime" = as.POSIXct(value_str),
+      "character" = value_str,
+      value_str  # default
+    )
+  }, error = function(e) {
+    value_str
+  })
+}
+
+#' Register metadata field
+#' @keywords internal
+register_metadata_field <- function(con, field_name, field_type) {
+  now <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  
+  field_name_clean <- gsub("'", "''", field_name)
+  
+  # Check if exists
+  existing <- DBI::dbGetQuery(con, sprintf(
+    "SELECT field_name FROM metadata_fields WHERE field_name = '%s'",
+    field_name_clean
+  ))
+  
+  if (nrow(existing) == 0) {
+    # Insert new
+    DBI::dbExecute(con, sprintf(
+      "INSERT INTO metadata_fields (field_name, field_type, first_seen, last_modified) 
+       VALUES ('%s', '%s', '%s', '%s')",
+      field_name_clean, field_type, now, now
+    ))
+  } else {
+    # Update timestamp
+    DBI::dbExecute(con, sprintf(
+      "UPDATE metadata_fields SET last_modified = '%s' WHERE field_name = '%s'",
+      now, field_name_clean
+    ))
+  }
+}
+
+#' Null coalescing operator
+#' @keywords internal
+`%||%` <- function(x, y) if (is.null(x)) y else x
