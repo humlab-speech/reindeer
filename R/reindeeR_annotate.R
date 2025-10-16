@@ -111,6 +111,16 @@ annotate_INTSINT_MOMEL <- function(emuDBhandle,
                                    verbose=FALSE,
                                    praat_path=NULL){
 
+  .Deprecated("draft_momel_intsint",
+              msg = paste("annotate_INTSINT_MOMEL() is deprecated and requires external Praat.",
+                         "Use the new transcription system instead:",
+                         "  corp <- corpus(path)",
+                         "  suggestions <- draft_momel_intsint(corp, bundles)",
+                         "  assess(suggestions)",
+                         "  prepare(suggestions)", 
+                         "  transcribe(suggestions)",
+                         sep = "\n  "))
+  
   if(! superassp::have_praat(praat_path)){
     stop("Could not find praat. Please specify a full path.")
   }
