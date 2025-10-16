@@ -82,15 +82,16 @@ initialize_metadata_schema <- function(con) {
 # METADATA GATHERING FROM .meta_json FILES
 # ==============================================================================
 
-#' Gather all metadata from .meta_json files and update SQLite cache
+#' Gather all metadata from .meta_json files and update SQLite cache - OPTIMIZED
 #'
 #' Efficiently scans database, session, and bundle .meta_json files
-#' and populates the metadata tables in the cache
+#' and populates the metadata tables in the cache using bulk operations
 #' 
 #' @param corpus_obj A corpus object
 #' @param verbose Show progress messages
+#' @param parallel Use parallel processing for bundle metadata (default: TRUE)
 #' @export
-gather_metadata <- function(corpus_obj, verbose = TRUE) {
+gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   
   if (!"corpus" %in% class(corpus_obj)) {
     cli::cli_abort("Input must be a corpus object")
@@ -144,34 +145,113 @@ gather_metadata <- function(corpus_obj, verbose = TRUE) {
     }
   }
   
-  # 3. Bundle-level metadata
+  # 3. Bundle-level metadata - OPTIMIZED with optional parallel processing
   bundles <- list_bundles_from_cache(con, db_uuid)
-  if (nrow(bundles) > 0 && verbose) {
+  
+  if (nrow(bundles) == 0) {
+    if (verbose) cli::cli_alert_success("Metadata gathering complete")
+    return(invisible(corpus_obj))
+  }
+  
+  if (verbose) {
     cli::cli_progress_bar("Processing bundle metadata", total = nrow(bundles))
   }
   
-  for (i in seq_len(nrow(bundles))) {
-    session_name <- bundles$session[i]
-    bundle_name <- bundles$name[i]
+  # Prepare file paths
+  bundle_files <- file.path(
+    basePath, 
+    paste0(bundles$session, "_ses"),
+    paste0(bundles$name, "_bndl"),
+    paste0(bundles$name, ".", metadata.extension)
+  )
+  
+  # Filter to existing files
+  exists_idx <- file.exists(bundle_files)
+  existing_files <- bundle_files[exists_idx]
+  existing_bundles <- bundles[exists_idx, ]
+  
+  if (length(existing_files) == 0) {
+    if (verbose) {
+      cli::cli_progress_done()
+      cli::cli_alert_success("Metadata gathering complete (no bundle metadata found)")
+    }
+    return(invisible(corpus_obj))
+  }
+  
+  # OPTIMIZATION: Use parallel processing for large databases
+  use_parallel <- parallel && length(existing_files) > 50 && requireNamespace("future.apply", quietly = TRUE)
+  
+  if (use_parallel) {
+    # Set up parallel processing
+    orig_plan <- future::plan()
+    future::plan(future::multisession, workers = min(4, parallel::detectCores() - 1))
+    on.exit(future::plan(orig_plan), add = TRUE)
     
-    bundle_meta_file <- file.path(
-      basePath, 
-      paste0(session_name, "_ses"),
-      paste0(bundle_name, "_bndl"),
-      paste0(bundle_name, ".", metadata.extension)
-    )
+    # Read all files in parallel
+    all_metadata <- future.apply::future_lapply(existing_files, function(f) {
+      tryCatch({
+        jsonlite::read_json(f, simplifyVector = TRUE)
+      }, error = function(e) {
+        list()
+      })
+    }, future.seed = TRUE)
     
-    if (file.exists(bundle_meta_file)) {
-      meta_data <- jsonlite::read_json(bundle_meta_file, simplifyVector = TRUE)
+  } else {
+    # Sequential reading (for small databases or if future not available)
+    all_metadata <- lapply(existing_files, function(f) {
+      tryCatch({
+        jsonlite::read_json(f, simplifyVector = TRUE)
+      }, error = function(e) {
+        list()
+      })
+    })
+  }
+  
+  # OPTIMIZATION: Bulk process all bundle metadata in a single transaction
+  # This is MUCH faster than individual inserts
+  DBI::dbWithTransaction(con, {
+    # Collect all metadata records
+    all_records <- list()
+    
+    for (i in seq_along(all_metadata)) {
+      meta_data <- all_metadata[[i]]
+      
       if (length(meta_data) > 0) {
-        process_metadata_list(con, db_uuid, session_name, bundle_name, meta_data, "bundle")
+        session_name <- existing_bundles$session[i]
+        bundle_name <- existing_bundles$name[i]
+        
+        for (field_name in names(meta_data)) {
+          field_info <- serialize_metadata_value(meta_data[[field_name]])
+          
+          all_records[[length(all_records) + 1]] <- data.frame(
+            db_uuid = db_uuid,
+            session = session_name,
+            bundle = bundle_name,
+            field_name = field_name,
+            field_value = field_info$value,
+            field_type = field_info$type,
+            stringsAsFactors = FALSE
+          )
+          
+          # Register field
+          register_metadata_field(con, field_name, field_info$type)
+        }
+      }
+      
+      if (verbose && i %% 10 == 0) {
+        cli::cli_progress_update(set = i)
       }
     }
     
-    if (verbose) cli::cli_progress_update()
-  }
+    # Bulk insert all records at once
+    if (length(all_records) > 0) {
+      combined_records <- do.call(rbind, all_records)
+      DBI::dbWriteTable(con, "metadata_bundle", combined_records, 
+                       append = TRUE, overwrite = FALSE)
+    }
+  })
   
-  if (verbose && nrow(bundles) > 0) {
+  if (verbose) {
     cli::cli_progress_done()
     cli::cli_alert_success("Metadata gathering complete")
   }
@@ -311,13 +391,14 @@ register_metadata_field <- function(con, field_name, field_type) {
 # EFFICIENT METADATA RETRIEVAL
 # ==============================================================================
 
-#' Get complete metadata for all bundles with inheritance
+#' Get complete metadata for all bundles with inheritance - OPTIMIZED
 #'
 #' Retrieves metadata with proper precedence: bundle > session > database
+#' Uses a single efficient SQL query instead of looping
 #' @param corpus_obj A corpus object
 #' @param session_pattern Optional regex pattern to filter sessions
 #' @param bundle_pattern Optional regex pattern to filter bundles
-#' @return A tibble with one row per bundle and columns for all metadata fields
+#' @return A data.table with one row per bundle and columns for all metadata fields
 #' @export
 get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".*") {
   
@@ -325,86 +406,140 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
   db_uuid <- get_db_uuid(corpus_obj)
   
   # Get all bundles
-  bundles <- list_bundles_from_cache(con, db_uuid)
+  bundles_dt <- data.table::setDT(list_bundles_from_cache(con, db_uuid))
+  data.table::setnames(bundles_dt, "name", "bundle")
   
   # Filter by patterns
   if (session_pattern != ".*") {
-    bundles <- bundles[grepl(session_pattern, bundles$session), ]
+    bundles_dt <- bundles_dt[grepl(session_pattern, session)]
   }
   if (bundle_pattern != ".*") {
-    bundles <- bundles[grepl(bundle_pattern, bundles$name), ]
+    bundles_dt <- bundles_dt[grepl(bundle_pattern, bundle)]
   }
   
-  if (nrow(bundles) == 0) {
-    return(tibble::tibble())
+  if (nrow(bundles_dt) == 0) {
+    return(data.table::data.table())
   }
   
-  # Get all metadata fields
-  fields <- DBI::dbGetQuery(con, "SELECT field_name FROM metadata_fields ORDER BY field_name")
+  # OPTIMIZATION: Single mega-query using PIVOT to get all metadata at once
+  # This is MUCH faster than looping through fields
+  query <- sprintf("
+    WITH all_metadata AS (
+      -- Bundle-level metadata
+      SELECT 
+        session, bundle, field_name, field_value, 1 as priority
+      FROM metadata_bundle
+      WHERE db_uuid = '%s'
+      
+      UNION ALL
+      
+      -- Session-level metadata  
+      SELECT 
+        ms.session, b.name as bundle, ms.field_name, ms.field_value, 2 as priority
+      FROM metadata_session ms
+      CROSS JOIN bundle b
+      WHERE ms.db_uuid = '%s' AND b.db_uuid = '%s' AND b.session = ms.session
+      
+      UNION ALL
+      
+      -- Database-level metadata
+      SELECT
+        b.session, b.name as bundle, md.field_name, md.field_value, 3 as priority
+      FROM metadata_database md
+      CROSS JOIN bundle b
+      WHERE md.db_uuid = '%s' AND b.db_uuid = '%s'
+    ),
+    ranked_metadata AS (
+      SELECT 
+        session, bundle, field_name, field_value,
+        ROW_NUMBER() OVER (PARTITION BY session, bundle, field_name ORDER BY priority) as rn
+      FROM all_metadata
+    )
+    SELECT session, bundle, field_name, field_value
+    FROM ranked_metadata
+    WHERE rn = 1
+  ", db_uuid, db_uuid, db_uuid, db_uuid, db_uuid)
   
-  # Start with bundle identifiers
-  result <- bundles %>%
-    dplyr::rename(bundle = name) %>%
-    dplyr::select(session, bundle)
+  # Execute query - get all metadata in one go
+  metadata_long <- data.table::setDT(DBI::dbGetQuery(con, query))
   
-  # For each field, get values with proper precedence
-  for (field_name in fields$field_name) {
-    field_values <- get_metadata_field(con, db_uuid, field_name, bundles$session, bundles$name)
-    result[[field_name]] <- field_values
+  if (nrow(metadata_long) == 0) {
+    # No metadata at all
+    return(bundles_dt[, .(session, bundle)])
   }
+  
+  # Convert from long to wide format using data.table's dcast (very fast)
+  metadata_wide <- data.table::dcast(
+    metadata_long,
+    session + bundle ~ field_name,
+    value.var = "field_value",
+    fun.aggregate = function(x) x[1]  # Take first value if duplicates
+  )
+  
+  # Join with bundles to ensure all bundles are present (even those without metadata)
+  result <- metadata_wide[bundles_dt[, .(session, bundle)], on = .(session, bundle)]
+  
+  # Reorder columns: session, bundle, then alphabetically
+  meta_cols <- setdiff(names(result), c("session", "bundle"))
+  data.table::setcolorder(result, c("session", "bundle", sort(meta_cols)))
   
   result
 }
 
-#' Get values for a single metadata field across bundles
+#' Get values for a single metadata field across bundles - OPTIMIZED
+#' 
+#' Uses a single SQL query with COALESCE to get values with proper inheritance
 #' @keywords internal
 get_metadata_field <- function(con, db_uuid, field_name, sessions, bundles) {
   
-  values <- character(length(sessions))
+  # Build single efficient query using COALESCE for precedence
+  # This replaces hundreds of individual queries with one query
+  query <- sprintf("
+    WITH bundle_session_pairs AS (
+      SELECT ? as session, ? as bundle
+      UNION ALL SELECT ?, ?
+      %s
+    )
+    SELECT 
+      bsp.session,
+      bsp.bundle,
+      COALESCE(
+        mb.field_value,
+        ms.field_value,
+        md.field_value
+      ) as field_value
+    FROM bundle_session_pairs bsp
+    LEFT JOIN metadata_bundle mb 
+      ON mb.db_uuid = '%s' 
+      AND mb.session = bsp.session 
+      AND mb.bundle = bsp.bundle
+      AND mb.field_name = %s
+    LEFT JOIN metadata_session ms
+      ON ms.db_uuid = '%s'
+      AND ms.session = bsp.session
+      AND ms.field_name = %s  
+    LEFT JOIN metadata_database md
+      ON md.db_uuid = '%s'
+      AND md.field_name = %s
+    ORDER BY bsp.rowid",
+    paste(rep("UNION ALL SELECT ?, ?", max(0, length(sessions) - 2)), collapse = "\n"),
+    db_uuid, DBI::dbQuoteString(con, field_name),
+    db_uuid, DBI::dbQuoteString(con, field_name),
+    db_uuid, DBI::dbQuoteString(con, field_name)
+  )
   
-  for (i in seq_along(sessions)) {
-    session <- sessions[i]
-    bundle <- bundles[i]
-    
-    # Try bundle level first
-    bundle_val <- DBI::dbGetQuery(con, sprintf(
-      "SELECT field_value, field_type FROM metadata_bundle 
-       WHERE db_uuid = '%s' AND session = '%s' AND bundle = '%s' AND field_name = %s",
-      db_uuid, session, bundle, DBI::dbQuoteString(con, field_name)
-    ))
-    
-    if (nrow(bundle_val) > 0) {
-      values[i] <- bundle_val$field_value[1]
-      next
-    }
-    
-    # Try session level
-    session_val <- DBI::dbGetQuery(con, sprintf(
-      "SELECT field_value, field_type FROM metadata_session 
-       WHERE db_uuid = '%s' AND session = '%s' AND field_name = %s",
-      db_uuid, session, DBI::dbQuoteString(con, field_name)
-    ))
-    
-    if (nrow(session_val) > 0) {
-      values[i] <- session_val$field_value[1]
-      next
-    }
-    
-    # Try database level
-    db_val <- DBI::dbGetQuery(con, sprintf(
-      "SELECT field_value, field_type FROM metadata_database 
-       WHERE db_uuid = '%s' AND field_name = %s",
-      db_uuid, DBI::dbQuoteString(con, field_name)
-    ))
-    
-    if (nrow(db_val) > 0) {
-      values[i] <- db_val$field_value[1]
-    } else {
-      values[i] <- NA_character_
-    }
-  }
+  # Prepare parameters - interleave sessions and bundles
+  params <- character(length(sessions) * 2)
+  params[seq(1, length(params), 2)] <- sessions
+  params[seq(2, length(params), 2)] <- bundles
   
-  values
+  # Execute prepared statement
+  stmt <- DBI::dbSendQuery(con, query)
+  DBI::dbBind(stmt, as.list(params))
+  result <- DBI::dbFetch(stmt)
+  DBI::dbClearResult(stmt)
+  
+  result$field_value
 }
 
 # ==============================================================================
@@ -762,7 +897,7 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
 # EXCEL IMPORT/EXPORT
 # ==============================================================================
 
-#' Export metadata to Excel for convenient editing
+#' Export metadata to Excel for convenient editing - OPTIMIZED
 #'
 #' @param corpus_obj A corpus object
 #' @param Excelfile Path to Excel file to create
@@ -779,8 +914,11 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
   con <- get_connection(corpus_obj)
   db_uuid <- get_db_uuid(corpus_obj)
   
-  # Get complete metadata with inheritance
+  # OPTIMIZATION: Use the optimized get_metadata which does everything in one query
   bundle_metadata <- get_metadata(corpus_obj)
+  
+  # Convert to data.frame for openxlsx
+  bundle_metadata <- as.data.frame(bundle_metadata)
   
   # Ensure mandatory columns exist
   for (col in mandatory) {
@@ -789,23 +927,33 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
     }
   }
   
-  # Get session-level metadata
-  sessions <- list_sessions_from_cache(con, db_uuid)
-  session_metadata <- tibble::tibble(session = sessions$name)
+  # OPTIMIZATION: Get session metadata with a single query
+  query_session <- sprintf("
+    SELECT 
+      s.name as session,
+      ms.field_name,
+      ms.field_value
+    FROM session s
+    LEFT JOIN metadata_session ms 
+      ON ms.db_uuid = s.db_uuid AND ms.session = s.name
+    WHERE s.db_uuid = '%s'
+  ", db_uuid)
   
-  fields <- DBI::dbGetQuery(con, "SELECT DISTINCT field_name FROM metadata_fields")
+  session_meta_long <- data.table::setDT(DBI::dbGetQuery(con, query_session))
   
-  for (field_name in fields$field_name) {
-    session_vals <- character(nrow(sessions))
-    for (i in seq_along(sessions$name)) {
-      val <- DBI::dbGetQuery(con, sprintf(
-        "SELECT field_value FROM metadata_session 
-         WHERE db_uuid = '%s' AND session = '%s' AND field_name = %s",
-        db_uuid, sessions$name[i], DBI::dbQuoteString(con, field_name)
-      ))
-      session_vals[i] <- if (nrow(val) > 0) val$field_value[1] else NA_character_
-    }
-    session_metadata[[field_name]] <- session_vals
+  if (nrow(session_meta_long) > 0 && !all(is.na(session_meta_long$field_name))) {
+    # Convert to wide format
+    session_metadata <- data.table::dcast(
+      session_meta_long[!is.na(field_name)],
+      session ~ field_name,
+      value.var = "field_value",
+      fun.aggregate = function(x) x[1]
+    )
+    session_metadata <- as.data.frame(session_metadata)
+  } else {
+    # Just session names
+    sessions <- list_sessions_from_cache(con, db_uuid)
+    session_metadata <- data.frame(session = sessions$name)
   }
   
   # Ensure mandatory columns in session metadata

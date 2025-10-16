@@ -82,7 +82,7 @@ make_dummy_metafiles <- function(db,session=TRUE){
   }
   if(session){
     #Inject some session wide defaults
-    ses <- list_sessions(db)[[1]]
+    ses <- emuR::list_sessions(db)[[1]]
     sessFile <- file.path(db$basePath,paste0(ses,emuR:::session.suffix),paste(ses,"meta_json",sep="."))
     cat('{"Age":35,"Shoe size":10,"Recording_Date":"2019-01-02"}',file=sessFile)
   }
