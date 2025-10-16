@@ -113,9 +113,9 @@ ask_for <- function(emuDB, query, ...) {
     stop("SQLite database not found at: ", db_path)
   }
   
-  # Check for lazy parameter (default TRUE for better performance)
+  # Check for lazy parameter (default FALSE until lazy evaluation is fully implemented)
   dots <- list(...)
-  lazy <- if ("lazy" %in% names(dots)) dots$lazy else TRUE
+  lazy <- if ("lazy" %in% names(dots)) dots$lazy else FALSE
   
   if (lazy) {
     # Return lazy segment list without executing query
