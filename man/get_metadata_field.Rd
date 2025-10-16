@@ -2,11 +2,11 @@
 % Please edit documentation in R/reindeeR_metadata_optimized.R
 \name{get_metadata_field}
 \alias{get_metadata_field}
-\title{Get values for a single metadata field across bundles}
+\title{Get values for a single metadata field across bundles - OPTIMIZED}
 \usage{
 get_metadata_field(con, db_uuid, field_name, sessions, bundles)
 }
 \description{
-Get values for a single metadata field across bundles
+Uses a single SQL query with COALESCE to get values with proper inheritance
 }
 \keyword{internal}

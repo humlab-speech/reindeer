@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeeR_metadata_optimized.R
 \name{get_metadata}
 \alias{get_metadata}
-\title{Get complete metadata for all bundles with inheritance}
+\title{Get complete metadata for all bundles with inheritance - OPTIMIZED}
 \usage{
 get_metadata(corpus_obj, session_pattern = ".*", bundle_pattern = ".*")
 }
@@ -14,8 +14,9 @@ get_metadata(corpus_obj, session_pattern = ".*", bundle_pattern = ".*")
 \item{bundle_pattern}{Optional regex pattern to filter bundles}
 }
 \value{
-A tibble with one row per bundle and columns for all metadata fields
+A data.table with one row per bundle and columns for all metadata fields
 }
 \description{
 Retrieves metadata with proper precedence: bundle > session > database
+Uses a single efficient SQL query instead of looping
 }

@@ -1,0 +1,337 @@
+# Simulation Infrastructure for DSP Parameter Exploration
+
+## Overview
+
+The simulation infrastructure in reindeer allows systematic exploration of DSP parameter spaces with efficient caching and result retrieval. This is essential for:
+
+- **Parameter optimization**: Finding optimal DSP settings for specific data
+- **Sensitivity analysis**: Understanding how parameter changes affect results  
+- **Reproducible research**: Caching and sharing parameter exploration results
+- **Method comparison**: Comparing multiple parameter configurations systematically
+
+## Key Features
+
+### 1. Signal File Integrity Tracking
+
+All signal files associated with bundles are tracked using SHA1 hashes. This ensures that:
+- Cached results remain valid only for unchanged signal files
+- File modifications are automatically detected
+- Simulation reproducibility is guaranteed
+
+```r
+# Update signal hashes for a corpus
+update_signal_hashes(corpus_obj)
+
+# Get hashes for specific bundles
+hashes <- get_signal_hashes(corpus_obj, session = "Session1", bundle = "Bundle1")
+```
+
+### 2. Parameter Grid Simulation
+
+The `quantify_simulate()` function extends `quantify()` to support systematic parameter space exploration:
+
+```r
+# Define parameter grid
+corp <- corpus("/path/to/database_emuDB")
+segments <- ask_for(corp, "Phonetic=a")
+
+# Simulate across parameter combinations
+results <- quantify_simulate(
+  segments,
+  .using = superassp::forest,
+  .simulate = list(
+    nominalF1 = seq(300, 800, by = 50),  # 11 values
+    minF = seq(50, 200, by = 50)          # 4 values
+  ),
+  .simulation_store = "./simulations",
+  .verbose = TRUE
+)
+# This creates 11 * 4 = 44 parameter combinations
+```
+
+### 3. Efficient Caching
+
+Results are stored in SQLite databases with:
+- **Metadata tracking**: DSP function, timestamp, corpus information
+- **Parameter indexing**: Fast lookup by parameter combination
+- **Signal validation**: SHA1 hashes ensure result validity
+- **Blob storage**: Efficient storage of arbitrary result objects
+
+Cache files are named: `YYYYMMDD_HHMMSS_functionname.sqlite`
+
+### 4. Result Retrieval
+
+Cached results can be efficiently retrieved:
+
+```r
+# Retrieve specific parameter combination
+result <- reminisce(
+  segments,
+  parameters = list(nominalF1 = 500, minF = 100),
+  cache_path = "./simulations/20231015_120000_forest.sqlite"
+)
+
+# Or use timestamp + function name
+result <- reminisce(
+  segments,
+  parameters = list(nominalF1 = 500, minF = 100),
+  timestamp = "20231015_120000",
+  cache_dir = "./simulations",
+  dsp_function = "forest"
+)
+
+# List all available simulations
+sims <- list_simulations("./simulations")
+print(sims)
+```
+
+## Workflow Example
+
+### Complete Parameter Exploration Workflow
+
+```r
+library(reindeer)
+library(superassp)
+
+# 1. Load corpus
+corp <- corpus("/path/to/ae_emuDB")
+
+# 2. Query segments of interest
+vowels <- ask_for(corp, "Phonetic=~[aeiou]")
+
+# 3. Ensure signal hashes are current
+update_signal_hashes(corp)
+
+# 4. Define parameter space to explore
+# Exploring formant analysis parameters
+param_space <- list(
+  nominalF1 = seq(400, 1000, by = 100),  # 7 values
+  nominalF2 = seq(1000, 2500, by = 250),  # 7 values
+  windowLength = c(25, 30, 35)            # 3 values
+)
+# Total: 7 * 7 * 3 = 147 combinations
+
+# 5. Run simulation
+sim_results <- quantify_simulate(
+  vowels,
+  .using = superassp::forest,
+  .simulate = param_space,
+  .simulation_store = "./vowel_simulations",
+  .simulation_timestamp = "formant_exploration_v1",  # Custom name
+  minF = 50,  # Fixed parameter
+  maxF = 5500,  # Fixed parameter
+  .verbose = TRUE
+)
+
+# 6. Examine results
+print(sim_results)
+summary(sim_results)
+
+# 7. Retrieve optimal combination (determined externally)
+optimal_result <- reminisce(
+  vowels,
+  parameters = list(
+    nominalF1 = 600,
+    nominalF2 = 1750,
+    windowLength = 30
+  ),
+  timestamp = "formant_exploration_v1",
+  cache_dir = "./vowel_simulations",
+  dsp_function = "forest"
+)
+
+# 8. Use optimal results for analysis
+plot(optimal_result$F1_frequency, optimal_result$F2_frequency,
+     col = factor(optimal_result$labels),
+     xlab = "F1 (Hz)", ylab = "F2 (Hz)",
+     main = "Vowel Space with Optimal Parameters")
+```
+
+### Comparing Multiple Parameter Configurations
+
+```r
+# Define configurations to compare
+configs <- list(
+  conservative = list(nominalF1 = 500, minF = 75, windowLength = 30),
+  moderate = list(nominalF1 = 650, minF = 60, windowLength = 25),
+  aggressive = list(nominalF1 = 800, minF = 50, windowLength = 20)
+)
+
+# Retrieve all configurations
+cache_file <- "./simulations/20231015_120000_forest.sqlite"
+results_list <- lapply(configs, function(params) {
+  reminisce(segments, parameters = params, cache_path = cache_file)
+})
+
+# Compare results
+names(results_list) <- names(configs)
+
+# Example: Compare F1 estimates
+f1_comparison <- data.frame(
+  conservative = results_list$conservative$F1_frequency,
+  moderate = results_list$moderate$F1_frequency,
+  aggressive = results_list$aggressive$F1_frequency
+)
+
+pairs(f1_comparison, main = "F1 Estimates Across Configurations")
+```
+
+## Cache Management
+
+### Listing and Inspecting Simulations
+
+```r
+# List all simulations in directory
+sims <- list_simulations("./simulations")
+
+# View metadata
+print(sims[, .(timestamp, dsp_function, n_segments, n_parameter_combinations)])
+
+# Find specific simulation
+formant_sims <- sims[dsp_function == "forest"]
+
+# Inspect specific cache
+con <- DBI::dbConnect(RSQLite::SQLite(), formant_sims$cache_file[1])
+
+# View parameter combinations
+params <- DBI::dbGetQuery(con, "
+  SELECT param_id, params_json 
+  FROM parameter_combinations
+  LIMIT 10
+")
+
+# View simulation metadata  
+meta <- DBI::dbGetQuery(con, "SELECT * FROM simulation_metadata")
+
+DBI::dbDisconnect(con)
+```
+
+### Cache File Structure
+
+Each cache file contains three main tables:
+
+1. **simulation_metadata**: Overview of the simulation
+   - timestamp, dsp_function, corpus information
+   - number of segments and parameter combinations
+   - computation time
+
+2. **parameter_combinations**: Unique parameter sets
+   - param_id: unique identifier
+   - param_hash: MD5 hash for fast lookup
+   - params_json: JSON representation of parameters
+
+3. **simulation_results**: Results for each segment × parameter combination
+   - segment information (session, bundle, times)
+   - signal_hash: validation of signal files
+   - result_blob: serialized result object
+
+## Performance Considerations
+
+### Parallel Processing
+
+Signal hash computation automatically uses parallel processing for large bundles:
+
+```r
+# Parallel hash computation (default)
+update_signal_hashes(corp, parallel = TRUE)
+
+# Sequential processing
+update_signal_hashes(corp, parallel = FALSE)
+```
+
+### Cache Size Management
+
+Simulation caches can become large. Consider:
+
+- **Selective caching**: Only cache parameter combinations of interest
+- **Result pruning**: Remove unnecessary columns before storage
+- **Compression**: SQLite automatic handles compression
+- **Separate caches**: Use different cache directories for different analyses
+
+```r
+# Estimate cache size
+cache_files <- list.files("./simulations", pattern = "\\.sqlite$", full.names = TRUE)
+total_size <- sum(file.size(cache_files))
+cat(sprintf("Total cache size: %.2f MB\n", total_size / 1024^2))
+```
+
+## Integration with Metadata System
+
+Simulation parameters can be informed by bundle metadata:
+
+```r
+# Set age/gender metadata
+corp["Session1", "Bundle1"] <- list(Age = 25, Gender = "Female")
+
+# Use metadata to set base parameters
+segments <- ask_for(corp, "Phonetic=a")
+
+# quantify_simulate will use metadata defaults for non-simulated parameters
+results <- quantify_simulate(
+  segments,
+  .using = superassp::forest,
+  .simulate = list(windowLength = c(20, 25, 30)),  # Only vary this
+  .simulation_store = "./sims"
+  # Other parameters (nominalF1, etc.) set from Age/Gender metadata
+)
+```
+
+## Best Practices
+
+1. **Name simulations meaningfully**: Use descriptive timestamps
+   ```r
+   .simulation_timestamp = "vowel_formants_method_comparison_2023"
+   ```
+
+2. **Document parameter ranges**: Keep notes on why specific ranges were chosen
+
+3. **Version control metadata**: Track simulation metadata in git
+
+4. **Validate before large runs**: Test with small parameter grids first
+   ```r
+   # Test run
+   test_results <- quantify_simulate(..., 
+     .simulate = list(param1 = c(1, 2)),  # Just 2 values
+   )
+   ```
+
+5. **Clean up old caches**: Remove caches from exploratory analyses
+
+6. **Share cache files**: Cache files are self-contained and portable
+
+## Troubleshooting
+
+### Cache Not Found
+
+```r
+# List available caches
+list_simulations(cache_dir)
+
+# Check file exists
+file.exists(cache_path)
+```
+
+### Parameter Mismatch
+
+```r
+# View available parameter combinations
+con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
+params <- DBI::dbGetQuery(con, "SELECT params_json FROM parameter_combinations")
+lapply(params$params_json, jsonlite::fromJSON)
+DBI::dbDisconnect(con)
+```
+
+### Signal Hash Mismatch
+
+Signal files have changed since simulation. Re-run simulation:
+
+```r
+results <- quantify_simulate(..., .simulation_overwrite = TRUE)
+```
+
+## See Also
+
+- `quantify()`: Standard quantification without simulation
+- `enrich()`: Add track data to corpus
+- `update_metadata()`: Manage bundle metadata
+- `ask_for()`: Query segments

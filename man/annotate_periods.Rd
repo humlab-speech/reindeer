@@ -21,17 +21,11 @@ annotate_periods(
 \arguments{
 \item{emuDBhandle}{A emuR database handle.}
 
-\item{beginTime}{The start time of the section of the sound file that should be processed.}
+\item{beginTime}{Start time in seconds (0 for beginning of file)}
 
-\item{endTime}{The end time of the section of the sound file that should be processed.}
+\item{endTime}{End time in seconds (0 for end of file)}
 
-\item{windowShift}{The measurement interval (frame duration), in seconds. If you supply 0, Praat will use a time step of 0.75 / (pitch floor), e.g. 0.01 seconds if the pitch floor is 75 Hz; in this example, Praat computes 100 pitch values per second.}
-
-\item{minF}{candidates below this frequency will not be recruited. This parameter determines the effective length of the analysis window: it will be 3 longest periods long, i.e., if the pitch floor is 75 Hz, the window will be effectively 3/75 = 0.04 seconds long. Note that if you set the time step to zero, the analysis windows for consecutive measurements will overlap appreciably: Praat will always compute 4 pitch values within one window length, i.e., the degree of oversampling is 4.}
-
-\item{maxF}{Candidates above this frequency will be ignored.}
-
-\item{windowShape}{the analysis window function used when extracting part of a sound file for analysis. De faults to "Hanning".}
+\item{windowShape}{Window shape for time windowing}
 
 \item{interpolation}{The method used for finding intensity associated with the pitch period event (ont of "nearest", or "linear", "cubic", "sinc70" or "sinc700" interpolation).}
 
