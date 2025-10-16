@@ -47,12 +47,16 @@ dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender")
   }
 
 
-  openxlsx::read.xlsx(file.path(system.file(package = "reindeer",mustWork = TRUE),"default_parameters.xlsx"),sep.names = " ") -> defaults
+  defaults <- openxlsx::read.xlsx(file.path(system.file(package = "reindeer",mustWork = TRUE),"default_parameters.xlsx"),sep.names = " ")
+  
+  # Pre-compute minimum sample size enforcement (optimization)
+  defaults$`Study participants` <- ifelse(defaults$`Study participants` < defaultsEstimatedSampleSize,
+                                          defaultsEstimatedSampleSize,
+                                          defaults$`Study participants`)
 
   defaults %>%
     dplyr::filter( Gender %in% c("Male","Female")) %>%
     dplyr::select(Gender:Age_upper,Parameter,Setting,`Study participants`,`Study identifier`) %>%
-    dplyr::mutate(`Study participants`=ifelse(`Study participants` < defaultsEstimatedSampleSize,defaultsEstimatedSampleSize,`Study participants`)) %>%
     dplyr::rowwise() %>%
     # divide df into a list of data.frames based on supplied grouping variables
     dplyr::group_split() %>%
@@ -86,10 +90,13 @@ dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender")
     }) %>%
     dplyr::ungroup() %>%
     tidyr::pivot_wider(names_from="Parameter",values_from = "Setting",id_cols = c("Gender","Age"))%>%
-    dplyr::mutate(windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize )) %>%
-    dplyr::mutate(nominalF2 = ifelse(is.na(nominalF2),ceiling(nominalF1*3),nominalF2 )) %>%
-    dplyr::mutate(nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3 ))  %>%
-    dplyr::mutate(across(where(is.numeric), ~round(.,digits = 0 ))) %>%
+    # Compute derived columns in a single mutate (optimization)
+    dplyr::mutate(
+      windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize),
+      nominalF2 = ifelse(is.na(nominalF2),ceiling(nominalF1*3),nominalF2),
+      nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3),
+      across(where(is.numeric), ~round(.,digits = 0))
+    ) %>%
     dplyr::arrange(Gender,Age) -> DSPP_mf
 
   if(impute){
@@ -102,7 +109,6 @@ dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender")
   defaults %>%
     dplyr::select(Gender:Age_upper,Parameter,Setting,`Study participants`,`Study identifier`) %>%
     dplyr::select(-Gender) %>%
-    dplyr::mutate(`Study participants`=ifelse(`Study participants` < defaultsEstimatedSampleSize,defaultsEstimatedSampleSize,`Study participants`)) %>%
     dplyr::rowwise() %>%
     # divide df into a list of data.frames based on supplied grouping variables
     dplyr::group_split() %>%
@@ -136,10 +142,13 @@ dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender")
     }) %>%
     dplyr::ungroup() %>%
     tidyr::pivot_wider(names_from="Parameter",values_from = "Setting",id_cols = c("Age"))%>%
-    dplyr::mutate(windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize )) %>%
-    dplyr::mutate(nominalF2 = ifelse(is.na(nominalF2),ceiling(nominalF1*3),nominalF2 )) %>%
-    dplyr::mutate(nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3 ))  %>%
-    dplyr::mutate(across(where(is.numeric), ~round(.,digits = 0 ))) -> DSPP_unspecified
+    # Compute derived columns in a single mutate (optimization)
+    dplyr::mutate(
+      windowSize = ifelse(is.na(windowSize),ceiling(2*1*1000/minF),windowSize),
+      nominalF2 = ifelse(is.na(nominalF2),ceiling(nominalF1*3),nominalF2),
+      nominalF3 = ifelse(is.na(nominalF3),ceiling(nominalF1*5),nominalF3),
+      across(where(is.numeric), ~round(.,digits = 0))
+    ) -> DSPP_unspecified
 
   if(impute){
     DSPP_unspecified <- DSPP_unspecified %>%
@@ -147,18 +156,17 @@ dspp_metadataParameters <- function(recompute=FALSE,id.columns=c("Age","Gender")
       dplyr::ungroup()
   }
 
-  DSPP_unspecified %>%
+  DSPP_unspecified <- DSPP_unspecified %>%
     dplyr::mutate(Gender="Unspecified") %>%
-    dplyr::arrange(Age) -> DSPP_unspecified
+    dplyr::arrange(Age)
 
-
-
-
-
+  # Combine and finalize (single mutate - optimization)
   DSPP <- DSPP_mf %>%
     dplyr::bind_rows(DSPP_unspecified) %>%
-    dplyr::mutate(across(where(is.numeric), as.integer)) %>%
-    dplyr::mutate(Gender=factor(Gender,levels = c("Female","Male","Unspecified")))
+    dplyr::mutate(
+      across(where(is.numeric), as.integer),
+      Gender=factor(Gender,levels = c("Female","Male","Unspecified"))
+    )
 
 
 
