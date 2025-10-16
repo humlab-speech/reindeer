@@ -21,6 +21,7 @@ Imports:
     openxlsx,
     sqldf,
     dplyr,
+    data.table (>= 1.14.0),
     stats,
     Rdpack,
     purrr,
