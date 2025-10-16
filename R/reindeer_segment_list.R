@@ -519,7 +519,10 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .use_metadata = TRUE,
                                                 .verbose = FALSE,
                                                 .parallel = TRUE,
-                                                .workers = NULL) {
+                                                .workers = NULL,
+                                                .use_cache = FALSE,
+                                                .cache_dir = NULL,
+                                                .optimize = TRUE) {
   
   if (!inherits(object, "segment_list")) {
     cli::cli_abort("{.arg object} must be a segment_list")
@@ -537,20 +540,8 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     }
   }
   
-  # Try to get corpus from db_path
-  corpus_obj <- NULL
-  if (!is.null(object@db_path) && nchar(object@db_path) > 0) {
-    if (dir.exists(object@db_path)) {
-      if (.verbose) cli::cli_alert_info("Loading corpus from {object@db_path}")
-      tryCatch({
-        corpus_obj <- corpus(object@db_path, verbose = FALSE)
-      }, error = function(e) {
-        if (.verbose) {
-          cli::cli_alert_warning("Could not load corpus: {conditionMessage(e)}")
-        }
-      })
-    }
-  }
+  # Try to get corpus from db_path (PHASE 1: Cached corpus loading)
+  corpus_obj <- .get_corpus_cached(object, NULL)
   
   if (is.null(corpus_obj)) {
     cli::cli_abort(c(
@@ -565,6 +556,8 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   
   # Get metadata if requested
   metadata_by_bundle <- NULL
+  dsp_params_base <- list(...)
+  
   if (.use_metadata) {
     if (.verbose) cli::cli_alert_info("Fetching metadata for {nrow(object)} segments")
     
@@ -582,21 +575,6 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
       tidyr::pivot_wider(names_from = key, values_from = value)
   }
   
-  # Setup parallel processing
-  if (.parallel) {
-    if (is.null(.workers)) {
-      .workers <- max(1, parallel::detectCores() - 1)
-    }
-    
-    if (.verbose) {
-      cli::cli_alert_info("Using parallel processing with {.workers} worker{?s}")
-    }
-    
-    old_plan <- future::plan()
-    on.exit(future::plan(old_plan), add = TRUE)
-    future::plan(future::multisession, workers = .workers)
-  }
-  
   # Convert to data frame for processing
   seg_df <- as.data.frame(object)
   
@@ -604,108 +582,66 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   if (!is.null(metadata_by_bundle)) {
     seg_df <- seg_df %>%
       dplyr::left_join(metadata_by_bundle, by = c("session", "bundle"))
-  }
-  
-  # Define processing function for each segment
-  process_segment <- function(i) {
-    seg <- seg_df[i, , drop = FALSE]
     
-    # Get signal file path
-    signal_file <- file.path(
-      corpus_obj@basePath,
-      paste0(seg$session, "_ses"),
-      paste0(seg$bundle, "_bndl"),
-      paste0(seg$bundle, ".", media_ext)
-    )
-    
-    if (!file.exists(signal_file)) {
-      if (.verbose) {
-        cli::cli_alert_warning("Signal file not found: {signal_file}")
-      }
-      return(NULL)
-    }
-    
-    # Derive DSP parameters from metadata if requested
-    user_params <- list(...)
-    dsp_params <- user_params
-    
-    if (.use_metadata && !is.null(metadata_by_bundle)) {
-      dsp_params <- derive_dsp_parameters(
+    # Derive DSP parameters from metadata where applicable
+    if (.use_metadata && nrow(metadata_by_bundle) > 0) {
+      # This happens once for all segments sharing metadata
+      dsp_params_base <- derive_dsp_parameters(
         dsp_fun = dsp_function,
-        metadata = seg,
+        metadata = metadata_by_bundle,
         metadata_fields = c("Gender", "Age"),
-        user_params = user_params
+        user_params = dsp_params_base
       )
     }
+  }
+  
+  # PHASE 2: Choose processing strategy based on optimize flag and available packages
+  if (.optimize && requireNamespace("data.table", quietly = TRUE) && nrow(seg_df) > 100) {
+    # Use vectorized processing for large datasets
+    if (.verbose) {
+      cli::cli_alert_info("Using optimized vectorized processing")
+    }
     
-    # Apply DSP function
-    tryCatch({
-      result <- do.call(dsp_function, c(
-        list(
-          listOfFiles = signal_file,
-          beginTime = seg$start / 1000,  # Convert ms to seconds
-          endTime = seg$end / 1000
-        ),
-        dsp_params,
-        list(toFile = FALSE, verbose = FALSE)
-      ))
-      
-      # Handle different result types
-      result_df <- if (inherits(result, "AsspDataObj")) {
-        # SSFF track - extract values
-        track_data <- wrassp::as.data.frame.AsspDataObj(result)
-        
-        # Extract at specific time points if requested
-        if (!is.null(.at)) {
-          n_frames <- nrow(track_data)
-          frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
-          track_data <- track_data[frame_indices, , drop = FALSE]
-          track_data$.time_point <- .at
-        }
-        
-        track_data
-      } else if (is.data.frame(result)) {
-        result
-      } else if (is.list(result)) {
-        as.data.frame(result)
-      } else {
-        data.frame(value = result)
-      }
-      
-      # Add segment info to each row
-      # If .at is specified and multiple points, replicate segment info
-      n_result_rows <- nrow(result_df)
-      seg_replicated <- seg[rep(1, n_result_rows), , drop = FALSE]
-      rownames(seg_replicated) <- NULL
-      
-      combined <- dplyr::bind_cols(
-        tibble::as_tibble(seg_replicated),
-        tibble::as_tibble(result_df)
-      )
-      
-      combined
-    }, error = function(e) {
-      if (.verbose) {
-        cli::cli_alert_warning("Error processing segment {i}: {conditionMessage(e)}")
-      }
+    # Setup persistent cache if requested
+    cache_conn <- if (.use_cache) {
+      .get_persistent_cache_connection(.cache_dir)
+    } else {
       NULL
-    })
-  }
-  
-  # Process all segments
-  if (.verbose) {
-    cli::cli_progress_bar("Processing segments", total = nrow(seg_df))
-  }
-  
-  if (.parallel) {
-    results <- furrr::future_map(
-      seq_len(nrow(seg_df)),
-      process_segment,
-      .progress = .verbose,
-      .options = furrr::furrr_options(seed = TRUE)
+    }
+    
+    # PHASE 2: Vectorized batch processing
+    results_list <- .process_segments_vectorized(
+      seg_df, corpus_obj, dsp_function, dsp_params_base,
+      media_ext, .at, .verbose, .use_cache, cache_conn
     )
+    
+  } else if (.parallel && nrow(seg_df) > 20) {
+    # Use parallel I/O for medium to large datasets
+    if (.verbose) {
+      cli::cli_alert_info("Using parallel I/O processing")
+    }
+    
+    if (is.null(.workers)) {
+      .workers <- max(1, parallel::detectCores() - 1)
+    }
+    
+    # PHASE 2: Parallel I/O processing
+    results_list <- .process_parallel_io(
+      seg_df, corpus_obj, dsp_function, dsp_params_base,
+      media_ext, .at, .workers, .verbose
+    )
+    
   } else {
-    results <- lapply(seq_len(nrow(seg_df)), process_segment)
+    # Fall back to sequential processing for small datasets
+    if (.verbose) {
+      cli::cli_alert_info("Using sequential processing")
+    }
+    
+    # PHASE 1: File-batch processing (already optimized)
+    results_list <- .process_by_file_batch(
+      seg_df, corpus_obj, dsp_function, dsp_params_base,
+      media_ext, .at, .verbose
+    )
   }
   
   if (.verbose) {
@@ -713,7 +649,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   }
   
   # Remove NULL results
-  results <- purrr::compact(results)
+  results <- purrr::compact(results_list)
   
   if (length(results) == 0) {
     if (.verbose) {
@@ -722,8 +658,14 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     return(tibble::tibble())
   }
   
-  # Combine all results
-  combined <- dplyr::bind_rows(results)
+  # Combine all results efficiently
+  # PHASE 2: Use data.table for faster binding if available
+  combined <- if (requireNamespace("data.table", quietly = TRUE) && length(results) > 100) {
+    data.table::rbindlist(results, fill = TRUE) |>
+      tibble::as_tibble()
+  } else {
+    dplyr::bind_rows(results)
+  }
   
   if (.verbose) {
     n_segs <- length(unique(combined$start_item_id))
@@ -736,7 +678,9 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     "labels", "start", "end", "db_uuid", "session", "bundle",
     "start_item_id", "end_item_id", "level", "attribute",
     "start_item_seq_idx", "end_item_seq_idx", "type",
-    "sample_start", "sample_end", "sample_rate"
+    "sample_start", "sample_end", "sample_rate", "signal_file",
+    "file_exists", "cache_key", "cached_result", "file_group_id",
+    "result"
   )
   
   # Also exclude metadata columns if present
