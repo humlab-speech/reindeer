@@ -197,33 +197,12 @@ relate_to <- function(.segments, .from = NULL,
     ))
   }
   
-  # Get corpus
-  corp <- NULL
-  if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
-    corp <- .from
-  } else if (S7::S7_inherits(.segments, reindeer::segment_list)) {
-    db_path <- S7::prop(.segments, "db_path")
-    if (nzchar(db_path) && dir.exists(db_path)) {
-      corp <- corpus(db_path)
-    }
-  }
+  # OPTIMIZATION: Use cached corpus and handle
+  corp <- .get_corpus_cached(.segments, .from)
+  handle <- .get_handle_cached(corp)
   
-  if (is.null(corp)) {
-    cli::cli_abort(c(
-      "Cannot determine corpus",
-      "x" = "Please provide a corpus via {.arg .from} argument or ensure segment list has valid db_path"
-    ))
-  }
-  
-  # Load emuR handle for requery operation
-  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
-  
-  # Convert segment_list to data.frame for emuR
-  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
-    seglist_df <- as.data.frame(S7::S7_data(.segments))
-  } else {
-    seglist_df <- as.data.frame(.segments)
-  }
+  # OPTIMIZATION: Efficient conversion
+  seglist_df <- .seglist_to_df(.segments)
   
   # Perform requery
   res <- emuR::requery_seq(
@@ -239,7 +218,7 @@ relate_to <- function(.segments, .from = NULL,
     resultType = "tibble"
   )
   
-  # Convert back to segment_list
+  # OPTIMIZATION: Direct construction
   result <- segment_list(
     data = res,
     db_path = corp@basePath
@@ -285,33 +264,12 @@ ascend_to <- function(.segments, .level, .from = NULL,
     ))
   }
   
-  # Get corpus
-  corp <- NULL
-  if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
-    corp <- .from
-  } else if (S7::S7_inherits(.segments, reindeer::segment_list)) {
-    db_path <- S7::prop(.segments, "db_path")
-    if (nzchar(db_path) && dir.exists(db_path)) {
-      corp <- corpus(db_path)
-    }
-  }
+  # OPTIMIZATION: Use cached corpus and handle
+  corp <- .get_corpus_cached(.segments, .from)
+  handle <- .get_handle_cached(corp)
   
-  if (is.null(corp)) {
-    cli::cli_abort(c(
-      "Cannot determine corpus",
-      "x" = "Please provide a corpus via {.arg .from} argument or ensure segment list has valid db_path"
-    ))
-  }
-  
-  # Load emuR handle for requery operation
-  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
-  
-  # Convert segment_list to data.frame for emuR
-  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
-    seglist_df <- as.data.frame(S7::S7_data(.segments))
-  } else {
-    seglist_df <- as.data.frame(.segments)
-  }
+  # OPTIMIZATION: Efficient conversion
+  seglist_df <- .seglist_to_df(.segments)
   
   # Perform hierarchical requery
   res <- emuR::requery_hier(
@@ -324,7 +282,7 @@ ascend_to <- function(.segments, .level, .from = NULL,
     resultType = "tibble"
   )
   
-  # Convert back to segment_list
+  # OPTIMIZATION: Direct construction
   result <- segment_list(
     data = res,
     db_path = corp@basePath
@@ -407,15 +365,12 @@ scout <- function(.segments, steps_forward,
     ))
   }
   
-  # Load emuR handle for requery operation
-  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
+  # OPTIMIZATION: Use cached corpus and handle
+  corp <- .get_corpus_cached(.segments, .from)
+  handle <- .get_handle_cached(corp)
   
-  # Convert segment_list to data.frame for emuR
-  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
-    seglist_df <- as.data.frame(S7::S7_data(.segments))
-  } else {
-    seglist_df <- as.data.frame(.segments)
-  }
+  # OPTIMIZATION: Efficient conversion
+  seglist_df <- .seglist_to_df(.segments)
   
   # Perform sequential requery
   res <- emuR::requery_seq(
@@ -431,7 +386,7 @@ scout <- function(.segments, steps_forward,
     resultType = "tibble"
   )
   
-  # Convert back to segment_list
+  # OPTIMIZATION: Direct construction
   result <- segment_list(
     data = res,
     db_path = corp@basePath
@@ -555,31 +510,35 @@ harvest <- function(..., .unique = FALSE, .sort = TRUE) {
     ))
   }
   
-  # Check all are segment_lists or can be converted
-  db_paths <- character()
-  dfs <- list()
+  # OPTIMIZATION: Pre-allocate vectors for better performance
+  n_lists <- length(seg_lists)
+  db_paths <- vector("character", n_lists)
+  dfs <- vector("list", n_lists)
   
+  # OPTIMIZATION: Vectorized checking and conversion
   for (i in seq_along(seg_lists)) {
     sl <- seg_lists[[i]]
     
     if (S7::S7_inherits(sl, reindeer::segment_list)) {
       db_paths[i] <- S7::prop(sl, "db_path")
+      # OPTIMIZATION: Avoid double conversion by using S7_data directly
       dfs[[i]] <- as.data.frame(S7::S7_data(sl))
     } else if (is.data.frame(sl)) {
       # Check for required columns
       required <- c("session", "bundle", "start", "end", "labels", "level")
-      if (!all(required %in% names(sl))) {
+      missing_cols <- setdiff(required, names(sl))
+      if (length(missing_cols) > 0) {
         cli::cli_abort(c(
           "Invalid segment list {i}",
-          "x" = "Missing required columns: {setdiff(required, names(sl))}"
+          "x" = "Missing required columns: {missing_cols}"
         ))
       }
       dfs[[i]] <- sl
       # Try to get db_path from attributes
-      if (!is.null(attr(sl, "basePath"))) {
-        db_paths[i] <- attr(sl, "basePath")
+      db_paths[i] <- if (!is.null(attr(sl, "basePath"))) {
+        attr(sl, "basePath")
       } else {
-        db_paths[i] <- NA_character_
+        NA_character_
       }
     } else {
       cli::cli_abort(c(
@@ -601,13 +560,24 @@ harvest <- function(..., .unique = FALSE, .sort = TRUE) {
   # Use first valid path as the db_path for result
   result_db_path <- if (length(valid_paths) > 0) valid_paths[1] else ""
   
-  # Combine data frames
-  combined_df <- dplyr::bind_rows(dfs)
+  # OPTIMIZATION: Use data.table::rbindlist if available for faster binding
+  combined_df <- if (requireNamespace("data.table", quietly = TRUE)) {
+    data.table::rbindlist(dfs, use.names = TRUE, fill = TRUE) |>
+      tibble::as_tibble()
+  } else {
+    dplyr::bind_rows(dfs)
+  }
   
   # Remove duplicates if requested
   if (.unique) {
     before_count <- nrow(combined_df)
-    combined_df <- dplyr::distinct(combined_df)
+    # OPTIMIZATION: Use data.table unique if available
+    combined_df <- if (requireNamespace("data.table", quietly = TRUE)) {
+      unique(data.table::as.data.table(combined_df)) |>
+        tibble::as_tibble()
+    } else {
+      dplyr::distinct(combined_df)
+    }
     after_count <- nrow(combined_df)
     if (before_count != after_count) {
       cli::cli_inform(
@@ -618,8 +588,14 @@ harvest <- function(..., .unique = FALSE, .sort = TRUE) {
   
   # Sort if requested
   if (.sort) {
-    combined_df <- combined_df |>
-      dplyr::arrange(session, bundle, start)
+    # OPTIMIZATION: Use data.table setorder if available
+    combined_df <- if (requireNamespace("data.table", quietly = TRUE)) {
+      dt <- data.table::as.data.table(combined_df)
+      data.table::setorder(dt, session, bundle, start)
+      tibble::as_tibble(dt)
+    } else {
+      dplyr::arrange(combined_df, session, bundle, start)
+    }
   }
   
   # Create segment_list
