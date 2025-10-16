@@ -407,3 +407,282 @@ test_that("assess validates inputs", {
   # Test handling of missing corpus
   # Test handling of missing track
 })
+
+# ==============================================================================
+# COMPREHENSIVE INTEGRATION TESTS
+# ==============================================================================
+
+test_that("quantify simulation end-to-end workflow", {
+  skip_if_not_installed("emuR")
+  skip_on_cran()
+  
+  # Setup test database
+  db_path <- file.path(tempdir(), "emuR_demoData")
+  if (dir.exists(db_path)) unlink(db_path, recursive = TRUE)
+  
+  emuR::create_emuRdemoData(dir = tempdir())
+  ae_path <- file.path(tempdir(), "emuR_demoData", "ae_emuDB")
+  
+  # Create corpus
+  corp <- corpus(ae_path)
+  
+  # Get segment list
+  segs <- ask_for(corp, "[Phonetic = a]")
+  expect_s3_class(segs, "segment_list")
+  
+  # Create simple test DSP function
+  test_dsp <- function(signal, sample_rate, param1 = 100, param2 = 0.5) {
+    # Return simple mock result
+    n_samples <- length(signal)
+    list(
+      value1 = rep(param1, n_samples),
+      value2 = rep(param2, n_samples)
+    )
+  }
+  
+  # Run simulation
+  cache_dir <- file.path(tempdir(), ".simulations_test")
+  if (dir.exists(cache_dir)) unlink(cache_dir, recursive = TRUE)
+  
+  results <- quantify_simulate(
+    segs,
+    .using = test_dsp,
+    .simulate = list(
+      param1 = c(100, 200),
+      param2 = c(0.5, 1.0)
+    ),
+    .simulation_store = cache_dir,
+    .verbose = FALSE
+  )
+  
+  expect_s3_class(results, "simulation_results")
+  expect_equal(length(results), 4)  # 2 * 2 combinations
+  
+  # Check cache was created
+  cache_files <- list.files(cache_dir, pattern = "quantify_.*\\.sqlite$")
+  expect_equal(length(cache_files), 1)
+  
+  # List simulations
+  sims <- list_simulations(cache_dir)
+  expect_equal(nrow(sims), 1)
+  
+  # Reminisce specific results
+  retrieved <- reminisce(
+    segs,
+    parameters = list(param1 = 100, param2 = 0.5),
+    cache_path = file.path(cache_dir, cache_files[1])
+  )
+  
+  expect_s3_class(retrieved, "extended_segment_list")
+  
+  # Cleanup
+  unlink(cache_dir, recursive = TRUE)
+  unlink(db_path, recursive = TRUE)
+})
+
+test_that("enrich simulation end-to-end workflow", {
+  skip_if_not_installed("emuR")
+  skip_on_cran()
+  
+  # Setup test database
+  db_path <- file.path(tempdir(), "emuR_demoData")
+  if (dir.exists(db_path)) unlink(db_path, recursive = TRUE)
+  
+  emuR::create_emuRdemoData(dir = tempdir())
+  ae_path <- file.path(tempdir(), "emuR_demoData", "ae_emuDB")
+  
+  # Create corpus
+  corp <- corpus(ae_path)
+  
+  # Create simple test DSP function that returns SSFF-like object
+  test_track_dsp <- function(signal, sample_rate, freq = 440, amp = 1.0) {
+    n_frames <- min(100, length(signal))
+    result <- matrix(
+      freq * amp,
+      nrow = n_frames,
+      ncol = 2,
+      dimnames = list(NULL, c("freq", "amp"))
+    )
+    
+    # Mock SSFF attributes
+    attr(result, "startTime") <- 0
+    attr(result, "origFreq") <- sample_rate
+    attr(result, "sampleRate") <- 100  # 100 Hz frame rate
+    
+    result
+  }
+  
+  # Run enrich simulation
+  cache_dir <- file.path(tempdir(), ".simulations_enrich")
+  if (dir.exists(cache_dir)) unlink(cache_dir, recursive = TRUE)
+  
+  results <- enrich_simulate(
+    corp,
+    .using = test_track_dsp,
+    .simulate = list(
+      freq = c(400, 450, 500),
+      amp = c(0.8, 1.0, 1.2)
+    ),
+    .simulation_store = cache_dir,
+    .verbose = FALSE
+  )
+  
+  expect_s3_class(results, "simulation_tracks")
+  expect_equal(length(results), 9)  # 3 * 3 combinations
+  
+  # Check cache was created
+  cache_files <- list.files(cache_dir, pattern = "enrich_.*\\.sqlite$")
+  expect_equal(length(cache_files), 1)
+  
+  # Reminisce specific track results
+  retrieved_tracks <- reminisce_tracks(
+    corp,
+    parameters = list(freq = 450, amp = 1.0),
+    cache_path = file.path(cache_dir, cache_files[1])
+  )
+  
+  expect_type(retrieved_tracks, "list")
+  
+  # Cleanup
+  unlink(cache_dir, recursive = TRUE)
+  unlink(db_path, recursive = TRUE)
+})
+
+test_that("simulation respects default cache location", {
+  skip_if_not_installed("emuR")
+  skip_on_cran()
+  
+  # Change to temp directory
+  old_wd <- getwd()
+  temp_wd <- tempfile()
+  dir.create(temp_wd)
+  setwd(temp_wd)
+  on.exit({
+    setwd(old_wd)
+    unlink(temp_wd, recursive = TRUE)
+  })
+  
+  # Setup
+  db_path <- file.path(tempdir(), "emuR_demoData")
+  if (dir.exists(db_path)) unlink(db_path, recursive = TRUE)
+  
+  emuR::create_emuRdemoData(dir = tempdir())
+  ae_path <- file.path(tempdir(), "emuR_demoData", "ae_emuDB")
+  corp <- corpus(ae_path)
+  segs <- ask_for(corp, "[Phonetic = a]")
+  
+  test_dsp <- function(signal, sample_rate, p = 1) {
+    list(val = rep(p, length(signal)))
+  }
+  
+  # Run without specifying .simulation_store (should use ./.simulations)
+  results <- quantify_simulate(
+    segs,
+    .using = test_dsp,
+    .simulate = list(p = c(1, 2)),
+    .verbose = FALSE
+  )
+  
+  # Check default location was used
+  expect_true(dir.exists(".simulations"))
+  cache_files <- list.files(".simulations", pattern = "quantify_.*\\.sqlite$")
+  expect_equal(length(cache_files), 1)
+  
+  # Cleanup
+  unlink(db_path, recursive = TRUE)
+})
+
+test_that("multiple simulations can coexist in same cache directory", {
+  skip_on_cran()
+  
+  cache_dir <- tempfile()
+  dir.create(cache_dir)
+  on.exit(unlink(cache_dir, recursive = TRUE))
+  
+  # Create multiple simulation caches
+  cache1 <- initialize_simulation_cache(cache_dir, "20231015_120000", "dsp1")
+  cache2 <- initialize_simulation_cache(cache_dir, "20231015_130000", "dsp2")
+  cache3 <- initialize_track_simulation_cache(cache_dir, "20231015_140000", "track1")
+  
+  # Check that caches were created with correct prefixes
+  expect_true(file.exists(cache1))
+  expect_true(file.exists(cache2))
+  expect_true(file.exists(cache3))
+  
+  expect_true(grepl("quantify_.*\\.sqlite$", basename(cache1)))
+  expect_true(grepl("quantify_.*\\.sqlite$", basename(cache2)))
+  expect_true(grepl("enrich_.*\\.sqlite$", basename(cache3)))
+  
+  # Verify we have 3 cache files
+  all_caches <- list.files(cache_dir, pattern = "\\.sqlite$")
+  expect_equal(length(all_caches), 3)
+})
+
+test_that("signal hash updates are tracked correctly", {
+  skip_if_not_installed("digest")
+  skip_on_cran()
+  
+  # Create temporary signal file
+  temp_signal <- tempfile(fileext = ".wav")
+  writeLines("signal content v1", temp_signal)
+  on.exit(unlink(temp_signal))
+  
+  hash1 <- compute_signal_hash(temp_signal)
+  expect_type(hash1, "character")
+  expect_equal(nchar(hash1), 40)
+  
+  # Simulate file modification
+  Sys.sleep(0.1)  # Ensure different timestamp
+  writeLines("signal content v2", temp_signal)
+  
+  hash2 <- compute_signal_hash(temp_signal)
+  expect_false(hash1 == hash2)
+  
+  # Hashes should be reproducible for same content
+  temp_signal2 <- tempfile(fileext = ".wav")
+  writeLines("signal content v2", temp_signal2)
+  on.exit(unlink(temp_signal2), add = TRUE)
+  
+  hash3 <- compute_signal_hash(temp_signal2)
+  expect_equal(hash2, hash3)
+})
+
+test_that("parameter grid handles edge cases", {
+  # Empty grid
+  grid0 <- create_parameter_grid(list())
+  expect_equal(nrow(grid0), 0)
+  
+  # Single parameter, single value
+  grid1 <- create_parameter_grid(list(p = 1))
+  expect_equal(nrow(grid1), 1)
+  expect_equal(grid1$p, 1)
+  
+  # Multiple parameters, single values each
+  grid2 <- create_parameter_grid(list(a = 1, b = "x"))
+  expect_equal(nrow(grid2), 1)
+  
+  # Large grid
+  grid_large <- create_parameter_grid(list(
+    p1 = 1:10,
+    p2 = 1:10,
+    p3 = 1:5
+  ))
+  expect_equal(nrow(grid_large), 10 * 10 * 5)
+  
+  # Mixed types
+  grid_mixed <- create_parameter_grid(list(
+    numeric = c(1.5, 2.5),
+    character = c("a", "b"),
+    logical = c(TRUE, FALSE),
+    integer = c(1L, 2L)
+  ))
+  expect_equal(nrow(grid_mixed), 2^4)  # 2 values each = 16 combinations
+})
+
+test_that("simulation handles DSP function errors gracefully", {
+  skip_on_cran()
+  skip("Error handling needs refinement")
+  
+  # Test DSP function that throws errors for some parameter combinations
+  # Should still complete other combinations successfully
+})

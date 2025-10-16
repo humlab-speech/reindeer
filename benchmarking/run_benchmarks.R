@@ -1,11 +1,12 @@
 #!/usr/bin/env Rscript
-# Run All Benchmarks (EQL Query + MOMEL/INTSINT + Quantify)
-# Usage: Rscript run_benchmarks.R [iterations] [momel] [quantify]
+# Run All Benchmarks (EQL Query + MOMEL/INTSINT + Quantify + Simulation)
+# Usage: Rscript run_benchmarks.R [iterations] [momel] [quantify] [simulation]
 
 args <- commandArgs(trailingOnly = TRUE)
 iterations <- if (length(args) > 0) as.integer(args[1]) else 50
 run_momel <- if (length(args) > 1) as.logical(args[2]) else TRUE
 run_quantify <- if (length(args) > 2) as.logical(args[3]) else TRUE
+run_simulation <- if (length(args) > 3) as.logical(args[4]) else TRUE
 
 cat("\n")
 cat("╔════════════════════════════════════════════════════════════════════╗\n")
@@ -15,6 +16,7 @@ cat("╚════════════════════════
 cat(sprintf("Query iterations: %d\n", iterations))
 cat(sprintf("Run MOMEL/INTSINT benchmarks: %s\n", run_momel))
 cat(sprintf("Run Quantify benchmarks: %s\n", run_quantify))
+cat(sprintf("Run Simulation benchmarks: %s\n", run_simulation))
 cat("Loading packages...\n")
 
 suppressPackageStartupMessages({
@@ -110,6 +112,32 @@ if (run_quantify) {
     cat("⚠️  Quantify benchmarks failed:\n")
     cat(sprintf("   %s\n", e$message))
     cat("   (Continuing without quantify benchmarks)\n\n")
+  })
+}
+
+# ==============================================================================
+# Simulation Benchmarks
+# ==============================================================================
+
+if (run_simulation) {
+  cat("\n")
+  cat("╔════════════════════════════════════════════════════════════════════╗\n")
+  cat("║          SIMULATION INFRASTRUCTURE BENCHMARKS                      ║\n")
+  cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
+  
+  cat("Running Simulation benchmarks...\n\n")
+  
+  tryCatch({
+    source("benchmarking/benchmark_simulation.R")
+    cat("\n")
+    cat("╔════════════════════════════════════════════════════════════════════╗\n")
+    cat("║  SIMULATION BENCHMARKS COMPLETE                                    ║\n")
+    cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
+  }, error = function(e) {
+    cat("\n")
+    cat("⚠️  Simulation benchmarks failed:\n")
+    cat(sprintf("   %s\n", e$message))
+    cat("   (Continuing without simulation benchmarks)\n\n")
   })
 }
 
