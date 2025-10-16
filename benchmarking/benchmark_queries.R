@@ -2,16 +2,14 @@
 # Compare performance of ask_for() vs emuR::query()
 
 library(emuR)
+library(reindeer)
 library(bench)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 
-# Source the optimized implementation
-source("R/reindeer_query_optimized.r")
-
 #' Setup test database
-#' @return list with path and db handle
+#' @return list with path, db handle, and corpus object
 setup_benchmark_db <- function() {
   temp_dir <- tempdir()
   if (!dir.exists(file.path(temp_dir, 'emuR_demoData'))) {
@@ -19,22 +17,23 @@ setup_benchmark_db <- function() {
   }
   ae_path <- file.path(temp_dir, 'emuR_demoData', 'ae_emuDB')
   ae <- load_emuDB(ae_path, verbose = FALSE)
-  list(path = ae_path, db = ae)
+  corp <- corpus(ae_path)
+  list(path = ae_path, db = ae, corpus = corp)
 }
 
 #' Run benchmark for a single query
 #' @param query_str EQL query string
-#' @param ae_path Path to database
+#' @param ae_corpus Corpus object
 #' @param ae_db Database handle
 #' @param iterations Number of iterations
 #' @return bench_mark object
-benchmark_query <- function(query_str, ae_path, ae_db, iterations = 50) {
+benchmark_query <- function(query_str, ae_corpus, ae_db, iterations = 50) {
   cat(sprintf("Benchmarking: %s\n", query_str))
   
   tryCatch({
     bm <- bench::mark(
-      emuR = query(ae_db, query_str),
-      optimized = ask_for(ae_path, query_str),
+      emuR = emuR::query(ae_db, query_str),
+      optimized = ask_for(ae_corpus, query_str),
       iterations = iterations,
       check = FALSE,
       memory = TRUE
@@ -84,7 +83,7 @@ run_benchmark_suite <- function(iterations = 50) {
   cat("=" , rep("=", 70), "\n\n", sep="")
   
   setup <- setup_benchmark_db()
-  ae_path <- setup$path
+  ae_corpus <- setup$corpus
   ae <- setup$db
   
   # Define benchmark queries by category
@@ -145,7 +144,7 @@ run_benchmark_suite <- function(iterations = 50) {
     cat(rep("-", 70), "\n", sep="")
     
     for (query in queries[[category]]) {
-      result <- benchmark_query(query, ae_path, ae, iterations)
+      result <- benchmark_query(query, ae_corpus, ae, iterations)
       if (!is.null(result)) {
         result$category <- category
         all_results[[length(all_results) + 1]] <- result
