@@ -121,6 +121,12 @@ clear_tidy_cache <- function() {
 #' Convert segment_list to data.frame efficiently
 #' @noRd
 .seglist_to_df <- function(.segments) {
+  # Handle lazy evaluation first - explicitly check class
+  if ("lazy_segment_list" %in% class(.segments)) {
+    # Force collection
+    .segments <- reindeer::collect(.segments)
+  }
+  
   if (S7::S7_inherits(.segments, reindeer::segment_list)) {
     as.data.frame(S7::S7_data(.segments))
   } else {

@@ -334,6 +334,12 @@ summary.lazy_segment_list <- function(object, ...) {
 #' @param x A lazy_segment_list object
 #' @param ... Additional arguments
 #' @export
+#' Convert lazy_segment_list to data.frame
+#' @param x A lazy_segment_list object
+#' @param ... Additional arguments (ignored)
+#' @return A data.frame
+#' @export
+#' @method as.data.frame lazy_segment_list
 as.data.frame.lazy_segment_list <- function(x, ...) {
   seg_list <- collect(x)
   as.data.frame(seg_list)

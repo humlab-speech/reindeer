@@ -114,6 +114,30 @@ if (run_quantify) {
 }
 
 # ==============================================================================
+# Performance Targets Verification
+# ==============================================================================
+
+cat("\n")
+cat("╔════════════════════════════════════════════════════════════════════╗\n")
+cat("║          PERFORMANCE TARGETS VERIFICATION                          ║\n")
+cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
+
+cat("Verifying documented performance targets...\n\n")
+
+tryCatch({
+  source("benchmarking/benchmark_performance_targets.R")
+  cat("\n")
+  cat("╔════════════════════════════════════════════════════════════════════╗\n")
+  cat("║  PERFORMANCE TARGETS VERIFICATION COMPLETE                         ║\n")
+  cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
+}, error = function(e) {
+  cat("\n")
+  cat("⚠️  Performance targets verification failed:\n")
+  cat(sprintf("   %s\n", e$message))
+  cat("   (Continuing without target verification)\n\n")
+})
+
+# ==============================================================================
 # Final Summary
 # ==============================================================================
 
