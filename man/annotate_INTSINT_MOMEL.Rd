@@ -27,7 +27,7 @@ annotate_INTSINT_MOMEL(
 \arguments{
 \item{emuDBhandle}{The Emu database handle.}
 
-\item{seglist}{A segment list resulting from a \link{query} function call,
+\item{seglist}{A segment list resulting from a \link[emuR:query]{emuR::query} function call,
 containing utterances that should be transcribed.}
 
 \item{windowSize}{The window size (in ms) used when extracting f0. One hald

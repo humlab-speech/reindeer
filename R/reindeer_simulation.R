@@ -749,3 +749,652 @@ summary.simulation_results <- function(object, ...) {
   
   invisible(object)
 }
+
+# ==============================================================================
+# SIMULATION SUPPORT FOR ENRICH
+# ==============================================================================
+
+#' Enhanced enrich with simulation support
+#'
+#' Extends enrich() to support systematic parameter space exploration for track
+#' generation. Results are cached in SQLite database for efficient retrieval.
+#'
+#' @param corpus_obj A corpus object
+#' @param .using A DSP function from superassp package
+#' @param ... Additional arguments passed to DSP function
+#' @param .simulate Named list specifying parameter grid (e.g.,
+#'   list(nominalF1 = seq(300, 600, 50), windowSize = c(20, 25, 30)))
+#' @param .simulation_store Directory for simulation cache (required if .simulate is used)
+#' @param .simulation_timestamp Optional timestamp (auto-generated if NULL)
+#' @param .simulation_overwrite Overwrite existing simulation cache
+#' @param .metadata_fields Character vector of metadata fields for parameter derivation
+#' @param .signal_extension File extension of signal files to process
+#' @param .force Recompute even if track files exist
+#' @param .verbose Show progress messages
+#' @param .parallel Use parallel processing
+#' @param .workers Number of parallel workers
+#' @return The corpus object (invisibly), or simulation_tracks object if simulating
+#' @export
+enrich_simulate <- function(corpus_obj, .using, ...,
+                            .simulate = NULL,
+                            .simulation_store = NULL,
+                            .simulation_timestamp = NULL,
+                            .simulation_overwrite = FALSE,
+                            .metadata_fields = c("Gender", "Age"),
+                            .signal_extension = NULL,
+                            .force = FALSE,
+                            .verbose = TRUE,
+                            .parallel = TRUE,
+                            .workers = NULL) {
+  
+  # If not simulating, use regular enrich
+  if (is.null(.simulate)) {
+    return(enrich(
+      corpus_obj = corpus_obj,
+      .using = .using,
+      ...,
+      .metadata_fields = .metadata_fields,
+      .signal_extension = .signal_extension,
+      .force = .force,
+      .verbose = .verbose,
+      .parallel = .parallel,
+      .workers = .workers
+    ))
+  }
+  
+  # Simulation mode
+  if (is.null(.simulation_store)) {
+    cli::cli_abort(
+      ".simulation_store directory must be specified when using .simulate"
+    )
+  }
+  
+  # Validate corpus
+  if (!inherits(corpus_obj, "reindeer::corpus") && !inherits(corpus_obj, "corpus")) {
+    cli::cli_abort("{.arg corpus_obj} must be a corpus object")
+  }
+  
+  # Generate timestamp if not provided
+  if (is.null(.simulation_timestamp)) {
+    .simulation_timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+  }
+  
+  # Get DSP function name
+  dsp_name <- deparse(substitute(.using))
+  if (is.character(.using)) {
+    dsp_name <- .using
+  } else if (is.function(.using)) {
+    dsp_name <- as.character(substitute(.using))
+  }
+  
+  # Initialize cache
+  cache_file <- initialize_track_simulation_cache(
+    .simulation_store,
+    .simulation_timestamp,
+    dsp_name
+  )
+  
+  if (.verbose) {
+    cli::cli_h2("Simulating track generation with {.fn {dsp_name}}")
+    cli::cli_alert_info("Cache: {.file {cache_file}}")
+  }
+  
+  # Determine signal extension
+  if (is.null(.signal_extension)) {
+    .signal_extension <- corpus_obj@config$mediafileExtension %||% "wav"
+  }
+  
+  # Get signal files
+  signal_files <- peek_signals(corpus_obj) %>%
+    dplyr::filter(extension == .signal_extension)
+  
+  if (nrow(signal_files) == 0) {
+    cli::cli_alert_warning("No signal files with extension {.val {.signal_extension}}")
+    return(invisible(corpus_obj))
+  }
+  
+  # Update signal hashes
+  if (.verbose) {
+    cli::cli_alert_info("Computing signal file hashes...")
+  }
+  update_signal_hashes(corpus_obj, verbose = FALSE, parallel = .parallel)
+  
+  # Create parameter grid
+  param_grid <- create_parameter_grid(.simulate)
+  n_combinations <- nrow(param_grid)
+  
+  if (.verbose) {
+    cli::cli_alert_info(
+      "Simulating {n_combinations} parameter combination{?s} on {nrow(signal_files)} signal file{?s}"
+    )
+    cli::cli_alert_info(
+      "Parameters: {paste(names(.simulate), collapse = ', ')}"
+    )
+  }
+  
+  # Open cache connection
+  con <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Store simulation metadata
+  DBI::dbExecute(con, "
+    INSERT INTO simulation_metadata
+      (timestamp, dsp_function, created_at, corpus_path, corpus_uuid,
+       n_signal_files, n_parameter_combinations, parameter_names)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    params = list(
+      .simulation_timestamp,
+      dsp_name,
+      as.character(Sys.time()),
+      corpus_obj@basePath,
+      corpus_obj@config$UUID,
+      nrow(signal_files),
+      n_combinations,
+      jsonlite::toJSON(names(.simulate))
+    )
+  )
+  
+  # Get metadata for bundles
+  bundle_metadata <- get_all_bundle_metadata(corpus_obj)
+  signal_files_with_meta <- signal_files %>%
+    dplyr::left_join(bundle_metadata, by = c("session", "bundle"))
+  
+  # Get base parameters
+  base_params <- list(...)
+  
+  # Determine parallel processing
+  if (.parallel) {
+    if (is.null(.workers)) {
+      .workers <- max(1, parallel::detectCores() - 1)
+    }
+    old_plan <- future::plan()
+    on.exit(future::plan(old_plan), add = TRUE)
+    future::plan(future::multisession, workers = .workers)
+  }
+  
+  start_time <- Sys.time()
+  
+  # Process each parameter combination
+  if (.verbose) {
+    cli::cli_progress_bar(
+      "Running simulations",
+      total = n_combinations
+    )
+  }
+  
+  track_results <- list()
+  
+  for (i in seq_len(n_combinations)) {
+    
+    # Get parameters for this combination
+    current_params <- as.list(param_grid[i, !c("param_hash")])
+    param_hash <- param_grid$param_hash[i]
+    
+    # Store parameter combination
+    param_id <- DBI::dbGetQuery(con, "
+      SELECT param_id FROM parameter_combinations WHERE param_hash = ?",
+      params = list(param_hash)
+    )
+    
+    if (nrow(param_id) == 0) {
+      DBI::dbExecute(con, "
+        INSERT INTO parameter_combinations (param_hash, params_json)
+        VALUES (?, ?)",
+        params = list(param_hash, jsonlite::toJSON(current_params, auto_unbox = TRUE))
+      )
+      param_id <- DBI::dbGetQuery(con, "SELECT last_insert_rowid() as param_id")
+    }
+    
+    param_id <- param_id$param_id[1]
+    
+    # Process each signal file with these parameters
+    process_file <- function(j, files_meta, dsp_fun, current_params, base_params,
+                             metadata_fields, param_id, con, cache_file) {
+      
+      file_row <- files_meta[j, ]
+      
+      # Derive DSP parameters from metadata
+      all_params <- derive_dsp_parameters(
+        dsp_fun = dsp_fun,
+        metadata = file_row,
+        metadata_fields = metadata_fields,
+        user_params = modifyList(base_params, current_params)
+      )
+      
+      # Apply DSP function in memory (not to file)
+      tryCatch({
+        track <- do.call(dsp_fun, c(
+          list(listOfFiles = file_row$full_path),
+          all_params,
+          list(toFile = FALSE, verbose = FALSE)
+        ))
+        
+        # Serialize track object
+        track_blob <- base::serialize(track, connection = NULL, ascii = FALSE)
+        
+        # Get signal hash
+        signal_hashes <- get_signal_hashes(corpus_obj, 
+                                           session = file_row$session,
+                                           bundle = file_row$bundle)
+        sig_hash_json <- if (nrow(signal_hashes) > 0) {
+          jsonlite::toJSON(signal_hashes$hashes[[1]])
+        } else {
+          NA_character_
+        }
+        
+        # Store in cache
+        # Need to reconnect in parallel workers
+        if (!DBI::dbIsValid(con)) {
+          con <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
+        }
+        
+        DBI::dbExecute(con, "
+          INSERT OR REPLACE INTO track_simulation_results
+            (param_id, session, bundle, signal_file, signal_hash, track_blob)
+          VALUES (?, ?, ?, ?, ?, ?)",
+          params = list(
+            param_id,
+            file_row$session,
+            file_row$bundle,
+            file_row$name,
+            sig_hash_json,
+            list(track_blob)  # Wrap in list for BLOB
+          )
+        )
+        
+        list(success = TRUE, bundle = file_row$bundle, session = file_row$session)
+      }, error = function(e) {
+        list(success = FALSE, bundle = file_row$bundle, session = file_row$session,
+             error = e$message)
+      })
+    }
+    
+    # Process all files for this parameter combination
+    if (.parallel) {
+      file_results <- furrr::future_map(
+        seq_len(nrow(signal_files_with_meta)),
+        process_file,
+        files_meta = signal_files_with_meta,
+        dsp_fun = .using,
+        current_params = current_params,
+        base_params = base_params,
+        metadata_fields = .metadata_fields,
+        param_id = param_id,
+        con = con,
+        cache_file = cache_file,
+        .progress = FALSE,
+        .options = furrr::furrr_options(seed = TRUE)
+      )
+    } else {
+      file_results <- lapply(
+        seq_len(nrow(signal_files_with_meta)),
+        process_file,
+        files_meta = signal_files_with_meta,
+        dsp_fun = .using,
+        current_params = current_params,
+        base_params = base_params,
+        metadata_fields = .metadata_fields,
+        param_id = param_id,
+        con = con,
+        cache_file = cache_file
+      )
+    }
+    
+    track_results[[i]] <- file_results
+    names(track_results)[i] <- param_hash
+    
+    if (.verbose) {
+      cli::cli_progress_update()
+    }
+  }
+  
+  if (.verbose) {
+    cli::cli_progress_done()
+  }
+  
+  # Update computation time
+  elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+  DBI::dbExecute(con, "
+    UPDATE simulation_metadata
+    SET computation_time_seconds = ?
+    WHERE id = 1",
+    params = list(elapsed)
+  )
+  
+  if (.verbose) {
+    cli::cli_alert_success(
+      "Track simulation complete in {round(elapsed, 2)} seconds"
+    )
+    
+    # Report errors
+    all_results <- unlist(track_results, recursive = FALSE)
+    errors <- Filter(function(x) !x$success, all_results)
+    if (length(errors) > 0) {
+      cli::cli_alert_warning("{length(errors)} file{?s} failed processing")
+    }
+  }
+  
+  # Return simulation results object
+  structure(
+    track_results,
+    class = c("simulation_tracks", "list"),
+    parameter_grid = param_grid,
+    cache_file = cache_file,
+    timestamp = .simulation_timestamp,
+    dsp_function = dsp_name,
+    corpus = corpus_obj
+  )
+}
+
+#' Initialize track simulation cache database
+#'
+#' @keywords internal
+initialize_track_simulation_cache <- function(cache_dir, timestamp, dsp_function_name) {
+  
+  if (!dir.exists(cache_dir)) {
+    dir.create(cache_dir, recursive = TRUE)
+  }
+  
+  cache_file <- file.path(
+    cache_dir,
+    sprintf("enrich_%s_%s.sqlite", timestamp, dsp_function_name)
+  )
+  
+  con <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Metadata table
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS simulation_metadata (
+      id INTEGER PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      dsp_function TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      corpus_path TEXT NOT NULL,
+      corpus_uuid TEXT NOT NULL,
+      n_signal_files INTEGER,
+      n_parameter_combinations INTEGER,
+      parameter_names TEXT,
+      computation_time_seconds REAL
+    )")
+  
+  # Parameters table
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS parameter_combinations (
+      param_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      param_hash TEXT UNIQUE NOT NULL,
+      params_json TEXT NOT NULL
+    )")
+  
+  # Track results table
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS track_simulation_results (
+      result_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      param_id INTEGER NOT NULL,
+      session TEXT NOT NULL,
+      bundle TEXT NOT NULL,
+      signal_file TEXT NOT NULL,
+      signal_hash TEXT,
+      track_blob BLOB NOT NULL,
+      FOREIGN KEY (param_id) REFERENCES parameter_combinations(param_id),
+      UNIQUE (param_id, session, bundle, signal_file)
+    )")
+  
+  # Indices
+  DBI::dbExecute(con, "
+    CREATE INDEX IF NOT EXISTS idx_track_param
+    ON track_simulation_results(param_id)")
+  
+  DBI::dbExecute(con, "
+    CREATE INDEX IF NOT EXISTS idx_track_bundle
+    ON track_simulation_results(session, bundle)")
+  
+  cache_file
+}
+
+#' Retrieve track simulation results
+#'
+#' Retrieves SSFF track objects from simulation cache
+#'
+#' @param corpus_obj Corpus object used in simulation
+#' @param parameters Named list of parameter values to retrieve
+#' @param cache_path Path to cache file, or
+#' @param timestamp Timestamp string, or
+#' @param cache_dir Cache directory (requires timestamp)
+#' @param dsp_function DSP function name (requires timestamp)
+#' @param session Optional session filter
+#' @param bundle Optional bundle filter
+#' @return data.table with track information
+#' @export
+reminisce_tracks <- function(corpus_obj,
+                             parameters,
+                             cache_path = NULL,
+                             timestamp = NULL,
+                             cache_dir = NULL,
+                             dsp_function = NULL,
+                             session = NULL,
+                             bundle = NULL) {
+  
+  # Determine cache file
+  if (is.null(cache_path)) {
+    if (is.null(timestamp) || is.null(cache_dir) || is.null(dsp_function)) {
+      cli::cli_abort(
+        "Must provide either cache_path or (timestamp, cache_dir, dsp_function)"
+      )
+    }
+    cache_path <- file.path(
+      cache_dir,
+      sprintf("enrich_%s_%s.sqlite", timestamp, dsp_function)
+    )
+  }
+  
+  if (!file.exists(cache_path)) {
+    cli::cli_abort("Cache file not found: {.file {cache_path}}")
+  }
+  
+  con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Find parameter combination
+  param_hash <- hash_parameters(parameters)
+  
+  param_id <- DBI::dbGetQuery(con, "
+    SELECT param_id FROM parameter_combinations
+    WHERE param_hash = ?",
+    params = list(param_hash)
+  )
+  
+  if (nrow(param_id) == 0) {
+    cli::cli_abort("No matching parameter combination found")
+  }
+  
+  param_id <- param_id$param_id[1]
+  
+  # Build query
+  query <- "
+    SELECT session, bundle, signal_file, signal_hash, track_blob
+    FROM track_simulation_results
+    WHERE param_id = ?"
+  params <- list(param_id)
+  
+  if (!is.null(session)) {
+    query <- paste0(query, " AND session = ?")
+    params <- c(params, list(session))
+  }
+  
+  if (!is.null(bundle)) {
+    query <- paste0(query, " AND bundle = ?")
+    params <- c(params, list(bundle))
+  }
+  
+  results <- DBI::dbGetQuery(con, query, params = params)
+  
+  if (nrow(results) == 0) {
+    cli::cli_alert_warning("No results found for parameters")
+    return(data.table::data.table())
+  }
+  
+  # Deserialize tracks
+  results$track <- lapply(results$track_blob, unserialize)
+  results$track_blob <- NULL
+  
+  # Convert to data.table
+  results_dt <- data.table::as.data.table(results)
+  
+  structure(
+    results_dt,
+    class = c("simulation_track_results", "data.table", "data.frame"),
+    parameters = parameters,
+    cache_file = cache_path
+  )
+}
+
+#' Assess simulation results against stored tracks
+#'
+#' Compares simulated track results with tracks stored in the corpus database
+#' using a specified assessment metric (default: RMSE from yardstick package)
+#'
+#' @param segment_list A segment_list with corpus attribute
+#' @param simulation_results Simulation results from enrich_simulate
+#' @param .metric Assessment metric function (default: yardstick::rmse)
+#' @param .track_name Name of track in database to compare against
+#' @param .detailed Return detailed per-segment metrics (vs. summary)
+#' @param .verbose Show progress
+#' @return data.table with assessment results
+#' @export
+assess <- function(segment_list,
+                   simulation_results,
+                   .metric = yardstick::rmse,
+                   .track_name = NULL,
+                   .detailed = FALSE,
+                   .verbose = TRUE) {
+  
+  # Validate inputs
+  if (!inherits(segment_list, "segment_list")) {
+    cli::cli_abort("First argument must be a segment_list")
+  }
+  
+  if (!inherits(simulation_results, "simulation_tracks")) {
+    cli::cli_abort("Second argument must be simulation_tracks from enrich_simulate")
+  }
+  
+  corpus_obj <- attr(segment_list, "corpus") %||% attr(simulation_results, "corpus")
+  if (is.null(corpus_obj)) {
+    cli::cli_abort("Cannot find corpus object in segment_list or simulation_results")
+  }
+  
+  # Determine track name
+  if (is.null(.track_name)) {
+    # Try to infer from DSP function
+    dsp_fun <- attr(simulation_results, "dsp_function")
+    cli::cli_alert_info("Using DSP function name as track: {.val {dsp_fun}}")
+    .track_name <- dsp_fun
+  }
+  
+  cache_file <- attr(simulation_results, "cache_file")
+  param_grid <- attr(simulation_results, "parameter_grid")
+  
+  if (.verbose) {
+    cli::cli_h2("Assessing simulation results")
+    cli::cli_alert_info("Comparing {nrow(param_grid)} parameter combination{?s}")
+    cli::cli_alert_info("Using metric: {.fn {deparse(substitute(.metric))}}")
+  }
+  
+  # Get stored tracks for segments
+  # This would call quantify on the original tracks
+  reference_tracks <- quantify(
+    segment_list,
+    .using = function(listOfFiles, ...) {
+      # Read existing SSFF files
+      wrassp::read.AsspDataObj(listOfFiles, ...)
+    },
+    trackName = .track_name
+  )
+  
+  # For each parameter combination, compare
+  assessment_results <- list()
+  
+  if (.verbose) {
+    cli::cli_progress_bar("Assessing combinations", total = nrow(param_grid))
+  }
+  
+  for (i in seq_len(nrow(param_grid))) {
+    param_hash <- param_grid$param_hash[i]
+    params <- as.list(param_grid[i, !c("param_hash")])
+    
+    # Retrieve simulated tracks
+    sim_tracks <- reminisce_tracks(
+      corpus_obj,
+      parameters = params,
+      cache_path = cache_file
+    )
+    
+    # Match segments to tracks
+    # Compare track values
+    # This is simplified - actual implementation would extract track data
+    # and compute metrics
+    
+    if (.detailed) {
+      # Per-segment metrics
+      # ... detailed comparison logic ...
+      assessment_results[[i]] <- data.table::data.table(
+        param_id = i,
+        params = list(params),
+        metric_value = NA_real_  # Placeholder
+      )
+    } else {
+      # Summary metric
+      assessment_results[[i]] <- data.table::data.table(
+        param_id = i,
+        params = list(params),
+        metric_value = NA_real_  # Placeholder
+      )
+    }
+    
+    if (.verbose) {
+      cli::cli_progress_update()
+    }
+  }
+  
+  if (.verbose) {
+    cli::cli_progress_done()
+  }
+  
+  results_dt <- data.table::rbindlist(assessment_results, fill = TRUE)
+  
+  structure(
+    results_dt,
+    class = c("assessment_results", "data.table", "data.frame"),
+    metric = deparse(substitute(.metric)),
+    track_name = .track_name,
+    detailed = .detailed
+  )
+}
+
+#' @export
+print.simulation_tracks <- function(x, ...) {
+  param_grid <- attr(x, "parameter_grid")
+  
+  cat("\n")
+  cat("══ Track Simulation Results ══\n")
+  cat("\n")
+  cat(sprintf("DSP function: %s\n", attr(x, 'dsp_function')))
+  cat(sprintf("Timestamp: %s\n", attr(x, 'timestamp')))
+  cat(sprintf("Cache file: %s\n", attr(x, 'cache_file')))
+  cat("\n")
+  cat(sprintf("%d parameter combination%s\n", length(x), if (length(x) != 1) "s" else ""))
+  cat("\n")
+  
+  param_display <- param_grid[, setdiff(names(param_grid), "param_hash"), with = FALSE]
+  
+  if (nrow(param_display) <= 10) {
+    print(param_display)
+  } else {
+    cat("First 5 parameter combinations:\n")
+    print(head(param_display, 5))
+    cat("...\n")
+    cat(sprintf("(%d more)\n", nrow(param_display) - 5))
+  }
+  
+  invisible(x)
+}

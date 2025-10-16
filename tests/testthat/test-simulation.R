@@ -282,3 +282,128 @@ test_that("simulation cache handles large parameter spaces", {
   ")
   expect_equal(nrow(result), 1)
 })
+
+# ==============================================================================
+# TESTS FOR ENRICH SIMULATION
+# ==============================================================================
+
+test_that("track simulation cache initialization works", {
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("RSQLite")
+  
+  cache_dir <- tempfile()
+  dir.create(cache_dir)
+  on.exit(unlink(cache_dir, recursive = TRUE))
+  
+  timestamp <- "20231015_140000"
+  dsp_name <- "test_track_fn"
+  
+  cache_file <- initialize_track_simulation_cache(cache_dir, timestamp, dsp_name)
+  
+  expect_true(file.exists(cache_file))
+  expect_match(basename(cache_file), "enrich_20231015_140000_test_track_fn\\.sqlite")
+  
+  # Check tables exist
+  con <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  tables <- DBI::dbListTables(con)
+  expect_true("simulation_metadata" %in% tables)
+  expect_true("parameter_combinations" %in% tables)
+  expect_true("track_simulation_results" %in% tables)
+  
+  # Check schema
+  track_result_cols <- DBI::dbListFields(con, "track_simulation_results")
+  expect_true("track_blob" %in% track_result_cols)
+  expect_true("signal_hash" %in% track_result_cols)
+  expect_true("session" %in% track_result_cols)
+  expect_true("bundle" %in% track_result_cols)
+})
+
+test_that("enrich_simulate without .simulate calls regular enrich", {
+  skip_if_not_installed("emuR")
+  skip("Integration test - requires full corpus")
+  
+  # This would test that enrich_simulate falls back to enrich
+  # when .simulate is NULL
+})
+
+test_that("enrich_simulate validates inputs", {
+  # Test error for missing .simulation_store
+  expect_error(
+    enrich_simulate(
+      list(),  # mock corpus
+      .using = function(x) x,
+      .simulate = list(a = 1:3)
+      # Missing .simulation_store
+    ),
+    ".simulation_store"
+  )
+  
+  # Test error for invalid corpus
+  expect_error(
+    enrich_simulate(
+      list(),  # not a corpus
+      .using = function(x) x,
+      .simulate = list(a = 1:3),
+      .simulation_store = tempdir()
+    ),
+    "corpus"
+  )
+})
+
+test_that("reminisce_tracks validates inputs", {
+  # Missing required parameters
+  expect_error(
+    reminisce_tracks(
+      list(),  # mock corpus
+      parameters = list(a = 1)
+      # Missing cache_path or timestamp info
+    ),
+    "Must provide"
+  )
+  
+  # Non-existent cache file
+  fake_path <- file.path(tempdir(), "nonexistent.sqlite")
+  expect_error(
+    reminisce_tracks(
+      list(),
+      parameters = list(a = 1),
+      cache_path = fake_path
+    ),
+    "not found"
+  )
+})
+
+test_that("simulation_tracks print method works", {
+  # Create mock simulation_tracks object
+  mock_tracks <- list(
+    result1 = list(success = TRUE),
+    result2 = list(success = TRUE)
+  )
+  
+  param_grid <- data.table::data.table(
+    param1 = c(100, 200),
+    param2 = c(0.5, 1.0),
+    param_hash = c("hash1", "hash2")
+  )
+  
+  class(mock_tracks) <- c("simulation_tracks", "list")
+  attr(mock_tracks, "parameter_grid") <- param_grid
+  attr(mock_tracks, "cache_file") <- "/tmp/enrich_test.sqlite"
+  attr(mock_tracks, "timestamp") <- "20231015_140000"
+  attr(mock_tracks, "dsp_function") <- "test_dsp"
+  
+  # Should not error
+  expect_output(print(mock_tracks), "Track Simulation Results")
+  expect_output(print(mock_tracks), "test_dsp")
+})
+
+test_that("assess validates inputs", {
+  skip("Requires full implementation")
+  
+  # Test validation of segment_list
+  # Test validation of simulation_results
+  # Test handling of missing corpus
+  # Test handling of missing track
+})
