@@ -1,3 +1,15 @@
+# ============================================================================
+# DEPRECATED FILE - MARKED FOR DELETION
+# ============================================================================
+# 
+# This file is no longer used by the reindeer package and will be removed.
+# See R/deprecated/README.md for replacement files.
+#
+# DO NOT USE FUNCTIONS FROM THIS FILE
+# 
+# Date marked: 2025-10-16
+# ============================================================================
+
 #' Provides the user with speaker dependent signal processing parameters
 #'
 #' This function returns age and gender specific speech signal processing

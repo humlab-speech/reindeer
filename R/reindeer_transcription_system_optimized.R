@@ -18,6 +18,50 @@ library(data.table)
 library(parallel)
 
 # ==============================================================================
+# SUGGESTION CLASS DEFINITIONS
+# ==============================================================================
+
+#' Base Suggestion class for transcription suggestions
+#' @export  
+Suggestion <- S7::new_class(
+  "Suggestion",
+  properties = list(
+    corpus = S7::class_any,  # corpus object
+    session = S7::class_character,
+    bundle = S7::class_character,
+    level_name = S7::class_character,
+    level_type = S7::class_character,  # "SEGMENT", "EVENT", or "ITEM"
+    attribute_name = S7::class_character,
+    suggestions = S7::class_data.frame,
+    min_duration = S7::class_numeric,
+    remove_empty = S7::class_logical,
+    assessed = S7::class_logical,
+    assessment_results = S7::class_any
+  )
+)
+
+#' ItemSuggestion - ITEM level transcription suggestions
+#' @export
+ItemSuggestion <- S7::new_class(
+  "ItemSuggestion",
+  parent = Suggestion
+)
+
+#' EventSuggestion - EVENT level transcription suggestions  
+#' @export
+EventSuggestion <- S7::new_class(
+  "EventSuggestion",
+  parent = Suggestion
+)
+
+#' SegmentSuggestion - SEGMENT level transcription suggestions
+#' @export
+SegmentSuggestion <- S7::new_class(
+  "SegmentSuggestion",
+  parent = Suggestion
+)
+
+# ==============================================================================
 # OPTIMIZE EXISTING SUGGESTION CLASSES FOR DATA.TABLE
 # ==============================================================================
 

@@ -1,3 +1,15 @@
+# ============================================================================
+# DEPRECATED FILE - MARKED FOR DELETION
+# ============================================================================
+# 
+# This file is no longer used by the reindeer package and will be removed.
+# See R/deprecated/README.md for replacement files.
+#
+# DO NOT USE FUNCTIONS FROM THIS FILE
+# 
+# Date marked: 2025-10-16
+# ============================================================================
+
 # NOTE: corpus class is now defined in reindeer-corpus.R
 # This conflicting definition has been removed to avoid duplicates
 segments <- S7::new_class("segments",
