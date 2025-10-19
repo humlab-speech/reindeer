@@ -41,7 +41,8 @@ Imports:
     S7,
     av,
     xml2,
-    Rcpp
+    Rcpp,
+    qs (>= 0.25.0)
 Remotes:
   github::humlab-speech/superassp
 RdMacros: Rdpack

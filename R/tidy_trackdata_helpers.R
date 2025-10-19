@@ -267,6 +267,7 @@ clear_tidy_cache <- function() {
       CREATE TABLE cache (
         cache_key TEXT PRIMARY KEY,
         result_blob BLOB,
+        format TEXT DEFAULT 'rds',
         created_at INTEGER,
         accessed_at INTEGER,
         size_bytes INTEGER
@@ -276,6 +277,17 @@ clear_tidy_cache <- function() {
     DBI::dbExecute(conn, "
       CREATE INDEX idx_accessed_at ON cache(accessed_at)
     ")
+    
+    DBI::dbExecute(conn, "
+      CREATE INDEX idx_format ON cache(format)
+    ")
+  } else {
+    # Migrate existing cache table to add format column if needed
+    columns <- DBI::dbListFields(conn, "cache")
+    if (!"format" %in% columns) {
+      DBI::dbExecute(conn, "ALTER TABLE cache ADD COLUMN format TEXT DEFAULT 'rds'")
+      DBI::dbExecute(conn, "CREATE INDEX idx_format ON cache(format)")
+    }
   }
   
   assign(cache_key, conn, envir = .tidy_cache)
@@ -285,7 +297,7 @@ clear_tidy_cache <- function() {
 #' Get result from persistent cache
 #' @noRd
 .get_persistent_cache <- function(cache_key, conn) {
-  query <- "SELECT result_blob FROM cache WHERE cache_key = ?"
+  query <- "SELECT result_blob, format FROM cache WHERE cache_key = ?"
   result <- DBI::dbGetQuery(conn, query, params = list(cache_key))
   
   if (nrow(result) > 0) {
@@ -295,8 +307,42 @@ clear_tidy_cache <- function() {
       params = list(as.integer(Sys.time()), cache_key)
     )
     
-    # Deserialize result
-    unserialize(result$result_blob[[1]])
+    # Get format (default to 'rds' for backward compatibility)
+    format <- result$format[1]
+    if (is.null(format) || is.na(format)) {
+      format <- "rds"
+    }
+    
+    # Deserialize based on format
+    blob <- result$result_blob[[1]]
+    
+    data <- tryCatch({
+      if (format == "qs" && requireNamespace("qs", quietly = TRUE)) {
+        qs::qdeserialize(blob)
+      } else {
+        unserialize(blob)
+      }
+    }, error = function(e) {
+      # If deserialization fails, try the other method as fallback
+      tryCatch({
+        if (format == "qs") {
+          # qs failed, try base unserialize
+          unserialize(blob)
+        } else {
+          # base failed, try qs if available
+          if (requireNamespace("qs", quietly = TRUE)) {
+            qs::qdeserialize(blob)
+          } else {
+            stop(e)
+          }
+        }
+      }, error = function(e2) {
+        # Both failed - return NULL to trigger recomputation
+        NULL
+      })
+    })
+    
+    return(data)
   } else {
     NULL
   }
@@ -304,9 +350,22 @@ clear_tidy_cache <- function() {
 
 #' Set result in persistent cache
 #' @noRd
-.set_persistent_cache <- function(cache_key, result, conn, max_cache_size_mb = 1000) {
-  # Serialize result
-  result_blob <- serialize(result, NULL)
+.set_persistent_cache <- function(cache_key, result, conn, max_cache_size_mb = 1000,
+                                   format = c("auto", "qs", "rds")) {
+  format <- match.arg(format)
+  
+  # Determine format to use
+  if (format == "auto") {
+    format <- if (requireNamespace("qs", quietly = TRUE)) "qs" else "rds"
+  }
+  
+  # Serialize result based on format
+  result_blob <- if (format == "qs" && requireNamespace("qs", quietly = TRUE)) {
+    qs::qserialize(result, preset = "fast")
+  } else {
+    serialize(result, NULL)
+  }
+  
   size_bytes <- length(result_blob)
   current_time <- as.integer(Sys.time())
   
@@ -327,11 +386,11 @@ clear_tidy_cache <- function() {
     DBI::dbExecute(conn, remove_query)
   }
   
-  # Insert or replace
+  # Insert or replace with format marker
   DBI::dbExecute(conn, "
-    INSERT OR REPLACE INTO cache (cache_key, result_blob, created_at, accessed_at, size_bytes)
-    VALUES (?, ?, ?, ?, ?)
-  ", params = list(cache_key, list(result_blob), current_time, current_time, size_bytes))
+    INSERT OR REPLACE INTO cache (cache_key, result_blob, format, created_at, accessed_at, size_bytes)
+    VALUES (?, ?, ?, ?, ?, ?)
+  ", params = list(cache_key, list(result_blob), format, current_time, current_time, size_bytes))
   
   invisible(NULL)
 }
@@ -340,7 +399,8 @@ clear_tidy_cache <- function() {
 #' @noRd
 .process_segments_vectorized <- function(seg_df, corpus_obj, dsp_function, dsp_params,
                                          media_ext, .at = NULL, .verbose = FALSE,
-                                         use_cache = TRUE, cache_conn = NULL) {
+                                         use_cache = TRUE, cache_conn = NULL,
+                                         cache_format = "auto") {
   
   # Convert to data.table for faster operations
   if (requireNamespace("data.table", quietly = TRUE)) {
@@ -415,7 +475,7 @@ clear_tidy_cache <- function() {
             
             # Store in cache if enabled
             if (use_cache && !is.null(cache_conn)) {
-              .set_persistent_cache(cache_key[i], result, cache_conn)
+              .set_persistent_cache(cache_key[i], result, cache_conn, format = cache_format)
             }
             
             result

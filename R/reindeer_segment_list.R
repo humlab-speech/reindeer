@@ -497,6 +497,12 @@ quantify <- S7::new_generic("quantify", "object")
 #' @param .verbose Logical; show progress messages
 #' @param .parallel Logical; use parallel processing (default TRUE)
 #' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
+#' @param .use_cache Logical; enable result caching (default FALSE)
+#' @param .cache_dir Character; cache directory path (default: tempdir()/reindeer_cache)
+#' @param .cache_format Character; serialization format - "auto" (uses qs if available, 
+#'        otherwise base serialize), "qs" (faster, smaller, requires qs package), 
+#'        or "rds" (base R serialize, slower, larger). Default: "auto"
+#' @param .optimize Logical; use optimized processing (default TRUE)
 #' 
 #' @return An extended_segment_list with segment information and DSP-derived measurements
 #' 
@@ -511,6 +517,12 @@ quantify <- S7::new_generic("quantify", "object")
 #' 
 #' # Disable parallel processing
 #' formants <- quantify(segs, superassp::forest, .parallel = FALSE)
+#' 
+#' # Enable caching with qs format (faster, recommended)
+#' formants <- quantify(segs, superassp::forest, .use_cache = TRUE)
+#' 
+#' # Force base R serialization
+#' formants <- quantify(segs, superassp::forest, .use_cache = TRUE, .cache_format = "rds")
 #' }
 #' 
 #' @export
@@ -522,7 +534,11 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .workers = NULL,
                                                 .use_cache = FALSE,
                                                 .cache_dir = NULL,
+                                                .cache_format = c("auto", "qs", "rds"),
                                                 .optimize = TRUE) {
+  
+  # Match cache format argument
+  .cache_format <- match.arg(.cache_format)
   
   if (!inherits(object, "segment_list")) {
     cli::cli_abort("{.arg object} must be a segment_list")
@@ -612,7 +628,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     # PHASE 2: Vectorized batch processing
     results_list <- .process_segments_vectorized(
       seg_df, corpus_obj, dsp_function, dsp_params_base,
-      media_ext, .at, .verbose, .use_cache, cache_conn
+      media_ext, .at, .verbose, .use_cache, cache_conn, .cache_format
     )
     
   } else if (.parallel && nrow(seg_df) > 20) {

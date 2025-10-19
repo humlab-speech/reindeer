@@ -4,24 +4,16 @@
 \alias{descend_to}
 \title{Descend to Lower Level in Hierarchy}
 \usage{
-descend_to(
-  .segments,
-  .level,
-  .from = NULL,
-  collapse = TRUE,
-  calculate_times = TRUE,
-  times_from = NULL,
-  .quiet = TRUE
-)
+descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 }
 \arguments{
 \item{.segments}{segment_list or lazy_segment_list object}
 
+\item{level}{Character; target level name to descend to}
+
 \item{.from}{corpus object (optional)}
 
 \item{.quiet}{Logical; suppress messages}
-
-\item{level}{Character; target level name to descend to}
 
 \item{collect}{Logical; force materialization (default TRUE)}
 }
