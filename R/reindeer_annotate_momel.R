@@ -48,20 +48,53 @@ draft_momel_intsint <- function(corpus,
                                intsint_level = "Intsint",
                                momel_level = NULL,
                                time_step = 0.01,
+                               .force_overwrite = FALSE,
                                verbose = TRUE) {
   
+  # Store parameters for caching
+  draft_params <- list(
+    windowSize = windowSize,
+    minF = minF,
+    maxF = maxF,
+    pitchSpan = pitchSpan,
+    maximumError = maximumError,
+    reducWindowSize = reducWindowSize,
+    minimalDistance = minimalDistance,
+    minimalFrequencyRatio = minimalFrequencyRatio,
+    intsint_level = intsint_level,
+    momel_level = momel_level,
+    time_step = time_step
+  )
+
+  # Get or create cache
+  cache_info <- get_draft_cache(
+    corpus,
+    "draft_momel_intsint",
+    draft_params,
+    force_overwrite = .force_overwrite,
+    verbose = verbose
+  )
+
+  con <- cache_info$con
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
   # Ensure Python module is available
   if (!reticulate::py_module_available("parselmouth")) {
     stop("Parselmouth not available. Install with: pip install praat-parselmouth")
   }
-  
+
   # Import Python module
   momel_intsint <- reticulate::import_from_path(
     "momel_intsint",
     path = system.file("python", package = "reindeer", mustWork = TRUE)
   )
-  
+
   if (verbose) {
+    if (!cache_info$is_new) {
+      cli::cli_alert_info(
+        "Resuming from cache: {cache_info$n_completed} bundle{?s} already completed"
+      )
+    }
     cli::cli_progress_step("Processing {nrow(bundle_list)} bundle{?s}")
   }
   
@@ -81,20 +114,41 @@ draft_momel_intsint <- function(corpus,
     stop("No audio files found with extension '", media_ext, "'")
   }
   
+  # Update total bundles in cache
+  DBI::dbExecute(con, "
+    UPDATE draft_metadata
+    SET n_bundles_total = ?
+    WHERE id = 1",
+    params = list(nrow(bundles_with_audio))
+  )
+
   # Process each bundle
   all_annotations <- list()
-  
+
   if (verbose) {
-    pb <- cli::cli_progress_bar(
-      "Processing bundles",
+    n_to_process <- sum(!sapply(seq_len(nrow(bundles_with_audio)), function(i) {
+      bundle_info <- bundles_with_audio[i, ]
+      is_bundle_cached(con, bundle_info$session, bundle_info$bundle, intsint_level, intsint_level)
+    }))
+
+    cli::cli_progress_bar(
+      "Processing bundles ({n_to_process} new)",
       total = nrow(bundles_with_audio)
     )
   }
-  
+
   for (i in seq_len(nrow(bundles_with_audio))) {
     bundle_info <- bundles_with_audio[i, ]
     sound_file <- bundle_info$full_path
-    
+
+    # Check if already cached
+    if (is_bundle_cached(con, bundle_info$session, bundle_info$bundle, intsint_level, intsint_level)) {
+      if (verbose) {
+        cli::cli_progress_update()
+      }
+      next
+    }
+
     tryCatch({
       # Process with Python
       result <- momel_intsint$process_momel_intsint(
@@ -130,30 +184,69 @@ draft_momel_intsint <- function(corpus,
           key = key_val,
           stringsAsFactors = FALSE
         )
-        
+
+        # Store in cache
+        store_draft_annotations(
+          con,
+          session = bundle_info$session,
+          bundle = bundle_info$bundle,
+          level_name = intsint_level,
+          level_type = "EVENT",
+          attribute_name = intsint_level,
+          annotations = annotations,
+          parameters = draft_params,
+          error_occurred = FALSE
+        )
+
         all_annotations[[i]] <- annotations
       }
-      
+
     }, error = function(e) {
-      cli::cli_alert_warning(
-        "Failed to process {bundle_info$session}/{bundle_info$bundle}: {e$message}"
+      # Store error in cache
+      store_draft_annotations(
+        con,
+        session = bundle_info$session,
+        bundle = bundle_info$bundle,
+        level_name = intsint_level,
+        level_type = "EVENT",
+        attribute_name = intsint_level,
+        annotations = NULL,
+        parameters = draft_params,
+        error_occurred = TRUE,
+        error_message = e$message
       )
+
+      if (verbose) {
+        cli::cli_alert_warning(
+          "Failed to process {bundle_info$session}/{bundle_info$bundle}: {e$message}"
+        )
+      }
     })
-    
+
     if (verbose) {
-      cli::cli_progress_update(id = pb)
+      cli::cli_progress_update()
     }
   }
   
   if (verbose) {
-    cli::cli_progress_done(id = pb)
+    cli::cli_progress_done()
   }
-  
+
+  # Mark cache as completed
+  mark_draft_completed(con)
+
+  # Retrieve all successful annotations from cache (includes previously cached + newly generated)
+  cached_results <- retrieve_draft_annotations(con, level_name = intsint_level)
+
+  if (nrow(cached_results) == 0 || all(cached_results$error_occurred)) {
+    stop("No annotations were generated successfully")
+  }
+
+  # Filter successful results and extract annotations
+  successful_results <- cached_results[!cached_results$error_occurred, ]
+  all_annotations <- successful_results$annotations
+
   # Combine all annotations
-  if (length(all_annotations) == 0) {
-    stop("No annotations were generated")
-  }
-  
   suggestions_df <- dplyr::bind_rows(all_annotations)
   
   # Create EventSuggestion object

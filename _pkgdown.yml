@@ -1,0 +1,137 @@
+url: https://humlab-speech.github.io/reindeer/
+template:
+  bootstrap: 5
+  bootswatch: flatly
+  bslib:
+    primary: "#0054AD"
+    border-radius: 0.5rem
+    btn-border-radius: 0.25rem
+
+development:
+  mode: auto
+
+home:
+  title: "reindeer: Enhanced EMU-SDMS for Speech Research"
+  description: >
+    R package extending emuR capabilities for working with speech data,
+    including metadata management, signal processing optimization, and
+    advanced query systems.
+
+authors:
+  Fredrik Karlsson:
+    href: https://github.com/frkkan96
+
+navbar:
+  structure:
+    left:  [home, reference, articles, news]
+    right: [search, github]
+  components:
+    home:
+      icon: fas fa-home
+      href: index.html
+    reference:
+      text: Reference
+      href: reference/index.html
+    articles:
+      text: Articles
+      menu:
+      - text: Tidy Speech Processing
+        href: articles/Tidy_speech_processing.html
+      - text: Metadata Management
+        href: articles/metadata_management.html
+      - text: Transcription Workflow
+        href: articles/transcription_workflow.html
+      - text: Simulation Infrastructure
+        href: articles/simulation-infrastructure.html
+    news:
+      text: News
+      href: news/index.html
+    github:
+      icon: fab fa-github
+      href: https://github.com/humlab-speech/reindeer
+
+reference:
+- title: "Corpus Management"
+  desc: "Core corpus and database management"
+  contents:
+  - corpus
+  - peek_at
+  - peek_signals
+  - summary.corpus
+
+- title: "Querying"
+  desc: "Query language and segment retrieval"
+  contents:
+  - ask_for
+  - query
+  - segment_list
+  - extended_segment_list
+
+- title: "Signal Processing"
+  desc: "DSP functions and track quantification"
+  contents:
+  - quantify
+  - enrich
+  - biographize
+  - dspp_metadataParameters_dt
+
+- title: "Simulation Infrastructure"
+  desc: "Parameter space exploration and testing"
+  contents:
+  - quantify_simulate
+  - enrich_simulate
+  - reminisce
+  - reminisce_tracks
+  - list_simulations
+  - prep_passthrough
+  - verify_prep_params
+
+- title: "Metadata Management"
+  desc: "Metadata operations with SQLite caching"
+  contents:
+  - gather_metadata
+  - get_metadata
+  - add_metadata
+  - export_metadata
+  - import_metadata
+
+- title: "Transcription"
+  desc: "Transcription and suggestion systems"
+  contents:
+  - suggest
+  - transcribe
+  - transcribe_parallel
+
+- title: "Annotation"
+  desc: "Automated annotation functions"
+  contents:
+  - draft_intsint_momel
+  - has_python_annotations
+  - test_python_annotations
+
+- title: "Utilities"
+  desc: "Helper functions and utilities"
+  contents:
+  - build_emuDB_cache
+  - get_corpus_connection
+  - derive_dsp_parameters
+  - compute_signal_hash
+  - update_signal_hashes
+
+- title: "Test Utilities"
+  desc: "Functions for package testing"
+  contents:
+  - create_test_corpus_for_simulation
+
+articles:
+- title: "Getting Started"
+  navbar: ~
+  contents:
+  - Tidy_speech_processing
+  - metadata_management
+
+- title: "Advanced Topics"
+  navbar: ~
+  contents:
+  - transcription_workflow
+  - simulation-infrastructure

@@ -7,9 +7,100 @@
 #
 # Key components:
 # 1. Signal file integrity tracking (SHA1 hashes)
-# 2. Simulation mode for quantify with parameter grids
-# 3. SQLite-based simulation caching
-# 4. Result retrieval and reuse
+# 2. Simulation mode for quantify/enrich with parameter grids
+# 3. Preprocessing support for media file transformation before DSP
+# 4. SQLite-based simulation caching
+# 5. Result retrieval and reuse
+#
+# ==============================================================================
+# PREPROCESSING EXAMPLES
+# ==============================================================================
+#
+# The simulation system supports preprocessing media files before DSP analysis.
+# This allows systematic exploration of how media transformations affect results.
+#
+# Example 1: Simulate formant analysis with different sample rates
+# \dontrun{
+# library(superassp)
+# library(reindeer)
+#
+# # Load corpus and query segments
+# corp <- corpus("path/to/db_emuDB")
+# segments <- ask_for(corp, "Phonetic == a")
+#
+# # Simulate with sample rate preprocessing
+# results <- quantify_simulate(
+#   segments,
+#   .using = superassp::forest,
+#   .simulate = list(
+#     nominalF1 = seq(500, 900, 100)  # DSP parameter grid
+#   ),
+#   .prep_function = superassp::prep_recode,
+#   .prep_simulate = list(
+#     sample_rate = c(16000, 22050, 44100),  # Prep parameter grid
+#     format = "wav"
+#   ),
+#   .simulation_store = "simulations/formants"
+# )
+#
+# # This creates 3 * 5 = 15 combinations:
+# # - 3 sample rates × 5 nominalF1 values
+# # Each segment is processed with all 15 combinations
+#
+# print(results)
+# # Shows both DSP and prep parameters
+# }
+#
+# Example 2: Enrich corpus with pitch tracks using different codecs
+# \dontrun{
+# # Simulate track generation with preprocessing
+# track_sim <- enrich_simulate(
+#   corp,
+#   .using = superassp::ksvF0,
+#   .simulate = list(
+#     minF = c(50, 75, 100),
+#     maxF = c(300, 400, 500)
+#   ),
+#   .prep_function = superassp::prep_recode,
+#   .prep_simulate = list(
+#     format = c("wav", "flac", "mp3"),
+#     bit_rate = c(128000, 320000)
+#   ),
+#   .simulation_store = "simulations/pitch"
+# )
+#
+# # This creates 3 * 3 * 3 * 2 = 54 combinations:
+# # - 3 minF × 3 maxF × 3 formats × 2 bit rates
+# }
+#
+# Example 3: Preprocessing only (no DSP parameter variation)
+# \dontrun{
+# # Test effect of sample rate alone
+# results <- quantify_simulate(
+#   segments,
+#   .using = superassp::forest,
+#   nominalF1 = 700,  # Fixed DSP parameter
+#   .prep_function = superassp::prep_recode,
+#   .prep_simulate = list(
+#     sample_rate = c(8000, 16000, 22050, 32000, 44100)
+#   ),
+#   .simulation_store = "simulations/samplerate_test"
+# )
+# }
+#
+# Example 4: DSP parameters only (no preprocessing)
+# \dontrun{
+# # Traditional simulation without preprocessing
+# results <- quantify_simulate(
+#   segments,
+#   .using = superassp::forest,
+#   .simulate = list(
+#     nominalF1 = seq(400, 1000, 50),
+#     windowShift = c(5, 10)
+#   ),
+#   .simulation_store = "simulations/traditional"
+# )
+# }
 #
 
 # ==============================================================================
@@ -204,12 +295,14 @@ initialize_simulation_cache <- function(cache_dir, timestamp, dsp_function_name)
       id INTEGER PRIMARY KEY,
       timestamp TEXT NOT NULL,
       dsp_function TEXT NOT NULL,
+      prep_function TEXT,  -- Preprocessing function name (optional)
       created_at TEXT NOT NULL,
       corpus_path TEXT NOT NULL,
       corpus_uuid TEXT NOT NULL,
       n_segments INTEGER,
       n_parameter_combinations INTEGER,
-      parameter_names TEXT,  -- JSON array
+      parameter_names TEXT,  -- JSON array of DSP parameter names
+      prep_parameter_names TEXT,  -- JSON array of prep parameter names
       computation_time_seconds REAL
     )")
   
@@ -218,7 +311,8 @@ initialize_simulation_cache <- function(cache_dir, timestamp, dsp_function_name)
     CREATE TABLE IF NOT EXISTS parameter_combinations (
       param_id INTEGER PRIMARY KEY AUTOINCREMENT,
       param_hash TEXT UNIQUE NOT NULL,  -- Hash of parameter combination
-      params_json TEXT NOT NULL  -- JSON of all parameters
+      params_json TEXT NOT NULL,  -- JSON of DSP parameters
+      prep_params_json TEXT  -- JSON of prep parameters (optional)
     )")
   
   # Results table - stores results for each segment × parameter combination
@@ -260,28 +354,74 @@ initialize_simulation_cache <- function(cache_dir, timestamp, dsp_function_name)
 #' Create parameter grid from simulation specification
 #'
 #' @param simulate_spec List with parameter names and value vectors
+#' @param prep_simulate_spec List with prep parameter names and value vectors (optional)
 #' @return data.table with all parameter combinations
 #' @keywords internal
-create_parameter_grid <- function(simulate_spec) {
-  
-  if (length(simulate_spec) == 0) {
+create_parameter_grid <- function(simulate_spec, prep_simulate_spec = NULL) {
+
+  if (length(simulate_spec) == 0 && (is.null(prep_simulate_spec) || length(prep_simulate_spec) == 0)) {
     return(data.table::data.table())
   }
-  
+
   # Validate input
-  if (!all(sapply(simulate_spec, is.vector))) {
+  if (length(simulate_spec) > 0 && !all(sapply(simulate_spec, is.vector))) {
     cli::cli_abort("All elements in .simulate must be vectors")
   }
-  
-  # Create grid
-  grid <- expand.grid(simulate_spec, stringsAsFactors = FALSE)
-  grid <- data.table::as.data.table(grid)
-  
-  # Add parameter hash for efficient lookup
+
+  if (!is.null(prep_simulate_spec) && length(prep_simulate_spec) > 0 &&
+      !all(sapply(prep_simulate_spec, is.vector))) {
+    cli::cli_abort("All elements in .prep_simulate must be vectors")
+  }
+
+  # Create grids
+  dsp_grid <- if (length(simulate_spec) > 0) {
+    expand.grid(simulate_spec, stringsAsFactors = FALSE)
+  } else {
+    data.frame(dummy = 1)  # Placeholder for when only prep params vary
+  }
+
+  prep_grid <- if (!is.null(prep_simulate_spec) && length(prep_simulate_spec) > 0) {
+    expand.grid(prep_simulate_spec, stringsAsFactors = FALSE)
+  } else {
+    data.frame(dummy = 1)  # Placeholder for when only DSP params vary
+  }
+
+  # Combine grids (full outer product)
+  combined_grid <- merge(dsp_grid, prep_grid, by = NULL)
+
+  # Remove dummy columns
+  combined_grid$dummy.x <- NULL
+  combined_grid$dummy.y <- NULL
+
+  grid <- data.table::as.data.table(combined_grid)
+
+  # Separate DSP and prep params
+  dsp_param_names <- if (length(simulate_spec) > 0) names(simulate_spec) else character(0)
+  prep_param_names <- if (!is.null(prep_simulate_spec) && length(prep_simulate_spec) > 0) {
+    names(prep_simulate_spec)
+  } else {
+    character(0)
+  }
+
+  # Add parameter hash for efficient lookup (hash includes both DSP and prep params)
   grid$param_hash <- sapply(seq_len(nrow(grid)), function(i) {
-    digest::digest(as.list(grid[i, ]), algo = "md5")
+    dsp_params <- if (length(dsp_param_names) > 0) {
+      as.list(grid[i, ..dsp_param_names])
+    } else {
+      list()
+    }
+    prep_params <- if (length(prep_param_names) > 0) {
+      as.list(grid[i, ..prep_param_names])
+    } else {
+      list()
+    }
+    digest::digest(list(dsp = dsp_params, prep = prep_params), algo = "md5")
   })
-  
+
+  # Add metadata about which params are DSP vs prep
+  attr(grid, "dsp_params") <- dsp_param_names
+  attr(grid, "prep_params") <- prep_param_names
+
   grid
 }
 
@@ -300,13 +440,19 @@ hash_parameters <- function(params) {
 
 #' Enhanced quantify method for segment_list with simulation support
 #'
-#' Extends quantify to support systematic parameter space exploration
+#' Extends quantify to support systematic parameter space exploration with
+#' optional preprocessing of media files before DSP analysis.
 #'
 #' @param .what A segment_list object
 #' @param .using DSP function to apply
 #' @param ... Additional arguments passed to DSP function
-#' @param .simulate Named list specifying parameter grid, e.g.,
+#' @param .simulate Named list specifying DSP parameter grid, e.g.,
 #'   list(nominalF1 = seq(300, 600, 10), minF = seq(100, 250, 50))
+#' @param .prep_function Optional preprocessing function to apply to media before DSP.
+#'   Should accept listOfFiles parameter and return audio data compatible with DSP function.
+#'   See superassp::prep_recode() for example.
+#' @param .prep_simulate Named list specifying prep parameter grid, e.g.,
+#'   list(sample_rate = c(16000, 22050, 44100), format = c("wav", "mp3"))
 #' @param .simulation_store Directory path for storing simulation cache
 #' @param .simulation_timestamp Optional timestamp string (auto-generated if NULL)
 #' @param .simulation_overwrite Overwrite existing simulation cache
@@ -315,6 +461,8 @@ hash_parameters <- function(params) {
 #' @export
 quantify_simulate <- function(.what, .using, ...,
                                .simulate = NULL,
+                               .prep_function = NULL,
+                               .prep_simulate = NULL,
                                .simulation_store = NULL,
                                .simulation_timestamp = NULL,
                                .simulation_overwrite = FALSE,
@@ -330,8 +478,17 @@ quantify_simulate <- function(.what, .using, ...,
   }
   
   # If not simulating, use regular quantify
-  if (is.null(.simulate)) {
+  if (is.null(.simulate) && is.null(.prep_simulate)) {
     return(quantify(.what, .using = .using, ...))
+  }
+
+  # Validate prep function if prep simulation is requested
+  if (!is.null(.prep_simulate) && is.null(.prep_function)) {
+    cli::cli_abort(".prep_function must be provided when using .prep_simulate")
+  }
+
+  if (!is.null(.prep_function) && !is.function(.prep_function)) {
+    cli::cli_abort(".prep_function must be a function")
   }
   
   # Simulation mode
@@ -357,7 +514,19 @@ quantify_simulate <- function(.what, .using, ...,
   if (is.character(.using)) {
     dsp_name <- .using
   }
-  
+
+  # Get prep function name if provided
+  prep_name <- if (!is.null(.prep_function)) {
+    prep_fn_name <- deparse(substitute(.prep_function))
+    if (is.character(.prep_function)) {
+      .prep_function
+    } else {
+      prep_fn_name
+    }
+  } else {
+    NULL
+  }
+
   # Initialize cache
   cache_file <- initialize_simulation_cache(
     .simulation_store,
@@ -386,16 +555,26 @@ quantify_simulate <- function(.what, .using, ...,
   }
   
   # Create parameter grid
-  param_grid <- create_parameter_grid(.simulate)
+  param_grid <- create_parameter_grid(.simulate %||% list(), .prep_simulate)
   n_combinations <- nrow(param_grid)
-  
+
+  dsp_param_names <- attr(param_grid, "dsp_params")
+  prep_param_names <- attr(param_grid, "prep_params")
+
   if (.verbose) {
     cli::cli_alert_info(
       "Simulating {n_combinations} parameter combination{?s} on {nrow(.what)} segment{?s}"
     )
-    cli::cli_alert_info(
-      "Parameters: {paste(names(.simulate), collapse = ', ')}"
-    )
+    if (length(dsp_param_names) > 0) {
+      cli::cli_alert_info(
+        "DSP parameters: {paste(dsp_param_names, collapse = ', ')}"
+      )
+    }
+    if (length(prep_param_names) > 0) {
+      cli::cli_alert_info(
+        "Prep parameters: {paste(prep_param_names, collapse = ', ')}"
+      )
+    }
   }
   
   # Get base parameters from metadata and ...
@@ -417,19 +596,21 @@ quantify_simulate <- function(.what, .using, ...,
   
   # Store simulation metadata
   DBI::dbExecute(con, "
-    INSERT INTO simulation_metadata 
-      (timestamp, dsp_function, created_at, corpus_path, corpus_uuid,
-       n_segments, n_parameter_combinations, parameter_names)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    INSERT INTO simulation_metadata
+      (timestamp, dsp_function, prep_function, created_at, corpus_path, corpus_uuid,
+       n_segments, n_parameter_combinations, parameter_names, prep_parameter_names)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     params = list(
       .simulation_timestamp,
       dsp_name,
+      prep_name,
       as.character(Sys.time()),
       corpus_obj@basePath,
       corpus_obj@config$UUID,
       nrow(.what),
       n_combinations,
-      jsonlite::toJSON(names(.simulate))
+      jsonlite::toJSON(dsp_param_names),
+      jsonlite::toJSON(prep_param_names %||% character(0))
     )
   )
   
@@ -446,36 +627,74 @@ quantify_simulate <- function(.what, .using, ...,
   results_list <- vector("list", n_combinations)
   
   for (i in seq_len(n_combinations)) {
-    
+
     # Get parameters for this combination
     current_params <- as.list(param_grid[i, !c("param_hash")])
     param_hash <- param_grid$param_hash[i]
-    
-    # Merge with base parameters (simulation params override)
-    all_params <- modifyList(base_params, current_params)
-    
+
+    # Separate DSP and prep parameters
+    current_dsp_params <- if (length(dsp_param_names) > 0) {
+      current_params[dsp_param_names]
+    } else {
+      list()
+    }
+
+    current_prep_params <- if (length(prep_param_names) > 0) {
+      current_params[prep_param_names]
+    } else {
+      list()
+    }
+
+    # Merge DSP params with base parameters (simulation params override)
+    all_dsp_params <- modifyList(base_params, current_dsp_params)
+
     # Store parameter combination
     param_id <- DBI::dbGetQuery(con, "
       SELECT param_id FROM parameter_combinations WHERE param_hash = ?",
       params = list(param_hash)
     )
-    
+
     if (nrow(param_id) == 0) {
       DBI::dbExecute(con, "
-        INSERT INTO parameter_combinations (param_hash, params_json)
-        VALUES (?, ?)",
-        params = list(param_hash, jsonlite::toJSON(current_params, auto_unbox = TRUE))
+        INSERT INTO parameter_combinations (param_hash, params_json, prep_params_json)
+        VALUES (?, ?, ?)",
+        params = list(
+          param_hash,
+          jsonlite::toJSON(current_dsp_params, auto_unbox = TRUE),
+          jsonlite::toJSON(current_prep_params, auto_unbox = TRUE)
+        )
       )
       param_id <- DBI::dbGetQuery(con, "SELECT last_insert_rowid() as param_id")
     }
-    
+
     param_id <- param_id$param_id[1]
-    
-    # Apply quantify with these parameters
-    result <- do.call(quantify, c(
-      list(.what = .what, .using = .using),
-      all_params
-    ))
+
+    # Apply preprocessing if prep function is provided
+    # For quantify, preprocessing happens at the segment/file level
+    # so we pass it as a parameter to quantify which will handle it
+    if (!is.null(.prep_function)) {
+      # Create a wrapper DSP function that applies preprocessing first
+      wrapped_dsp <- function(listOfFiles, ...) {
+        # Apply prep function with current prep params
+        prep_args <- c(list(listOfFiles = listOfFiles), current_prep_params)
+        processed_audio <- do.call(.prep_function, prep_args)
+
+        # Now apply DSP function to preprocessed audio
+        # The DSP function should accept the processed audio data
+        .using(processed_audio, ...)
+      }
+
+      result <- do.call(quantify, c(
+        list(.what = .what, .using = wrapped_dsp),
+        all_dsp_params
+      ))
+    } else {
+      # No preprocessing, use DSP function directly
+      result <- do.call(quantify, c(
+        list(.what = .what, .using = .using),
+        all_dsp_params
+      ))
+    }
     
     # Store results in cache
     for (seg_idx in seq_len(nrow(result))) {
@@ -545,7 +764,10 @@ quantify_simulate <- function(.what, .using, ...,
     parameter_grid = param_grid,
     cache_file = cache_file,
     timestamp = .simulation_timestamp,
-    dsp_function = dsp_name
+    dsp_function = dsp_name,
+    prep_function = prep_name,
+    dsp_params = dsp_param_names,
+    prep_params = prep_param_names
   )
 }
 
@@ -707,29 +929,59 @@ list_simulations <- function(cache_dir) {
 #' @export
 print.simulation_results <- function(x, ...) {
   param_grid <- attr(x, "parameter_grid")
-  
+  dsp_params <- attr(x, "dsp_params")
+  prep_params <- attr(x, "prep_params")
+  prep_function <- attr(x, "prep_function")
+
   cat("\n")
   cat("══ Simulation Results ══\n")
   cat("\n")
   cat(sprintf("DSP function: %s\n", attr(x, 'dsp_function')))
+
+  if (!is.null(prep_function)) {
+    cat(sprintf("Prep function: %s\n", prep_function))
+  }
+
   cat(sprintf("Timestamp: %s\n", attr(x, 'timestamp')))
   cat(sprintf("Cache file: %s\n", attr(x, 'cache_file')))
   cat("\n")
   cat(sprintf("%d parameter combination%s\n", length(x), if (length(x) != 1) "s" else ""))
   cat("\n")
-  
+
   # Remove param_hash column for display
   param_display <- param_grid[, setdiff(names(param_grid), "param_hash"), with = FALSE]
-  
-  if (nrow(param_display) <= 10) {
-    print(param_display)
+
+  # Show DSP and prep parameters separately if both exist
+  if (length(dsp_params) > 0 && length(prep_params) > 0) {
+    cat("DSP Parameters:\n")
+    dsp_display <- param_display[, ..dsp_params]
+    if (nrow(dsp_display) <= 10) {
+      print(dsp_display)
+    } else {
+      print(head(dsp_display, 5))
+      cat(sprintf("... (%d more combinations)\n", nrow(dsp_display) - 5))
+    }
+
+    cat("\nPrep Parameters:\n")
+    prep_display <- param_display[, ..prep_params]
+    if (nrow(prep_display) <= 10) {
+      print(unique(prep_display))
+    } else {
+      print(head(unique(prep_display), 5))
+      cat(sprintf("... (%d more combinations)\n", nrow(unique(prep_display)) - 5))
+    }
   } else {
-    cat("First 5 parameter combinations:\n")
-    print(head(param_display, 5))
-    cat("...\n")
-    cat(sprintf("(%d more)\n", nrow(param_display) - 5))
+    # Show all parameters together
+    if (nrow(param_display) <= 10) {
+      print(param_display)
+    } else {
+      cat("First 5 parameter combinations:\n")
+      print(head(param_display, 5))
+      cat("...\n")
+      cat(sprintf("(%d more)\n", nrow(param_display) - 5))
+    }
   }
-  
+
   invisible(x)
 }
 
@@ -757,13 +1009,19 @@ summary.simulation_results <- function(object, ...) {
 #' Enhanced enrich with simulation support
 #'
 #' Extends enrich() to support systematic parameter space exploration for track
-#' generation. Results are cached in SQLite database for efficient retrieval.
+#' generation with optional preprocessing of media files. Results are cached in
+#' SQLite database for efficient retrieval.
 #'
 #' @param corpus_obj A corpus object
 #' @param .using A DSP function from superassp package
 #' @param ... Additional arguments passed to DSP function
-#' @param .simulate Named list specifying parameter grid (e.g.,
+#' @param .simulate Named list specifying DSP parameter grid (e.g.,
 #'   list(nominalF1 = seq(300, 600, 50), windowSize = c(20, 25, 30)))
+#' @param .prep_function Optional preprocessing function to apply to media before DSP.
+#'   Should accept listOfFiles parameter and return audio data compatible with DSP function.
+#'   See superassp::prep_recode() for example.
+#' @param .prep_simulate Named list specifying prep parameter grid (e.g.,
+#'   list(sample_rate = c(16000, 22050, 44100), format = "wav"))
 #' @param .simulation_store Directory for simulation cache (required if .simulate is used)
 #' @param .simulation_timestamp Optional timestamp (auto-generated if NULL)
 #' @param .simulation_overwrite Overwrite existing simulation cache
@@ -777,6 +1035,8 @@ summary.simulation_results <- function(object, ...) {
 #' @export
 enrich_simulate <- function(corpus_obj, .using, ...,
                             .simulate = NULL,
+                            .prep_function = NULL,
+                            .prep_simulate = NULL,
                             .simulation_store = NULL,
                             .simulation_timestamp = NULL,
                             .simulation_overwrite = FALSE,
@@ -788,7 +1048,7 @@ enrich_simulate <- function(corpus_obj, .using, ...,
                             .workers = NULL) {
   
   # If not simulating, use regular enrich
-  if (is.null(.simulate)) {
+  if (is.null(.simulate) && is.null(.prep_simulate)) {
     return(enrich(
       corpus_obj = corpus_obj,
       .using = .using,
@@ -801,11 +1061,20 @@ enrich_simulate <- function(corpus_obj, .using, ...,
       .workers = .workers
     ))
   }
-  
+
+  # Validate prep function if prep simulation is requested
+  if (!is.null(.prep_simulate) && is.null(.prep_function)) {
+    cli::cli_abort(".prep_function must be provided when using .prep_simulate")
+  }
+
+  if (!is.null(.prep_function) && !is.function(.prep_function)) {
+    cli::cli_abort(".prep_function must be a function")
+  }
+
   # Simulation mode
   if (is.null(.simulation_store)) {
     cli::cli_abort(
-      ".simulation_store directory must be specified when using .simulate"
+      ".simulation_store directory must be specified when using .simulate or .prep_simulate"
     )
   }
   
@@ -826,7 +1095,19 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   } else if (is.function(.using)) {
     dsp_name <- as.character(substitute(.using))
   }
-  
+
+  # Get prep function name if provided
+  prep_name <- if (!is.null(.prep_function)) {
+    prep_fn_name <- deparse(substitute(.prep_function))
+    if (is.character(.prep_function)) {
+      .prep_function
+    } else {
+      prep_fn_name
+    }
+  } else {
+    NULL
+  }
+
   # Initialize cache
   cache_file <- initialize_track_simulation_cache(
     .simulation_store,
@@ -860,16 +1141,26 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   update_signal_hashes(corpus_obj, verbose = FALSE, parallel = .parallel)
   
   # Create parameter grid
-  param_grid <- create_parameter_grid(.simulate)
+  param_grid <- create_parameter_grid(.simulate %||% list(), .prep_simulate)
   n_combinations <- nrow(param_grid)
-  
+
+  dsp_param_names <- attr(param_grid, "dsp_params")
+  prep_param_names <- attr(param_grid, "prep_params")
+
   if (.verbose) {
     cli::cli_alert_info(
       "Simulating {n_combinations} parameter combination{?s} on {nrow(signal_files)} signal file{?s}"
     )
-    cli::cli_alert_info(
-      "Parameters: {paste(names(.simulate), collapse = ', ')}"
-    )
+    if (length(dsp_param_names) > 0) {
+      cli::cli_alert_info(
+        "DSP parameters: {paste(dsp_param_names, collapse = ', ')}"
+      )
+    }
+    if (length(prep_param_names) > 0) {
+      cli::cli_alert_info(
+        "Prep parameters: {paste(prep_param_names, collapse = ', ')}"
+      )
+    }
   }
   
   # Open cache connection
@@ -879,18 +1170,20 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   # Store simulation metadata
   DBI::dbExecute(con, "
     INSERT INTO simulation_metadata
-      (timestamp, dsp_function, created_at, corpus_path, corpus_uuid,
-       n_signal_files, n_parameter_combinations, parameter_names)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      (timestamp, dsp_function, prep_function, created_at, corpus_path, corpus_uuid,
+       n_signal_files, n_parameter_combinations, parameter_names, prep_parameter_names)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     params = list(
       .simulation_timestamp,
       dsp_name,
+      prep_name,
       as.character(Sys.time()),
       corpus_obj@basePath,
       corpus_obj@config$UUID,
       nrow(signal_files),
       n_combinations,
-      jsonlite::toJSON(names(.simulate))
+      jsonlite::toJSON(dsp_param_names),
+      jsonlite::toJSON(prep_param_names %||% character(0))
     )
   )
   
@@ -925,47 +1218,76 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   track_results <- list()
   
   for (i in seq_len(n_combinations)) {
-    
+
     # Get parameters for this combination
     current_params <- as.list(param_grid[i, !c("param_hash")])
     param_hash <- param_grid$param_hash[i]
-    
+
+    # Separate DSP and prep parameters
+    current_dsp_params <- if (length(dsp_param_names) > 0) {
+      current_params[dsp_param_names]
+    } else {
+      list()
+    }
+
+    current_prep_params <- if (length(prep_param_names) > 0) {
+      current_params[prep_param_names]
+    } else {
+      list()
+    }
+
     # Store parameter combination
     param_id <- DBI::dbGetQuery(con, "
       SELECT param_id FROM parameter_combinations WHERE param_hash = ?",
       params = list(param_hash)
     )
-    
+
     if (nrow(param_id) == 0) {
       DBI::dbExecute(con, "
-        INSERT INTO parameter_combinations (param_hash, params_json)
-        VALUES (?, ?)",
-        params = list(param_hash, jsonlite::toJSON(current_params, auto_unbox = TRUE))
+        INSERT INTO parameter_combinations (param_hash, params_json, prep_params_json)
+        VALUES (?, ?, ?)",
+        params = list(
+          param_hash,
+          jsonlite::toJSON(current_dsp_params, auto_unbox = TRUE),
+          jsonlite::toJSON(current_prep_params, auto_unbox = TRUE)
+        )
       )
       param_id <- DBI::dbGetQuery(con, "SELECT last_insert_rowid() as param_id")
     }
-    
+
     param_id <- param_id$param_id[1]
-    
+
     # Process each signal file with these parameters
-    process_file <- function(j, files_meta, dsp_fun, current_params, base_params,
+    process_file <- function(j, files_meta, dsp_fun, prep_fun, current_dsp_params,
+                             current_prep_params, base_params,
                              metadata_fields, param_id, con, cache_file) {
-      
+
       file_row <- files_meta[j, ]
-      
+
       # Derive DSP parameters from metadata
-      all_params <- derive_dsp_parameters(
+      all_dsp_params <- derive_dsp_parameters(
         dsp_fun = dsp_fun,
         metadata = file_row,
         metadata_fields = metadata_fields,
-        user_params = modifyList(base_params, current_params)
+        user_params = modifyList(base_params, current_dsp_params)
       )
-      
-      # Apply DSP function in memory (not to file)
+
+      # Apply preprocessing and DSP function in memory (not to file)
       tryCatch({
+        # Apply prep function first if provided
+        input_for_dsp <- if (!is.null(prep_fun)) {
+          # Apply prep function with prep parameters
+          prep_args <- c(list(listOfFiles = file_row$full_path), current_prep_params)
+          do.call(prep_fun, prep_args)
+        } else {
+          # No preprocessing, use file path directly
+          file_row$full_path
+        }
+
+        # Apply DSP function to preprocessed (or original) input
         track <- do.call(dsp_fun, c(
-          list(listOfFiles = file_row$full_path),
-          all_params,
+          list(listOfFiles = input_for_dsp),
+          all_dsp_params,
           list(toFile = FALSE, verbose = FALSE)
         ))
         
@@ -1016,7 +1338,9 @@ enrich_simulate <- function(corpus_obj, .using, ...,
         process_file,
         files_meta = signal_files_with_meta,
         dsp_fun = .using,
-        current_params = current_params,
+        prep_fun = .prep_function,
+        current_dsp_params = current_dsp_params,
+        current_prep_params = current_prep_params,
         base_params = base_params,
         metadata_fields = .metadata_fields,
         param_id = param_id,
@@ -1031,7 +1355,9 @@ enrich_simulate <- function(corpus_obj, .using, ...,
         process_file,
         files_meta = signal_files_with_meta,
         dsp_fun = .using,
-        current_params = current_params,
+        prep_fun = .prep_function,
+        current_dsp_params = current_dsp_params,
+        current_prep_params = current_prep_params,
         base_params = base_params,
         metadata_fields = .metadata_fields,
         param_id = param_id,
@@ -1082,6 +1408,9 @@ enrich_simulate <- function(corpus_obj, .using, ...,
     cache_file = cache_file,
     timestamp = .simulation_timestamp,
     dsp_function = dsp_name,
+    prep_function = prep_name,
+    dsp_params = dsp_param_names,
+    prep_params = prep_param_names,
     corpus = corpus_obj
   )
 }
@@ -1109,12 +1438,14 @@ initialize_track_simulation_cache <- function(cache_dir, timestamp, dsp_function
       id INTEGER PRIMARY KEY,
       timestamp TEXT NOT NULL,
       dsp_function TEXT NOT NULL,
+      prep_function TEXT,  -- Preprocessing function name (optional)
       created_at TEXT NOT NULL,
       corpus_path TEXT NOT NULL,
       corpus_uuid TEXT NOT NULL,
       n_signal_files INTEGER,
       n_parameter_combinations INTEGER,
-      parameter_names TEXT,
+      parameter_names TEXT,  -- JSON array of DSP parameter names
+      prep_parameter_names TEXT,  -- JSON array of prep parameter names
       computation_time_seconds REAL
     )")
   
@@ -1123,7 +1454,8 @@ initialize_track_simulation_cache <- function(cache_dir, timestamp, dsp_function
     CREATE TABLE IF NOT EXISTS parameter_combinations (
       param_id INTEGER PRIMARY KEY AUTOINCREMENT,
       param_hash TEXT UNIQUE NOT NULL,
-      params_json TEXT NOT NULL
+      params_json TEXT NOT NULL,  -- JSON of DSP parameters
+      prep_params_json TEXT  -- JSON of prep parameters (optional)
     )")
   
   # Track results table
@@ -1374,27 +1706,57 @@ assess <- function(segment_list,
 #' @export
 print.simulation_tracks <- function(x, ...) {
   param_grid <- attr(x, "parameter_grid")
-  
+  dsp_params <- attr(x, "dsp_params")
+  prep_params <- attr(x, "prep_params")
+  prep_function <- attr(x, "prep_function")
+
   cat("\n")
   cat("══ Track Simulation Results ══\n")
   cat("\n")
   cat(sprintf("DSP function: %s\n", attr(x, 'dsp_function')))
+
+  if (!is.null(prep_function)) {
+    cat(sprintf("Prep function: %s\n", prep_function))
+  }
+
   cat(sprintf("Timestamp: %s\n", attr(x, 'timestamp')))
   cat(sprintf("Cache file: %s\n", attr(x, 'cache_file')))
   cat("\n")
   cat(sprintf("%d parameter combination%s\n", length(x), if (length(x) != 1) "s" else ""))
   cat("\n")
-  
+
   param_display <- param_grid[, setdiff(names(param_grid), "param_hash"), with = FALSE]
-  
-  if (nrow(param_display) <= 10) {
-    print(param_display)
+
+  # Show DSP and prep parameters separately if both exist
+  if (length(dsp_params) > 0 && length(prep_params) > 0) {
+    cat("DSP Parameters:\n")
+    dsp_display <- param_display[, ..dsp_params]
+    if (nrow(dsp_display) <= 10) {
+      print(dsp_display)
+    } else {
+      print(head(dsp_display, 5))
+      cat(sprintf("... (%d more combinations)\n", nrow(dsp_display) - 5))
+    }
+
+    cat("\nPrep Parameters:\n")
+    prep_display <- param_display[, ..prep_params]
+    if (nrow(prep_display) <= 10) {
+      print(unique(prep_display))
+    } else {
+      print(head(unique(prep_display), 5))
+      cat(sprintf("... (%d more combinations)\n", nrow(unique(prep_display)) - 5))
+    }
   } else {
-    cat("First 5 parameter combinations:\n")
-    print(head(param_display, 5))
-    cat("...\n")
-    cat(sprintf("(%d more)\n", nrow(param_display) - 5))
+    # Show all parameters together
+    if (nrow(param_display) <= 10) {
+      print(param_display)
+    } else {
+      cat("First 5 parameter combinations:\n")
+      print(head(param_display, 5))
+      cat("...\n")
+      cat(sprintf("(%d more)\n", nrow(param_display) - 5))
+    }
   }
-  
+
   invisible(x)
 }
