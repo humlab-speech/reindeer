@@ -541,7 +541,23 @@ quantify_simulate <- function(.what, .using, ...,
   # Check if cache exists and whether to use it
   con <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
-  
+
+  # Check cache size if it exists
+  if (file.exists(cache_file) && .verbose) {
+    tryCatch({
+      cache_size_info <- check_cache_size(
+        cache_file,
+        cache_type = "Simulation",
+        warn_threshold = "500 MB",
+        max_threshold = "2 GB",
+        verbose = TRUE
+      )
+    }, error = function(e) {
+      # Silently ignore errors in cache size checking
+      NULL
+    })
+  }
+
   existing_metadata <- DBI::dbGetQuery(con, "
     SELECT COUNT(*) as n FROM simulation_metadata
   ")

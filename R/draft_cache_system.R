@@ -204,6 +204,22 @@ get_draft_cache <- function(corpus_obj, draft_function_name, parameters,
   # Initialize or connect to cache
   con <- initialize_draft_cache(cache_path, draft_function_name)
 
+  # Check cache size if it exists
+  if (cache_exists && verbose) {
+    tryCatch({
+      cache_dir <- get_draft_cache_dir(corpus_obj)
+      cache_size_info <- check_draft_cache_size(
+        corpus_obj,
+        warn_threshold = "500 MB",
+        max_threshold = "2 GB",
+        verbose = TRUE
+      )
+    }, error = function(e) {
+      # Silently ignore errors in cache size checking
+      NULL
+    })
+  }
+
   is_new <- !cache_exists
   n_completed <- 0
 

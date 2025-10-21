@@ -239,27 +239,43 @@ clear_tidy_cache <- function() {
 
 #' Get or create persistent SQLite cache for quantify results
 #' @noRd
-..get_persistent_cache_connection <- function(cache_dir = NULL) {
+..get_persistent_cache_connection <- function(cache_dir = NULL, verbose = TRUE) {
   if (is.null(cache_dir)) {
     cache_dir <- file.path(tempdir(), "reindeer_cache")
   }
-  
+
   if (!dir.exists(cache_dir)) {
     dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
   }
-  
+
   cache_file <- file.path(cache_dir, "quantify_cache.sqlite")
   cache_key <- paste0("persistent_cache_", cache_file)
-  
+
   if (exists(cache_key, envir = .tidy_cache)) {
     conn <- get(cache_key, envir = .tidy_cache)
     if (DBI::dbIsValid(conn)) {
       return(conn)
     }
   }
-  
+
   # Create new connection
   conn <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
+
+  # Check cache size if it exists and verbose is enabled
+  if (file.exists(cache_file) && verbose) {
+    tryCatch({
+      cache_size_info <- check_cache_size(
+        cache_file,
+        cache_type = "Quantify/enrich persistent",
+        warn_threshold = "500 MB",
+        max_threshold = "2 GB",
+        verbose = TRUE
+      )
+    }, error = function(e) {
+      # Silently ignore errors in cache size checking
+      NULL
+    })
+  }
   
   # Create cache table if it doesn't exist
   if (!"cache" %in% DBI::dbListTables(conn)) {
