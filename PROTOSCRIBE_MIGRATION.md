@@ -1,125 +1,74 @@
-# Migration Status: Draft Annotation Functions → protoscribe
+# Draft Annotation Migration Notice
 
 **Date**: 2025-10-23  
-**Status**: Phase 1 Complete
+**Status**: ✅ Migration Complete in protoscribe
 
 ## What Happened
 
-Draft annotation functionality has been extracted to a new **protoscribe** package.
-This implements a clean producer-consumer architecture where:
+Draft annotation functionality (suggestion system, workflow, and caching) has been **migrated to the protoscribe package**.
 
-- **protoscribe** (new package): Produces Suggestion objects from audio files
-- **reindeer** (this package): Will consume Suggestions via workflow functions
+## Migrated Functionality
 
-## Files Copied to protoscribe
+The following functionality has moved from reindeer to protoscribe:
 
-The following files were copied to protoscribe (originals remain here for now):
+### 1. Suggestion Classes
+- `Suggestion`, `EventSuggestion`, `SegmentSuggestion`, `ItemSuggestion`
+- Now in: `protoscribe::Suggestion` etc.
 
-### Python Integration
-- `inst/python/annotation_wrappers.py`
-- `inst/python/annotate_periods.py`
-- `inst/python/momel_intsint.py`
+### 2. Workflow Functions
+- `assess()` - Validate suggestions
+- `prepare()` - Create database structures
+- `transcribe()` - Apply to database
+- `reverse()` - Rollback operations
+- `TranscriptionLog` - Operation tracking
+- Now in: `protoscribe::assess()`, `protoscribe::transcribe()`, etc.
 
-These Python files are now maintained in protoscribe. They will remain here 
-temporarily for backward compatibility.
+### 3. Draft Generation Functions
+- `draft_periods()` - Glottal period detection
+- `draft_momel_intsint()` - Intonation annotation
+- Now in: `protoscribe::draft_periods()`, `protoscribe::draft_momel_intsint()`
 
-### Core Concepts Extracted
-From `R/reindeer_transcription_system_optimized.R`:
-- Suggestion S7 class definitions (simplified, no corpus object)
-- EventSuggestion, SegmentSuggestion, ItemSuggestion classes
+### 4. Caching System
+- Complete SQLite-based draft caching
+- Cache management utilities
+- Now in: `protoscribe::draft_cache_*()` functions
 
-From `R/reindeeR_annotate_python.R` and `R/reindeer_annotate_momel.R`:
-- Draft generation logic (simplified, no caching)
-- `draft_periods()` → protoscribe::draft_periods()
-- `draft_momel_intsint()` → protoscribe::draft_momel_intsint()
+### 5. Python Integration
+- Parselmouth-based annotation tools
+- Now in: `protoscribe` inst/python/
 
-## What Stays in reindeer
+## Files That Can Be Removed from reindeer
 
-**All existing functionality remains:**
-- Corpus management (corpus class)
-- Query system (ask_for, query)
-- Signal processing (quantify, enrich)
-- Metadata system (gather_metadata, biographize)
-- Simulation infrastructure
+Once protoscribe is installed and working, these files can be removed:
 
-**Current draft functions still work:**
-- `draft_periods()` - Still functional as-is
-- `draft_momel_intsint()` - Still functional as-is
-- No breaking changes yet
+1. **R/reindeer_transcription_system_optimized.R** (~488 lines)
+2. **R/draft_cache_system.R** (~515 lines)
+3. **R/cache_size_management.R** (~500 lines)
+4. **R/reindeeR_annotate_python.R** (if still exists)
+5. **R/reindeer_annotate_momel.R** (if still exists)
 
-## Phase 2: What Will Be Added to reindeer
+## Updated Usage
 
-In a future update, reindeer will gain workflow functions:
-
+### New (reindeer + protoscribe)
 ```r
-# New functions to be added:
-assess(corpus, suggestion)      # Validate Suggestion against corpus
-prepare(corpus, suggestion)     # Create levels/attributes in corpus
-transcribe(corpus, suggestion)  # Apply Suggestion to database
-reverse(corpus, log)            # Rollback transcription
+library(reindeer)     # For corpus management
+library(protoscribe)  # For draft annotations
 
-# Draft caching will move here:
-# - Draft cache system from draft_cache_system.R
-# - Integrated with corpus context
+corp <- corpus("path/to/db")                    # reindeer
+suggestions <- draft_periods(corp, bundles)     # protoscribe
+assess(suggestions)                             # protoscribe
+transcribe(suggestions)                         # protoscribe
 ```
 
-## Phase 2: Deprecation Plan
+## Next Steps for reindeer
 
-When workflow functions are added:
+1. Add protoscribe to DESCRIPTION Imports
+2. Remove migrated files (after testing)
+3. Update documentation to reference protoscribe
+4. Optional: Add compatibility wrappers
 
-1. Current `draft_*()` functions will be deprecated with warnings
-2. They will call protoscribe internally: `protoscribe::draft_*()`
-3. `assess()`, `transcribe()` etc. will be reindeer functions
-4. Old code will still work, just with deprecation messages
-
-## New Workflow (Future)
-
-```r
-library(reindeer)     # Corpus + workflows
-library(protoscribe)  # Suggestion generators
-
-# 1. Get corpus and files (reindeer)
-corp <- corpus("path/to/db_emuDB")
-files <- signal_files(corp)
-
-# 2. Generate suggestions (protoscribe)
-suggestions <- protoscribe::draft_periods(
-  audio_files = files$full_path,
-  session_names = files$session,
-  bundle_names = files$bundle
-)
-
-# 3. Apply to corpus (reindeer - to be added)
-assess(corp, suggestions)
-prepare(corp, suggestions)
-log <- transcribe(corp, suggestions)
-```
-
-## Benefits of This Architecture
-
-1. **Separation of concerns**: Generation vs. database management
-2. **Cleaner codebase**: Each package has clear responsibility
-3. **Easier testing**: Can test generation without database
-4. **Better extensibility**: Easy to add new draft functions
-5. **Follows patterns**: Like superassp (producer) → reindeer (consumer)
-
-## No Action Required
-
-This is a documentation commit only. No changes to reindeer functionality yet.
-The existing draft annotation functions continue to work as before.
-
-## Timeline
-
-- ✅ Phase 1: protoscribe package created (DONE)
-- ⏳ Phase 2: reindeer workflow functions (future PR)
-- ⏳ Phase 3: Deprecation and cleanup (future PR)
-
-## References
-
-- protoscribe repository: (location TBD)
-- Migration planning docs: See protoscribe package
-- Discussion: (link to issue/discussion TBD)
+See full details in this file.
 
 ---
-**Note**: This is a planning document. Actual migration of assess/transcribe 
-functions to reindeer will happen in Phase 2.
+**Migration Date**: 2025-10-23  
+**protoscribe Version**: 0.0.0.9000
