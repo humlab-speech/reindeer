@@ -9,6 +9,8 @@ quantify_simulate(
   .using,
   ...,
   .simulate = NULL,
+  .prep_function = NULL,
+  .prep_simulate = NULL,
   .simulation_store = NULL,
   .simulation_timestamp = NULL,
   .simulation_overwrite = FALSE,
@@ -22,8 +24,15 @@ quantify_simulate(
 
 \item{...}{Additional arguments passed to DSP function}
 
-\item{.simulate}{Named list specifying parameter grid, e.g.,
+\item{.simulate}{Named list specifying DSP parameter grid, e.g.,
 list(nominalF1 = seq(300, 600, 10), minF = seq(100, 250, 50))}
+
+\item{.prep_function}{Optional preprocessing function to apply to media before DSP.
+Should accept listOfFiles parameter and return audio data compatible with DSP function.
+See superassp::prep_recode() for example.}
+
+\item{.prep_simulate}{Named list specifying prep parameter grid, e.g.,
+list(sample_rate = c(16000, 22050, 44100), format = c("wav", "mp3"))}
 
 \item{.simulation_store}{Directory path for storing simulation cache}
 
@@ -37,5 +46,6 @@ list(nominalF1 = seq(300, 600, 10), minF = seq(100, 250, 50))}
 extended_segment_list or list of extended_segment_lists (if simulating)
 }
 \description{
-Extends quantify to support systematic parameter space exploration
+Extends quantify to support systematic parameter space exploration with
+optional preprocessing of media files before DSP analysis.
 }

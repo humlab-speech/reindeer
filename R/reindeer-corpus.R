@@ -228,49 +228,79 @@ S7::method(`[<-`, corpus) <- function(x, i, j, ..., value) {
 }
 
 # ==============================================================================
-# PRINT AND SUMMARY METHODS
+# PRINT, SUMMARY, AND GLIMPSE METHODS
 # ==============================================================================
 
-#' Print method for corpus
+#' Print method for corpus with tidyverse-style formatting
 #' @export
 S7::method(print, corpus) <- function(x, ...) {
-  cli::cli_h1("Emu Speech Corpus")
+  cli::cli_h1("{.cls corpus}: {.field {x@dbName}}")
+  
+  # Database identification
+  cli::cli_div(theme = list(rule = list(`margin-top` = 0)))
+  cli::cli_text("")
   cli::cli_dl(c(
-    "Database" = x@dbName,
     "UUID" = x@.uuid,
-    "Path" = x@basePath
+    "Path" = cli::style_hyperlink(x@basePath, paste0("file://", x@basePath))
   ))
-
-  # Show basic database info from cache
+  cli::cli_text("")
+  
+  # Get summary statistics
   tryCatch({
     con <- get_corpus_connection(x)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
     
-    session_count <- DBI::dbGetQuery(con, sprintf(
-      "SELECT COUNT(*) as n FROM session WHERE db_uuid = '%s'", x@.uuid
-    ))$n
+    # Count basic entities
+    stats <- list(
+      sessions = DBI::dbGetQuery(con, sprintf(
+        "SELECT COUNT(*) as n FROM session WHERE db_uuid = '%s'", x@.uuid
+      ))$n,
+      bundles = DBI::dbGetQuery(con, sprintf(
+        "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = '%s'", x@.uuid
+      ))$n,
+      items = DBI::dbGetQuery(con, sprintf(
+        "SELECT COUNT(*) as n FROM items WHERE db_uuid = '%s'", x@.uuid
+      ))$n,
+      labels = DBI::dbGetQuery(con, sprintf(
+        "SELECT COUNT(*) as n FROM labels WHERE db_uuid = '%s'", x@.uuid
+      ))$n
+    )
     
-    bundle_count <- DBI::dbGetQuery(con, sprintf(
-      "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = '%s'", x@.uuid
-    ))$n
+    # Levels available
+    levels_query <- sprintf(
+      "SELECT DISTINCT level FROM items WHERE db_uuid = '%s' ORDER BY level", 
+      x@.uuid
+    )
+    levels <- DBI::dbGetQuery(con, levels_query)$level
     
-    item_count <- DBI::dbGetQuery(con, sprintf(
-      "SELECT COUNT(*) as n FROM items WHERE db_uuid = '%s'", x@.uuid
-    ))$n
+    # Metadata fields
+    fields_query <- "SELECT COUNT(DISTINCT field_name) as n FROM metadata_fields"
+    n_metadata_fields <- DBI::dbGetQuery(con, fields_query)$n
     
-    cli::cli_dl(c(
-      "Sessions" = session_count,
-      "Bundles" = bundle_count,
-      "Items" = item_count
+    # Content summary
+    cli::cli_text("{.strong Content:}")
+    cli::cli_ul(c(
+      "{cli::col_blue(stats$sessions)} session{?s}",
+      "{cli::col_blue(stats$bundles)} bundle{?s}",
+      "{cli::col_blue(stats$items)} annotation item{?s}",
+      "{cli::col_blue(stats$labels)} label{?s}"
     ))
     
     cli::cli_text("")
-    cli::cli_text("Use {.code summary(corpus)} for detailed information")
-    cli::cli_text("Use {.code corpus[session, bundle]} to access bundles")
+    cli::cli_text("{.strong Annotation levels:} {.val {paste(levels, collapse = ', ')}}")
+    
+    if (n_metadata_fields > 0) {
+      cli::cli_text("{.strong Metadata fields:} {cli::col_blue(n_metadata_fields)}")
+    }
+    
+    cli::cli_text("")
+    cli::cli_text("{.emph Use {.fn summary} for detailed information}")
+    cli::cli_text("{.emph Use {.code corpus[session, bundle]} to access bundles}")
+    
   }, error = function(e) {
-    cli::cli_alert_warning("Could not load database info: {e$message}")
+    cli::cli_alert_warning("Could not load database statistics: {e$message}")
   })
-
+  
   invisible(x)
 }
 
@@ -396,11 +426,93 @@ S7::method(summary, corpus) <- function(object, ...) {
   invisible(object)
 }
 
-#' Print method for bundle_list
+#' Glimpse method for corpus - quick overview
 #' @export
-S7::method(print, bundle_list) <- function(x, ...) {
-  cli::cli_text("{.strong Bundle List} ({nrow(x@.data)} bundle{?s})")
-  print(tibble::as_tibble(x@.data))
+glimpse <- function(x, ...) {
+  UseMethod("glimpse")
+}
+
+#' @export
+glimpse.corpus <- function(x, ...) {
+  cli::cli_h2("Corpus: {.field {x@dbName}}")
+  
+  con <- get_corpus_connection(x)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  
+  # Get sample data for levels
+  levels_query <- sprintf(
+    "SELECT DISTINCT level FROM items WHERE db_uuid = '%s' LIMIT 10", 
+    x@.uuid
+  )
+  levels <- DBI::dbGetQuery(con, levels_query)$level
+  
+  # Show level structure
+  cli::cli_text("{.strong Levels ({length(levels)}):} {.val {paste(levels, collapse = ', ')}}")
+  
+  # Sample labels per level
+  for (lvl in head(levels, 3)) {
+    labels_query <- sprintf(
+      "SELECT DISTINCT l.label 
+       FROM labels l 
+       INNER JOIN items i ON l.db_uuid = i.db_uuid AND l.session = i.session 
+         AND l.bundle = i.bundle AND l.item_id = i.item_id
+       WHERE i.db_uuid = '%s' AND i.level = '%s' 
+       LIMIT 5",
+      x@.uuid, lvl
+    )
+    labels <- DBI::dbGetQuery(con, labels_query)$label
+    cli::cli_text("  {.field {lvl}}: {.val {paste(head(labels, 5), collapse = ', ')}}")
+  }
+  
+  # Sample sessions
+  sessions_query <- sprintf(
+    "SELECT name FROM session WHERE db_uuid = '%s' LIMIT 5", 
+    x@.uuid
+  )
+  sessions <- DBI::dbGetQuery(con, sessions_query)$name
+  cli::cli_text("")
+  cli::cli_text("{.strong Sessions (sample):} {.val {paste(sessions, collapse = ', ')}}")
+  
+  invisible(x)
+}
+
+#' Print method for bundle_list with tidyverse-style formatting
+#' @export
+S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
+  if (is.null(n)) {
+    n <- getOption("pillar.print_max", 10)
+  }
+  
+  cli::cli_rule(
+    left = cli::style_bold("bundle_list"),
+    right = "{cli::col_silver('{nrow(x@.data)} bundle{?s}')}"
+  )
+  
+  if (nrow(x@.data) == 0) {
+    cli::cli_alert_warning("Empty bundle list")
+    return(invisible(x))
+  }
+  
+  # Quick stats
+  n_sessions <- dplyr::n_distinct(x@.data$session)
+  metadata_cols <- setdiff(names(x@.data), c("session", "bundle"))
+  
+  cli::cli_text("")
+  cli::cli_text(
+    "{cli::col_blue(n_sessions)} session{?s}, ",
+    "{cli::col_blue(length(metadata_cols))} metadata field{?s}"
+  )
+  
+  if (length(metadata_cols) > 0) {
+    cli::cli_text("Fields: {.val {paste(head(metadata_cols, 5), collapse = ', ')}}")
+  }
+  
+  cli::cli_rule()
+  cli::cli_text("")
+  
+  # Use tibble for nice display
+  print(tibble::as_tibble(x@.data), n = n, ...)
+  
   invisible(x)
 }
 

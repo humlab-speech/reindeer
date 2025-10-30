@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeer_lazy_segment_list.R
 \name{as.data.frame.lazy_segment_list}
 \alias{as.data.frame.lazy_segment_list}
-\title{Convert Lazy Segment List to Data Frame}
+\title{Convert lazy_segment_list to data.frame}
 \usage{
 \method{as.data.frame}{lazy_segment_list}(x, ...)
 }
@@ -15,5 +15,5 @@
 A data.frame
 }
 \description{
-Forces materialization
+Forces materialization of the lazy evaluation
 }

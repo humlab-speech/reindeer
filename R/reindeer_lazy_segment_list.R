@@ -239,76 +239,116 @@ apply_descend_transform <- function(sql, level) {
   )
 }
 
-#' Print Method for Lazy Segment List
-#'
-#' Shows query structure without materializing (unless already cached)
-#'
-#' @param x A lazy_segment_list object
-#' @param ... Additional arguments
+# ==============================================================================
+# PRINT, SUMMARY, AND GLIMPSE METHODS FOR LAZY_SEGMENT_LIST
+# ==============================================================================
+
+#' Print method for lazy_segment_list
 #' @export
-print.lazy_segment_list <- function(x, ...) {
-  cli::cli_h1("Lazy Segment List")
+S7::method(print, lazy_segment_list) <- function(x, ...) {
+  cli::cli_rule(
+    left = cli::style_bold("lazy_segment_list"),
+    right = if (x@materialized) "{cli::col_green('✓ materialized')}" else "{cli::col_silver('⧗ lazy')}"
+  )
+  
+  cli::cli_text("")
   
   if (x@materialized && !is.null(x@cache)) {
-    cli::cli_alert_success("Materialized (cached)")
-    cli::cli_text("Showing cached result:")
-    print(x@cache)
+    cli::cli_alert_success("Query executed (cached)")
+    cli::cli_text("")
+    print(x@cache, ...)
   } else {
-    cli::cli_alert_info("Not yet materialized")
+    cli::cli_alert_info("Query not yet executed")
     
-    # Show query structure
-    cli::cli_h2("Query Structure")
-    cli::cli_text("Base: {.code {substr(x@query_parts$base, 1, 60)}}...")
+    # Query structure
+    cli::cli_text("")
+    cli::cli_text("{.strong Query plan:}")
     
+    if (!is.null(x@query_parts$base)) {
+      base_preview <- substr(x@query_parts$base, 1, 60)
+      cli::cli_text("  Base: {.code {base_preview}}...")
+    }
+    
+    # Show transforms
     if (!is.null(x@query_parts$transforms) && length(x@query_parts$transforms) > 0) {
-      cli::cli_h3("Transforms")
+      cli::cli_text("")
+      cli::cli_text("  {.strong Transforms:}")
       for (i in seq_along(x@query_parts$transforms)) {
         t <- x@query_parts$transforms[[i]]
-        cli::cli_li("{i}. {t$type} {.emph {paste(names(t)[-1], t[-1], sep='=', collapse=', ')}}")
+        t_desc <- paste(names(t[-1]), t[-1], sep = "=", collapse = ", ")
+        cli::cli_text("    {i}. {.fn {t$type}} ({t_desc})")
       }
     }
     
-    cli::cli_text("")
-    cli::cli_alert("Call {.fn collect} to execute query and get results")
-    
-    # Show preview if possible (execute with LIMIT)
+    # Try to estimate size
     tryCatch({
-      preview_sql <- paste0(build_sql_from_parts(x@query_parts), " LIMIT 5")
+      count_sql <- paste0(
+        "SELECT COUNT(*) as n FROM (",
+        build_sql_from_parts(x@query_parts),
+        ")"
+      )
       conn <- DBI::dbConnect(RSQLite::SQLite(), x@db_path)
       on.exit(DBI::dbDisconnect(conn))
-      preview_dt <- data.table::setDT(DBI::dbGetQuery(conn, preview_sql))
+      n <- DBI::dbGetQuery(conn, count_sql)$n
+      cli::cli_text("")
+      cli::cli_text("  Estimated result: {cli::col_blue(n)} row{?s}")
+    }, error = function(e) {
+      # Silently fail
+    })
+    
+    cli::cli_text("")
+    cli::cli_text("{.emph Call {.fn collect} to execute and get results}")
+    
+    # Show preview
+    cli::cli_text("")
+    cli::cli_text("{.strong Preview (first 3 rows):}")
+    tryCatch({
+      preview_sql <- paste0(build_sql_from_parts(x@query_parts), " LIMIT 3")
+      conn <- DBI::dbConnect(RSQLite::SQLite(), x@db_path)
+      on.exit(DBI::dbDisconnect(conn), add = TRUE)
+      preview_tbl <- tibble::as_tibble(DBI::dbGetQuery(conn, preview_sql))
       
-      if (nrow(preview_dt) > 0) {
-        cli::cli_h3("Preview (first 5 rows)")
-        print(preview_dt)
+      if (nrow(preview_tbl) > 0) {
+        print(preview_tbl)
+      } else {
+        cli::cli_alert_warning("Query would return 0 rows")
       }
     }, error = function(e) {
-      cli::cli_alert_warning("Could not generate preview: {e$message}")
+      cli::cli_alert_warning("Could not generate preview")
     })
   }
   
   invisible(x)
 }
 
-#' Summary Method for Lazy Segment List
-#'
-#' @param object A lazy_segment_list object
-#' @param ... Additional arguments
+#' Summary method for lazy_segment_list
 #' @export
-summary.lazy_segment_list <- function(object, ...) {
+S7::method(summary, lazy_segment_list) <- function(object, ...) {
   if (object@materialized && !is.null(object@cache)) {
-    cli::cli_alert_success("Materialized lazy segment list")
-    summary(object@cache)
+    cli::cli_h1("Lazy Segment List (Materialized)")
+    summary(object@cache, ...)
   } else {
-    cli::cli_alert_info("Lazy segment list (not materialized)")
-    cli::cli_text("Database: {.path {object@db_path}}")
-    cli::cli_text("UUID: {.val {object@db_uuid}}")
+    cli::cli_h1("Lazy Segment List (Not Materialized)")
     
-    # Count transforms
+    cli::cli_dl(c(
+      "Database" = object@db_path,
+      "UUID" = object@db_uuid,
+      "Status" = "Lazy (call collect() to execute)"
+    ))
+    
+    cli::cli_h2("Query Plan")
+    
     n_transforms <- length(object@query_parts$transforms %||% list())
-    cli::cli_text("Pending transforms: {.val {n_transforms}}")
+    cli::cli_text("Transforms: {.val {n_transforms}}")
     
-    # Try to get count without materializing full result
+    if (n_transforms > 0) {
+      for (i in seq_along(object@query_parts$transforms)) {
+        t <- object@query_parts$transforms[[i]]
+        cli::cli_text("  {i}. {.fn {t$type}}")
+      }
+    }
+    
+    # Try to estimate result size
     tryCatch({
       count_sql <- paste0(
         "SELECT COUNT(*) as n FROM (",
@@ -318,6 +358,7 @@ summary.lazy_segment_list <- function(object, ...) {
       conn <- DBI::dbConnect(RSQLite::SQLite(), object@db_path)
       on.exit(DBI::dbDisconnect(conn))
       n <- DBI::dbGetQuery(conn, count_sql)$n
+      cli::cli_text("")
       cli::cli_text("Estimated rows: {.val {n}}")
     }, error = function(e) {
       cli::cli_alert_warning("Could not estimate row count")
@@ -327,14 +368,26 @@ summary.lazy_segment_list <- function(object, ...) {
   invisible(object)
 }
 
-#' Convert Lazy Segment List to Data Frame
-#'
-#' Forces materialization
-#'
-#' @param x A lazy_segment_list object
-#' @param ... Additional arguments
+#' Glimpse method for lazy_segment_list
 #' @export
+glimpse.lazy_segment_list <- function(x, ...) {
+  if (x@materialized && !is.null(x@cache)) {
+    glimpse(x@cache, ...)
+  } else {
+    cli::cli_h2("lazy_segment_list {cli::col_silver('[not materialized]')}")
+    cli::cli_text("Query: {substr(x@query_parts$base, 1, 80)}...")
+    cli::cli_text("Transforms: {length(x@query_parts$transforms %||% list())}")
+    cli::cli_text("")
+    cli::cli_text("{.emph Call {.fn collect} to execute}")
+  }
+  
+  invisible(x)
+}
+
 #' Convert lazy_segment_list to data.frame
+#'
+#' Forces materialization of the lazy evaluation
+#'
 #' @param x A lazy_segment_list object
 #' @param ... Additional arguments (ignored)
 #' @return A data.frame

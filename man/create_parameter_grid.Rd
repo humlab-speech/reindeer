@@ -4,10 +4,12 @@
 \alias{create_parameter_grid}
 \title{Create parameter grid from simulation specification}
 \usage{
-create_parameter_grid(simulate_spec)
+create_parameter_grid(simulate_spec, prep_simulate_spec = NULL)
 }
 \arguments{
 \item{simulate_spec}{List with parameter names and value vectors}
+
+\item{prep_simulate_spec}{List with prep parameter names and value vectors (optional)}
 }
 \value{
 data.table with all parameter combinations

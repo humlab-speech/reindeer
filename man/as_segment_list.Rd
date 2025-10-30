@@ -6,6 +6,16 @@
 \usage{
 as_segment_list(x, db_uuid = NULL, db_path = NULL)
 }
+\arguments{
+\item{x}{data.frame or compatible object}
+
+\item{db_uuid}{Database UUID}
+
+\item{db_path}{Database path}
+}
+\value{
+A segment_list object
+}
 \description{
 Convert data.frame to segment_list
 }

@@ -9,6 +9,8 @@ enrich_simulate(
   .using,
   ...,
   .simulate = NULL,
+  .prep_function = NULL,
+  .prep_simulate = NULL,
   .simulation_store = NULL,
   .simulation_timestamp = NULL,
   .simulation_overwrite = FALSE,
@@ -27,8 +29,15 @@ enrich_simulate(
 
 \item{...}{Additional arguments passed to DSP function}
 
-\item{.simulate}{Named list specifying parameter grid (e.g.,
+\item{.simulate}{Named list specifying DSP parameter grid (e.g.,
 list(nominalF1 = seq(300, 600, 50), windowSize = c(20, 25, 30)))}
+
+\item{.prep_function}{Optional preprocessing function to apply to media before DSP.
+Should accept listOfFiles parameter and return audio data compatible with DSP function.
+See superassp::prep_recode() for example.}
+
+\item{.prep_simulate}{Named list specifying prep parameter grid (e.g.,
+list(sample_rate = c(16000, 22050, 44100), format = "wav"))}
 
 \item{.simulation_store}{Directory for simulation cache (required if .simulate is used)}
 
@@ -53,5 +62,6 @@ The corpus object (invisibly), or simulation_tracks object if simulating
 }
 \description{
 Extends enrich() to support systematic parameter space exploration for track
-generation. Results are cached in SQLite database for efficient retrieval.
+generation with optional preprocessing of media files. Results are cached in
+SQLite database for efficient retrieval.
 }

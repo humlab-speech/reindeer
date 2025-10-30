@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: This package extends the capabilities of emuR to work with speech data in a nordic climate
-Version: 0.1.18
+Version: 0.1.19
 Authors@R:
     person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se", role = c("aut", "cre"))
 Maintainer: Fredrik Karlsson <fredrik.k.karlsson@umu.se>
@@ -42,7 +42,10 @@ Imports:
     av,
     xml2,
     Rcpp,
-    qs (>= 0.25.0)
+    qs (>= 0.25.0),
+    pillar,
+    tibble,
+    knitr
 Remotes:
   github::humlab-speech/superassp,
   github::humlab-speech/av
