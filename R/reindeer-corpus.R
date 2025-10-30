@@ -272,9 +272,13 @@ S7::method(print, corpus) <- function(x, ...) {
     )
     levels <- DBI::dbGetQuery(con, levels_query)$level
     
-    # Metadata fields
-    fields_query <- "SELECT COUNT(DISTINCT field_name) as n FROM metadata_fields"
-    n_metadata_fields <- DBI::dbGetQuery(con, fields_query)$n
+    # Metadata fields - check if table exists first
+    n_metadata_fields <- tryCatch({
+      fields_query <- "SELECT COUNT(DISTINCT field_name) as n FROM metadata_fields"
+      DBI::dbGetQuery(con, fields_query)$n
+    }, error = function(e) {
+      0  # Table doesn't exist yet
+    })
     
     # Content summary
     cli::cli_text("{.strong Content:}")
@@ -410,9 +414,14 @@ S7::method(summary, corpus) <- function(object, ...) {
     cli::cli_text("")
   }
   
-  # Metadata summary
-  fields_query <- "SELECT DISTINCT field_name FROM metadata_fields ORDER BY field_name"
-  fields <- DBI::dbGetQuery(con, fields_query)
+  # Metadata summary - check if table exists
+  fields <- tryCatch({
+    fields_query <- "SELECT DISTINCT field_name FROM metadata_fields ORDER BY field_name"
+    DBI::dbGetQuery(con, fields_query)
+  }, error = function(e) {
+    # Table doesn't exist
+    data.frame(field_name = character(0))
+  })
   
   if (nrow(fields) > 0) {
     cli::cli_h3("Metadata fields defined")
