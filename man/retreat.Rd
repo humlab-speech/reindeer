@@ -4,7 +4,7 @@
 \alias{retreat}
 \title{Retreat Backward in Sequence}
 \usage{
-retreat()
+retreat(.segments, steps_backward, ...)
 }
 \arguments{
 \item{.segments}{segment_list or lazy_segment_list object}

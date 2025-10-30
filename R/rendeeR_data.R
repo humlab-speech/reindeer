@@ -18,7 +18,7 @@
 #' The default settings contained within `DSPP` is collected directly from, or
 #' estimated from, a number of sources. The age independent but gender dependent
 #' parameters are generally found in the Praat
-#' \insertCite{Praatdoingphoneti:2022}{reindeer} or [wrassp]
+#' \insertCite{Praatdoingphoneti:2022}{reindeer} or \[https://cran.r-project.org/web/packages/wrassp/index.html\].
 #' \insertCite{Winkelmann:2017cl}{reindeer} manuals. Nominal F1, F2 and F3 for
 #' young and adolescent male and female speakers were estimated as the mid point
 #' of the age dependent range published by

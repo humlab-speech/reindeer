@@ -4,7 +4,7 @@
 \alias{quantify}
 \title{Quantify generic - Apply DSP to segments}
 \usage{
-quantify(...)
+quantify(object, ...)
 }
 \description{
 Quantify generic - Apply DSP to segments

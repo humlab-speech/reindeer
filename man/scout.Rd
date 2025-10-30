@@ -5,18 +5,21 @@
 \title{Optimized Sequence Operations with data.table}
 \usage{
 scout(
-  .data,
+  .segments,
   steps_forward,
   count_from = "START",
   capture = 1,
   ignore_bundle_boundaries = FALSE,
   calculate_times = TRUE,
   times_from = NULL,
-  interactive = FALSE,
-  .inside_of = NULL
+  .from = NULL,
+  .quiet = TRUE,
+  collect = TRUE
 )
 }
 \arguments{
+\item{.segments}{segment_list or lazy_segment_list object}
+
 \item{steps_forward}{Integer; number of steps to move forward (positive) or backward (negative)}
 
 \item{count_from}{Character; "START" or "END" of segment}
@@ -28,8 +31,6 @@ scout(
 \item{calculate_times}{Logical; whether to calculate start/end times}
 
 \item{times_from}{Character; level to use for time calculation}
-
-\item{.segments}{segment_list or lazy_segment_list object}
 
 \item{.from}{corpus object (optional, for additional context)}
 

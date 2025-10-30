@@ -4,15 +4,7 @@
 \alias{ascend_to}
 \title{Ascend to Higher Level in Hierarchy}
 \usage{
-ascend_to(
-  .data,
-  .attribute_name,
-  .collapse = TRUE,
-  .skip_times = FALSE,
-  .times_from = NULL,
-  .interactive = FALSE,
-  .inside_of = NULL
-)
+ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 }
 \arguments{
 \item{.segments}{segment_list or lazy_segment_list object}

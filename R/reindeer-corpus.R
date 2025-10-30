@@ -1107,12 +1107,22 @@ build_emuDB_cache <- function(database_dir,
   db_config <- jsonlite::fromJSON(db_config_path, simplifyVector = FALSE)
 
   if (verbose) {
-    cli::cli_h1("Building emuDB cache for {.field {db_name}}")
+    cli::cli_h2("Building emuDB cache for {.field {db_name}}")
   }
 
   # Initialize SQLite connection
   if (file.exists(cache_path)) {
-    if (verbose) cli::cli_alert_info("Removing existing cache file")
+    if (verbose) cli::cli_alert_info("Using existing cache file")
+    # For updates, we could add logic here to only update changed bundles
+    # For now, we rebuild (safer for consistency)
+  }
+  
+  if (verbose) {
+    cli::cli_alert_info("Initializing cache database...")
+  }
+  
+  # Remove old cache if it exists to ensure clean state
+  if (file.exists(cache_path)) {
     unlink(cache_path)
   }
 
@@ -1372,17 +1382,23 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
 
   # Process batches with progress tracking
   results <- list()
-
+  total_bundles <- nrow(sessions_bundles)
+  
   if (verbose) {
-    cli::cli_progress_step("Processing {.val {nrow(sessions_bundles)}} bundles...")
+    cli::cli_alert_info("Processing {total_bundles} bundles{?s} in {length(batches)} batch{?es}...")
+    if (parallel) {
+      cli::cli_alert_info("Using parallel processing with {workers} worker{?s}")
+    }
+    cli::cli_progress_bar(
+      "Processing",
+      total = total_bundles,
+      format = "{cli::pb_spin} {cli::pb_current}/{cli::pb_total} | {cli::pb_bar} {cli::pb_percent} | ETA: {cli::pb_eta}",
+      clear = FALSE
+    )
   }
 
   for (i in seq_along(batches)) {
     batch <- batches[[i]]
-
-    if (verbose) {
-      cli::cli_progress_message("Processing batch {i}/{length(batches)} ({nrow(batch)} bundles)")
-    }
 
     if (parallel) {
       batch_results <- furrr::future_pmap(
@@ -1409,6 +1425,12 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
     }
 
     results <- c(results, batch_results)
+    
+    # Update progress bar
+    if (verbose) {
+      bundles_done <- sum(purrr::map_int(batches[1:i], nrow))
+      cli::cli_progress_update(set = bundles_done)
+    }
   }
 
   if (verbose) {
@@ -1619,6 +1641,14 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   # 2. Session-level metadata
   sessions <- list_sessions_from_cache(con, db_uuid)
   
+  if (verbose && nrow(sessions) > 0) {
+    cli::cli_progress_bar(
+      "Loading session metadata",
+      total = nrow(sessions),
+      format = "{cli::pb_spin} Session {cli::pb_current}/{cli::pb_total} | {cli::pb_bar} {cli::pb_percent}"
+    )
+  }
+  
   for (i in seq_len(nrow(sessions))) {
     session_name <- sessions$name[i]
     session_meta_file <- file.path(basePath, paste0(session_name, "_ses"),
@@ -1630,10 +1660,26 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
         process_metadata_list(con, db_uuid, session_name, NULL, meta_data, "session")
       }
     }
+    
+    if (verbose && nrow(sessions) > 0) {
+      cli::cli_progress_update()
+    }
+  }
+  
+  if (verbose && nrow(sessions) > 0) {
+    cli::cli_progress_done()
   }
   
   # 3. Bundle-level metadata
   bundles <- list_bundles_from_cache(con, db_uuid)
+  
+  if (verbose && nrow(bundles) > 0) {
+    cli::cli_progress_bar(
+      "Loading bundle metadata",
+      total = nrow(bundles),
+      format = "{cli::pb_spin} Bundle {cli::pb_current}/{cli::pb_total} | {cli::pb_bar} {cli::pb_percent}"
+    )
+  }
   
   for (i in seq_len(nrow(bundles))) {
     session_name <- bundles$session[i]
@@ -1652,6 +1698,14 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
         process_metadata_list(con, db_uuid, session_name, bundle_name, meta_data, "bundle")
       }
     }
+    
+    if (verbose && nrow(bundles) > 0) {
+      cli::cli_progress_update()
+    }
+  }
+  
+  if (verbose && nrow(bundles) > 0) {
+    cli::cli_progress_done()
   }
   
   if (verbose) {

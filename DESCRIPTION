@@ -45,7 +45,8 @@ Imports:
     qs (>= 0.25.0),
     pillar,
     tibble,
-    knitr
+    knitr,
+    bigstatsr
 Remotes:
   github::humlab-speech/superassp,
   github::humlab-speech/av

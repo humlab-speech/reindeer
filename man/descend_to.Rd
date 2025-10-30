@@ -4,15 +4,7 @@
 \alias{descend_to}
 \title{Descend to Lower Level in Hierarchy}
 \usage{
-descend_to(
-  .data,
-  .attribute_name,
-  .collapse = TRUE,
-  .skip_times = FALSE,
-  .times_from = NULL,
-  .interactive = FALSE,
-  .inside_of = NULL
-)
+descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 }
 \arguments{
 \item{.segments}{segment_list or lazy_segment_list object}
