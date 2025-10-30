@@ -433,14 +433,35 @@ S7::method(summary, corpus) <- function(object, ...) {
   invisible(object)
 }
 
-#' Glimpse method for corpus - quick overview
+#' Glimpse at an object
+#' 
+#' Provides a quick overview of object structure. For corpus objects, shows levels,
+#' sample labels, and sessions. For segment_list objects, shows column-wise preview.
+#' 
+#' @param x An object to glimpse at  
+#' @param ... Additional arguments passed to methods
+#' @return Invisibly returns the object
 #' @export
 glimpse <- function(x, ...) {
+  # Handle S7 classes explicitly since S3 dispatch doesn't work with namespace-qualified class names
+  if (inherits(x, "S7_object")) {
+    class_name <- class(x)[1]
+    if (class_name == "reindeer::corpus") {
+      return(glimpse_corpus_impl(x, ...))
+    } else if (class_name == "reindeer::segment_list") {
+      return(glimpse_segment_list_impl(x, ...))
+    } else if (class_name == "reindeer::extended_segment_list") {
+      return(glimpse_extended_segment_list_impl(x, ...))
+    } else if (class_name == "reindeer::lazy_segment_list") {
+      return(glimpse_lazy_segment_list_impl(x, ...))
+    }
+  }
+  # Fall back to S3 dispatch for other classes (e.g. tibbles)
   UseMethod("glimpse")
 }
 
-#' @export
-glimpse.corpus <- function(x, ...) {
+# Implementation function for corpus
+glimpse_corpus_impl <- function(x, ...) {
   cli::cli_h2("Corpus: {.field {x@dbName}}")
   
   con <- get_corpus_connection(x)

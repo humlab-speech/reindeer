@@ -366,9 +366,8 @@ S7::method(summary, lazy_segment_list) <- function(object, ...) {
   invisible(object)
 }
 
-#' Glimpse method for lazy_segment_list
-#' @export
-glimpse.lazy_segment_list <- function(x, ...) {
+# Implementation function for lazy_segment_list
+glimpse_lazy_segment_list_impl <- function(x, ...) {
   if (x@materialized && !is.null(x@cache)) {
     glimpse(x@cache, ...)
   } else {

@@ -2,10 +2,19 @@
 % Please edit documentation in R/reindeer-corpus.R
 \name{glimpse}
 \alias{glimpse}
-\title{Glimpse method for corpus - quick overview}
+\title{Glimpse at an object}
 \usage{
 glimpse(x, ...)
 }
+\arguments{
+\item{x}{An object to glimpse at}
+
+\item{...}{Additional arguments passed to methods}
+}
+\value{
+Invisibly returns the object
+}
 \description{
-Glimpse method for corpus - quick overview
+Provides a quick overview of object structure. For corpus objects, shows levels,
+sample labels, and sessions. For segment_list objects, shows column-wise preview.
 }

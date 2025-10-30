@@ -248,9 +248,8 @@ S7::method(summary, segment_list) <- function(object, ...) {
   invisible(object)
 }
 
-#' Glimpse method for segment_list
-#' @export
-glimpse.segment_list <- function(x, width = NULL, ...) {
+# Implementation function for segment_list
+glimpse_segment_list_impl <- function(x, width = NULL, ...) {
   cli::cli_h2("segment_list [{nrow(x)} × {ncol(x)}]")
   
   if (nrow(x) == 0) {
@@ -535,9 +534,8 @@ S7::method(summary, extended_segment_list) <- function(object, ...) {
   invisible(object)
 }
 
-#' Glimpse method for extended_segment_list
-#' @export
-glimpse.extended_segment_list <- function(x, width = NULL, ...) {
+# Implementation function for extended_segment_list
+glimpse_extended_segment_list_impl <- function(x, width = NULL, ...) {
   cli::cli_h2("extended_segment_list [{nrow(x)} × {ncol(x)}]")
   
   if (nrow(x) == 0) {
