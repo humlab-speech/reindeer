@@ -232,7 +232,6 @@ S7::method(`[<-`, corpus) <- function(x, i, j, ..., value) {
 # ==============================================================================
 
 #' Print method for corpus with tidyverse-style formatting
-#' @export
 S7::method(print, corpus) <- function(x, ...) {
   cli::cli_h1("{.cls corpus}: {.field {x@dbName}}")
   
@@ -305,7 +304,6 @@ S7::method(print, corpus) <- function(x, ...) {
 }
 
 #' Summary method for corpus - comprehensive database overview
-#' @export
 S7::method(summary, corpus) <- function(object, ...) {
   con <- get_corpus_connection(object)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -477,7 +475,6 @@ glimpse.corpus <- function(x, ...) {
 }
 
 #' Print method for bundle_list with tidyverse-style formatting
-#' @export
 S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
   if (is.null(n)) {
     n <- getOption("pillar.print_max", 10)

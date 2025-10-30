@@ -113,7 +113,6 @@ segment_list <- S7::new_class(
 # ==============================================================================
 
 #' Print method for segment_list with pillar formatting
-#' @export
 S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
   # Determine number of rows to show
   if (is.null(n)) {
@@ -172,7 +171,6 @@ S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
 }
 
 #' Summary method for segment_list
-#' @export
 S7::method(summary, segment_list) <- function(object, ...) {
   cli::cli_h1("Segment List Summary")
   
@@ -386,7 +384,6 @@ extended_segment_list <- S7::new_class(
 # ==============================================================================
 
 #' Print method for extended_segment_list with pillar formatting
-#' @export
 S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = NULL) {
   # Determine number of rows to show
   if (is.null(n)) {
@@ -455,7 +452,6 @@ S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = N
 }
 
 #' Summary method for extended_segment_list
-#' @export
 S7::method(summary, extended_segment_list) <- function(object, ...) {
   cli::cli_h1("Extended Segment List Summary")
   

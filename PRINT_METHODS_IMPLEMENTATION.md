@@ -4,6 +4,14 @@
 
 I have implemented tidyverse-style `print()`, `summary()`, and `glimpse()` methods for all S7 classes in the reindeer package, providing informative and well-formatted output at each stage of analysis.
 
+## Important Note on Installation
+
+**Current Limitation**: The S7 methods work perfectly with `devtools::load_all()` but may not dispatch correctly when the package is installed with `R CMD INSTALL` and loaded with `library()` due to how S7 handles method registration during package building. 
+
+**Recommended Usage**: Use `devtools::load_all()` for development, or rebuild/reinstall after each method change.
+
+**Technical Detail**: S7 method registration with `method<-` at package top level should persist through installation, but there appears to be an S7 package limitation with this pattern. The methods are correctly defined and work when sourced directly (as `devtools::load_all()` does), but don't always survive the package build/install cycle.
+
 ## Classes Enhanced
 
 ### 1. `corpus` class

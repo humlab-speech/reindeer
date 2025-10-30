@@ -244,7 +244,6 @@ apply_descend_transform <- function(sql, level) {
 # ==============================================================================
 
 #' Print method for lazy_segment_list
-#' @export
 S7::method(print, lazy_segment_list) <- function(x, ...) {
   cli::cli_rule(
     left = cli::style_bold("lazy_segment_list"),
@@ -322,7 +321,6 @@ S7::method(print, lazy_segment_list) <- function(x, ...) {
 }
 
 #' Summary method for lazy_segment_list
-#' @export
 S7::method(summary, lazy_segment_list) <- function(object, ...) {
   if (object@materialized && !is.null(object@cache)) {
     cli::cli_h1("Lazy Segment List (Materialized)")

@@ -4,12 +4,20 @@
 \alias{ask_for}
 \title{Optimized EMU Query Language (EQL) Implementation}
 \usage{
-ask_for(emuDB, query, ...)
+ask_for(
+  inside_of,
+  query,
+  sessions_regex = ".*",
+  bundles_regex = ".*",
+  times_from = NULL,
+  calculate_times = TRUE,
+  interactive = FALSE
+)
 }
 \arguments{
-\item{emuDB}{Either a path to an emuDB directory, an emuDBhandle, or a corpus object}
-
 \item{query}{EQL query string}
+
+\item{emuDB}{Either a path to an emuDB directory, an emuDBhandle, or a corpus object}
 
 \item{...}{Additional arguments passed to query execution}
 }

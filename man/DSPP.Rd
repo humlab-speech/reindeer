@@ -15,7 +15,7 @@ This data frame provides default parameters for signal processing functions
 that may depend on speaker metadata. Currently, only Gender is considered.
 The default settings defined in this collection is based on the
 recommendations found in the literature for the signal processing functions
-defined in \link[superassp:superassp-package]{superassp::superassp} (and by extension \link{wrassp}).
+defined in \link{superassp} (and by extension \link{wrassp}).
 }
 \details{
 If the user defines their own signal processing function, it may be
