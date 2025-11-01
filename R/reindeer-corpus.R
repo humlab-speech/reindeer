@@ -98,6 +98,12 @@ corpus <- S7::new_class(
       .connection_valid = FALSE
     )
     
+    # Check for auto-sync on load
+    sync_config <- load_sync_config_from_path(basePath)
+    if (!is.null(sync_config) && sync_config$enabled && verbose) {
+      cli::cli_alert_info("Auto-sync is enabled for this database")
+    }
+    
     # Gather metadata after object creation
     con <- get_corpus_connection(corpus_obj)
     initialize_metadata_schema(con)
@@ -166,11 +172,16 @@ bundle_list <- S7::new_class(
 
 #' Subset corpus to get bundle list with metadata
 #'
+#' @description 
+#' Subset corpus to get bundle list with metadata
+#' 
 #' @param x corpus object
 #' @param i session pattern (regex or literal)
 #' @param j bundle pattern (regex or literal)
 #' @return bundle_list object (tibble with session, bundle, and metadata columns)
 #' @export
+#' 
+
 S7::method(`[`, corpus) <- function(x, i, j, ..., drop = FALSE) {
   # Handle various indexing patterns
   session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"
@@ -1158,9 +1169,9 @@ build_emuDB_cache <- function(database_dir,
 
   if (nrow(sessions_bundles) == 0) {
     cli::cli_alert_warning("No bundles found in database")
-    # Create minimal emuDBhandle for corpus
-    handle <- emuDBhandle(db_name, database_dir, db_config$UUID, connection = con)
-    return(corpus(handle, verbose = FALSE))
+
+    
+    return(corpus(database_dir, verbose = FALSE))
   }
 
   if (verbose) {

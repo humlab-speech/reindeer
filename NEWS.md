@@ -1,3 +1,67 @@
+# reindeer 0.2.3
+
+## New Features
+
+* **Automatic Synchronization System**
+  - `enable_auto_sync()`: Configure automatic sync for database
+  - `sync_database()`: Manually trigger synchronization
+  - Automatic EAF file updates when `_annot.json` files change
+  - Automatic CMDI updates when database structure or metadata changes
+  - Change detection using MD5 checksums and state tracking
+  - Sync state persisted in `.sync_config.json` and `.sync_state.json`
+
+* **Metadata Management Functions**
+  - `write_bundle_metadata()`: Write bundle-level `.meta_json` with auto-sync
+  - `write_session_metadata()`: Write session-level `.meta_json` with auto-sync
+  - `batch_update_metadata()`: Efficiently update multiple bundles at once
+  - Merge mode for incremental metadata updates
+
+* **Database Modification Wrappers**
+  - `add_session_with_sync()`: Add session and trigger CMDI update
+  - `remove_session_with_sync()`: Remove session and update CMDI
+  - `update_config_with_sync()`: Update configuration and sync CMDI
+  - All wrappers respect auto-sync configuration
+
+* **Change Detection**
+  - `detect_annot_changes()`: Find modified annotation files
+  - `detect_metadata_changes()`: Find modified metadata files
+  - `detect_config_changes()`: Detect database configuration changes
+  - Efficient checksumming to avoid unnecessary syncs
+
+## Documentation
+
+* Added comprehensive auto-sync guide (`inst/doc/AUTO_SYNC_SYSTEM.md`)
+  - Quick start and configuration
+  - Metadata management workflows
+  - Batch operations
+  - Monitoring and troubleshooting
+  - Performance optimization
+  - Best practices
+  - Complete usage examples
+
+## Architecture
+
+* Modular auto-sync system:
+  - `reindeeR_autosync.R`: Core sync engine and change detection
+  - `reindeeR_autosync_wrappers.R`: Database modification wrappers
+  - State management with JSON persistence
+  - Configurable sync triggers (EAF/CMDI independent)
+  - Preserves user-edited CMDI metadata on regeneration
+
+## Workflow Integration
+
+* **Corpus Curation**: Auto-update CMDI when adding participant metadata
+* **Annotation Pipeline**: Auto-generate EAF files for ELAN as annotations change
+* **Database Evolution**: CMDI stays current as corpus structure evolves
+* **Batch Processing**: Efficient bulk operations with single sync
+
+## Performance
+
+* Incremental sync: Only changed files are processed
+* MD5-based change detection: Fast checksumming
+* Batch-friendly: Defer sync until after multiple operations
+* Typical overhead: <100ms for most operations
+
 # reindeer 0.2.2
 
 ## New Features
