@@ -1,0 +1,24 @@
+{
+  "participant": {
+    "id": "P001",
+    "age": 25,
+    "gender": "Female",
+    "language": "English",
+    "dialect": "American English",
+    "education": "Bachelor's degree",
+    "occupation": "Student"
+  },
+  "recording": {
+    "date": "2023-09-15",
+    "time": "14:30",
+    "location": "Speech Laboratory",
+    "equipment": "Shure SM58",
+    "sampleRate": 16000,
+    "channels": 1
+  },
+  "session": {
+    "name": "0000_ses",
+    "task": "Reading task",
+    "duration_minutes": 30
+  }
+}

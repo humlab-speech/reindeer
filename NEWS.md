@@ -1,3 +1,68 @@
+# reindeer 0.2.2
+
+## New Features
+
+* Added `create_cmdi_metadata()` function for generating CLARIN-compliant CMDI XML files
+  - Supports multiple CMDI profiles (media-corpus, speech-corpus, speech-corpus-dlu)
+  - Automatically collects metadata from database structure
+  - Reads participant information from .meta_json files at session/bundle level
+  - Generates comprehensive metadata including participants, resources, annotations
+  - Includes placeholders for planned metadata additions
+
+* Added CMDI validation script (`inst/scripts/validate-cmdi.sh`)
+  - Validates XML well-formedness
+  - Checks CMDI namespace compliance
+  - Verifies required elements
+  - Detects placeholder fields
+  - Assesses metadata completeness
+  - Validates resource references
+
+## Documentation
+
+* Added comprehensive CMDI generation guide (`inst/doc/CMDI_METADATA_GENERATION.md`)
+  - Complete function usage examples
+  - .meta_json file format specifications
+  - CMDI profile descriptions
+  - Placeholder field specifications (PROJECT.json, PUBLICATIONS.json, ETHICS.json, QUALITY.json)
+  - Integration guide for CLARIN repositories
+  - Best practices and troubleshooting
+
+* Added metadata templates (`inst/templates/`)
+  - session_meta_template.json
+  - bundle_meta_template.json
+  - PROJECT.json
+
+## Metadata Infrastructure
+
+* Session-level metadata support via `.meta_json` files
+  - Participant demographics (age, gender, language, dialect)
+  - Recording details (date, location, equipment, sample rate)
+  - Session information (task, duration, notes)
+
+* Bundle-level metadata support
+  - Stimulus information
+  - Repetition tracking
+  - Annotation quality metrics
+
+* Planned additions (with placeholders):
+  - Project funding information
+  - Related publications
+  - Ethical approval details
+  - Quality control procedures
+
+## CLARIN Integration
+
+* Full CMDI 1.2 specification compliance
+* Three supported profiles:
+  - media-corpus (clarin.eu:cr1:p_1387365569699)
+  - SpeechCorpusWithParticipants (clarin.eu:cr1:p_1392642184799)
+  - SpeechCorpus-DLU (clarin.eu:cr1:p_1381926654456)
+
+* Generated CMDI files ready for upload to:
+  - The Language Archive (TLA)
+  - LINDAT/CLARIAH-CZ
+  - Other CLARIN repositories
+
 # reindeer 0.2.1
 
 ## Documentation
