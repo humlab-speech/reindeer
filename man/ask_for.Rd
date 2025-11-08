@@ -25,10 +25,10 @@ query system for improved performance.
 
 \itemize{
 \item Simple queries: ==, !=, =~, !~
-\item Sequence queries: \link{A -> B}
-\item Dominance queries: \link{A ^ B}
-\item Conjunction: \link{A & B}
-\item Disjunction: \link{A | B}
+\item Sequence queries: [A -> B]
+\item Dominance queries: [A ^ B]
+\item Conjunction: [A & B]
+\item Disjunction: [A | B]
 \item Projection: #Level
 \item Position functions: Start(), End(), Medial()
 \item Count function: Num()

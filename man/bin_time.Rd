@@ -18,7 +18,10 @@ a factor with \code{bins} bins, into which all items in \code{x} have been place
 }
 \description{
 This is a simple utility function to just create simple bins for a set of
-time indicators (vector). The user supplies the number of bins needed, and this function
+time indicators (vector).
+}
+\details{
+The user supplies the number of bins needed, and this function
 than returns a factor as long as the original vector, but with labels from
 $1..bins$. That is, if the user sets \link{bins=10}, then the user gets a factor
 where each value in the original vector has been given a number 1 to 10
@@ -30,8 +33,7 @@ instead, then the bins are renamed accordingly. For instance, if
 the first bin will always include the lowest value. The 30\% bin will include
 values up until and including the value indicating the 30\% cutoff of the
 interval.
-}
-\details{
+
 The function is just a convenience function and a wrapper around \link[base:cut]{base::cut}
 (with \code{include.lowest = TRUE,right = TRUE}), but is intended to ensure
 uniform and reliable binning of track data by time so that data belonging to

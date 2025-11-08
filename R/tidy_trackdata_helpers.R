@@ -233,12 +233,14 @@ clear_tidy_cache <- function() {
   unlist(results, recursive = FALSE)
 }
 
-#' ============================================================================
-#' PHASE 2: Advanced Optimizations
-#' ============================================================================
+# ============================================================================
+# PHASE 2: Advanced Optimizations
+# ============================================================================
 
 #' Get or create persistent SQLite cache for quantify results
+#' 
 #' @noRd
+#' @keywords internal
 ..get_persistent_cache_connection <- function(cache_dir = NULL, verbose = TRUE) {
   if (is.null(cache_dir)) {
     cache_dir <- file.path(tempdir(), "reindeer_cache")

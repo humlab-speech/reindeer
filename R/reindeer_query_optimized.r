@@ -8,10 +8,10 @@
 #' 
 #' @section Supported Features:
 #' - Simple queries: ==, !=, =~, !~
-#' - Sequence queries: [A -> B]
-#' - Dominance queries: [A ^ B]  
-#' - Conjunction: [A & B]
-#' - Disjunction: [A | B]
+#' - Sequence queries: \[A -> B\]
+#' - Dominance queries: \[A ^ B\]  
+#' - Conjunction: \[A & B\]
+#' - Disjunction: \[A | B\]
 #' - Projection: #Level
 #' - Position functions: Start(), End(), Medial()
 #' - Count function: Num()

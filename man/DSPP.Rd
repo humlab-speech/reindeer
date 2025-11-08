@@ -15,7 +15,7 @@ This data frame provides default parameters for signal processing functions
 that may depend on speaker metadata. Currently, only Gender is considered.
 The default settings defined in this collection is based on the
 recommendations found in the literature for the signal processing functions
-defined in \link{superassp} (and by extension \link{wrassp}).
+defined in \emph{superassp}.
 }
 \details{
 If the user defines their own signal processing function, it may be
@@ -30,7 +30,7 @@ used unaltered.
 The default settings contained within \code{DSPP} is collected directly from, or
 estimated from, a number of sources. The age independent but gender dependent
 parameters are generally found in the Praat
-\insertCite{Praatdoingphoneti:2022}{reindeer} or [https://cran.r-project.org/web/packages/wrassp/index.html].
+\insertCite{Praatdoingphoneti:2022}{reindeer} or \href{https://cran.r-project.org/web/packages/wrassp/index.html}{wrassp}.
 \insertCite{Winkelmann:2017cl}{reindeer} manuals. Nominal F1, F2 and F3 for
 young and adolescent male and female speakers were estimated as the mid point
 of the age dependent range published by

@@ -3,7 +3,9 @@
 #' A function that may be used to divide up a range of times into bins
 #'
 #' This is a simple utility function to just create simple bins for a set of
-#' time indicators (vector). The user supplies the number of bins needed, and this function
+#' time indicators (vector). 
+#' 
+#' @details The user supplies the number of bins needed, and this function
 #' than returns a factor as long as the original vector, but with labels from
 #' $1..bins$. That is, if the user sets [bins=10], then the user gets a factor
 #' where each value in the original vector has been given a number 1 to 10
