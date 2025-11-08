@@ -620,3 +620,135 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
   # Sort by size descending
   combined[order(combined$size_bytes, decreasing = TRUE), ]
 }
+
+# ==============================================================================
+# USER-FRIENDLY CACHE MANAGEMENT WRAPPER
+# ==============================================================================
+
+#' Manage reindeer caches
+#'
+#' User-friendly wrapper for cache management operations. Provides a unified
+#' interface for checking cache status, listing cache files, and cleaning old
+#' cache data across all cache systems (quantify/enrich, draft annotations,
+#' and simulations).
+#'
+#' @param corpus A corpus object
+#' @param action Character; one of:
+#'   - "status": Show cache sizes and warnings (default)
+#'   - "list": List all cache files sorted by size
+#'   - "clean": Remove old cache files (interactive prompt)
+#' @param days_old Integer; for "clean" action, remove files older than this
+#'   (default: 30 days)
+#' @param cache_type Character; type of cache to manage for "list" action:
+#'   "all" (default), "quantify", "draft", or "simulation"
+#' @param dry_run Logical; for "clean" action, preview what would be deleted
+#'   without actually deleting (default: TRUE)
+#'
+#' @return Depends on action:
+#'   - "status": List with cache sizes (invisibly)
+#'   - "list": Data frame of cache files
+#'   - "clean": Summary of cleanup (invisibly)
+#'
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Check cache status
+#' manage_cache(corpus)
+#'
+#' # List all cache files
+#' manage_cache(corpus, action = "list")
+#'
+#' # Preview cleanup (dry run)
+#' manage_cache(corpus, action = "clean", days_old = 30)
+#'
+#' # Actually clean old files
+#' manage_cache(corpus, action = "clean", days_old = 30, dry_run = FALSE)
+#'
+#' # List only draft caches
+#' manage_cache(corpus, action = "list", cache_type = "draft")
+#' }
+manage_cache <- function(corpus,
+                        action = c("status", "list", "clean"),
+                        days_old = 30,
+                        cache_type = c("all", "quantify", "draft", "simulation"),
+                        dry_run = TRUE) {
+
+  # Input validation with assertthat
+  assertthat::assert_that(
+    inherits(corpus, "corpus"),
+    msg = "corpus must be a corpus object"
+  )
+
+  action <- match.arg(action)
+  cache_type <- match.arg(cache_type)
+
+  assertthat::assert_that(
+    assertthat::is.count(days_old),
+    msg = "days_old must be a positive integer"
+  )
+  assertthat::assert_that(
+    assertthat::is.flag(dry_run),
+    msg = "dry_run must be TRUE or FALSE"
+  )
+
+  # Execute requested action
+  switch(action,
+    status = {
+      cli::cli_h1("Cache Status")
+      result <- check_all_cache_sizes(corpus)
+      invisible(result)
+    },
+
+    list = {
+      cli::cli_h1("Cache Files")
+      files <- list_cache_files(corpus, cache_type = cache_type)
+
+      if (nrow(files) == 0) {
+        cli::cli_alert_info("No cache files found")
+        return(invisible(files))
+      }
+
+      # Format output
+      cli::cli_text("")
+      cli::cli_text("Found {nrow(files)} cache file{?s}:")
+      cli::cli_text("")
+
+      # Print summary table
+      for (i in seq_len(min(20, nrow(files)))) {
+        file_info <- files[i, ]
+        cli::cli_text(
+          "{.file {file_info$file}} ",
+          "({file_info$size_formatted}) ",
+          "[{file_info$type}]"
+        )
+      }
+
+      if (nrow(files) > 20) {
+        cli::cli_text("")
+        cli::cli_text(
+          "{.emph ... and {nrow(files) - 20} more file{?s}}"
+        )
+      }
+
+      total_size <- sum(files$size_bytes, na.rm = TRUE)
+      cli::cli_text("")
+      cli::cli_rule()
+      cli::cli_text("Total: {format_bytes(total_size)}")
+
+      invisible(files)
+    },
+
+    clean = {
+      cli::cli_h1("Clean Old Cache Files")
+
+      if (dry_run) {
+        cli::cli_alert_info("Running in DRY RUN mode - no files will be deleted")
+      }
+
+      result <- clean_all_caches(corpus, days_old = days_old, dry_run = dry_run)
+
+      invisible(result)
+    }
+  )
+}

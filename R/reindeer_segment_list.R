@@ -655,12 +655,26 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .cache_format = c("auto", "qs", "rds"),
                                                 .optimize = TRUE) {
 
+  # Input validation with assertthat
+  assertthat::assert_that(
+    inherits(object, "segment_list"),
+    msg = "object must be a segment_list"
+  )
+  assertthat::assert_that(
+    is.function(dsp_function) || is.character(dsp_function),
+    msg = "dsp_function must be a function or character string"
+  )
+  assertthat::assert_that(
+    assertthat::is.flag(.use_metadata),
+    assertthat::is.flag(.verbose),
+    assertthat::is.flag(.parallel),
+    assertthat::is.flag(.use_cache),
+    assertthat::is.flag(.optimize),
+    msg = "Logical flags must be TRUE or FALSE"
+  )
+
   # Match cache format argument
   .cache_format <- match.arg(.cache_format)
-
-  if (!inherits(object, "segment_list")) {
-    cli::cli_abort("{.arg object} must be a segment_list")
-  }
 
   if (nrow(object) == 0) {
     if (.verbose) cli::cli_alert_warning("Empty segment list")
@@ -669,9 +683,22 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   # Validate .at parameter
   if (!is.null(.at)) {
-    if (!is.numeric(.at) || any(.at < 0) || any(.at > 1)) {
-      cli::cli_abort("{.arg .at} must be numeric values between 0 and 1")
-    }
+    assertthat::assert_that(
+      is.numeric(.at),
+      msg = ".at must be numeric"
+    )
+    assertthat::assert_that(
+      all(.at >= 0 & .at <= 1),
+      msg = ".at values must be between 0 and 1"
+    )
+  }
+
+  # Validate .workers if provided
+  if (!is.null(.workers)) {
+    assertthat::assert_that(
+      assertthat::is.count(.workers),
+      msg = ".workers must be a positive integer"
+    )
   }
 
   # Try to get corpus from db_path (PHASE 1: Cached corpus loading)

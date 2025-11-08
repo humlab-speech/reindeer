@@ -125,6 +125,16 @@ find_draft_cache_files <- function(corpus_obj, draft_function_name) {
 #' @keywords internal
 initialize_draft_cache <- function(cache_path, draft_function_name) {
 
+  # Input validation with assertthat
+  assertthat::assert_that(
+    assertthat::is.string(cache_path),
+    msg = "cache_path must be a character string"
+  )
+  assertthat::assert_that(
+    assertthat::is.string(draft_function_name),
+    msg = "draft_function_name must be a character string"
+  )
+
   con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
 
   # Metadata table - stores information about the draft generation run
@@ -151,7 +161,7 @@ initialize_draft_cache <- function(cache_path, draft_function_name) {
       level_name TEXT NOT NULL,
       level_type TEXT NOT NULL,  -- SEGMENT, EVENT, or ITEM
       attribute_name TEXT NOT NULL,
-      annotations_blob BLOB NOT NULL,  -- Serialized data.frame of annotations
+      annotations_blob BLOB,  -- Serialized data.frame of annotations (NULL for errors)
       parameters_json TEXT,  -- Parameters used for this bundle
       created_at TEXT NOT NULL,
       error_occurred LOGICAL DEFAULT 0,
@@ -313,6 +323,41 @@ is_bundle_cached <- function(con, session, bundle, level_name, attribute_name) {
 store_draft_annotations <- function(con, session, bundle, level_name, level_type,
                                     attribute_name, annotations, parameters,
                                     error_occurred = FALSE, error_message = NULL) {
+
+  # Input validation with assertthat
+  assertthat::assert_that(
+    inherits(con, "SQLiteConnection"),
+    msg = "con must be a SQLite database connection"
+  )
+  assertthat::assert_that(
+    assertthat::is.string(session),
+    assertthat::is.string(bundle),
+    assertthat::is.string(level_name),
+    assertthat::is.string(level_type),
+    assertthat::is.string(attribute_name),
+    msg = "session, bundle, level_name, level_type, and attribute_name must be character strings"
+  )
+  assertthat::assert_that(
+    is.list(parameters),
+    msg = "parameters must be a list"
+  )
+  assertthat::assert_that(
+    assertthat::is.flag(error_occurred),
+    msg = "error_occurred must be TRUE or FALSE"
+  )
+
+  # Validate data consistency
+  if (error_occurred) {
+    assertthat::assert_that(
+      !is.null(error_message),
+      msg = "error_message must be provided when error_occurred is TRUE"
+    )
+  } else {
+    assertthat::assert_that(
+      !is.null(annotations),
+      msg = "annotations must be provided when error_occurred is FALSE"
+    )
+  }
 
   # Serialize annotations
   annotations_blob <- if (!error_occurred) {

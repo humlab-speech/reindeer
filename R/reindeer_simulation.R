@@ -715,8 +715,8 @@ quantify_simulate <- function(.what, .using, ...,
     # Store results in cache
     for (seg_idx in seq_len(nrow(result))) {
       
-      # Serialize result for this segment
-      result_blob <- serialize(result[seg_idx], NULL)
+      # Serialize result for this segment using qs for better performance
+      result_blob <- qs::qserialize(result[seg_idx], preset = "fast")
       
       # Get signal hash
       sig_hash <- NA_character_
@@ -875,8 +875,8 @@ reminisce <- function(segment_list,
     cli::cli_abort("No results found for parameter combination")
   }
   
-  # Deserialize and combine results
-  result_list <- lapply(results$result_blob, unserialize)
+  # Deserialize and combine results using qs
+  result_list <- lapply(results$result_blob, qs::qdeserialize)
   
   combined <- data.table::rbindlist(result_list, fill = TRUE)
   
@@ -1307,8 +1307,8 @@ enrich_simulate <- function(corpus_obj, .using, ...,
           list(toFile = FALSE, verbose = FALSE)
         ))
         
-        # Serialize track object
-        track_blob <- base::serialize(track, connection = NULL, ascii = FALSE)
+        # Serialize track object using qs for better performance
+        track_blob <- qs::qserialize(track, preset = "fast")
         
         # Get signal hash
         signal_hashes <- get_signal_hashes(corpus_obj, 
@@ -1582,8 +1582,8 @@ reminisce_tracks <- function(corpus_obj,
     return(data.table::data.table())
   }
   
-  # Deserialize tracks
-  results$track <- lapply(results$track_blob, unserialize)
+  # Deserialize tracks using qs
+  results$track <- lapply(results$track_blob, qs::qdeserialize)
   results$track_blob <- NULL
   
   # Convert to data.table

@@ -47,18 +47,30 @@ corpus <- S7::new_class(
     .connection_valid = S7::class_logical
   ),
   constructor = function(path, verbose = FALSE) {
-    # Validate input
-    if (length(path) == 0 || is.null(path)) {
-      cli::cli_abort("Path cannot be NULL or empty")
-    }
-    
+    # Input validation with assertthat
+    assertthat::assert_that(
+      !is.null(path),
+      length(path) > 0,
+      msg = "path cannot be NULL or empty"
+    )
+    assertthat::assert_that(
+      assertthat::is.flag(verbose),
+      msg = "verbose must be TRUE or FALSE"
+    )
+
     if (is.character(path)) {
-      if (!dir.exists(path)) {
-        cli::cli_abort("Database path {.path {path}} does not exist")
-      }
-      if (!stringr::str_ends(basename(path), "_emuDB")) {
-        cli::cli_abort("Database directory should end with '_emuDB'")
-      }
+      assertthat::assert_that(
+        assertthat::is.string(path),
+        msg = "path must be a single character string"
+      )
+      assertthat::assert_that(
+        dir.exists(path),
+        msg = sprintf("Database path '%s' does not exist", path)
+      )
+      assertthat::assert_that(
+        stringr::str_ends(basename(path), "_emuDB"),
+        msg = "Database directory should end with '_emuDB'"
+      )
       basePath <- path
       dbName <- stringr::str_remove(basename(basePath), "_emuDB$")
       
