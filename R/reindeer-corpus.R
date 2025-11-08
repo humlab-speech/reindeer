@@ -1182,8 +1182,14 @@ build_emuDB_cache <- function(database_dir,
   if (nrow(sessions_bundles) == 0) {
     cli::cli_alert_warning("No bundles found in database")
 
-    
-    return(corpus(database_dir, verbose = FALSE))
+    # Initialize metadata schema even if no bundles
+    initialize_metadata_schema(con)
+
+    # Close connection and return (corpus constructor will proceed)
+    DBI::dbDisconnect(con)
+    on.exit()  # Remove the on.exit handler
+
+    return(invisible(NULL))
   }
 
   if (verbose) {

@@ -379,7 +379,7 @@ store_draft_annotations <- function(con, session, bundle, level_name, level_type
       jsonlite::toJSON(parameters, auto_unbox = TRUE),
       as.character(Sys.time()),
       as.integer(error_occurred),
-      error_message
+      if (is.null(error_message)) NA_character_ else error_message
     )
   )
 
@@ -429,7 +429,12 @@ retrieve_draft_annotations <- function(con, session = NULL, bundle = NULL, level
     params <- c(params, list(level_name))
   }
 
-  result <- DBI::dbGetQuery(con, query, params = params)
+  # Execute query with or without params
+  result <- if (length(params) > 0) {
+    DBI::dbGetQuery(con, query, params = params)
+  } else {
+    DBI::dbGetQuery(con, query)
+  }
 
   if (nrow(result) == 0) {
     return(data.frame())
@@ -438,8 +443,12 @@ retrieve_draft_annotations <- function(con, session = NULL, bundle = NULL, level
   # Deserialize annotations
   result$annotations <- lapply(result$annotations_blob, function(blob) {
     if (is.null(blob)) return(NULL)
-    qs::qdeserialize(blob[[1]])
+    # blob is already a raw vector from SQLite, don't index it
+    qs::qdeserialize(blob)
   })
+
+  # Convert error_occurred from integer to logical
+  result$error_occurred <- as.logical(result$error_occurred)
 
   result$annotations_blob <- NULL
 
