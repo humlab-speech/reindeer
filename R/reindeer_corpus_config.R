@@ -55,7 +55,8 @@ load_DBconfig <- function(obj) {
     stop(dbCfgPath, " does not exist. Check 'name' entry in DBconfig file.")
   }
 
-  DBconfig <- jsonlite::fromJSON(dbCfgPath, simplifyVector = FALSE)
+  # Use optimized JSON reading with RcppSimdJson
+  DBconfig <- read_json_fast(dbCfgPath, simplifyVector = FALSE)
 
   # Cache the config
   attr(DBconfig, "mtime") <- file.mtime(dbCfgPath)

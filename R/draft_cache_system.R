@@ -272,7 +272,7 @@ get_draft_cache <- function(corpus_obj, draft_function_name, parameters,
         as.character(Sys.time()),
         corpus_obj@basePath,
         corpus_obj@.uuid,
-        jsonlite::toJSON(parameters, auto_unbox = TRUE),
+        to_json_compat(parameters, auto_unbox = TRUE),
         NA_integer_  # Will be updated when we know total
       )
     )
@@ -376,7 +376,7 @@ store_draft_annotations <- function(con, session, bundle, level_name, level_type
     params = list(
       session, bundle, level_name, level_type, attribute_name,
       list(annotations_blob),
-      jsonlite::toJSON(parameters, auto_unbox = TRUE),
+      to_json_compat(parameters, auto_unbox = TRUE),
       as.character(Sys.time()),
       as.integer(error_occurred),
       if (is.null(error_message)) NA_character_ else error_message
@@ -515,7 +515,7 @@ draft_cache_summary <- function(corpus_obj, draft_function_name, date = Sys.Date
     n_bundles_total = metadata$n_bundles_total[1],
     n_bundles_completed = metadata$n_bundles_completed[1],
     completed = as.logical(metadata$completed[1]),
-    parameters = jsonlite::fromJSON(metadata$parameters_json[1]),
+    parameters = parse_json_fast(metadata$parameters_json[1]),
     annotations_by_level = annotations_summary
   )
 }

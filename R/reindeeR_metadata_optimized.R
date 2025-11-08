@@ -120,7 +120,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   
   if (file.exists(db_meta_file)) {
     if (verbose) cli::cli_alert_info("Processing database-level defaults")
-    db_meta <- jsonlite::read_json(db_meta_file, simplifyVector = TRUE)
+    db_meta <- read_json_fast(db_meta_file, simplifyVector = TRUE)
     if (length(db_meta) > 0) {
       process_metadata_list(con, db_uuid, NULL, NULL, db_meta, "database")
     }
@@ -138,7 +138,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
                                    paste0(session_name, ".", metadata.extension))
     
     if (file.exists(session_meta_file)) {
-      meta_data <- jsonlite::read_json(session_meta_file, simplifyVector = TRUE)
+      meta_data <- read_json_fast(session_meta_file, simplifyVector = TRUE)
       if (length(meta_data) > 0) {
         process_metadata_list(con, db_uuid, session_name, NULL, meta_data, "session")
       }
@@ -190,7 +190,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     # Read all files in parallel
     all_metadata <- future.apply::future_lapply(existing_files, function(f) {
       tryCatch({
-        jsonlite::read_json(f, simplifyVector = TRUE)
+        read_json_fast(f, simplifyVector = TRUE)
       }, error = function(e) {
         list()
       })
@@ -200,7 +200,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     # Sequential reading (for small databases or if future not available)
     all_metadata <- lapply(existing_files, function(f) {
       tryCatch({
-        jsonlite::read_json(f, simplifyVector = TRUE)
+        read_json_fast(f, simplifyVector = TRUE)
       }, error = function(e) {
         list()
       })
@@ -850,7 +850,7 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     
     # Read existing or create new
     if (file.exists(meta_file)) {
-      existing <- jsonlite::read_json(meta_file, simplifyVector = TRUE)
+      existing <- read_json_fast(meta_file, simplifyVector = TRUE)
     } else {
       existing <- list()
     }
@@ -864,7 +864,7 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     
     # Read existing or create new
     if (file.exists(meta_file)) {
-      existing <- jsonlite::read_json(meta_file, simplifyVector = TRUE)
+      existing <- read_json_fast(meta_file, simplifyVector = TRUE)
     } else {
       existing <- list()
     }
@@ -883,7 +883,7 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     
     # Read existing or create new
     if (file.exists(meta_file)) {
-      existing <- jsonlite::read_json(meta_file, simplifyVector = TRUE)
+      existing <- read_json_fast(meta_file, simplifyVector = TRUE)
     } else {
       existing <- list()
     }
