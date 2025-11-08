@@ -35,14 +35,18 @@ navbar:
     articles:
       text: Articles
       menu:
-      - text: Tidy Speech Processing
-        href: articles/Tidy_speech_processing.html
+      - text: Getting Started
+        href: articles/getting_started.html
+      - text: Cache Management
+        href: articles/cache_management.html
       - text: Metadata Management
         href: articles/metadata_management.html
       - text: Transcription Workflow
         href: articles/transcription_workflow.html
       - text: Simulation Infrastructure
         href: articles/simulation-infrastructure.html
+      - text: Reindeer Workflow
+        href: articles/reindeer_workflow.html
     news:
       text: News
       href: news/index.html
@@ -109,6 +113,18 @@ reference:
   - has_python_annotations
   - test_python_annotations
 
+- title: "Cache Management"
+  desc: "Cache monitoring and cleanup utilities"
+  contents:
+  - manage_cache
+  - check_all_cache_sizes
+  - check_quantify_cache_size
+  - check_draft_cache_size
+  - clean_all_caches
+  - clean_quantify_cache
+  - clean_draft_cache
+  - list_cache_files
+
 - title: "Utilities"
   desc: "Helper functions and utilities"
   contents:
@@ -127,11 +143,18 @@ articles:
 - title: "Getting Started"
   navbar: ~
   contents:
-  - Tidy_speech_processing
+  - getting_started
+  - cache_management
   - metadata_management
+
+- title: "Workflows"
+  navbar: ~
+  contents:
+  - reindeer_workflow
+  - transcription_workflow
 
 - title: "Advanced Topics"
   navbar: ~
   contents:
-  - transcription_workflow
   - simulation-infrastructure
+  - query_benchmarks
