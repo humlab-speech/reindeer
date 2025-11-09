@@ -30,3 +30,8 @@ vignettes/*.pdf
 
 /.quarto/
 .DS_Store
+
+# Compiled files
+*.o
+*.so
+*.dylib
