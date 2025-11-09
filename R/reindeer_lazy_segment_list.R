@@ -22,8 +22,11 @@
 #' print(lazy_segs)  # Shows preview
 #' }
 
+#' @noRd
 library(S7)
 
+#' S7 class for lazy segment lists
+#' @name lazy_segment_list
 #' @export
 lazy_segment_list <- S7::new_class(
   "lazy_segment_list",
@@ -244,6 +247,9 @@ apply_descend_transform <- function(sql, level) {
 # ==============================================================================
 
 #' Print method for lazy_segment_list
+#' @param x lazy_segment_list object
+#' @param ... Additional arguments (unused)
+#' @name print.lazy_segment_list
 S7::method(print, lazy_segment_list) <- function(x, ...) {
   cli::cli_rule(
     left = cli::style_bold("lazy_segment_list"),
@@ -321,6 +327,9 @@ S7::method(print, lazy_segment_list) <- function(x, ...) {
 }
 
 #' Summary method for lazy_segment_list
+#' @param object lazy_segment_list object
+#' @param ... Additional arguments (unused)
+#' @name summary.lazy_segment_list
 S7::method(summary, lazy_segment_list) <- function(object, ...) {
   if (object@materialized && !is.null(object@cache)) {
     cli::cli_h1("Lazy Segment List (Materialized)")

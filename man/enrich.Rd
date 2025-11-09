@@ -95,5 +95,5 @@ corp \%>\% enrich(.using = superassp::forest, .parallel = FALSE)
 
 }
 \seealso{
-\code{\link[=quantify]{quantify()}}, \code{\link[=peek_signals]{peek_signals()}}
+\code{\link[=quantify]{quantify()}}
 }

@@ -187,13 +187,15 @@ bundle_list <- S7::new_class(
 #' @description 
 #' Subset corpus to get bundle list with metadata
 #' 
+#' Extract bundles from corpus using bracket notation
 #' @param x corpus object
 #' @param i session pattern (regex or literal)
 #' @param j bundle pattern (regex or literal)
+#' @param ... Additional arguments (unused)
+#' @param drop Logical; unused (for S3 compatibility)
 #' @return bundle_list object (tibble with session, bundle, and metadata columns)
+#' @name [.corpus
 #' @export
-#' 
-
 S7::method(`[`, corpus) <- function(x, i, j, ..., drop = FALSE) {
   # Handle various indexing patterns
   session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"
@@ -233,7 +235,9 @@ S7::method(`[`, corpus) <- function(x, i, j, ..., drop = FALSE) {
 #' @param x corpus object
 #' @param i session pattern
 #' @param j bundle pattern
+#' @param ... Additional arguments (unused)
 #' @param value Either a named list (metadata) or character vector (media files)
+#' @name [<-.corpus
 #' @export
 S7::method(`[<-`, corpus) <- function(x, i, j, ..., value) {
   # Determine what type of assignment this is
@@ -255,6 +259,9 @@ S7::method(`[<-`, corpus) <- function(x, i, j, ..., value) {
 # ==============================================================================
 
 #' Print method for corpus with tidyverse-style formatting
+#' @param x corpus object
+#' @param ... Additional arguments (unused)
+#' @name print.corpus
 S7::method(print, corpus) <- function(x, ...) {
   cli::cli_h1("{.cls corpus}: {.field {x@dbName}}")
   
@@ -331,6 +338,9 @@ S7::method(print, corpus) <- function(x, ...) {
 }
 
 #' Summary method for corpus - comprehensive database overview
+#' @param object corpus object
+#' @param ... Additional arguments (unused)
+#' @name summary.corpus
 S7::method(summary, corpus) <- function(object, ...) {
   con <- get_corpus_connection(object)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -528,6 +538,10 @@ glimpse_corpus_impl <- function(x, ...) {
 }
 
 #' Print method for bundle_list with tidyverse-style formatting
+#' @param x bundle_list object
+#' @param ... Additional arguments (unused)
+#' @param n Number of rows to show
+#' @name print.bundle_list
 S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
   if (is.null(n)) {
     n <- getOption("pillar.print_max", 10)

@@ -740,12 +740,19 @@ get_metadata_diagnostics_internal <- function(con, db_uuid) {
 
 #' Set metadata for corpus, session, or bundle with validation
 #'
-#' mycorpus["Session1", "Bundle1"] <- list(Age = 25, Sex = "Male")
-#' 
+#' @description
+#' Assign metadata values to a corpus, session, or bundle using bracket notation.
+#'
 #' @param x A corpus object
 #' @param i Session name (optional)
 #' @param j Bundle name (optional)
 #' @param value Named list of metadata values
+#'
+#' @examples
+#' \dontrun{
+#' mycorpus["Session1", "Bundle1"] <- list(Age = 25, Sex = "Male")
+#' }
+#'
 #' @export
 `[<-.corpus` <- function(x, i = NULL, j = NULL, value) {
   

@@ -6,6 +6,11 @@
 \usage{
 quantify(object, ...)
 }
+\arguments{
+\item{object}{The object to quantify}
+
+\item{...}{Additional arguments passed to methods}
+}
 \description{
 Quantify generic - Apply DSP to segments
 }

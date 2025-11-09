@@ -49,7 +49,7 @@
 #' corp %>% enrich(.using = superassp::forest, .parallel = FALSE)
 #' }
 #' 
-#' @seealso [quantify()], [peek_signals()]
+#' @seealso [quantify()]
 #' @export
 enrich <- function(corpus_obj, .using, ..., 
                    .metadata_fields = c("Gender", "Age"),

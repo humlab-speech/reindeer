@@ -32,8 +32,11 @@
 #' result <- quantify(segs, dsp_function)
 #' }
 
+#' @noRd
 library(S7)
 
+#' S7 class for segment lists
+#' @name segment_list
 #' @export
 segment_list <- S7::new_class(
   "segment_list",
@@ -113,6 +116,11 @@ segment_list <- S7::new_class(
 # ==============================================================================
 
 #' Print method for segment_list with pillar formatting
+#' @param x The segment_list object
+#' @param ... Additional arguments (unused)
+#' @param n Number of rows to show
+#' @param width Width of the printed table
+#' @name print.segment_list
 S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
   # Determine number of rows to show
   if (is.null(n)) {
@@ -171,6 +179,9 @@ S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
 }
 
 #' Summary method for segment_list
+#' @param object The segment_list object
+#' @param ... Additional arguments (unused)
+#' @name summary.segment_list
 S7::method(summary, segment_list) <- function(object, ...) {
   cli::cli_h1("Segment List Summary")
 
@@ -385,9 +396,10 @@ extended_segment_list <- S7::new_class(
 #' Print method for extended_segment_list with pillar formatting
 #'
 #' @param x The object.
-#' @param ...
+#' @param ... Additional arguments (unused)
 #' @param n The number of rows to show
 #' @param width The width of the printed table.
+#' @name print.extended_segment_list
 #'
 S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = NULL) {
   # Determine number of rows to show
@@ -457,6 +469,9 @@ S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = N
 }
 
 #' Summary method for extended_segment_list
+#' @param object The extended_segment_list object
+#' @param ... Additional arguments (unused)
+#' @name summary.extended_segment_list
 S7::method(summary, extended_segment_list) <- function(object, ...) {
   cli::cli_h1("Extended Segment List Summary")
 
@@ -598,6 +613,9 @@ is_extended_segment_list <- function(x) {
 }
 
 #' Quantify generic - Apply DSP to segments
+#' @param object The object to quantify
+#' @param ... Additional arguments passed to methods
+#' @name quantify
 #' @export
 quantify <- S7::new_generic("quantify", "object")
 
@@ -643,6 +661,7 @@ quantify <- S7::new_generic("quantify", "object")
 #' formants <- quantify(segs, superassp::forest, .use_cache = TRUE, .cache_format = "rds")
 #' }
 #'
+#' @name quantify.segment_list
 #' @export
 S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .at = NULL,
