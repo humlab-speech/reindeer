@@ -195,7 +195,6 @@ bundle_list <- S7::new_class(
 #' @param drop Logical; unused (for S3 compatibility)
 #' @return bundle_list object (tibble with session, bundle, and metadata columns)
 #' @name [.corpus
-#' @export
 S7::method(`[`, corpus) <- function(x, i, j, ..., drop = FALSE) {
   # Handle various indexing patterns
   session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"

@@ -662,7 +662,6 @@ quantify <- S7::new_generic("quantify", "object")
 #' }
 #'
 #' @name quantify.segment_list
-#' @export
 S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .at = NULL,
                                                 .use_metadata = TRUE,
