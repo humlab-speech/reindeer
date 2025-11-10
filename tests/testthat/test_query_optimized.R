@@ -124,7 +124,7 @@ describe("Boolean Operations", {
   test_that("disjunction works in ask_for", {
     # Test that our implementation handles disjunction correctly
     result <- ask_for(ae_path, "[Phonetic == t | Phonetic == k]")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     expect_gt(nrow(result), 0)
     
     # Should have results from both queries
@@ -143,7 +143,7 @@ describe("Function Queries", {
     # Note: Position functions may have different counting logic
     # Test that it at least executes without error
     result <- ask_for(ae_path, "Start(Syllable, Phoneme) == 1")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     # Should return some results (exact count may differ from emuR)
     # expect_query_equivalent("Start(Syllable, Phoneme) == 1", ae_path, ae)
   })
@@ -151,7 +151,7 @@ describe("Function Queries", {
   test_that("End function works", {
     # Note: Position functions may have different counting logic
     result <- ask_for(ae_path, "End(Syllable, Phoneme) == 1")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     # Should return some results (exact count may differ from emuR)
     # expect_query_equivalent("End(Syllable, Phoneme) == 1", ae_path, ae)
   })
@@ -173,13 +173,14 @@ describe("Edge Cases", {
     expect_query_equivalent("[Phoneme == xyz -> Phoneme == abc]", ae_path, ae)
   })
   
-  test_that("queries return proper emuRsegs object", {
+  test_that("queries return proper segment_list object", {
     result <- ask_for(ae_path, "Phonetic == t")
-    expect_s3_class(result, "emuRsegs")
+    # Result should be segment_list (S7 class) or emuRsegs (for backwards compatibility)
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     expect_s3_class(result, "data.frame")
-    
+
     # Check for required columns
-    expected_cols <- c("labels", "start", "end", "session", "bundle", 
+    expected_cols <- c("labels", "start", "end", "session", "bundle",
                       "level", "attribute", "start_item_id", "end_item_id",
                       "type", "sample_start", "sample_end", "sample_rate")
     expect_true(all(expected_cols %in% names(result)))
@@ -197,7 +198,7 @@ describe("Edge Cases", {
   test_that("wildcard patterns work", {
     # Test regex patterns if supported
     result <- ask_for(ae_path, "Phonetic =~ .*")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     expect_gt(nrow(result), 0)
   })
   
@@ -269,7 +270,7 @@ describe("Database Path Handling", {
   
   test_that("works with path string", {
     result <- ask_for(ae_path, "Phonetic == t")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     expect_gt(nrow(result), 0)
   })
   
@@ -301,7 +302,7 @@ describe("Complex Multi-Level Queries", {
     # Complex query with both operators
     # Note: Some complex nested queries may have parsing differences
     result <- ask_for(ae_path, "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
   })
   
   test_that("multiple projections work", {
@@ -314,7 +315,7 @@ describe("Complex Multi-Level Queries", {
     # Multiple sequence operators
     # Note: Long chains may have different behavior
     result <- ask_for(ae_path, "[Phoneme == n -> Phoneme == t]")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
   })
 })
 
@@ -326,14 +327,14 @@ describe("Boundary Conditions", {
   test_that("handles single-item results", {
     # Query that might return very few results
     result <- ask_for(ae_path, "Word == absolutely")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     # Should work even if result is empty or has only 1 row
   })
   
   test_that("handles queries on EVENT levels", {
     # EVENT types have different timing characteristics
     result <- ask_for(ae_path, "Tone =~ .*")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     if (nrow(result) > 0) {
       expect_equal(result$type[1], "EVENT")
     }
@@ -341,7 +342,7 @@ describe("Boundary Conditions", {
   
   test_that("handles queries on ITEM levels", {
     result <- ask_for(ae_path, "Phoneme == n")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     if (nrow(result) > 0) {
       expect_equal(result$type[1], "ITEM")
     }
@@ -349,7 +350,7 @@ describe("Boundary Conditions", {
   
   test_that("handles queries on SEGMENT levels", {
     result <- ask_for(ae_path, "Phonetic == t")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
     if (nrow(result) > 0) {
       expect_equal(result$type[1], "SEGMENT")
     }
@@ -370,7 +371,7 @@ describe("Query Language Edge Cases", {
     # Test that regex metacharacters are handled correctly
     expect_no_error(ask_for(ae_path, "Phonetic =~ [tkp]"))
     result <- ask_for(ae_path, "Phonetic =~ [tkp]")
-    expect_s3_class(result, "emuRsegs")
+    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
   })
   
   test_that("handles multiple attributes", {
