@@ -19,7 +19,7 @@ extract_samples(
 \arguments{
 \item{emuDBhandle}{The database handle.}
 
-\item{seglist}{A segment list (resulting from a call of \link{query}) which should
+\item{seglist}{A segment list (resulting from a call of \link[emuR:query]{emuR::query}) which should
 be used as a cut list.}
 
 \item{output.directory}{The directory where all extracted parts of the
@@ -46,7 +46,7 @@ the output file name.}
 }
 \description{
 This function enables the user to extract parts of speech recordings based on
-a segment list (resulting from a call of \link{query}). The extracted parts will
+a segment list (resulting from a call of \link[emuR:query]{emuR::query}). The extracted parts will
 be named by the segment label, the first sample, last sample extracted, as
 well as the sample rate of the original media file. The user can also append
 metadata fields to the file file name following the segment label. The

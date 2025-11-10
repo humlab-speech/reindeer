@@ -1,0 +1,29 @@
+{
+  "project": {
+    "name": "Speech Research Project",
+    "description": "A project studying speech patterns",
+    "acronym": "SRP",
+    "startDate": "2020-01-01",
+    "endDate": "2024-12-31",
+    "website": "https://project.example.com"
+  },
+  "funding": {
+    "funder": "National Science Foundation",
+    "grantNumber": "NSF-12345",
+    "amount": "500000",
+    "currency": "USD"
+  },
+  "team": [
+    {
+      "name": "Principal Investigator Name",
+      "role": "PI",
+      "affiliation": "University of Example",
+      "email": "pi@example.edu"
+    },
+    {
+      "name": "Co-Investigator Name",
+      "role": "Co-PI",
+      "affiliation": "University of Example"
+    }
+  ]
+}

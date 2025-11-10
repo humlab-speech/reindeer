@@ -1,0 +1,17 @@
+{
+  "participant": {
+    "id": "P001",
+    "age": 25,
+    "gender": "Female"
+  },
+  "recording": {
+    "date": "2023-09-15",
+    "stimulus": "Reading passage A",
+    "repetition": 1
+  },
+  "annotation": {
+    "annotator": "JD",
+    "annotation_date": "2023-10-01",
+    "quality": "high"
+  }
+}

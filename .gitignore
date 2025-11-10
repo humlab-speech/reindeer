@@ -26,4 +26,12 @@ vignettes/*.pdf
 *.knit.md
 # R Environment Variables
 .Renviron
+**/.DS_Store
+
+/.quarto/
 .DS_Store
+
+# Compiled files
+*.o
+*.so
+*.dylib

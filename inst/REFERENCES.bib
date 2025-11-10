@@ -281,3 +281,37 @@ author = {Boersma, Paul and Weenink, David},
 title = {{Praat: doing phonetics by computer [Computer program]}},
 url = {http://www.praat.org/}
 }
+
+
+
+@article{Bredin.2021,
+year = {2021},
+title = {{End-to-end speaker segmentation for overlap-aware resegmentation}},
+author = {Bredin, Hervé and Laurent, Antoine},
+journal = {arXiv},
+eprint = {2104.04045},
+abstract = {{Speaker segmentation consists in partitioning a conversation between one or more speakers into speaker turns. Usually addressed as the late combination of three sub-tasks (voice activity detection, speaker change detection, and overlapped speech detection), we propose to train an end-to-end segmentation model that does it directly. Inspired by the original end-to-end neural speaker diarization approach (EEND), the task is modeled as a multi-label classification problem using permutation-invariant training. The main difference is that our model operates on short audio chunks (5 seconds) but at a much higher temporal resolution (every 16ms). Experiments on multiple speaker diarization datasets conclude that our model can be used with great success on both voice activity detection and overlapped speech detection. Our proposed model can also be used as a post-processing step, to detect and correctly assign overlapped speech regions. Relative diarization error rate improvement over the best considered baseline (VBx) reaches 17\% on AMI, 13\% on DIHARD 3, and 13\% on VoxConverse.}},
+}
+
+
+@article{Bredin.2019,
+year = {2019},
+title = {{pyannote.audio: neural building blocks for speaker diarization}},
+author = {Bredin, Hervé and Yin, Ruiqing and Coria, Juan Manuel and Gelly, Gregory and Korshunov, Pavel and Lavechin, Marvin and Fustes, Diego and Titeux, Hadrien and Bouaziz, Wassim and Gill, Marie-Philippe},
+journal = {arXiv},
+eprint = {1911.01255},
+abstract = {{We introduce pyannote.audio, an open-source toolkit written in Python for speaker diarization. Based on PyTorch machine learning framework, it provides a set of trainable end-to-end neural building blocks that can be combined and jointly optimized to build speaker diarization pipelines. pyannote.audio also comes with pre-trained models covering a wide range of domains for voice activity detection, speaker change detection, overlapped speech detection, and speaker embedding -- reaching state-of-the-art performance for most of them.}},
+keywords = {}
+}
+
+@misc{EAF_v3.0_MPI_2017,
+  author = {{The Language Archive} and {Max Planck Institute for Psycholinguistics}},
+  title = {{ELAN Annotation Format (EAF): Schema version 3.0}},
+  year = {2017},
+  month = {January},
+  note = {Document last modified: 11 January 2017},
+  howpublished = {Technical Specification},
+  organization = {Max Planck Institute for Psycholinguistics},
+  address = {Nijmegen, The Netherlands},
+  url = {http://www.mpi.nl/tools/elan/EAF_Annotation_Format_3.0_and_ELAN.pdf}
+}

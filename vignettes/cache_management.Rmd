@@ -1,0 +1,287 @@
+---
+title: "Cache Management in reindeer"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Cache Management in reindeer}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE  # Don't evaluate code chunks during vignette build
+)
+```
+
+## Introduction
+
+The **reindeer** package uses intelligent caching to dramatically speed up computationally intensive operations like signal processing, metadata queries, and draft annotation generation. However, these caches can grow large over time. This vignette shows you how to monitor and manage your caches effectively.
+
+## Cache Types
+
+Reindeer uses three types of caches:
+
+1. **Quantify/Enrich Cache** (`.quantify_cache/`): Stores results from `quantify()` and `enrich()` operations
+2. **Draft Annotation Cache** (`.draft_cache/`): Stores draft annotations from functions like `draft_momel_intsint()`
+3. **Simulation Cache** (user-specified): Stores results from `quantify_simulate()` and `enrich_simulate()`
+
+All caches use the high-performance **qs** package for fast serialization, providing:
+
+- 3-4x faster read/write compared to base R
+- ~50% smaller file sizes
+- Better handling of complex R objects
+
+## The `manage_cache()` Function
+
+The `manage_cache()` function provides a unified interface for all cache operations.
+
+### Basic Usage
+
+```{r}
+library(reindeer)
+
+# Load your corpus
+corp <- corpus("path/to/your_db_emuDB")
+
+# Check cache status (default action)
+manage_cache(corp)
+```
+
+This displays:
+- Size of each cache type
+- Warnings if caches exceed thresholds
+- Total cache size across all types
+
+### Listing Cache Files
+
+To see what's taking up space:
+
+```{r}
+# List all cache files, sorted by size
+manage_cache(corp, action = "list")
+
+# List only draft annotation caches
+manage_cache(corp, action = "list", cache_type = "draft")
+
+# List only quantify/enrich caches
+manage_cache(corp, action = "list", cache_type = "quantify")
+```
+
+Output example:
+```
+── Cache Files ─────────────────────────────────────
+
+Found 15 cache files:
+
+momel_intsint_20251020.sqlite (245.67 MB) [draft]
+forest_results.qs (123.45 MB) [quantify]
+ksvF0_results.qs (98.32 MB) [quantify]
+...
+
+─────────────────────────────────────────────────────
+Total: 1.23 GB
+```
+
+### Cleaning Old Caches
+
+Before deleting files, always preview with dry run (default):
+
+```{r}
+# Preview what would be deleted (safe - doesn't actually delete)
+manage_cache(corp, action = "clean", days_old = 30)
+```
+
+This shows you:
+- Which files would be deleted
+- How much space would be freed
+- Files are NOT actually deleted
+
+When you're ready to clean:
+
+```{r}
+# Actually delete files older than 30 days
+manage_cache(corp, action = "clean", days_old = 30, dry_run = FALSE)
+
+# More aggressive: delete files older than 7 days
+manage_cache(corp, action = "clean", days_old = 7, dry_run = FALSE)
+```
+
+## Cache Size Warnings
+
+Reindeer automatically warns you when caches grow large:
+
+**Warning Thresholds:**
+- Quantify/Draft caches: 500 MB (warning), 2 GB (critical)
+- Simulation caches: 1 GB (warning), 5 GB (critical)
+
+You'll see warnings like:
+```
+! Draft annotation cache is large: 1.25 GB (threshold: 500.00 MB)
+ℹ Consider running: manage_cache(corp, action = "clean", days_old = 30)
+```
+
+## Advanced Cache Management
+
+### Checking Specific Cache Types
+
+```{r}
+# Check only quantify cache size
+check_quantify_cache_size(corp)
+
+# Check only draft cache size
+check_draft_cache_size(corp)
+
+# Check all caches with detailed breakdown
+check_all_cache_sizes(corp)
+```
+
+### Cleaning Specific Cache Types
+
+```{r}
+# Clean only quantify caches
+clean_quantify_cache(corp, days_old = 30)
+
+# Clean only draft caches
+clean_draft_cache(corp, days_old = 30)
+
+# Clean all caches at once
+clean_all_caches(corp, days_old = 30, dry_run = FALSE)
+```
+
+### Inspecting Cache Contents
+
+For simulation caches, you can list available simulations:
+
+```{r}
+# List all simulation caches
+list_simulations(simulation_store = "path/to/simulations")
+
+# Retrieve specific simulation results
+results <- reminisce(
+  simulation_store = "path/to/simulations",
+  .using = "forest",
+  nominalF1 = 500
+)
+```
+
+## Best Practices
+
+### 1. Regular Monitoring
+
+Add cache checks to your workflow:
+
+```{r}
+# At the start of your analysis session
+corp <- corpus("path/to/db_emuDB")
+manage_cache(corp, action = "status")
+```
+
+### 2. Clean Periodically
+
+Set up a monthly cleaning routine:
+
+```{r}
+# First Monday of each month
+manage_cache(corp, action = "clean", days_old = 60, dry_run = FALSE)
+```
+
+### 3. Balance Speed vs Space
+
+- **Keep recent caches**: Speeds up iterative analysis
+- **Delete old caches**: Free up disk space
+- **Recommended**: Keep 30-60 days of caches
+
+### 4. Simulation Caches
+
+Simulation caches can grow very large. Be more aggressive:
+
+```{r}
+# Clean simulations older than 14 days
+clean_simulation_cache("path/to/simulations", days_old = 14, dry_run = FALSE)
+```
+
+## Understanding Cache Invalidation
+
+Caches are automatically invalidated when:
+
+1. **Signal files change**: File modification time is tracked
+2. **Parameters change**: Different DSP parameters create new cache entries
+3. **Function changes**: Cache uses function name + parameter hash as key
+
+You never need to manually clear caches unless you want to free space.
+
+## Cache Storage Locations
+
+All caches are stored within your database directory:
+
+```
+your_db_emuDB/
+├── .quantify_cache/       # Quantify/enrich results
+│   ├── result_abc123.qs
+│   └── result_def456.qs
+├── .draft_cache/          # Draft annotations
+│   ├── momel_intsint_20251020.sqlite
+│   └── momel_intsint_20251019.sqlite
+└── _emuDBcache.sqlite     # Main database cache
+```
+
+Simulation caches are stored in user-specified locations (often outside the database).
+
+## Troubleshooting
+
+### Cache is too large
+
+```{r}
+# Check what's using space
+manage_cache(corp, action = "list")
+
+# Clean aggressively
+manage_cache(corp, action = "clean", days_old = 7, dry_run = FALSE)
+```
+
+### Want to clear all caches
+
+```{r}
+# Nuclear option: delete all cache directories
+# WARNING: This will slow down your next analysis
+clean_all_caches(corp, days_old = 0, dry_run = FALSE)
+```
+
+### Cache corruption
+
+If you suspect cache corruption:
+
+```{r}
+# Delete suspicious cache files manually
+unlink(file.path(corp@basePath, ".quantify_cache"), recursive = TRUE)
+
+# Or rebuild from scratch
+# Caches will be regenerated on next use
+```
+
+## Performance Tips
+
+1. **Use qs format**: Already enabled by default in recent versions
+2. **Parallel processing**: Speeds up both computation and cache creation
+3. **Batch operations**: Process multiple segments at once for better caching
+4. **Monitor size**: Run `manage_cache(corp)` regularly
+
+## Summary
+
+| Task | Command |
+|------|---------|
+| Check cache status | `manage_cache(corp)` |
+| List cache files | `manage_cache(corp, action = "list")` |
+| Preview cleanup | `manage_cache(corp, action = "clean", days_old = 30)` |
+| Actually clean | `manage_cache(corp, action = "clean", days_old = 30, dry_run = FALSE)` |
+
+The cache system in **reindeer** is designed to be transparent and automatic, but with `manage_cache()`, you have full control when you need it.
+
+## See Also
+
+- `?manage_cache` - Function documentation
+- `?quantify` - Learn about signal quantification
+- `?draft_momel_intsint` - Learn about draft annotations
+- `vignette("simulation-infrastructure")` - Learn about simulation caching

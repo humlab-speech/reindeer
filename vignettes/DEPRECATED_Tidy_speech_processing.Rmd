@@ -1,0 +1,216 @@
+---
+title: "Tidy speech processing"
+author: "Fredrik Karlsson"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Tidy speech processing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+The purpose of this document is to present the tidy work with speech databases that is fascilitated by the `reindeer` package.
+
+## What is a speech database?
+
+Whenever we refer to a speech database in this document, we refer to a database set up according to the Emu Speech Database Management System standards. A database *handle* is a reference of some sort to the location of the base directory of an EmuR database. That is, it can be the full path to a `<database name>_emuDB` directory, of an `emuDBhandle` created by explicitly making a connection between the database on disc and something in memory using [emuR::load_emuDB].
+
+The advantages of using a path is that it is directly usable again when you save a session, does not require the additional step of explicit loading, and avoids the burden for the you of having to keep apart two names for what are actually the same thing.
+
+The disadvantage of using the path, and therefore the advantage of using `emuDBhandle` objects, is that the code may run *a bit* faster as the functions discussed here then do not have to attach the database themselves. In actual practice, however, the speedup of using pre-loaded database handles is not sufficient in isolation to warrant their use.
+
+## Databasing
+
+Like most gardens, a speech corpus will grow unwieldy and unstructured if not managed properly. A database will have three basic kinds of `things` in them that should be kept organized:
+
+1)  The original speech registrations. Usually, these files are simply sound (`wav`) files, but may also be other kinds of registrations that happened as the audio recording was made (and in the same sampling intervals as the audio recording). If an electroglottograph is used, for instance, the EGG track may be recorded in the same file as the audio recording, in a separate channel or into a different file. Other examples may be airflow readings from oral and nasal openings. If one wants to reason about how to refer to and distinguish between things on this list, speech registrations stand out as not being possible to acquire again with the exact same result.
+
+2)  Metadata for the speech registration. These may be the partcipant ID in the study, the gender and age of the participant, a geographical note on where the recording was made (e.g. a placename or a latitude and longitude coordinate pair), the condition the participant was in (such as any treatment the participant was under or which sets of instructions they were given), and any such important information. The most usual case is that metadata describes an entire recording, which is usually a *Session* in Emu-SDMS terminology since that allows for structured recordings of sub-tasks into separate speech registration files ( *Bundles* in Emu-SDMS terminology). It is, however, possible to view a *Session* directory as an organizational unit in which all follow-up recordings of a participant is stored in separate *Bundles*, although this is a slightly less flexible structure model. Either way, individual *Bundles* may be given unique additional metadata properties that adds to or overwrites the description given for the entire *Session*. As a special case, metadata may also be the place where summative information on the speech registration / recording is stored, such as amplitude calibration information or voice quality quantification (.e.g the AVQI) across the entire session.
+
+3)  Derived signal descriptions. These are most often in the form of SSFF[^1] files, which then summarize some property of the original speech registration in time windows with certain time intervals between them. There are many instances of derived signal tracks, but the most frequently used are estimates of fundamental frequency, formants, or speech signal amplitude in each portion of the signal. Each signal processing algorithm used by [reindeer] to compute these signals take a *windowShift* argument that determines how often an estimate is made (in ms, and usually every 10 or 5 ms of the signal) and often also a *windowSize* parameter that determines how much of the portion of the signal surrounding the window will be included when computing the property. Thus, the a value may be computed every 5ms of the audio recording but include an additional 10ms before and after the window to make the computation (that is, actually consult 25ms of the speech recording) and capture slow moving properties better even if estimated often.
+
+4)  Derived quantifications that makes less sense to compute every 5 ms, 10 ms, or so, and using a pre-determined time window. Some algorithm may only make sense to apply on a single production, such a sustained vowel, and therefore does not fit well with the usual derived signals specification described in 3). And it may be that you would like to describe and store a set of summative acoustic properties, but you do not know beforehand where the most robust estimated would be obtained (disregard the first 1s, 0.5s, or how much, and how much of a sustained vowel production to include) and then would like to the values computed from multiple possily overlaping portions of the speech signal.
+
+5)  Simple information that relates to just a portion of the speech signal. These may be manually added or determinated by algorithm. Regardless of how the information was obtained, the annotation may be tied to the portion of the speech registration (a *Segment*), just be tied to a single point in time (an *Event*), or store a higher level description of one or more time-bound (e.g. stored in *Segments* or *Events*) information (an *Item* ). An *Item* can be useful for grouping words that belong to a single utterance together by their mutual link to the *Item*, or annotating theoretical or other categories information related to *Segments* or *Events*. An *Item* needs *Segments* (or, less commonly, *Events*) to aquire time information so that they can be used in conjunction with the speech registration or derived signals of most kinds.
+
+[^1]: Simple Signal File Format
+
+We can get an overview of most of these types of files in a database using the syntax below. Please note that we are using one of the example databases included in the [emuR] package for this, so there are just a few files in there.
+
+```{r The listing of a database using EmuR syntax, echo=FALSE}
+library(reindeer)
+#Load the 'ae' example database and attach some made up metadata to the bundles
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db(verbose = FALSE) -> ae 
+#This database handle stores also the full path to the actual database
+reindeer:::add_dummy_metadata(ae)
+
+#List defined signal tracks
+list_ssffTrackDefinitions(ae)
+
+
+#List all files 
+list.files(ae$basePath,recursive = TRUE,include.dirs = TRUE)
+
+
+```
+
+## The structure of a reindeer (emuR) database
+
+The reindeer package allow you to use a new syntax that is aligned with the [tidyverse](https://www.tidyverse.org) structured way of managing data. The reindeer package is however not fully developed yet, and many times relies on functions in the [emuR] package to do the heavy lifting, so the below examples show the use of both manners to achieve the same result.
+
+If want to acquaint ourselves with a database, we may want to have a look at what is inside. You can [reindeer::peek_at] one of
+
+levels
+
+:   This result in a listing of transcription levels and their associated attributes in the database
+
+attributes
+:   All levels have at least one *attribute* associated with them, but may have more if you want to encode different kinds of information for one label. 
+
+links
+:   An overview of how the levels are linked together to form the database hierarchy.
+
+tracks
+:   The derived signal tracks defined for the database. 
+
+sessions
+:   The sessions / session directories stored in the database. These may contain 
+bundles
+:   
+perspectives
+
+files
+ 
+local_lg
+global_lg : Label groups may be defined globally or local to a attribute of a level, and listed by peeking at them.
+
+```{r The listing of a database using tidyspeech (reindeer) syntax, echo=FALSE }
+library(magrittr)
+ae |> 
+  peek_at("sessions") %T>% ## The magrittr pipes also works with the verbs, if that package is loaded of course
+  print() %>%
+  peek_bundles() %T>%
+  print() |>
+  peek_levels()
+  
+```
+
+## Setting up a database
+
+Once a directory for the database is set up and we have added some files to it, the usual step is to [furnish] the database with some derived signal files that we may want to see in the interface while making manual annotations of it.
+
+Below we estimate fundamental frequency using two different digital processing algorithms, and one formant track with frequencies and bandwidths. We use a couple of equivalent syntaxes to do so, just to show how the verbs can be piped together. 
+
+```{r Furnishing the database with some initial signal tracks }
+library(dplyr)
+library(superassp)
+
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db(verbose = FALSE) -> ae
+
+#TODO: explicitExt ses inte längre som ett argument till forest
+logger::log_threshold(logger::INFO)
+
+furnish(ae,forest,FORMANTS2="fm","bw","fm",explicitExt="fm2",nominalF1=533,.force=TRUE, .really_force=TRUE,.parameter_log_excel = "~/Desktop/1.xlsx",.recompute = TRUE) 
+#|>
+#furnish("fms")
+
+```
+
+
+
+```{r Transcription level initiation}
+reindeer:::unlink_emuRDemoDir()
+reindeer:::create_ae_db(verbose = FALSE) -> ae
+
+ae |>
+    tier("Comments1",tier_type="s",parent=NULL) |>
+    tier("Comments1",tier_type="s",parent=NULL) |>
+    tier("Comments2",tier_type="e",parent="Comments1") |>
+    tier("Comments3",tier_type="i",parent="Comments2") 
+    
+
+
+```
+
+# Using the database
+
+
+## Ask for segments and then use thos as points of reference to move around
+
+
+
+```{r How to make simple queries}
+library(magrittr)
+
+ae |>
+  ask_for("Phonetic = V") |>
+  ascend_to("Word") |>
+  scout(steps_forward = 1, capture = 2) -> words
+
+words |>
+  descend_to("Phonetic") %T>%
+  print(.) -> segments_following
+  
+
+
+```
+
+## Ask for acoustic measurement data associated with the segments
+
+```{r Accessing data from a pre-computed track}
+
+segments_following |>
+  quantify("fm", .where=0.5, .n_preceeding=2,.n_following=1) 
+
+```
+
+
+```{r Acquiring track data on the fly for segments}
+
+segments_following |>
+  quantify(forest, windowShift=5,nominalF1 = 522,.recompute = FALSE, .naively = TRUE,.parameter_log_excel="~/Desktop/forest.xlsx",.cache_file=TRUE) |>
+  glimpse()
+
+```
+
+
+```{r Using quantify to acquire summary acoustic data}
+
+segments_following |>
+  quantify(praat_voice_report,.parameter_log_excel="~/Desktop/vt.xlsx",.cache_file=TRUE) 
+
+
+
+```
+
+# Computed-aided annotation
+
+```{r}
+
+ae |>
+  ask_for("Utterances != ''") |>
+  suggest(.algorithm=annotate_INTSINT_MOMEL) |>
+  annotate()
+```
+
+
+```{r}
+
+ae |> 
+  ask_for()
+
+
+```
+
+

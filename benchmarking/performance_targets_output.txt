@@ -1,0 +1,193 @@
+Registered S3 methods overwritten by 'superassp':
+  method                from  
+  as_tibble.AsspDataObj wrassp
+  print.AsspDataObj     wrassp
+Registered S3 method overwritten by 'quantmod':
+  method            from
+  as.zoo.data.frame zoo 
+Optimized EQL query implementation loaded successfully!
+Usage: result <- ask_for(emuDB, 'Phonetic == t')  # or query() as alias
+
+Supported EQL features:
+  - Simple queries: Level == value, Level != value
+  - Regex queries: Level =~ pattern, Level !~ pattern
+  - Attributes: Level:Attribute == value
+  - Sequence: [Level == a -> Level == b]
+  - Dominance: [Level1 == a ^ Level2 == b]
+  - Projection: #Level marks the side to return
+  - Conjunction: [query1 & query2]
+  - Disjunction: [query1 | query2]
+  - Position functions: Start(parent, child), End(parent, child), Medial(parent, child)
+  - Count function: Num(parent, child) >= n
+
+Returns: segment_list object (compatible with emuR::query results)
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ readr     2.1.5
+✔ lubridate 1.9.4     ✔ stringr   1.5.2
+✔ purrr     1.1.0     ✔ tibble    3.3.0
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ data.table::between() masks dplyr::between()
+✖ dplyr::filter()       masks stats::filter()
+✖ data.table::first()   masks dplyr::first()
+✖ lubridate::hour()     masks data.table::hour()
+✖ lubridate::isoweek()  masks data.table::isoweek()
+✖ dplyr::lag()          masks stats::lag()
+✖ data.table::last()    masks dplyr::last()
+✖ lubridate::mday()     masks data.table::mday()
+✖ lubridate::minute()   masks data.table::minute()
+✖ lubridate::month()    masks data.table::month()
+✖ lubridate::quarter()  masks data.table::quarter()
+✖ lubridate::second()   masks data.table::second()
+✖ purrr::transpose()    masks data.table::transpose()
+✖ lubridate::wday()     masks data.table::wday()
+✖ lubridate::week()     masks data.table::week()
+✖ lubridate::yday()     masks data.table::yday()
+✖ lubridate::year()     masks data.table::year()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Loading required package: future
+Warning message:
+Objects listed as exports, but not present in namespace:
+• add_attrDefLabelGroup
+• add_attributeDefinition
+• add_labelGroup
+• add_linkDefinition
+• add_ssffTrackDefinition
+• autobuild_linkFromTimes
+• bark
+• create_emuDB
+• create_itemsInLevel
+• create_links
+• delete_itemsInLevel
+• duplicate_level
+• get_legalLabels
+• get_levelCanvasesOrder
+• get_signalCanvasesOrder
+• get_trackdata
+• list_attrDefLabelGroups
+• list_attributeDefinitions
+• list_bundles
+• list_files
+• list_labelGroups
+• list_linkDefinitions
+• list_perspectives
+• list_sampleRates
+• list_sessions
+• list_ssffTrackDefinitions
+• load_emuDB
+• mel
+• query
+• read_bundleList
+• remove_attrDefLabelGroup
+• remove_attributeDefinition
+• remove_labelGroup
+• remove_legalLabels
+• remove_linkDefinition
+• remove_perspective
+• remove_ssffTrackDefinition
+• rename_bundles
+• rename_emuDB
+• replace_itemLabels
+• requery_hier
+• requery_seq
+• serve
+• set_legalLabels
+• set_levelCanvasesOrder
+• set_signalCanvasesOrder
+• write_bundleList 
+
+── Performance Target Verification ─────────────────────────────────────────────
+
+
+── Setup ──
+
+✔ Test database loaded
+
+
+── Target 1: Lazy Query Chain Building ──
+
+Target: < 1ms overhead per operation
+
+! Lazy evaluation not yet implemented - skipping tests
+
+
+── Target 2: Lazy Materialization Performance ──
+
+Target: No slower than immediate execution
+
+
+
+── Target 3: Simple Queries with data.table ──
+
+Target: 50%+ faster than base implementation
+
+ℹ emuR::query: "10.78 ms"
+ℹ ask_for: "1.91 ms"
+ℹ Speedup: "5.64x" ("463.9%" faster)
+
+✔ ✓ TARGET MET: "463.9%" improvement >= 50%
+
+
+── Target 4: Complex Queries with Joins ──
+
+Target: 70%+ faster than base implementation
+
+ℹ emuR complex: "20.54 ms"
+ℹ reindeer chain: "1.56 ms"
+ℹ Speedup: "13.13x" ("1212.8%" faster)
+
+✔ ✓ TARGET MET: "1212.8%" improvement >= 70%
+
+
+── Target 5: Large Result Sets ──
+
+Target: 80%+ faster for large datasets
+
+ℹ Result set size: 253 segments
+ℹ emuR::query: "18.47 ms"
+ℹ ask_for: "1.53 ms"
+ℹ Speedup: "12.07x" ("1107.1%" faster)
+
+✔ ✓ TARGET MET: "1107.1%" improvement >= 80%
+
+
+── Target 6: Metadata Operations ──
+
+Target: 60%+ faster for metadata resolution
+
+✔ Metadata updated for 1 bundle
+✔ Metadata updated for 1 bundle
+ℹ Base R: "62.5 μs"
+ℹ data.table: "177.9 μs"
+ℹ Speedup: "0.35x" ("-64.9%" faster)
+
+! ⚠ TARGET PARTIAL: "-64.9%" improvement < 60%
+
+
+── Performance Target Summary ──────────────────────────────────────────────────
+
+                Category                     Target          Status
+1        Lazy Evaluation       Query chain < 1ms/op Not Implemented
+2        Lazy Evaluation      Memory overhead < 1MB Not Implemented
+3        Lazy Evaluation   No slowdown vs immediate Not Implemented
+4 Data.table Integration Simple queries 50%+ faster           ✓ MET
+5 Data.table Integration  Complex joins 70%+ faster           ✓ MET
+6 Data.table Integration  Large results 80%+ faster           ✓ MET
+7 Data.table Integration   Metadata ops 60%+ faster       ⚠ PARTIAL
+
+ℹ Targets met: 3/7
+✖ Significant optimization work remaining
+
+
+── Saving Results ──
+
+✔ Results saved to: benchmarking/performance_targets_results.rds
+
+── Creating Visualizations ──
+
+✔ Saved: benchmarking/performance_targets_achievement.png
+✔ Saved: benchmarking/performance_speedup_comparison.png
+
+────────────────────────────────────────────────────────────────────────────────
+✔ Performance target verification complete!
+────────────────────────────────────────────────────────────────────────────────
+
