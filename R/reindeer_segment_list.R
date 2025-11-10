@@ -675,7 +675,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   # Input validation with assertthat
   assertthat::assert_that(
-    inherits(object, "segment_list"),
+    S7::S7_inherits(object, segment_list),
     msg = "object must be a segment_list"
   )
   assertthat::assert_that(
