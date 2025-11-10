@@ -92,8 +92,8 @@ initialize_metadata_schema <- function(con) {
 #' @param parallel Use parallel processing for bundle metadata (default: TRUE)
 #' @export
 gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
-  
-  if (!"corpus" %in% class(corpus_obj)) {
+
+  if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("Input must be a corpus object")
   }
   

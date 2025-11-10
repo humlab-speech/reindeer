@@ -26,10 +26,14 @@ load_DBconfig <- function(obj) {
   # Determine basePath based on input type
   if (is.character(obj)) {
     basePath <- obj
-  } else if (inherits(obj, "corpus") || (is.list(obj) && !is.null(obj$basePath))) {
-    basePath <- if (inherits(obj, "corpus")) obj@basePath else obj$basePath
+  } else if (S7::S7_inherits(obj, corpus)) {
+    # S7 corpus class
+    basePath <- obj@basePath
+  } else if (is.list(obj) && !is.null(obj$basePath)) {
+    # emuDBhandle
+    basePath <- obj$basePath
   } else if (is.list(obj) && !is.null(obj@basePath)) {
-    basePath <- obj@basePath  
+    basePath <- obj@basePath
   } else {
     stop("obj must be a basePath (character) or corpus/emuDBhandle object")
   }
