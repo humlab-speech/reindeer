@@ -257,7 +257,7 @@ get_levelDefinition <- function(corpusObj, name) {
 store_DBconfig <- function(obj, dbConfig, basePath = NULL) {
   # Extract basePath and dbName
   if (is.null(basePath)) {
-    if (inherits(obj, "corpus")) {
+    if (S7::S7_inherits(obj, corpus)) {
       basePath <- obj@basePath
       dbName <- obj@dbName
     } else if (is.list(obj) && !is.null(obj$basePath)) {

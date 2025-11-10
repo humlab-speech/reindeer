@@ -676,7 +676,7 @@ manage_cache <- function(corpus,
 
   # Input validation with assertthat
   assertthat::assert_that(
-    inherits(corpus, "corpus"),
+    S7::S7_inherits(corpus, reindeer::corpus),
     msg = "corpus must be a corpus object"
   )
 

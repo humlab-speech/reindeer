@@ -59,7 +59,7 @@ enrich <- function(corpus_obj, .using, ...,
                    .parallel = TRUE,
                    .workers = NULL) {
   
-  if (!inherits(corpus_obj, "corpus")) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
   }
   

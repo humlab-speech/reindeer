@@ -132,7 +132,7 @@ compute_signal_hash <- function(file_path) {
 update_signal_hashes <- function(corpus_obj, bundles = NULL, 
                                   verbose = TRUE, parallel = TRUE) {
   
-  if (!inherits(corpus_obj, "reindeer::corpus") && !inherits(corpus_obj, "corpus")) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("Input must be a corpus object")
   }
   
@@ -1095,7 +1095,7 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   }
   
   # Validate corpus
-  if (!inherits(corpus_obj, "reindeer::corpus") && !inherits(corpus_obj, "corpus")) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
   }
   

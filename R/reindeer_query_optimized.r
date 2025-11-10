@@ -49,7 +49,7 @@
 #' @export
 ask_for <- function(emuDB, query, ...) {
   # Handle corpus objects
-  if (inherits(emuDB, "reindeer::corpus")) {
+  if (S7::S7_inherits(emuDB, reindeer::corpus)) {
     base_path <- emuDB@basePath
     db_name <- emuDB@dbName
     
@@ -130,7 +130,7 @@ ask_for <- function(emuDB, query, ...) {
     db_uuid <- if (nrow(db_uuid_result) > 0) db_uuid_result$uuid[1] else ""
     
     # Create corpus object if we have one
-    corpus_obj <- if (inherits(emuDB, "reindeer::corpus")) emuDB else NULL
+    corpus_obj <- if (S7::S7_inherits(emuDB, reindeer::corpus)) emuDB else NULL
     
     return(lazy_segment_list(
       corpus = corpus_obj,
