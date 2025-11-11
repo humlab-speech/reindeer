@@ -33,3 +33,39 @@ get_hierPathsConnectingLevels_cpp <- function(DBconfig, levelName1, levelName2) 
     .Call(`_reindeer_get_hierPathsConnectingLevels_cpp`, DBconfig, levelName1, levelName2)
 }
 
+#' SIMD-optimized semitone conversion
+#'
+#' Convert frequencies (Hz) to semitones using vectorized operations.
+#' Uses SIMD instructions for log, division, and multiplication.
+#'
+#' @param x NumericVector of frequencies in Hz
+#' @param ref Reference frequency (default 16.35160 Hz = C0)
+#' @return NumericVector of semitone values
+#' @keywords internal
+st_simd <- function(x, ref = 16.35160) {
+    .Call(`_reindeer_st_simd`, x, ref)
+}
+
+#' SIMD-optimized ERB scale conversion
+#'
+#' Convert frequencies (Hz) to Equivalent Rectangular Bandwidth (ERB) scale
+#' using vectorized operations. Formula from Moore (1982).
+#'
+#' @param f NumericVector of frequencies in Hz
+#' @return NumericVector of ERB values
+#' @keywords internal
+erb_simd <- function(f) {
+    .Call(`_reindeer_erb_simd`, f)
+}
+
+#' Check if SIMD is available and get architecture info
+#'
+#' Returns information about the SIMD capabilities available at runtime.
+#' Useful for debugging and verification.
+#'
+#' @return List with SIMD architecture information
+#' @export
+simd_info <- function() {
+    .Call(`_reindeer_simd_info`)
+}
+

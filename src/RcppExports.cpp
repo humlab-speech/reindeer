@@ -104,6 +104,39 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// st_simd
+NumericVector st_simd(NumericVector x, double ref);
+RcppExport SEXP _reindeer_st_simd(SEXP xSEXP, SEXP refSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type ref(refSEXP);
+    rcpp_result_gen = Rcpp::wrap(st_simd(x, ref));
+    return rcpp_result_gen;
+END_RCPP
+}
+// erb_simd
+NumericVector erb_simd(NumericVector f);
+RcppExport SEXP _reindeer_erb_simd(SEXP fSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type f(fSEXP);
+    rcpp_result_gen = Rcpp::wrap(erb_simd(f));
+    return rcpp_result_gen;
+END_RCPP
+}
+// simd_info
+List simd_info();
+RcppExport SEXP _reindeer_simd_info() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(simd_info());
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_reindeer_get_allAttributeNames_cpp", (DL_FUNC) &_reindeer_get_allAttributeNames_cpp, 1},
@@ -114,6 +147,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_reindeer_find_segmentLevels_cpp", (DL_FUNC) &_reindeer_find_segmentLevels_cpp, 2},
     {"_reindeer_get_levelDefinition_cpp", (DL_FUNC) &_reindeer_get_levelDefinition_cpp, 2},
     {"_reindeer_get_hierPathsConnectingLevels_cpp", (DL_FUNC) &_reindeer_get_hierPathsConnectingLevels_cpp, 3},
+    {"_reindeer_st_simd", (DL_FUNC) &_reindeer_st_simd, 2},
+    {"_reindeer_erb_simd", (DL_FUNC) &_reindeer_erb_simd, 1},
+    {"_reindeer_simd_info", (DL_FUNC) &_reindeer_simd_info, 0},
     {NULL, NULL, 0}
 };
 
