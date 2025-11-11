@@ -30,14 +30,9 @@
 #' # phonogram (C0-C4) range in Semitones
 #' strange <- st(261.6256)
 #' strange
-st <- function(x, ref = 16.35160){
-  # Use SIMD-optimized version if available, fallback to R implementation
-  tryCatch({
-    st_simd(x, ref)
-  }, error = function(e) {
-    # Fallback to pure R implementation
-    12 * log(x / ref) / log(2)
-  })
+st <- function(x,ref=16.35160){
+  out <- 12 * log( x / ref ) / log(2)
+  return(out)
 }
 
 
@@ -67,11 +62,8 @@ st <- function(x, ref = 16.35160){
 #' abline(a = 0, b=1,col="blue")
 
 erb <- function(f){
-  # Use SIMD-optimized version if available, fallback to R implementation
-  tryCatch({
-    erb_simd(f)
-  }, error = function(e) {
-    # Fallback to pure R implementation
-    11.17 * log((f + 0.312) / (f + 14.675)) + 43
-  })
+
+    nerb <- 11.17 * log( (f + 0.312 ) / (f + 14.675))  + 43
+
+  return(nerb)
 }
