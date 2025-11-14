@@ -3,16 +3,12 @@
 # ==============================================================================
 
 .onLoad <- function(libname, pkgname) {
-  # Force S7 method registration for print and summary
-  # Methods defined with method<- in package files should work automatically,
-  # but we ensure they're active by accessing them once
-  
-  # The methods are already defined in the respective files with:
-  # S7::method(print, corpus) <- function...
-  # This .onLoad ensures they're properly registered
-  
-  # No explicit action needed - S7 handles registration automatically
-  # when the package namespace is built
-  
+  # Register S7 methods for corpus class
+  # Must be done in .onLoad to ensure they're available after package installation
+
+  # Import method assignment operator from S7
+  S7::method(print, corpus) <- .print_corpus
+  S7::method(summary, corpus) <- .summary_corpus
+
   invisible()
 }

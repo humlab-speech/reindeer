@@ -1,3 +1,6 @@
+#' @importFrom S7 method method<-
+NULL
+
 # ==============================================================================
 # CORPUS SUBSETTING OPERATORS - corpus[i, j]
 # ==============================================================================
@@ -77,11 +80,9 @@ S7::method(`[<-`, corpus) <- function(x, i, j, ..., value) {
 # PRINT, SUMMARY, AND GLIMPSE METHODS
 # ==============================================================================
 
-#' Print method for corpus with tidyverse-style formatting
-#' @param x corpus object
-#' @param ... Additional arguments (unused)
-#' @name print.corpus
-S7::method(print, corpus) <- function(x, ...) {
+# Print method for corpus - to be registered with S7
+#' @keywords internal
+.print_corpus <- function(x, ...) {
   cli::cli_h1("{.cls corpus}: {.field {x@dbName}}")
   
   # Database identification
@@ -156,11 +157,9 @@ S7::method(print, corpus) <- function(x, ...) {
   invisible(x)
 }
 
-#' Summary method for corpus - comprehensive database overview
-#' @param object corpus object
-#' @param ... Additional arguments (unused)
-#' @name summary.corpus
-S7::method(summary, corpus) <- function(object, ...) {
+# Summary method for corpus - to be registered with S7
+#' @keywords internal
+.summary_corpus <- function(object, ...) {
   con <- get_corpus_connection(object)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
   
