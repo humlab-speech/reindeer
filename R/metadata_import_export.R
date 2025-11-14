@@ -221,26 +221,28 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
   basePath <- corpus_obj@basePath
   
   if (level == "database") {
-    # Delete <dbname>.meta_json
+    # Delete METADATA.json from database root
     db_name <- basename(basePath)
     db_name <- sub("_emuDB$", "", db_name)
-    meta_file <- file.path(basePath, paste0(db_name, ".", metadata.extension))
+    meta_file <- file.path(basePath, metadata.filename)
     if (file.exists(meta_file)) {
       unlink(meta_file)
     }
-    
+
   } else if (level == "session") {
-    meta_file <- file.path(basePath, paste0(session, "_ses"), paste0(session, ".", metadata.extension))
+    # Delete METADATA.json from session directory
+    meta_file <- file.path(basePath, paste0(session, "_ses"), metadata.filename)
     if (file.exists(meta_file)) {
       unlink(meta_file)
     }
-    
+
   } else if (level == "bundle") {
+    # Delete METADATA.json from bundle directory
     meta_file <- file.path(
-      basePath, 
+      basePath,
       paste0(session, "_ses"),
       paste0(bundle, "_bndl"),
-      paste0(bundle, ".", metadata.extension)
+      metadata.filename
     )
     if (file.exists(meta_file)) {
       unlink(meta_file)

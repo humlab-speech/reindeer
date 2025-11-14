@@ -24,9 +24,9 @@ corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, 
 #' Set database-level metadata
 #' @keywords internal
 set_metadata_database <- function(corpus_obj, metadata_list) {
-  # Write to <dbname>.meta_json
-  db_meta_file <- file.path(corpus_obj@basePath, 
-                            paste0(corpus_obj@dbName, ".meta_json"))
+  # Write to METADATA.json in database root
+  db_meta_file <- file.path(corpus_obj@basePath,
+                            metadata.filename)
   
   # Read existing
   if (file.exists(db_meta_file)) {
@@ -75,7 +75,7 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
     session_meta_file <- file.path(
       corpus_obj@basePath,
       paste0(session_name, "_ses"),
-      paste0(session_name, ".meta_json")
+      metadata.filename
     )
     
     # Read existing
@@ -130,7 +130,7 @@ set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, met
       corpus_obj@basePath,
       paste0(session_name, "_ses"),
       paste0(bundle_name, "_bndl"),
-      paste0(bundle_name, ".meta_json")
+      metadata.filename
     )
     
     # Read existing

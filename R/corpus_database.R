@@ -551,7 +551,7 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   DBI::dbExecute(con, sprintf("DELETE FROM metadata_database WHERE db_uuid = '%s'", db_uuid))
   
   # 1. Database-level metadata
-  db_meta_file <- file.path(basePath, paste0(corpus_obj@dbName, ".meta_json"))
+  db_meta_file <- file.path(basePath, metadata.filename)
   
   if (file.exists(db_meta_file)) {
     if (verbose) cli::cli_alert_info("Loading database defaults")
@@ -575,7 +575,7 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   for (i in seq_len(nrow(sessions))) {
     session_name <- sessions$name[i]
     session_meta_file <- file.path(basePath, paste0(session_name, "_ses"),
-                                   paste0(session_name, ".meta_json"))
+                                   metadata.filename)
     
     if (file.exists(session_meta_file)) {
       meta_data <- jsonlite::read_json(session_meta_file, simplifyVector = TRUE)
@@ -609,10 +609,10 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
     bundle_name <- bundles$name[i]
     
     bundle_meta_file <- file.path(
-      basePath, 
+      basePath,
       paste0(session_name, "_ses"),
       paste0(bundle_name, "_bndl"),
-      paste0(bundle_name, ".meta_json")
+      metadata.filename
     )
     
     if (file.exists(bundle_meta_file)) {

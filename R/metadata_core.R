@@ -7,7 +7,9 @@
 #
 
 ## Constants
-metadata.extension <- "meta_json"
+# New simplified metadata structure: all levels use METADATA.json
+# Placed in: database root, session directory, or bundle directory
+metadata.filename <- "METADATA.json"
 
 # ==============================================================================
 # SQLITE SCHEMA FOR METADATA CACHING
@@ -113,10 +115,10 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   DBI::dbExecute(con, sprintf("DELETE FROM metadata_session WHERE db_uuid = '%s'", db_uuid))
   DBI::dbExecute(con, sprintf("DELETE FROM metadata_database WHERE db_uuid = '%s'", db_uuid))
   
-  # 1. Database-level metadata (from <dbname>.meta_json)
+  # 1. Database-level metadata (from METADATA.json in database root)
   db_name <- basename(basePath)
   db_name <- sub("_emuDB$", "", db_name)
-  db_meta_file <- file.path(basePath, paste0(db_name, ".", metadata.extension))
+  db_meta_file <- file.path(basePath, metadata.filename)
   
   if (file.exists(db_meta_file)) {
     if (verbose) cli::cli_alert_info("Processing database-level defaults")
@@ -135,7 +137,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   for (i in seq_len(nrow(sessions))) {
     session_name <- sessions$name[i]
     session_meta_file <- file.path(basePath, paste0(session_name, "_ses"),
-                                   paste0(session_name, ".", metadata.extension))
+                                   metadata.filename)
     
     if (file.exists(session_meta_file)) {
       meta_data <- read_json_fast(session_meta_file, simplifyVector = TRUE)
@@ -159,10 +161,10 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   
   # Prepare file paths
   bundle_files <- file.path(
-    basePath, 
+    basePath,
     paste0(bundles$session, "_ses"),
     paste0(bundles$name, "_bndl"),
-    paste0(bundles$name, ".", metadata.extension)
+    metadata.filename
   )
   
   # Filter to existing files
@@ -850,10 +852,10 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
   basePath <- corpus_obj@basePath
   
   if (level == "database") {
-    # Update <dbname>.meta_json
+    # Update METADATA.json in database root
     db_name <- basename(basePath)
     db_name <- sub("_emuDB$", "", db_name)
-    meta_file <- file.path(basePath, paste0(db_name, ".", metadata.extension))
+    meta_file <- file.path(basePath, metadata.filename)
     
     # Read existing or create new
     if (file.exists(meta_file)) {
@@ -866,8 +868,8 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
     
   } else if (level == "session") {
-    # Update session .meta_json
-    meta_file <- file.path(basePath, paste0(session, "_ses"), paste0(session, ".", metadata.extension))
+    # Update METADATA.json in session directory
+    meta_file <- file.path(basePath, paste0(session, "_ses"), metadata.filename)
     
     # Read existing or create new
     if (file.exists(meta_file)) {
@@ -880,12 +882,12 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
     
   } else if (level == "bundle") {
-    # Update bundle .meta_json
+    # Update METADATA.json in bundle directory
     meta_file <- file.path(
-      basePath, 
+      basePath,
       paste0(session, "_ses"),
       paste0(bundle, "_bndl"),
-      paste0(bundle, ".", metadata.extension)
+      metadata.filename
     )
     
     # Read existing or create new

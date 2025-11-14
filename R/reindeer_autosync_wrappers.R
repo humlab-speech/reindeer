@@ -41,7 +41,7 @@ write_bundle_metadata <- function(db_handle,
     stop("Bundle directory not found: ", bundle_dir)
   }
   
-  meta_path <- file.path(bundle_dir, ".meta_json")
+  meta_path <- file.path(bundle_dir, metadata.filename)
   
   # Load existing metadata if merging
   if (merge && file.exists(meta_path)) {
