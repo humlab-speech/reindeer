@@ -1,26 +1,25 @@
 Package: reindeer
 Type: Package
 Title: This package extends the capabilities of emuR to work with speech data in a nordic climate
-Version: 0.1.0
-Authors@R:
-    person("Fredrik", "Karlsson", email = "fredrik.k.karlsson@umu.se", role = c("aut", "cre"))
-Maintainer: Fredrik Karlsson <fredrik.k.karlsson@umu.se>
-Description: This package extends the capabilities of emuR to work with speech 
-  data and includes the facilities for working with metadata, and for working with 
-  computationally intensive and sparse measurement data. 
-  The package also provides functions for setting up Emu web app with signal track overlays.
-  When loaded, it also loads many functions from the emuR package, and makes them available for the user.
+Version: 0.1.1
+Date: 2025-11-14
+Authors@R: c(
+    person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-3373-0934"))
+  )
+Maintainer: Fredrik Nylén <fredrik.nylen@umu.se>
+Description: The purpose of this package is to provide a systematic framework for speech corpora managemnet that retains emuR compatability, but provides provides
+  expanded ability to store metadata associated with the recording, use the metadata to guide signal processing when appropriate, and support the user in future archiving and FAIR use
+  by automating the creation, and continnous updating, of standard compliant metadata files for corpora. 
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
 Imports:
-    emuR (>= 2.0.2),
     S7 (>= 0.1.0),
     digest,
     superassp,
     jsonlite,
     openxlsx,
-    sqldf,
     dplyr,
     stats,
     Rdpack,
@@ -30,7 +29,6 @@ Imports:
     testthat,
     assertthat,
     git2r,
-    glue,
     tidyr,
     stringr,
     reticulate,
@@ -39,8 +37,8 @@ Imports:
     cli,
     av
 Remotes:
-  github::tjmahr/tjm.praat,
   github::humlab-speech/superassp
+  github::humlab-speech/av
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
