@@ -5,10 +5,10 @@
 \title{reindeer: An extension of the capabilities of emuR to work with speech data in
 a nordic climate}
 \description{
-This package extends the capabilities of emuR to work with speech  data and
-includes the facilities for working with metadata, and for working with
-computationally intensive and sparse measurement data. The package also
-provides functions for setting up Emu web app with signal track overlays.When
-loaded, it also loads many functions from the emuR package, and makes them
-available for the user.
+The purpose of this package is to provide a systematic framework for speech
+corpora managemnet that retains emuR compatability, but provides provides
+expanded ability to store metadata associated with the recording, use the
+metadata to guide signal processing when appropriate, and support the user in
+future archiving and FAIR use by automating the creation, and continnous
+updating, of standard compliant metadata files for corpora.
 }
