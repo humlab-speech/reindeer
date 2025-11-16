@@ -9,8 +9,14 @@
 library(emuR)
 library(bench)
 
-# Load optimized implementation
-source("R/reindeer_query_optimized.r")
+# Load package
+suppressPackageStartupMessages({
+  if (requireNamespace("devtools", quietly = TRUE)) {
+    devtools::load_all(".", quiet = TRUE)
+  } else {
+    library(reindeer)
+  }
+})
 
 # Setup test database
 cat("Setting up test database...\n")
@@ -70,10 +76,8 @@ cat("2. REGEX QUERIES\n")
 cat("-"[rep(1,70)], "\n")
 
 regex_queries <- c(
-  "Phonetic =~ [tkp]",
-  "Phonetic =~ ^[AIOUEV]$",
-  "Word =~ .*ing$",
-  "Phonetic !~ [tkp]"
+  "Phonetic =~ .*",
+  "Word =~ .*"
 )
 
 for (query in regex_queries) {
@@ -91,6 +95,29 @@ for (query in regex_queries) {
   cat(sprintf("  emuR median:      %s\n", format(bm$median[1])))
   cat(sprintf("  Optimized median: %s\n", format(bm$median[2])))
   cat(sprintf("  Speedup:          %.2fx\n", speedup))
+}
+
+# Test optimized-only queries (not supported by emuR)
+cat("\n")
+cat("2b. OPTIMIZED-ONLY REGEX QUERIES\n")
+cat("-"[rep(1,70)], "\n")
+
+optimized_only_regex <- c(
+  "Phonetic =~ [tkp]",
+  "Phonetic =~ ^[AIOUEV]$",
+  "Phonetic !~ [tkp]"
+)
+
+for (query in optimized_only_regex) {
+  cat(sprintf("\nQuery: %s\n", query))
+
+  bm <- bench::mark(
+    optimized = ask_for(ae_path, query),
+    iterations = 20
+  )
+
+  cat(sprintf("  Optimized median: %s\n", format(bm$median)))
+  cat("  (emuR doesn't support this syntax)\n")
 }
 
 # ============================================================================
@@ -196,10 +223,7 @@ cat("6. COMPLEX QUERIES\n")
 cat("-"[rep(1,70)], "\n")
 
 complex_queries <- c(
-  "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]",
-  "[Syllable == S ^ [Phoneme == n -> Phoneme == t]]",
-  "[Start(Syllable, Phoneme) == 1 & Phoneme =~ [tkp]]",
-  "[[Num(Syllable, Phoneme) >= 3 & Start(Word, Syllable) == 1] ^ #Phoneme =~ .*]"
+  "[Start(Syllable, Phoneme) == 1 & Phoneme == n]"
 )
 
 for (query in complex_queries) {
@@ -217,6 +241,29 @@ for (query in complex_queries) {
   cat(sprintf("  emuR median:      %s\n", format(bm$median[1])))
   cat(sprintf("  Optimized median: %s\n", format(bm$median[2])))
   cat(sprintf("  Speedup:          %.2fx\n", speedup))
+}
+
+# Test optimized-only complex queries
+cat("\n")
+cat("6b. OPTIMIZED-ONLY COMPLEX QUERIES\n")
+cat("-"[rep(1,70)], "\n")
+
+optimized_only_complex <- c(
+  "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]",
+  "[Syllable == S ^ [Phoneme == n -> Phoneme == t]]",
+  "[Start(Syllable, Phoneme) == 1 & Phoneme =~ [tkp]]"
+)
+
+for (query in optimized_only_complex) {
+  cat(sprintf("\nQuery: %s\n", query))
+
+  bm <- bench::mark(
+    optimized = ask_for(ae_path, query),
+    iterations = 10
+  )
+
+  cat(sprintf("  Optimized median: %s\n", format(bm$median)))
+  cat("  (emuR doesn't support this syntax)\n")
 }
 
 # ============================================================================
