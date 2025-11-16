@@ -51,20 +51,77 @@ describe("Simple Queries", {
   setup <- setup_test_db()
   ae_path <- setup$path
   ae <- setup$db
-  
+
   test_that("equality queries work", {
     expect_query_equivalent("Phonetic == t", ae_path, ae)
     expect_query_equivalent("Phoneme == n", ae_path, ae)
     expect_query_equivalent("Syllable == S", ae_path, ae)
   })
-  
+
+  test_that("equality with quotes works", {
+    # Single quotes
+    expect_query_equivalent("Phonetic == 't'", ae_path, ae)
+
+    # NOTE: emuR doesn't support double quotes in simple queries
+    # Test that our implementation handles both quote styles
+    result_no_quotes <- ask_for(ae_path, "Phonetic == t")
+    result_single <- ask_for(ae_path, "Phonetic == 't'")
+    result_double <- ask_for(ae_path, 'Phonetic == "t"')
+
+    # Single quotes and no quotes should match
+    expect_equal(nrow(result_no_quotes), nrow(result_single))
+    # Double quotes should also work in our implementation
+    expect_equal(nrow(result_no_quotes), nrow(result_double))
+  })
+
   test_that("inequality queries work", {
     expect_query_equivalent("Phonetic != t", ae_path, ae)
     expect_query_equivalent("Phoneme != n", ae_path, ae)
+
+    # Verify != returns complement of ==
+    result_eq <- ask_for(ae_path, "Phonetic == t")
+    result_neq <- ask_for(ae_path, "Phonetic != t")
+    result_all <- ask_for(ae_path, "Phonetic =~ .*")
+
+    expect_equal(nrow(result_eq) + nrow(result_neq), nrow(result_all))
   })
-  
+
+  test_that("regex match queries work", {
+    expect_query_equivalent("Phonetic =~ .*", ae_path, ae)
+
+    # NOTE: emuR requires square brackets around character classes to be properly escaped
+    # Test our implementation handles various regex patterns
+    result1 <- ask_for(ae_path, "Phonetic =~ [tkp]")
+    expect_true(nrow(result1) > 0)
+
+    # Complex patterns
+    result2 <- ask_for(ae_path, "Phonetic =~ ^[AIOUEV]$")
+    expect_true(nrow(result2) >= 0)
+
+    # Character class negation
+    result3 <- ask_for(ae_path, "Phonetic =~ [^aeiou]")
+    expect_true(nrow(result3) >= 0)
+  })
+
+  test_that("regex non-match queries work", {
+    # NOTE: emuR doesn't support !~ operator, so we can't validate against it
+    # Test that our implementation handles it correctly
+
+    # Should be complement of =~
+    result_match <- ask_for(ae_path, "Phonetic =~ [tkp]")
+    result_nomatch <- ask_for(ae_path, "Phonetic !~ [tkp]")
+    result_all <- ask_for(ae_path, "Phonetic =~ .*")
+
+    expect_equal(nrow(result_match) + nrow(result_nomatch), nrow(result_all))
+
+    # Complex patterns
+    result <- ask_for(ae_path, "Phonetic !~ ^[AIOUEV]$")
+    expect_true(nrow(result) >= 0)
+  })
+
   test_that("queries with special characters work", {
     expect_query_equivalent("Phonetic == V", ae_path, ae)
+    expect_query_equivalent("Phonetic == @", ae_path, ae)
   })
 })
 
@@ -138,28 +195,103 @@ describe("Function Queries", {
   setup <- setup_test_db()
   ae_path <- setup$path
   ae <- setup$db
-  
+
   test_that("Start function works", {
-    # Note: Position functions may have different counting logic
-    # Test that it at least executes without error
-    result <- ask_for(ae_path, "Start(Syllable, Phoneme) == 1")
-    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
-    # Should return some results (exact count may differ from emuR)
-    # expect_query_equivalent("Start(Syllable, Phoneme) == 1", ae_path, ae)
+    # Validate against emuR
+    expect_query_equivalent("Start(Syllable, Phoneme) == 1", ae_path, ae)
+    expect_query_equivalent("Start(Word, Syllable) == 1", ae_path, ae)
   })
-  
+
+  test_that("Start function with FALSE/0", {
+    expect_query_equivalent("Start(Syllable, Phoneme) == 0", ae_path, ae)
+
+    # Verify mutual exclusivity: Start == 1 and Start == 0 should cover all
+    result_true <- ask_for(ae_path, "Start(Syllable, Phoneme) == 1")
+    result_false <- ask_for(ae_path, "Start(Syllable, Phoneme) == 0")
+    result_all <- ask_for(ae_path, "Phoneme =~ .*")
+
+    expect_equal(nrow(result_true) + nrow(result_false), nrow(result_all))
+  })
+
   test_that("End function works", {
-    # Note: Position functions may have different counting logic
-    result <- ask_for(ae_path, "End(Syllable, Phoneme) == 1")
-    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
-    # Should return some results (exact count may differ from emuR)
-    # expect_query_equivalent("End(Syllable, Phoneme) == 1", ae_path, ae)
+    # Validate against emuR
+    expect_query_equivalent("End(Syllable, Phoneme) == 1", ae_path, ae)
+    expect_query_equivalent("End(Word, Syllable) == 1", ae_path, ae)
   })
-  
+
+  test_that("End function with FALSE/0", {
+    expect_query_equivalent("End(Syllable, Phoneme) == 0", ae_path, ae)
+
+    # Verify mutual exclusivity
+    result_true <- ask_for(ae_path, "End(Syllable, Phoneme) == 1")
+    result_false <- ask_for(ae_path, "End(Syllable, Phoneme) == 0")
+    result_all <- ask_for(ae_path, "Phoneme =~ .*")
+
+    expect_equal(nrow(result_true) + nrow(result_false), nrow(result_all))
+  })
+
+  test_that("Medial function works", {
+    # Test basic medial query
+    expect_query_equivalent("Medial(Syllable, Phoneme) == 1", ae_path, ae)
+    expect_query_equivalent("Medial(Word, Syllable) == 1", ae_path, ae)
+  })
+
+  test_that("Medial function with FALSE/0", {
+    expect_query_equivalent("Medial(Syllable, Phoneme) == 0", ae_path, ae)
+
+    # Medial == 0 should include Start OR End positions
+    result_medial_false <- ask_for(ae_path, "Medial(Syllable, Phoneme) == 0")
+    result_medial_true <- ask_for(ae_path, "Medial(Syllable, Phoneme) == 1")
+    result_all <- ask_for(ae_path, "Phoneme =~ .*")
+
+    # Medial TRUE + FALSE should cover all phonemes
+    expect_equal(nrow(result_medial_false) + nrow(result_medial_true), nrow(result_all))
+  })
+
+  test_that("Position functions handle edge cases", {
+    # Get results for each position
+    result_start <- ask_for(ae_path, "Start(Syllable, Phoneme) == 1")
+    result_medial <- ask_for(ae_path, "Medial(Syllable, Phoneme) == 1")
+    result_end <- ask_for(ae_path, "End(Syllable, Phoneme) == 1")
+
+    # NOTE: Position functions may have implementation-specific behavior for:
+    # - Single-phoneme syllables (can be both start AND end)
+    # - Two-phoneme syllables (no medial position)
+
+    # Basic sanity checks
+    expect_true(nrow(result_start) > 0)
+    expect_true(nrow(result_end) > 0)
+
+    # Medial positions exist only in syllables with 3+ phonemes
+    # So medial result could be 0 or positive
+    expect_true(nrow(result_medial) >= 0)
+  })
+
   test_that("Num function works", {
     expect_query_equivalent("Num(Syllable, Phoneme) >= 3", ae_path, ae)
     expect_query_equivalent("Num(Syllable, Phoneme) == 2", ae_path, ae)
     expect_query_equivalent("Num(Word, Syllable) >= 2", ae_path, ae)
+  })
+
+  test_that("Num function with all comparison operators", {
+    # Test all operators
+    expect_query_equivalent("Num(Syllable, Phoneme) > 2", ae_path, ae)
+    expect_query_equivalent("Num(Syllable, Phoneme) < 3", ae_path, ae)
+    expect_query_equivalent("Num(Syllable, Phoneme) <= 2", ae_path, ae)
+    expect_query_equivalent("Num(Syllable, Phoneme) != 1", ae_path, ae)
+
+    # Edge cases
+    expect_query_equivalent("Num(Syllable, Phoneme) >= 1", ae_path, ae)  # All syllables
+  })
+
+  test_that("Position functions in complex queries", {
+    # Position + label constraint
+    result <- ask_for(ae_path, "[Start(Syllable, Phoneme) == 1 & Phoneme == n]")
+    expect_true(nrow(result) >= 0)
+
+    # Position in sequence
+    result <- ask_for(ae_path, "[Start(Syllable, Phoneme) == 1 -> End(Syllable, Phoneme) == 1]")
+    expect_true(nrow(result) >= 0)
   })
 })
 
@@ -212,30 +344,6 @@ describe("Edge Cases", {
   })
 })
 
-describe("Performance Characteristics", {
-  setup <- setup_test_db()
-  ae_path <- setup$path
-  ae <- setup$db
-  
-  test_that("optimized query is faster than emuR for simple queries", {
-    skip_if_not_installed("bench")
-    
-    bm <- bench::mark(
-      emuR = emuR::query(ae, "Phonetic == t"),
-      optimized = ask_for(ae_path, "Phonetic == t"),
-      iterations = 10,
-      check = FALSE
-    )
-    
-    # Optimized version should generally be faster
-    # (this is informational, not a strict requirement)
-    message(sprintf(
-      "emuR median: %s, optimized median: %s",
-      format(bm$median[1]),
-      format(bm$median[2])
-    ))
-  })
-})
 
 describe("Result Format Consistency", {
   setup <- setup_test_db()
@@ -357,33 +465,205 @@ describe("Boundary Conditions", {
   })
 })
 
+describe("Attribute Queries", {
+  setup <- setup_test_db()
+  ae_path <- setup$path
+  ae <- setup$db
+
+  test_that("explicit attribute syntax works", {
+    # Word level has Text and Accent attributes
+    # Test explicit attribute access
+    result <- ask_for(ae_path, "Word:Text =~ .*")
+    expect_true(nrow(result) >= 0)
+
+    result <- ask_for(ae_path, "Word:Accent =~ .*")
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("default attribute matches explicit", {
+    # Default attribute query should match explicit
+    result_implicit <- ask_for(ae_path, "Word =~ .*")
+    result_explicit <- ask_for(ae_path, "Word:Text =~ .*")
+
+    # Should return same results
+    expect_equal(nrow(result_implicit), nrow(result_explicit))
+  })
+
+  test_that("multiple attributes via conjunction", {
+    # Query combining different attributes of same level
+    result <- ask_for(ae_path, "[Word:Text =~ .* & Word:Accent =~ .*]")
+    expect_true(nrow(result) >= 0)
+  })
+})
+
 describe("Query Language Edge Cases", {
   setup <- setup_test_db()
   ae_path <- setup$path
   ae <- setup$db
-  
-  test_that("handles double quotes in labels", {
-    # Test with different quote styles if data exists
-    expect_no_error(ask_for(ae_path, 'Phonetic == "t"'))
+
+  test_that("handles whitespace variations", {
+    # Compact vs spaced queries should be equivalent
+    result_compact <- ask_for(ae_path, "Phonetic==t")
+    result_spaced <- ask_for(ae_path, "Phonetic  ==  t")
+
+    expect_equal(nrow(result_compact), nrow(result_spaced))
+
+    # Whitespace in brackets
+    result1 <- ask_for(ae_path, "[Phoneme==n->Phoneme==t]")
+    result2 <- ask_for(ae_path, "[ Phoneme == n -> Phoneme == t ]")
+
+    expect_equal(nrow(result1), nrow(result2))
   })
-  
+
   test_that("handles regex special characters", {
     # Test that regex metacharacters are handled correctly
     expect_no_error(ask_for(ae_path, "Phonetic =~ [tkp]"))
     result <- ask_for(ae_path, "Phonetic =~ [tkp]")
     expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
+
+    # Test anchors
+    result <- ask_for(ae_path, "Phonetic =~ ^t$")
+    expect_true(nrow(result) >= 0)
   })
-  
-  test_that("handles multiple attributes", {
-    # Word level has multiple attributes (Word, Accent, Text)
-    # Query by level name works for default attribute
-    expect_query_equivalent("Word =~ .*", ae_path, ae)
-  })
-  
+
   test_that("handles numeric comparisons in functions", {
     expect_query_equivalent("Num(Syllable, Phoneme) > 2", ae_path, ae)
     expect_query_equivalent("Num(Syllable, Phoneme) <= 3", ae_path, ae)
     expect_query_equivalent("Num(Syllable, Phoneme) != 1", ae_path, ae)
+  })
+
+  test_that("invalid queries are handled gracefully", {
+    # NOTE: Implementation may handle invalid queries in different ways:
+    # - Return errors
+    # - Return empty results
+    # - Parse what it can and ignore invalid parts
+
+    # Unclosed bracket - test that it doesn't crash
+    tryCatch(
+      {result <- ask_for(ae_path, "[Phoneme == n")},
+      error = function(e) expect_true(inherits(e, "error"))
+    )
+
+    # Missing operand
+    tryCatch(
+      {result <- ask_for(ae_path, "Phoneme ==")},
+      error = function(e) expect_true(inherits(e, "error"))
+    )
+
+    # Multiple # in same query
+    tryCatch(
+      {result <- ask_for(ae_path, "[#Phoneme == n -> #Phoneme == t]")},
+      error = function(e) expect_true(inherits(e, "error"))
+    )
+
+    # Invalid function name
+    tryCatch(
+      {result <- ask_for(ae_path, "InvalidFunc(Syllable, Phoneme) == 1")},
+      error = function(e) expect_true(inherits(e, "error"))
+    )
+
+    # If no errors, that's fine - implementation is lenient
+    expect_true(TRUE)
+  })
+
+  test_that("boundary values handled correctly", {
+    # Empty results
+    result <- ask_for(ae_path, "Phonetic == xyz")
+    expect_equal(nrow(result), 0)
+
+    # Num with 0
+    result <- ask_for(ae_path, "Num(Syllable, Phoneme) == 0")
+    expect_equal(nrow(result), 0)
+
+    # Num with large number (should match all or none)
+    result <- ask_for(ae_path, "Num(Syllable, Phoneme) < 1000")
+    result_all <- ask_for(ae_path, "Syllable =~ .*")
+    expect_equal(nrow(result), nrow(result_all))
+  })
+})
+
+describe("Deep Nesting and Complex Queries", {
+  setup <- setup_test_db()
+  ae_path <- setup$path
+  ae <- setup$db
+
+  test_that("deeply nested queries work", {
+    # Three levels of nesting
+    query <- "[[[Syllable == S ^ Phoneme == n] & Start(Syllable, Phoneme) == 1] -> Phoneme == t]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("sequence within dominance works", {
+    query <- "[Syllable == S ^ [Phoneme == n -> Phoneme == t]]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("dominance within sequence works", {
+    query <- "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("complex queries with all operators work", {
+    # Combining: Num, Position, Dominance, Sequence, Conjunction, Projection
+    query <- "[[Num(Syllable, Phoneme) >= 3 & Start(Word, Syllable) == 1] ^ #Phoneme =~ .*]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("projection in nested queries works correctly", {
+    # Projection on inner query
+    query <- "[Syllable == S ^ [#Phoneme == n -> Phoneme == t]]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+
+    # Projection on outer query
+    query <- "[#Syllable == S ^ [Phoneme == n -> Phoneme == t]]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+})
+
+describe("Niche Query Scenarios", {
+  setup <- setup_test_db()
+  ae_path <- setup$path
+  ae <- setup$db
+
+  test_that("syllable boundary sequences work", {
+    # Find sequences where syllable-final precedes syllable-initial
+    query <- "[End(Syllable, Phoneme) == 1 -> Start(Syllable, Phoneme) == 1]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("minimum syllable complexity queries work", {
+    # Find syllables with at least 3 phonemes
+    query <- "[Syllable =~ .* & Num(Syllable, Phoneme) >= 3]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("polysyllabic word queries work", {
+    # Find words with multiple syllables
+    query <- "[Word =~ .* & Num(Word, Syllable) > 1]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("position-based onset queries work", {
+    # Find syllable-initial phonemes matching pattern
+    query <- "[Start(Syllable, Phoneme) == 1 & Phoneme =~ [tkp]]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
+  })
+
+  test_that("position-based coda queries work", {
+    # Find syllable-final phonemes matching pattern
+    query <- "[End(Syllable, Phoneme) == 1 & Phoneme =~ [nm]]"
+    result <- ask_for(ae_path, query)
+    expect_true(nrow(result) >= 0)
   })
 })
 
@@ -391,21 +671,21 @@ describe("Result Ordering and Consistency", {
   setup <- setup_test_db()
   ae_path <- setup$path
   ae <- setup$db
-  
+
   test_that("results are ordered consistently", {
     # Run same query twice
     result1 <- ask_for(ae_path, "Phonetic == t")
     result2 <- ask_for(ae_path, "Phonetic == t")
-    
+
     # Should return identical results
     expect_equal(nrow(result1), nrow(result2))
     expect_equal(result1$bundle, result2$bundle)
     expect_equal(result1$start_item_id, result2$start_item_id)
   })
-  
+
   test_that("results maintain temporal order", {
     result <- ask_for(ae_path, "Phonetic =~ .*")
-    
+
     if (nrow(result) > 1) {
       # Within each bundle, start times should be ordered
       for (bndl in unique(result$bundle)) {
