@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Annotation and transcription systems
 - Query optimization using direct SQLite access
 - Track data quantification and enrichment
+- Interactive annotation via EMU-webApp
 
 The package uses modern S7 classes and data.table for performance, with extensive caching to handle computationally intensive operations on large speech corpora.
 
@@ -168,6 +169,32 @@ Two C++ files in `src/`:
 - `RcppExports.cpp`: Auto-generated Rcpp bindings
 
 Functions are called from `R/RcppExports.R` and used in corpus configuration utilities.
+
+### Interactive Annotation System
+
+`R/reindeer_serve.R` provides a web-based annotation interface:
+
+- **`serve(corpus)`**: Launch EMU-webApp for interactive annotation
+  - Serves revised EMU-webApp from `/Users/frkkan96/Documents/src/EMU-webApp/dist/`
+  - HTTP server on port 17890 (configurable)
+  - WebSocket server for real-time communication (protocol v0.0.2)
+  - Supports bundle/session filtering and segment list restrictions
+  - RStudio Viewer integration
+
+**Usage**:
+```r
+corp <- corpus("path/to/db_emuDB")
+serve(corp)  # Opens EMU-webApp in browser
+# Make annotations, then close or call httpuv::stopAllServers()
+```
+
+**Key features**:
+- Filter bundles: `serve(corp, sessionPattern = "Session.*", bundlePattern = "msajc.*")`
+- Serve query results: `serve(corp, seglist = ask_for(corp, "Phonetic == t"))`
+- Custom port: `serve(corp, port = 8080)`
+- Debug mode: `serve(corp, debug = TRUE, debugLevel = 2)`
+
+See `SERVE_FUNCTION_SUMMARY.md` for detailed documentation.
 
 ## Key Design Patterns
 
