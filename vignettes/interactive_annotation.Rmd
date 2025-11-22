@@ -1,0 +1,578 @@
+---
+title: "Interactive Annotation with EMU-webApp"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Interactive Annotation with EMU-webApp}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+## Introduction
+
+The **reindeer** package provides `serve()`, a powerful function that launches the EMU-webApp annotation interface directly from R. This allows you to:
+
+- **Visualize** your speech data with interactive spectrograms
+- **Annotate** segments, events, and hierarchical structures
+- **Play audio** synchronized with annotations
+- **Edit** annotations in real-time
+- **Save** changes directly back to your database
+
+This vignette shows you how to use `serve()` for interactive annotation workflows.
+
+## Quick Start
+
+```{r quick-start}
+library(reindeer)
+
+# Load your corpus
+corp <- corpus("path/to/database_emuDB")
+
+# Launch the annotation interface
+serve(corp)
+```
+
+That's it! The EMU-webApp will open in your browser (or RStudio Viewer pane) and you can start annotating.
+
+## Setup and Configuration
+
+### First-Time Setup
+
+The `serve()` function looks for the EMU-webApp in several locations:
+
+```{r setup}
+# Method 1: Set R option (recommended for interactive use)
+options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
+
+# Method 2: Set environment variable (recommended for scripts)
+Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
+
+# Method 3: Let reindeer find it automatically
+# - Checks package installation directory
+# - Looks for ../EMU-webApp/dist relative to package
+serve(corp)  # Will use auto-detected path
+```
+
+### Verifying Setup
+
+```{r verify}
+# The function will show an informative error if webapp not found
+serve(corp)
+# Error: EMU-webApp directory not found.
+# ℹ Tried: /path/that/was/checked
+# ℹ Set a custom path via options(reindeer.emuWebApp.dir = '/path/to/EMU-webApp/dist')
+```
+
+## Basic Annotation Workflows
+
+### Annotate Entire Corpus
+
+```{r annotate-all}
+corp <- corpus("path/to/database_emuDB")
+
+# Serve all bundles
+serve(corp)
+
+# The webApp will show:
+# - All sessions in the corpus
+# - All bundles in each session
+# - Navigate with arrow keys or bundle list
+```
+
+### Annotate Specific Sessions
+
+```{r annotate-sessions}
+# Serve only specific sessions using regex patterns
+serve(corp, sessionPattern = "Session0[12]")
+
+# Or more complex patterns
+serve(corp, sessionPattern = "^(pilot|main)_")
+```
+
+### Annotate Specific Bundles
+
+```{r annotate-bundles}
+# Serve only bundles matching a pattern
+serve(corp, bundlePattern = "recording_0[1-5]")
+
+# Combine session and bundle patterns
+serve(corp,
+      sessionPattern = "Session01",
+      bundlePattern = "msajc.*")
+```
+
+### Annotate Query Results
+
+This is particularly powerful - navigate directly to segments of interest:
+
+```{r annotate-query}
+# Find all /t/ phonemes
+t_segments <- ask_for(corp, "Phonetic == t")
+
+# Open webApp at those specific segments
+serve(corp, seglist = t_segments)
+
+# The webApp will:
+# 1. Show only bundles containing /t/
+# 2. Automatically navigate to each /t/ segment
+# 3. Highlight the segment boundaries
+```
+
+### Workflow Example: Annotate Vowels
+
+```{r vowel-workflow}
+# 1. Query for vowels
+vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+
+# 2. Check how many bundles
+length(unique(paste(vowels$session, vowels$bundle)))
+# > 45 bundles with vowels
+
+# 3. Open annotation interface
+serve(corp, seglist = vowels)
+
+# 4. Annotate in the webApp:
+#    - Add stress markers
+#    - Adjust boundaries
+#    - Add comments
+
+# 5. Changes are saved automatically to the database
+```
+
+## Advanced Usage
+
+### Custom Server Settings
+
+```{r custom-server}
+# Use a different port (useful if default is busy)
+serve(corp, port = 8080)
+
+# Bind to a different interface
+serve(corp, host = "0.0.0.0", port = 17890)  # Allow external connections
+
+# Disable auto-opening browser
+serve(corp, autoOpenURL = "")
+
+# Use external browser instead of RStudio viewer
+serve(corp, useViewer = FALSE)
+```
+
+### Debug Mode
+
+```{r debug}
+# Enable debug output
+serve(corp, debug = TRUE, debugLevel = 2)
+
+# Debug levels:
+# 0 = no debug output
+# 1 = basic info
+# 2 = detailed protocol messages
+# 8 = maximum verbosity
+```
+
+### Working with Bundle Lists
+
+If your database has predefined bundle lists:
+
+```{r bundle-lists}
+# Serve a specific bundle list
+serve(corp, bundleListName = "AnnotationQueue")
+
+# This is useful for:
+# - Annotation workflows with specific bundles to review
+# - Quality control checklists
+# - Collaborative annotation (different annotators get different lists)
+```
+
+## Annotation Interface Features
+
+### Navigation
+
+Once the webApp opens:
+
+**Keyboard Shortcuts:**
+- `←` / `→` - Previous/Next bundle
+- `Space` - Play/Pause audio
+- `Ctrl + ←` / `Ctrl + →` - Move 10 seconds
+- `Ctrl + Shift + ←` / `Ctrl + Shift + →` - Move to start/end
+
+**Mouse:**
+- Click waveform - Set playback position
+- Drag on spectrogram - Create new segment
+- Click segment boundary - Adjust boundary
+- Right-click segment - Edit label or delete
+
+### Editing Annotations
+
+**Add Segments:**
+1. Select the target level in the level panel
+2. Drag on the spectrogram to create boundaries
+3. Type label in the popup
+4. Press Enter to confirm
+
+**Modify Segments:**
+1. Click segment boundary to drag it
+2. Double-click label to edit text
+3. Right-click → Delete to remove
+
+**Hierarchical Annotation:**
+- The interface shows parent-child relationships
+- Drag to link items across levels
+- Edit link types in the context menu
+
+### Signal Tracks
+
+View multiple signal representations:
+
+**Default Tracks:**
+- Waveform (OSCI)
+- Spectrogram (SPEC)
+
+**Add Custom Tracks:**
+```{r custom-tracks}
+# These must be pre-computed and added to the database
+# via emuR::add_ssffTrackDefinition()
+
+# Example: Add formant track
+# Then it will appear in the webApp automatically
+```
+
+## Stopping the Server
+
+**Method 1: Clear button in webApp**
+- Click the "clear" button in the EMU-webApp interface
+
+**Method 2: Close browser**
+- Simply close or reload the webApp page
+
+**Method 3: R command**
+```{r stop-server}
+# Stop all servers
+httpuv::stopAllServers()
+
+# Or restart R session
+.rs.restartR()  # In RStudio
+```
+
+## Quality Control Workflow
+
+Here's a complete workflow for annotation QC:
+
+```{r qc-workflow}
+library(reindeer)
+library(dplyr)
+
+# 1. Load corpus
+corp <- corpus("path/to/database_emuDB")
+
+# 2. Find segments that might need review
+#    (e.g., very short segments)
+all_segments <- ask_for(corp, "Phonetic =~ .*")
+
+short_segments <- all_segments %>%
+  mutate(duration = end - start) %>%
+  filter(duration < 20)  # Less than 20ms
+
+cat(sprintf("Found %d short segments to review\n", nrow(short_segments)))
+
+# 3. Open annotation interface for review
+serve(corp, seglist = short_segments)
+
+# 4. Annotator reviews and fixes in webApp
+#    - Adjust boundaries
+#    - Delete artifacts
+#    - Merge segments
+
+# 5. Re-query to verify fixes
+all_segments_updated <- ask_for(corp, "Phonetic =~ .*")
+
+short_segments_updated <- all_segments_updated %>%
+  mutate(duration = end - start) %>%
+  filter(duration < 20)
+
+cat(sprintf("Now %d short segments remain\n", nrow(short_segments_updated)))
+```
+
+## Integration with Analysis Pipeline
+
+The `serve()` function integrates seamlessly with analysis:
+
+```{r integration}
+# Analysis → Annotation → Re-analysis cycle
+
+# 1. Initial analysis
+corp <- corpus("path/to/database_emuDB")
+vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+formants <- quantify(vowels, superassp::forest)
+
+# 2. Find outliers
+library(dplyr)
+outliers <- formants %>%
+  group_by(label) %>%
+  mutate(
+    F1_z = scale(F1),
+    F2_z = scale(F2)
+  ) %>%
+  filter(abs(F1_z) > 3 | abs(F2_z) > 3) %>%
+  ungroup()
+
+cat(sprintf("Found %d outlier measurements\n", nrow(outliers)))
+
+# 3. Review outliers in context
+serve(corp, seglist = outliers)
+
+# Annotator checks:
+# - Are boundaries accurate?
+# - Is the label correct?
+# - Is there background noise?
+# - Should this token be excluded?
+
+# 4. Re-run analysis after corrections
+vowels_corrected <- ask_for(corp, "Phonetic =~ [aeiou]")
+formants_corrected <- quantify(vowels_corrected, superassp::forest)
+
+# 5. Compare results
+cat("Before correction:\n")
+summary(formants$F1)
+
+cat("\nAfter correction:\n")
+summary(formants_corrected$F1)
+```
+
+## Collaborative Annotation
+
+For team annotation projects:
+
+```{r collaborative}
+# 1. Set up bundle lists for each annotator
+corp <- corpus("path/to/database_emuDB")
+
+# Create bundle lists (one-time setup, using emuR)
+# emuR::add_bundleList(corp, "Annotator_A", bundles_A)
+# emuR::add_bundleList(corp, "Annotator_B", bundles_B)
+
+# 2. Each annotator serves their assigned list
+serve(corp, bundleListName = "Annotator_A")
+
+# 3. Track progress
+bundles_A <- emuR::read_bundleList(as_emuDBhandle(corp), "Annotator_A")
+
+# Check which have been annotated
+# (Look for .meta_json or specific annotation levels)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Problem:** WebApp doesn't open
+
+```{r troubleshoot-open}
+# Check if port is already in use
+serve(corp, port = 8080)  # Try different port
+
+# Check browser setting
+serve(corp, browser = getOption("browser"))
+```
+
+**Problem:** "EMU-webApp directory not found"
+
+```{r troubleshoot-path}
+# Set the path explicitly
+options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
+
+# Verify path exists
+dir.exists(getOption("reindeer.emuWebApp.dir"))
+```
+
+**Problem:** Changes not saving
+
+```{r troubleshoot-save}
+# Ensure database isn't read-only
+# Check file permissions on the database directory
+
+# Verify changes are reflected
+gather_metadata(corp, verbose = TRUE)
+```
+
+**Problem:** Server won't stop
+
+```{r troubleshoot-stop}
+# Force stop all servers
+httpuv::stopAllServers()
+
+# If that doesn't work, restart R session
+.rs.restartR()  # RStudio only
+```
+
+### Getting Help
+
+```{r help}
+# Function documentation
+?serve
+
+# Check server status
+# (No built-in status check, but server will error if already running)
+
+# View EMU-webApp console for errors
+# Open browser developer tools (F12)
+```
+
+## Tips and Best Practices
+
+### 1. Start Small
+
+```{r tip-small}
+# Don't serve the entire corpus at once
+# Start with a small session
+serve(corp, sessionPattern = "pilot_session")
+
+# Then scale up as needed
+```
+
+### 2. Use Query Results for Targeted Annotation
+
+```{r tip-query}
+# Much more efficient than browsing all bundles
+vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+serve(corp, seglist = vowels)
+```
+
+### 3. Save Regularly
+
+```{r tip-save}
+# The webApp auto-saves, but:
+# - Close properly (don't kill the server)
+# - Check database after major annotation sessions
+# - Consider git commits for version control
+```
+
+### 4. Use RStudio Viewer
+
+```{r tip-viewer}
+# Default behavior in RStudio
+serve(corp, useViewer = TRUE)
+
+# Benefits:
+# - Side-by-side with R console
+# - Easy to copy segment IDs or labels
+# - Switch between code and annotation
+```
+
+### 5. Keyboard Shortcuts
+
+Learn the keyboard shortcuts - they dramatically speed up annotation:
+- Space: Play/pause
+- Arrow keys: Navigate
+- Enter: Confirm edit
+- Esc: Cancel edit
+
+### 6. Check Configuration
+
+```{r tip-config}
+# Before a long annotation session:
+# 1. Verify correct levels are shown
+corp@config$levelDefinitions
+
+# 2. Check label definitions
+corp@config$labelDefinitions
+
+# 3. Ensure hierarchy is correct
+corp@config$linkDefinitions
+```
+
+## Example: Complete Annotation Session
+
+```{r complete-example}
+library(reindeer)
+library(dplyr)
+
+# === SETUP ===
+corp <- corpus("path/to/corpus_emuDB")
+
+# === FIND WORK TO DO ===
+# Find all words, check for missing phonetic annotations
+words <- ask_for(corp, "Word =~ .*")
+
+# Check which bundles have words but no phonetic tier
+bundles_with_words <- words %>%
+  select(session, bundle) %>%
+  distinct()
+
+phonemes <- ask_for(corp, "Phonetic =~ .*")
+bundles_with_phonemes <- phonemes %>%
+  select(session, bundle) %>%
+  distinct()
+
+bundles_needing_annotation <- anti_join(
+  bundles_with_words,
+  bundles_with_phonemes,
+  by = c("session", "bundle")
+)
+
+cat(sprintf("Found %d bundles needing phonetic annotation\n",
+            nrow(bundles_needing_annotation)))
+
+# === ANNOTATE ===
+# Convert to segment_list format for serve()
+work_segments <- words %>%
+  semi_join(bundles_needing_annotation, by = c("session", "bundle"))
+
+# Open annotation interface
+serve(corp, seglist = work_segments)
+
+# [ Annotator works in webApp ]
+# - Add phonetic segments within each word
+# - Adjust boundaries as needed
+# - Save changes (automatic)
+
+# === VERIFY ===
+# Check progress after annotation session
+phonemes_updated <- ask_for(corp, "Phonetic =~ .*")
+bundles_with_phonemes_updated <- phonemes_updated %>%
+  select(session, bundle) %>%
+  distinct()
+
+completed <- semi_join(
+  bundles_needing_annotation,
+  bundles_with_phonemes_updated,
+  by = c("session", "bundle")
+)
+
+cat(sprintf("Completed %d/%d bundles\n",
+            nrow(completed),
+            nrow(bundles_needing_annotation)))
+
+# === ANALYZE ===
+# Now ready for acoustic analysis
+phonemes_final <- ask_for(corp, "Phonetic =~ [aeiou]")
+formants <- quantify(phonemes_final, superassp::forest)
+
+# Proceed with analysis...
+```
+
+## Summary
+
+The `serve()` function provides:
+
+- **Easy launch** - One function call to start annotating
+- **Flexible filtering** - Serve exactly what you need to annotate
+- **Query integration** - Jump directly to segments of interest
+- **Seamless workflow** - Integrate annotation with analysis pipelines
+- **Auto-save** - Changes persist to database automatically
+
+This makes interactive annotation a natural part of your reindeer workflow, not a separate step with external tools.
+
+## See Also
+
+- `?serve` - Complete function documentation
+- `vignette("getting_started")` - Reindeer basics
+- `vignette("transcription_workflow")` - Automatic annotation
+- EMU-webApp documentation: https://ips-lmu.github.io/EMU-webApp/
