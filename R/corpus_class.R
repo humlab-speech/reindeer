@@ -9,6 +9,7 @@
 #'
 #' @param path Either a file path ending in '_emuDB' or an emuDBhandle object
 #' @param verbose Show progress messages during construction
+#' @param create Logical; if TRUE and path doesn't exist, create a new database
 #'
 #' @returns A corpus object with access to database contents
 #'
@@ -45,7 +46,7 @@ corpus <- S7::new_class(
     .connection = S7::class_any,
     .connection_valid = S7::class_logical
   ),
-  constructor = function(path, verbose = FALSE) {
+  constructor = function(path, verbose = FALSE, create = FALSE) {
     # Input validation with assertthat
     assertthat::assert_that(
       !is.null(path),
@@ -56,22 +57,48 @@ corpus <- S7::new_class(
       assertthat::is.flag(verbose),
       msg = "verbose must be TRUE or FALSE"
     )
+    assertthat::assert_that(
+      assertthat::is.flag(create),
+      msg = "create must be TRUE or FALSE"
+    )
 
     if (is.character(path)) {
       assertthat::assert_that(
         assertthat::is.string(path),
         msg = "path must be a single character string"
       )
-      assertthat::assert_that(
-        dir.exists(path),
-        msg = sprintf("Database path '%s' does not exist", path)
-      )
-      assertthat::assert_that(
-        stringr::str_ends(basename(path), "_emuDB"),
-        msg = "Database directory should end with '_emuDB'"
-      )
-      basePath <- path
-      dbName <- stringr::str_remove(basename(basePath), "_emuDB$")
+      
+      # Auto-append _emuDB if not present
+      if (!stringr::str_ends(path, "_emuDB")) {
+        path <- paste0(path, "_emuDB")
+        if (verbose) {
+          cli::cli_alert_info("Auto-appending suffix: {.path {path}}")
+        }
+      }
+      
+      # Check if path exists
+      if (!dir.exists(path)) {
+        if (create) {
+          # Create new database
+          dbName <- stringr::str_remove(basename(path), "_emuDB$")
+          basePath <- create_new_emuDB(path, dbName, verbose)
+        } else {
+          # Provide helpful error message
+          cli::cli_abort(c(
+            "Database path {.path {path}} does not exist",
+            "i" = "To create a new corpus, use: {.code corpus('{path}', create = TRUE)}",
+            "i" = "Or create with emuR first: {.code emuR::create_emuDB(name='{stringr::str_remove(basename(path), '_emuDB$')}', targetDir='{dirname(path)}')}"
+          ))
+        }
+      } else {
+        # Path exists - validate it's a proper _emuDB
+        assertthat::assert_that(
+          stringr::str_ends(basename(path), "_emuDB"),
+          msg = "Database directory should end with '_emuDB'"
+        )
+        basePath <- path
+        dbName <- stringr::str_remove(basename(basePath), "_emuDB$")
+      }
 
       # Build/update cache with progress display
       build_emuDB_cache(basePath, verbose = verbose)
@@ -108,6 +135,10 @@ corpus <- S7::new_class(
       .connection = NULL,
       .connection_valid = FALSE
     )
+    
+    # Add "corpus" as FIRST class for S3 method dispatch priority
+    # This allows [<-.corpus to work, taking precedence over S7's subsettability check
+    class(corpus_obj) <- c("corpus", class(corpus_obj))
 
     # Check for auto-sync on load
     sync_config <- load_sync_config_from_path(basePath)

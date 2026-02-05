@@ -9,6 +9,7 @@
   # Import method assignment operator from S7
   S7::method(print, corpus) <- .print_corpus
   S7::method(summary, corpus) <- .summary_corpus
+  S7::method(`[`, corpus) <- .subset_corpus
 
   invisible()
 }

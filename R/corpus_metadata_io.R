@@ -7,6 +7,14 @@ corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, 
   is_session_all <- is.null(session_pattern) || session_pattern == ".*"
   is_bundle_all <- is.null(bundle_pattern) || bundle_pattern == ".*"
   
+  # Validate names if they're literal (not wildcards)
+  if (!is_session_all) {
+    validate_name(session_pattern, "Session name", allow_regex = TRUE)
+  }
+  if (!is_bundle_all && !is_session_all) {
+    validate_name(bundle_pattern, "Bundle name", allow_regex = TRUE)
+  }
+  
   if (is_session_all && is_bundle_all) {
     # Database level
     set_metadata_database(corpus_obj, metadata_list)
@@ -167,10 +175,9 @@ corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, med
   # - Vector with channel assignments: c("egg", "path.mp3", NULL, "flow")
   # - Vector with file first: c("path.mp3", "egg", NULL, "flow")
   
-  if (grepl("[.*+?^${}()|\\[\\]]", session_pattern) || 
-      grepl("[.*+?^${}()|\\[\\]]", bundle_pattern)) {
-    cli::cli_abort("Regex patterns not allowed for media import. Specify exact session and bundle names.")
-  }
+  # Validate that these are literal names, not patterns
+  validate_name(session_pattern, "Session name", allow_regex = FALSE)
+  validate_name(bundle_pattern, "Bundle name", allow_regex = FALSE)
   
   # Find the unique bundle
   con <- get_corpus_connection(corpus_obj)
@@ -182,8 +189,19 @@ corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, med
   
   matching_bundles <- bundles[session_matches & bundle_matches, ]
   
+  # If bundle doesn't exist, create it
   if (nrow(matching_bundles) == 0) {
-    cli::cli_abort("Bundle {.val {bundle_pattern}} not found in session {.val {session_pattern}}")
+    DBI::dbDisconnect(con)  # Close connection before creating
+    on.exit()  # Remove the on.exit handler
+    
+    cli::cli_alert_info("Creating new session/bundle: {.field {session_pattern}}/{.field {bundle_pattern}}")
+    create_session_and_bundle(corpus_obj, session_pattern, bundle_pattern, verbose = TRUE)
+    
+    # Reconnect and verify
+    con <- get_corpus_connection(corpus_obj)
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
+    bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)
+    matching_bundles <- bundles[bundles$session == session_pattern & bundles$name == bundle_pattern, ]
   }
   
   if (nrow(matching_bundles) > 1) {

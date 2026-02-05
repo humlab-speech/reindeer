@@ -5,6 +5,8 @@
 \title{Assign values to corpus bundles - metadata or media import}
 \usage{
 \method{[}{corpus}(x, i = NULL, j = NULL) <- value
+
+\method{[}{corpus}(x, i = NULL, j = NULL) <- value
 }
 \arguments{
 \item{x}{A corpus object}
@@ -17,10 +19,23 @@
 
 \item{...}{Additional arguments (unused)}
 }
+\value{
+Modified corpus object (invisibly)
+}
 \description{
+Assign metadata or import media files to corpus bundles using bracket notation.
+
 Assign metadata values to a corpus, session, or bundle using bracket notation.
 }
 \examples{
+\dontrun{
+# Set metadata
+corpus["Session1", "Bundle1"] <- list(Age = 25, Gender = "F")
+
+# Import media file
+corpus["Session1", "Bundle1"] <- "path/to/audio.wav"
+}
+
 \dontrun{
 mycorpus["Session1", "Bundle1"] <- list(Age = 25, Sex = "Male")
 }

@@ -4,12 +4,14 @@
 \alias{corpus}
 \title{Corpus Class - Represents an EmuR database with persistent connection and metadata management}
 \usage{
-corpus(path, verbose = FALSE)
+corpus(path, verbose = FALSE, create = FALSE)
 }
 \arguments{
 \item{path}{Either a file path ending in '_emuDB' or an emuDBhandle object}
 
 \item{verbose}{Show progress messages during construction}
+
+\item{create}{Logical; if TRUE and path doesn't exist, create a new database}
 }
 \value{
 A corpus object with access to database contents

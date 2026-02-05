@@ -5,20 +5,12 @@ NULL
 # CORPUS SUBSETTING OPERATORS - corpus[i, j]
 # ==============================================================================
 
+# Define implementation functions for S7 methods
+# These will be registered in .onLoad() to ensure proper dispatch
+
 #' Subset corpus to get bundle list with metadata
-#'
-#' @description 
-#' Subset corpus to get bundle list with metadata
-#' 
-#' Extract bundles from corpus using bracket notation
-#' @param x corpus object
-#' @param i session pattern (regex or literal)
-#' @param j bundle pattern (regex or literal)
-#' @param ... Additional arguments (unused)
-#' @param drop Logical; unused (for S3 compatibility)
-#' @return bundle_list object (tibble with session, bundle, and metadata columns)
-#' @name [.corpus
-S7::method(`[`, corpus) <- function(x, i, j, ..., drop = FALSE) {
+#' @keywords internal
+.subset_corpus <- function(x, i, j, ..., drop = FALSE) {
   # Handle various indexing patterns
   session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"
   bundle_pattern <- if (!missing(j) && !is.null(j)) j else ".*"
@@ -53,15 +45,28 @@ S7::method(`[`, corpus) <- function(x, i, j, ..., drop = FALSE) {
 }
 
 #' Assign values to corpus bundles - metadata or media import
-#'
+#' 
+#' @description
+#' Assign metadata or import media files to corpus bundles using bracket notation.
+#' 
 #' @param x corpus object
-#' @param i session pattern
-#' @param j bundle pattern
+#' @param i session name (literal, not regex)
+#' @param j bundle name (literal, not regex)
 #' @param ... Additional arguments (unused)
 #' @param value Either a named list (metadata) or character vector (media files)
-#' @name [<-.corpus
+#' @return Modified corpus object (invisibly)
+#' 
+#' @examples
+#' \dontrun{
+#' # Set metadata
+#' corpus["Session1", "Bundle1"] <- list(Age = 25, Gender = "F")
+#' 
+#' # Import media file
+#' corpus["Session1", "Bundle1"] <- "path/to/audio.wav"
+#' }
+#' 
 #' @export
-S7::method(`[<-`, corpus) <- function(x, i, j, ..., value) {
+`[<-.corpus` <- function(x, i, j, ..., value) {
   # Determine what type of assignment this is
   if (is.list(value) && !is.null(names(value))) {
     # Metadata assignment
