@@ -35,3 +35,6 @@ vignettes/*.pdf
 *.o
 *.so
 *.dylib
+
+# Build logs
+build.log
