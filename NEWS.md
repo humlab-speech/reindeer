@@ -1,5 +1,96 @@
 # reindeer 0.2.5 (Development)
 
+## Major New Features 🎉
+
+### Corpus Creation from Scratch
+
+* `corpus()` now supports creating new EMU databases with `create = TRUE` parameter
+* Automatically appends `_emuDB` suffix if not present
+* Provides helpful error messages when database doesn't exist
+* Uses `emuR::create_emuDB()` internally for full compatibility
+
+### Dynamic Session and Bundle Creation
+
+* New function `create_session_and_bundle()` for programmatic corpus building
+* Automatically creates proper directory structure (`<session>_ses/<bundle>_bndl/`)
+* Generates minimal `_annot.json` files
+* Updates SQLite cache automatically
+* Auto-creation when importing media to non-existent sessions/bundles
+
+### Name Validation
+
+* New `validate_name()` function ensures valid session/bundle names
+* Blocks regex special characters for literal names
+* Prevents path separators and problematic characters
+* Provides clear validation error messages
+
+## Bug Fixes 🐛
+
+### Bracket Assignment Operator
+
+* **Fixed critical issue**: `corpus[i, j] <- value` now works correctly
+* Resolved S7/S3 method dispatch conflict by adjusting class order
+* Added "corpus" as first class in hierarchy for proper S3 dispatch
+* Class order now: `corpus < reindeer::corpus < S7_object`
+* Bracket notation now works for both metadata assignment and media import
+
+### Media Import
+
+* `corpus_import_media()` now validates names properly
+* Auto-creates missing sessions/bundles before import
+* Better error handling and progress messages
+
+## Improvements
+
+### Error Messages
+
+* Significantly improved error messages throughout
+* Helpful suggestions when database path doesn't exist
+* Clear guidance for name validation failures
+* Better context in all error conditions
+
+### Documentation
+
+* Added comprehensive roxygen documentation for new functions
+* Created `CORPUS_CREATION_IMPLEMENTATION.md` technical guide
+* Updated function examples with corpus creation workflows
+* Improved parameter descriptions
+
+## Internal Changes
+
+* New file `R/corpus_creation.R` with creation utilities
+* Modified `R/corpus_class.R` constructor to support `create` parameter
+* Fixed `R/corpus_methods.R` subsetting operator registration
+* Updated `R/zzz.R` to register S7 `[` method in `.onLoad()`
+* Enhanced `R/corpus_metadata_io.R` with validation and auto-creation
+
+## Breaking Changes
+
+None - fully backward compatible. Existing code continues to work unchanged.
+
+## Usage Example
+
+```r
+library(reindeer)
+
+# Create new corpus from scratch
+VISP <- corpus("VISP", create = TRUE)
+
+# Add metadata
+add_metadata(VISP, list(
+  Project = "VISP",
+  Language = "Swedish"
+))
+
+# Create session and bundle
+create_session_and_bundle(VISP, "Svenska", "Annie")
+
+# Import media (auto-creates if needed)
+# VISP["Svenska", "Erik"] <- "path/to/audio.wav"
+```
+
+---
+
 ## Code Quality Improvements 🧹
 
 ### Repository Cleanup
