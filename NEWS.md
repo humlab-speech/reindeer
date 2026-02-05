@@ -1,3 +1,11 @@
+# reindeer 0.3.2 (2026-02-05)
+
+## Minor Update
+
+Version bump for consistency with ongoing development.
+
+---
+
 # reindeer 0.3.1 (Documentation Update - 2026-02-05)
 
 ## Documentation Improvements
