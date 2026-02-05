@@ -150,48 +150,8 @@ test_that("check_quantify_cache_size works with corpus", {
   })
 })
 
-test_that("check_draft_cache_size works with corpus", {
-  skip_if_not_installed("emuR")
-
-  test_dir <- tempdir()
-  db_path <- file.path(test_dir, "test_draft_cache_size_emuDB")
-
-  if (dir.exists(db_path)) {
-    unlink(db_path, recursive = TRUE)
-  }
-
-  tryCatch({
-    emuR::create_emuDB(name = "test_draft_cache_size", targetDir = test_dir, verbose = FALSE)
-    corp <- corpus(db_path)
-
-    # Create draft cache directory and files
-    cache_dir <- reindeer:::get_draft_cache_dir(corp)
-    dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
-
-    # Create some test cache files
-    file1 <- file.path(cache_dir, "momel_intsint_20251020.sqlite")
-    file2 <- file.path(cache_dir, "test_function_20251019.sqlite")
-    writeLines(rep("data", 100), file1)
-    writeLines(rep("data", 100), file2)
-
-    result <- check_draft_cache_size(
-      corp,
-      warn_threshold = "10 MB",
-      max_threshold = "20 MB",
-      verbose = FALSE
-    )
-
-    expect_type(result, "list")
-    expect_false(result$warn_exceeded)
-    expect_false(result$max_exceeded)
-    expect_true(result$size_bytes > 0)
-  }, error = function(e) {
-    skip("Could not create corpus object")
-  }, finally = {
-    # Clean up
-    unlink(db_path, recursive = TRUE)
-  })
-})
+# Test removed: check_draft_cache_size() removed from reindeer
+# Use protoscribe::check_draft_cache_size() for draft cache management
 
 test_that("list_cache_files returns correct structure", {
   skip_if_not_installed("emuR")
@@ -207,16 +167,16 @@ test_that("list_cache_files returns correct structure", {
     emuR::create_emuDB(name = "test_list_cache", targetDir = test_dir, verbose = FALSE)
     corp <- corpus(db_path)
 
-    # Create cache files
-    draft_dir <- reindeer:::get_draft_cache_dir(corp)
-    dir.create(draft_dir, showWarnings = FALSE, recursive = TRUE)
+    # Create quantify cache files
+    quantify_dir <- reindeer:::get_quantify_cache_dir(corp)
+    dir.create(quantify_dir, showWarnings = FALSE, recursive = TRUE)
 
-    file1 <- file.path(draft_dir, "test1_20251020.sqlite")
-    file2 <- file.path(draft_dir, "test2_20251019.sqlite")
+    file1 <- file.path(quantify_dir, "test1.rds")
+    file2 <- file.path(quantify_dir, "test2.qs")
     writeLines("data", file1)
     writeLines("data", file2)
 
-    result <- list_cache_files(corp, cache_type = "draft")
+    result <- list_cache_files(corp, cache_type = "quantify")
 
     expect_s3_class(result, "data.frame")
     expect_true(nrow(result) >= 2)
@@ -271,47 +231,10 @@ test_that("remove_old_cache_files removes files older than threshold", {
   expect_true(file.exists(recent_file))  # Should still exist
 })
 
-test_that("clean_draft_cache removes old files", {
-  skip_if_not_installed("emuR")
+# Test removed: clean_draft_cache() removed from reindeer
+# Use protoscribe::clean_draft_cache() for draft cache management
 
-  test_dir <- tempdir()
-  db_path <- file.path(test_dir, "test_clean_draft_emuDB")
-
-  if (dir.exists(db_path)) {
-    unlink(db_path, recursive = TRUE)
-  }
-
-  tryCatch({
-    emuR::create_emuDB(name = "test_clean_draft", targetDir = test_dir, verbose = FALSE)
-    corp <- corpus(db_path)
-
-    # Create draft cache with old file
-    cache_dir <- reindeer:::get_draft_cache_dir(corp)
-    dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
-
-    old_file <- file.path(cache_dir, "test_20250101.sqlite")
-    writeLines("old data", old_file)
-
-    # Set modification time to 60 days ago
-    old_time <- Sys.time() - (60 * 24 * 3600)
-    Sys.setFileTime(old_file, old_time)
-
-    # Dry run
-    result <- clean_draft_cache(corp, days_old = 30, dry_run = TRUE, verbose = FALSE)
-    expect_true(file.exists(old_file))
-
-    # Real cleanup
-    result <- clean_draft_cache(corp, days_old = 30, dry_run = FALSE, verbose = FALSE)
-    expect_false(file.exists(old_file))
-  }, error = function(e) {
-    skip("Could not create corpus object")
-  }, finally = {
-    # Clean up
-    unlink(db_path, recursive = TRUE)
-  })
-})
-
-test_that("check_all_cache_sizes checks all cache types", {
+test_that("check_all_cache_sizes checks quantify and simulation caches", {
   skip_if_not_installed("emuR")
 
   test_dir <- tempdir()
@@ -325,10 +248,10 @@ test_that("check_all_cache_sizes checks all cache types", {
     emuR::create_emuDB(name = "test_all_caches", targetDir = test_dir, verbose = FALSE)
     corp <- corpus(db_path)
 
-    # Create various cache files
-    draft_dir <- reindeer:::get_draft_cache_dir(corp)
-    dir.create(draft_dir, showWarnings = FALSE, recursive = TRUE)
-    writeLines("draft", file.path(draft_dir, "test_20251020.sqlite"))
+    # Create quantify cache files
+    quantify_dir <- reindeer:::get_quantify_cache_dir(corp)
+    dir.create(quantify_dir, showWarnings = FALSE, recursive = TRUE)
+    writeLines("quantify", file.path(quantify_dir, "test.rds"))
 
     # Suppress output
     result <- suppressMessages(
@@ -336,7 +259,9 @@ test_that("check_all_cache_sizes checks all cache types", {
     )
 
     expect_type(result, "list")
-    expect_true("draft" %in% names(result))
+    expect_true("quantify" %in% names(result))
+    # Draft cache should NOT be in result anymore
+    expect_false("draft" %in% names(result))
   }, error = function(e) {
     skip("Could not create corpus object")
   }, finally = {

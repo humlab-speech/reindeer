@@ -27,7 +27,8 @@ clean_all_caches(
 Named list with number of files deleted from each cache
 }
 \description{
-Clean all caches for a corpus
+Cleans quantify/enrich and simulation caches. For draft annotation cache
+cleanup, use protoscribe package functions.
 }
 \examples{
 \dontrun{

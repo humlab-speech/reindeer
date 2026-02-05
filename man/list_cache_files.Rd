@@ -9,18 +9,19 @@ list_cache_files(corpus_obj, cache_type = "all")
 \arguments{
 \item{corpus_obj}{A corpus object}
 
-\item{cache_type}{Type of cache: "quantify", "draft", or "all"}
+\item{cache_type}{Type of cache: "quantify" or "all" (same as "quantify")}
 }
 \value{
 Data frame with cache file information
 }
 \description{
-List cache files with size information
+Lists quantify/enrich cache files. For draft annotation cache files,
+use protoscribe package functions.
 }
 \examples{
 \dontrun{
 corp <- corpus("path/to/db_emuDB")
-list_cache_files(corp, "draft")
+list_cache_files(corp, "quantify")
 list_cache_files(corp, "all")
 }
 }

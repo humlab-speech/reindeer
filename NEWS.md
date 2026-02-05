@@ -64,9 +64,34 @@ library(protoscribe) # Draft annotations
 - ✅ protoscribe can be developed independently
 - ✅ Better code maintainability
 
+### Cache Management Changes
+
+Draft annotation cache management functions have been **removed** from reindeer:
+
+**Removed functions:**
+- `check_draft_cache_size()` → Use `protoscribe::check_draft_cache_size()`
+- `clean_draft_cache()` → Use `protoscribe::clean_draft_cache()`
+
+**Modified functions (draft cache support removed):**
+- `check_all_cache_sizes()` - Now only checks quantify and simulation caches
+- `clean_all_caches()` - Now only cleans quantify and simulation caches  
+- `list_cache_files()` - No longer supports `cache_type = "draft"`
+- `manage_cache()` - Removed "draft" and "simulation" from cache_type options
+
+**Migration:**
+```r
+# For draft annotation cache management
+library(protoscribe)
+protoscribe::check_draft_cache_size(corp)
+protoscribe::clean_draft_cache(corp, days_old = 30)
+```
+
 ### Breaking Changes
 
-**Action Required:** Update your code to use `protoscribe::` prefix for all draft annotation functions.
+**Action Required:** 
+1. Update your code to use `protoscribe::` prefix for all draft annotation functions
+2. Use `protoscribe::check_draft_cache_size()` instead of `reindeer::check_draft_cache_size()`
+3. Use `protoscribe::clean_draft_cache()` instead of `reindeer::clean_draft_cache()`
 
 **No action needed if:** You only use reindeer for corpus management, queries (`ask_for()`), signal processing (`quantify()`), or metadata operations.
 

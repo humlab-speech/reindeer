@@ -1,0 +1,21 @@
+* checking for file ‘./DESCRIPTION’ ... OK
+* preparing ‘reindeer’:
+* checking DESCRIPTION meta-information ... OK
+* cleaning src
+* installing the package to process help pages
+* saving partial Rd database
+* cleaning src
+* checking for LF line-endings in source and make files and shell scripts
+* checking for empty or unneeded directories
+Removed empty directory ‘reindeer/.qodo’
+Removed empty directory ‘reindeer/R/deprecated’
+Removed empty directory ‘reindeer/images’
+Removed empty directory ‘reindeer/inst/pymomelintsint/.idea/inspectionProfiles’
+Removed empty directory ‘reindeer/inst/pymomelintsint/testdata’
+Removed empty directory ‘reindeer/tests/testthat/_snaps’
+  NB: this package now depends on R (>= 3.5.0)
+  WARNING: Added dependency on R >= 3.5.0 because serialized objects in
+  serialize/load version 3 cannot be read in older versions of R.
+  File(s) containing such objects:
+    ‘reindeer/data/DSPP.rda’
+* building ‘reindeer_0.3.0.tar.gz’

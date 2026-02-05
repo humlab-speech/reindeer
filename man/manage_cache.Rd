@@ -8,7 +8,7 @@ manage_cache(
   corpus,
   action = c("status", "list", "clean"),
   days_old = 30,
-  cache_type = c("all", "quantify", "draft", "simulation"),
+  cache_type = c("all", "quantify"),
   dry_run = TRUE
 )
 }
@@ -26,7 +26,7 @@ manage_cache(
 (default: 30 days)}
 
 \item{cache_type}{Character; type of cache to manage for "list" action:
-"all" (default), "quantify", "draft", or "simulation"}
+"all" (default) or "quantify"}
 
 \item{dry_run}{Logical; for "clean" action, preview what would be deleted
 without actually deleting (default: TRUE)}
@@ -42,8 +42,10 @@ Depends on action:
 \description{
 User-friendly wrapper for cache management operations. Provides a unified
 interface for checking cache status, listing cache files, and cleaning old
-cache data across all cache systems (quantify/enrich, draft annotations,
-and simulations).
+cache data for quantify/enrich and simulation caches.
+}
+\details{
+For draft annotation cache management, use protoscribe package functions.
 }
 \examples{
 \dontrun{
@@ -59,7 +61,7 @@ manage_cache(corpus, action = "clean", days_old = 30)
 # Actually clean old files
 manage_cache(corpus, action = "clean", days_old = 30, dry_run = FALSE)
 
-# List only draft caches
-manage_cache(corpus, action = "list", cache_type = "draft")
+# List only quantify caches
+manage_cache(corpus, action = "list", cache_type = "quantify")
 }
 }

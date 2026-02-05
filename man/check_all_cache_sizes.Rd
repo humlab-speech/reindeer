@@ -17,7 +17,8 @@ check_all_cache_sizes(corpus_obj, simulation_store = NULL, verbose = TRUE)
 List with all cache sizes
 }
 \description{
-Check all cache sizes for a corpus
+Checks cache sizes for quantify/enrich and simulation caches.
+For draft annotation cache management, use protoscribe package functions.
 }
 \examples{
 \dontrun{

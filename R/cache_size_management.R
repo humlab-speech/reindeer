@@ -5,9 +5,10 @@
 # Unified infrastructure for monitoring and managing cache sizes across:
 # - Persistent quantify/enrich caches
 # - Simulation result caches
-# - Draft annotation caches
 #
 # Provides warnings when caches become large and utilities for cleanup.
+#
+# Note: Draft annotation cache management is handled by the protoscribe package.
 
 # ==============================================================================
 # SIZE UTILITIES
@@ -276,31 +277,10 @@ check_simulation_cache_size <- function(simulation_store,
   )
 }
 
-#' Check draft annotation cache sizes
-#'
-#' @param corpus_obj A corpus object
-#' @param warn_threshold Warning threshold (default: 500 MB)
-#' @param max_threshold Maximum threshold (default: 2 GB)
-#' @param verbose Show messages
-#' @return Cache size information
-#' @export
-check_draft_cache_size <- function(corpus_obj,
-                                    warn_threshold = "500 MB",
-                                    max_threshold = "2 GB",
-                                    verbose = TRUE) {
-
-  cache_dir <- get_draft_cache_dir(corpus_obj)
-
-  check_cache_size(
-    cache_dir,
-    cache_type = "Draft annotation",
-    warn_threshold = warn_threshold,
-    max_threshold = max_threshold,
-    verbose = verbose
-  )
-}
-
 #' Check all cache sizes for a corpus
+#'
+#' Checks cache sizes for quantify/enrich and simulation caches.
+#' For draft annotation cache management, use protoscribe package functions.
 #'
 #' @param corpus_obj A corpus object
 #' @param simulation_store Optional simulation store directory
@@ -324,9 +304,6 @@ check_all_cache_sizes <- function(corpus_obj,
   # Check quantify cache
   quantify_info <- check_quantify_cache_size(corpus_obj, verbose = verbose)
 
-  # Check draft cache
-  draft_info <- check_draft_cache_size(corpus_obj, verbose = verbose)
-
   # Check simulation cache if provided
   simulation_info <- if (!is.null(simulation_store)) {
     check_simulation_cache_size(simulation_store, verbose = verbose)
@@ -335,8 +312,7 @@ check_all_cache_sizes <- function(corpus_obj,
   }
 
   # Calculate total
-  total_size <- quantify_info$size_bytes + draft_info$size_bytes +
-    (simulation_info$size_bytes %||% 0)
+  total_size <- quantify_info$size_bytes + (simulation_info$size_bytes %||% 0)
 
   if (verbose) {
     cli::cli_alert_info("Total cache size: {.val {format_bytes(total_size)}}")
@@ -344,7 +320,6 @@ check_all_cache_sizes <- function(corpus_obj,
 
   invisible(list(
     quantify = quantify_info,
-    draft = draft_info,
     simulation = simulation_info,
     total_bytes = total_size,
     total_formatted = format_bytes(total_size)
@@ -448,29 +423,6 @@ clean_quantify_cache <- function(corpus_obj,
                           dry_run = dry_run, verbose = verbose)
 }
 
-#' Clean draft annotation cache
-#'
-#' @param corpus_obj A corpus object
-#' @param days_old Remove files older than this many days (default: 30)
-#' @param dry_run If TRUE, only show what would be deleted
-#' @param verbose Show messages
-#' @return Number of files deleted
-#' @export
-clean_draft_cache <- function(corpus_obj,
-                               days_old = 30,
-                               dry_run = FALSE,
-                               verbose = TRUE) {
-
-  cache_dir <- get_draft_cache_dir(corpus_obj)
-
-  if (verbose) {
-    cli::cli_h3("Cleaning draft annotation cache")
-  }
-
-  remove_old_cache_files(cache_dir, days_old, pattern = "\\.sqlite$",
-                          dry_run = dry_run, verbose = verbose)
-}
-
 #' Clean simulation cache
 #'
 #' @param simulation_store Simulation store directory
@@ -493,6 +445,9 @@ clean_simulation_cache <- function(simulation_store,
 }
 
 #' Clean all caches for a corpus
+#'
+#' Cleans quantify/enrich and simulation caches. For draft annotation cache
+#' cleanup, use protoscribe package functions.
 #'
 #' @param corpus_obj A corpus object
 #' @param simulation_store Optional simulation store directory
@@ -529,7 +484,6 @@ clean_all_caches <- function(corpus_obj,
   }
 
   quantify_deleted <- clean_quantify_cache(corpus_obj, days_old, dry_run, verbose)
-  draft_deleted <- clean_draft_cache(corpus_obj, days_old, dry_run, verbose)
 
   simulation_deleted <- if (!is.null(simulation_store)) {
     clean_simulation_cache(simulation_store, days_old, dry_run, verbose)
@@ -537,7 +491,7 @@ clean_all_caches <- function(corpus_obj,
     0
   }
 
-  total <- quantify_deleted + draft_deleted + simulation_deleted
+  total <- quantify_deleted + simulation_deleted
 
   if (verbose) {
     if (dry_run) {
@@ -549,7 +503,6 @@ clean_all_caches <- function(corpus_obj,
 
   invisible(list(
     quantify = quantify_deleted,
-    draft = draft_deleted,
     simulation = simulation_deleted,
     total = total
   ))
@@ -567,39 +520,32 @@ get_quantify_cache_dir <- function(corpus_obj) {
 
 #' List cache files with size information
 #'
+#' Lists quantify/enrich cache files. For draft annotation cache files,
+#' use protoscribe package functions.
+#'
 #' @param corpus_obj A corpus object
-#' @param cache_type Type of cache: "quantify", "draft", or "all"
+#' @param cache_type Type of cache: "quantify" or "all" (same as "quantify")
 #' @return Data frame with cache file information
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' corp <- corpus("path/to/db_emuDB")
-#' list_cache_files(corp, "draft")
+#' list_cache_files(corp, "quantify")
 #' list_cache_files(corp, "all")
 #' }
 list_cache_files <- function(corpus_obj, cache_type = "all") {
 
-  cache_type <- match.arg(cache_type, c("all", "quantify", "draft"))
+  cache_type <- match.arg(cache_type, c("all", "quantify"))
 
   results <- list()
 
-  if (cache_type %in% c("all", "quantify")) {
-    quantify_dir <- get_quantify_cache_dir(corpus_obj)
-    quantify_files <- get_cache_dir_summary(quantify_dir, pattern = "\\.rds$|\\.qs$")
-    if (nrow(quantify_files) > 0) {
-      quantify_files$type <- "quantify"
-      results$quantify <- quantify_files
-    }
-  }
-
-  if (cache_type %in% c("all", "draft")) {
-    draft_dir <- get_draft_cache_dir(corpus_obj)
-    draft_files <- get_cache_dir_summary(draft_dir, pattern = "\\.sqlite$")
-    if (nrow(draft_files) > 0) {
-      draft_files$type <- "draft"
-      results$draft <- draft_files
-    }
+  # Only quantify caches are managed by reindeer
+  quantify_dir <- get_quantify_cache_dir(corpus_obj)
+  quantify_files <- get_cache_dir_summary(quantify_dir, pattern = "\\.rds$|\\.qs$")
+  if (nrow(quantify_files) > 0) {
+    quantify_files$type <- "quantify"
+    results$quantify <- quantify_files
   }
 
   if (length(results) == 0) {
@@ -629,8 +575,9 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #'
 #' User-friendly wrapper for cache management operations. Provides a unified
 #' interface for checking cache status, listing cache files, and cleaning old
-#' cache data across all cache systems (quantify/enrich, draft annotations,
-#' and simulations).
+#' cache data for quantify/enrich and simulation caches.
+#'
+#' For draft annotation cache management, use protoscribe package functions.
 #'
 #' @param corpus A corpus object
 #' @param action Character; one of:
@@ -640,7 +587,7 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #' @param days_old Integer; for "clean" action, remove files older than this
 #'   (default: 30 days)
 #' @param cache_type Character; type of cache to manage for "list" action:
-#'   "all" (default), "quantify", "draft", or "simulation"
+#'   "all" (default) or "quantify"
 #' @param dry_run Logical; for "clean" action, preview what would be deleted
 #'   without actually deleting (default: TRUE)
 #'
@@ -665,13 +612,13 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #' # Actually clean old files
 #' manage_cache(corpus, action = "clean", days_old = 30, dry_run = FALSE)
 #'
-#' # List only draft caches
-#' manage_cache(corpus, action = "list", cache_type = "draft")
+#' # List only quantify caches
+#' manage_cache(corpus, action = "list", cache_type = "quantify")
 #' }
 manage_cache <- function(corpus,
                         action = c("status", "list", "clean"),
                         days_old = 30,
-                        cache_type = c("all", "quantify", "draft", "simulation"),
+                        cache_type = c("all", "quantify"),
                         dry_run = TRUE) {
 
   # Input validation with assertthat

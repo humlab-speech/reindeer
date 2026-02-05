@@ -466,15 +466,14 @@ corpus_emuDB/
 ├── .quantify_cache/             # Persistent quantify/enrich cache
 │   ├── cache_item1.rds
 │   └── cache_item2.qs
-├── .draft_cache/                # Draft annotation caches
-│   ├── momel_intsint_20251020.sqlite
-│   └── momel_intsint_20251019.sqlite
 └── sessions/bundles...
 
 simulations/                     # Simulation caches (user-specified location)
 ├── 20251020_forest.sqlite
 └── 20251019_ksvF0.sqlite
 ```
+
+**Note:** Draft annotation caches (`.draft_cache/`) are managed by the protoscribe package.
 
 **Cache priority**:
 1. Ground truth: JSON files (`.meta_json`, `_annot.json`)
@@ -491,5 +490,4 @@ simulations/                     # Simulation caches (user-specified location)
 6. **Update docs**: Roxygen comments for functions, vignettes for workflows
 7. **S7 class properties**: Use `@` not `$` for S7 objects
 8. **Cache invalidation**: Consider digest/hash when modifying cache-related code
-9. **Cache management**: Use `check_*_cache_size()` and `clean_*_cache()` functions
-10. **Draft functions**: Prefix with `draft_` and integrate caching from `R/draft_cache_system.R`
+9. **Cache management**: Use `check_*_cache_size()` and `clean_*_cache()` functions (draft cache functions in protoscribe)
