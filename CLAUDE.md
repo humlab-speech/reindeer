@@ -8,12 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Metadata management with SQLite caching
 - Speech signal processing with age/gender-appropriate parameters
-- Annotation and transcription systems
 - Query optimization using direct SQLite access
 - Track data quantification and enrichment
 - Interactive annotation via EMU-webApp
 
 The package uses modern S7 classes and data.table for performance, with extensive caching to handle computationally intensive operations on large speech corpora.
+
+**For draft annotation generation** (MOMEL/INTSINT, periods, VOT, VAD, etc.), use the companion package **[protoscribe](https://github.com/humlab-speech/protoscribe)**. As of v0.3.0, all annotation draft functionality has been moved to protoscribe.
 
 ## Development Commands
 
@@ -153,15 +154,6 @@ ask_for(corp, "Phonetic == t") -> segments
 - Cache invalidation based on signal file modification time + processing parameters
 - Uses digest/hash to identify unique parameter combinations
 
-### Python Integration
-
-The package uses Python (via reticulate) for some annotation tasks:
-
-- **MOMEL/INTSINT** (`R/reindeer_annotate_momel.R`, `R/reindeeR_annotate_python.R`):
-  - Pitch stylization and tonal annotation
-  - Uses Parselmouth (Python Praat wrapper)
-  - `draft_intsint_momel()`: Main implementation
-
 ### C++ Components
 
 Two C++ files in `src/`:
@@ -246,43 +238,29 @@ quantify_simulate(
 # Creates 3 sample rates × 5 nominalF1 = 15 combinations per segment
 ```
 
-### 5. Draft Annotation System
+### 5. Draft Annotation System (MOVED TO PROTOSCRIBE)
 
-`R/draft_cache_system.R` provides robust caching for computationally intensive draft annotation generation:
+**As of v0.3.0**, all draft annotation functionality has been moved to the **[protoscribe](https://github.com/humlab-speech/protoscribe)** package.
 
-**Key Features**:
-- **Date-based caching**: Cache files named `<function>_YYYYMMDD.sqlite`
-- **Automatic resume**: Interrupted processes resume from where they left off
-- **Parameter tracking**: All parameters stored with results for reproducibility
-- **Force overwrite**: `.force_overwrite = TRUE` to regenerate annotations
-- **Error handling**: Bundle errors don't stop processing; errors stored in cache
+For draft annotation generation (MOMEL/INTSINT, periods, VOT, VAD, creak, etc.), use:
 
-**Draft Functions** (prefix `draft_`):
-- `draft_momel_intsint()`: MOMEL/INTSINT pitch annotation using Python/Parselmouth
-- Future: `draft_phonetic_alignment()`, `draft_stress_markers()`, etc.
-
-**Cache Management**:
-- `draft_cache_summary(corpus, "draft_momel_intsint")`: Get cache statistics
-- `list_draft_caches(corpus)`: List all draft caches with metadata
-- `clean_draft_cache(corpus, days_old = 30)`: Remove old cache files
-
-**Example workflow**:
 ```r
-# First run - generates all annotations
-suggestions <- draft_momel_intsint(corp, bundles)
+library(protoscribe)
+library(reindeer)
 
-# Process crashes at bundle 50...
-
-# Resume automatically - skips already completed bundles
-suggestions <- draft_momel_intsint(corp, bundles)
-# Resuming from cache: 50 bundles already completed
-# Processing bundles (50 new)
-
-# Force regeneration
-suggestions <- draft_momel_intsint(corp, bundles, .force_overwrite = TRUE)
+# Get audio file paths from corpus
+corp <- corpus("path/to/db")
+# ... use protoscribe draft functions
+suggestions <- protoscribe::draft_momel_intsint(...)
+protoscribe::assess(suggestions)
+protoscribe::transcribe(suggestions)
 ```
 
-See `DRAFT_CACHE_SYSTEM_SUMMARY.md` for complete documentation.
+See protoscribe documentation for details on:
+- Draft cache system
+- Suggestion classes (EventSuggestion, SegmentSuggestion, ItemSuggestion)
+- Workflow functions (assess, prepare, transcribe, reverse)
+- All draft_*() annotation functions
 
 ### 6. Cache Size Management
 
@@ -290,18 +268,16 @@ See `DRAFT_CACHE_SYSTEM_SUMMARY.md` for complete documentation.
 
 **Size Monitoring**:
 - `check_quantify_cache_size(corpus)`: Check quantify/enrich cache
-- `check_draft_cache_size(corpus)`: Check draft annotation cache
 - `check_simulation_cache_size(simulation_store)`: Check simulation cache
 - `check_all_cache_sizes(corpus)`: Check all caches with total
 
 **Automatic Warnings**: Integrated into cache connection code
-- Warning threshold: 500 MB for quantify/draft, 1 GB for simulation
-- Maximum threshold: 2 GB for quantify/draft, 5 GB for simulation
+- Warning threshold: 500 MB for quantify, 1 GB for simulation
+- Maximum threshold: 2 GB for quantify, 5 GB for simulation
 - Warnings appear when opening/accessing caches
 
 **Cache Cleanup**:
 - `clean_quantify_cache(corpus, days_old = 30)`: Remove old quantify files
-- `clean_draft_cache(corpus, days_old = 30)`: Remove old draft files
 - `clean_simulation_cache(simulation_store, days_old = 30)`: Remove old simulation files
 - `clean_all_caches(corpus, days_old = 30, dry_run = TRUE)`: Clean all caches
 
@@ -313,9 +289,8 @@ See `DRAFT_CACHE_SYSTEM_SUMMARY.md` for complete documentation.
 ```r
 # Check all cache sizes
 check_all_cache_sizes(corp)
-## ! Draft annotation cache is large: 1.25 GB (threshold: 500.00 MB)
 ## ✓ Quantify/enrich cache: 234.56 MB
-## ℹ Total cache size: 1.48 GB
+## ℹ Total cache size: 234.56 MB
 
 # Preview cleanup (dry run)
 clean_all_caches(corp, days_old = 30, dry_run = TRUE)
@@ -334,20 +309,11 @@ Test files in `tests/testthat/`:
 - `test_query_optimized.R`: Query system tests
 - `test_metadata_optimized.R`: Metadata system tests
 - `test_quantify_segment_list.R`: Signal quantification tests
-- `test-annotation-fidelity.R`: Annotation accuracy tests
-- `test_draft_cache_system.R`: Draft annotation cache tests (27 tests)
 - `test_simulation_preprocessing.R`: Simulation preprocessing tests (16 tests)
 - `test_cache_size_management.R`: Cache size monitoring tests (40 tests)
 - `test_reindeeR-metadata.R`: Legacy metadata tests
 
 Tests use the `ae` demo database from emuR package.
-
-**Running specific test suites**:
-```bash
-# Draft cache system tests
-Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_draft_cache_system.R')"
-
-# Cache size management tests
 Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_cache_size_management.R')"
 
 # Simulation preprocessing tests

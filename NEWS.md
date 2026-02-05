@@ -1,3 +1,77 @@
+# reindeer 0.3.0 (BREAKING CHANGES - 2026-02-05)
+
+## Major Changes: Draft Annotation Migration
+
+All draft annotation functionality has been **removed** from reindeer and is now exclusively in the **protoscribe** package. This creates a clean separation of concerns:
+
+- **reindeer**: Corpus management, queries, signal processing, metadata
+- **protoscribe**: Draft annotation generation (MOMEL/INTSINT, periods, VOT, VAD, etc.)
+
+### Removed Functions (NOW IN PROTOSCRIBE)
+
+The following functions have been **removed**. Use protoscribe instead:
+
+```r
+# OLD (reindeer, REMOVED)
+corp <- corpus("path/to/db")
+suggestions <- draft_momel_intsint(corp, bundles)
+assess(suggestions)
+transcribe(suggestions)
+
+# NEW (protoscribe)
+library(protoscribe)
+library(reindeer)
+
+corp <- corpus("path/to/db")
+audio_files <- # ... get audio file paths
+suggestions <- protoscribe::draft_momel_intsint(audio_files, sessions, bundles)
+protoscribe::assess(suggestions)
+protoscribe::transcribe(suggestions)
+```
+
+**Removed R files:**
+- `R/draft_cache_system.R` → Use `protoscribe::get_draft_cache()`
+- `R/reindeer_annotate_momel.R` → Use `protoscribe::draft_momel_intsint()`
+- `R/reindeer_annotate_python.R` → Use `protoscribe::draft_periods()`, etc.
+- `R/reindeer_transcription_system_optimized.R` → Use `protoscribe::assess/prepare/transcribe()`
+
+**Removed Python dependencies:**
+- `inst/python/` directory completely removed
+- `reticulate` removed from dependencies
+- No Python environment setup required for reindeer
+
+**Removed tests:**
+- All annotation/transcription tests moved to protoscribe
+- 6 test files (~60KB) migrated
+
+### Migration Guide
+
+Install protoscribe for draft annotation features:
+
+```r
+# Install protoscribe
+remotes::install_github("humlab-speech/protoscribe")
+
+# reindeer now suggests (but doesn't require) protoscribe
+library(reindeer)    # Corpus management
+library(protoscribe) # Draft annotations
+```
+
+**Key Benefits:**
+- ✅ Cleaner package boundaries
+- ✅ No Python dependencies in reindeer
+- ✅ Faster installation of reindeer
+- ✅ protoscribe can be developed independently
+- ✅ Better code maintainability
+
+### Breaking Changes
+
+**Action Required:** Update your code to use `protoscribe::` prefix for all draft annotation functions.
+
+**No action needed if:** You only use reindeer for corpus management, queries (`ask_for()`), signal processing (`quantify()`), or metadata operations.
+
+---
+
 # reindeer 0.2.5 (Development)
 
 ## Major New Features 🎉
