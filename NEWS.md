@@ -1,3 +1,16 @@
+# reindeer 0.3.1 (Documentation Update - 2026-02-05)
+
+## Documentation Improvements
+
+Updated cache management documentation to clarify that:
+- reindeer manages **quantify/enrich** and **simulation** caches
+- protoscribe manages **draft annotation** caches
+- Added cross-references between packages
+
+**No functional changes** - documentation only.
+
+---
+
 # reindeer 0.3.0 (BREAKING CHANGES - 2026-02-05)
 
 ## Major Changes: Draft Annotation Migration
