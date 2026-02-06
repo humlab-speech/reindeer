@@ -81,7 +81,7 @@ parse_simple_query <- function(query_string) {
   matches <- regmatches(query_string, match)[[1]]
   
   if (length(matches) < 4) {
-    stop("Cannot parse simple query: ", query_string)
+    cli::cli_abort("Cannot parse simple query: {.val {query_string}}")
   }
   
   level <- matches[2]
@@ -104,7 +104,7 @@ parse_dominance_query <- function(query_string) {
   parts <- strsplit(inner, "\\^")[[1]]
   
   if (length(parts) != 2) {
-    stop("Invalid dominance query: ", query_string)
+    cli::cli_abort("Invalid dominance query: {.val {query_string}}")
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -122,7 +122,7 @@ parse_sequence_query <- function(query_string) {
   parts <- strsplit(inner, "->")[[1]]
   
   if (length(parts) != 2) {
-    stop("Invalid sequence query: ", query_string)
+    cli::cli_abort("Invalid sequence query: {.val {query_string}}")
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -142,7 +142,7 @@ parse_conjunction_query <- function(query_string) {
   parts <- split_on_operator(inner, "&")
   
   if (length(parts) != 2) {
-    stop("Invalid conjunction query: ", query_string)
+    cli::cli_abort("Invalid conjunction query: {.val {query_string}}")
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -162,7 +162,7 @@ parse_disjunction_query <- function(query_string) {
   parts <- split_on_operator(inner, "|")
   
   if (length(parts) != 2) {
-    stop("Invalid disjunction query: ", query_string)
+    cli::cli_abort("Invalid disjunction query: {.val {query_string}}")
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -238,7 +238,7 @@ parse_function_query <- function(query_string) {
     ))
   }
   
-  stop("Cannot parse function query: ", query_string)
+  cli::cli_abort("Cannot parse function query: {.val {query_string}}")
 }
 
 # Simple query execution
@@ -280,7 +280,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   right_level <- extract_level_from_query(right_query)
   
   if (left_level != right_level) {
-    stop("Sequence queries require both sides to be from the same level")
+    cli::cli_abort("Sequence queries require both sides to be from the same level")
   }
   
   # Determine result level and side based on projection
@@ -473,8 +473,7 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
   hierarchy_info <- get_hierarchy_info(con)
   
   if (!can_dominate(hierarchy_info, left_level, right_level)) {
-    warning(sprintf("No dominance relationship possible between %s and %s", 
-                   left_level, right_level))
+    cli::cli_warn("No dominance relationship possible between {.val {left_level}} and {.val {right_level}}")
     return(create_empty_result())
   }
   
@@ -503,7 +502,7 @@ execute_function_query_corrected <- function(db_path, parsed_query) {
   } else if (func_name == "Num") {
     return(execute_count_function(con, level1, level2, operator, value))
   } else {
-    stop("Unknown function: ", func_name)
+    cli::cli_abort("Unknown function: {.val {func_name}}")
   }
 }
 
@@ -560,7 +559,7 @@ execute_subquery <- function(db_path, parsed_query) {
     "function" = execute_function_query_corrected(db_path, parsed_query),
     "conjunction" = execute_conjunction_query(db_path, parsed_query, NULL),
     "disjunction" = execute_disjunction_query(db_path, parsed_query, NULL),
-    stop("Unknown query type in subquery: ", parsed_query$type)
+    cli::cli_abort("Unknown query type in subquery: {.val {parsed_query$type}}")
   )
   return(result)
 }
@@ -597,14 +596,14 @@ extract_condition_from_query <- function(query) {
     }
   }
   
-  stop("Cannot extract condition from query")
+  cli::cli_abort("Cannot extract condition from query")
 }
 
 extract_level_from_query <- function(query) {
   if (is.list(query) && !is.null(query$level)) {
     return(query$level)
   }
-  stop("Cannot extract level from query")
+  cli::cli_abort("Cannot extract level from query")
 }
 
 create_empty_result <- function() {
@@ -640,7 +639,7 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
   path <- find_dominance_path(hierarchy_info, left_level, right_level)
   
   if (length(path) == 0) {
-    stop("No dominance path found")
+    cli::cli_abort("No dominance path found")
   }
   
   with_clauses <- build_dominance_chain_cte(path, left_condition, right_condition)
@@ -726,7 +725,7 @@ build_dominance_chain_cte <- function(path, left_condition, right_condition) {
 
 build_recursive_dominance_chain <- function(path) {
   if (length(path) <= 2) {
-    stop("build_recursive_dominance_chain called for direct dominance")
+    cli::cli_abort("build_recursive_dominance_chain called for direct dominance")
   }
   
   joins <- c()
@@ -807,7 +806,7 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
     "==" = value == 1,
     "=" = value == 1,
     "!=" = value != 1,
-    stop("Invalid operator for position function: ", operator)
+    cli::cli_abort("Invalid operator for position function: {.val {operator}}")
   )
   
   # If we're looking for items NOT in position (value != 1), negate the condition
@@ -1007,9 +1006,7 @@ format_as_emuRsegs <- function(result_df) {
   )
   
   # Convert to tibble to match emuR output
-  if (requireNamespace("dplyr", quietly = TRUE)) {
-    emuRsegs_df <- dplyr::as_tibble(emuRsegs_df)
-  }
+  emuRsegs_df <- dplyr::as_tibble(emuRsegs_df)
   class(emuRsegs_df) <- c("emuRsegs", class(emuRsegs_df))
   return(emuRsegs_df)
 }
@@ -1036,9 +1033,7 @@ create_empty_emuRsegs <- function() {
   )
   
   # Convert to tibble to match emuR output
-  if (requireNamespace("dplyr", quietly = TRUE)) {
-    empty_df <- dplyr::as_tibble(empty_df)
-  }
+  empty_df <- dplyr::as_tibble(empty_df)
   class(empty_df) <- c("emuRsegs", class(empty_df))
   return(empty_df)
 }

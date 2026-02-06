@@ -297,7 +297,7 @@ add_levelDefinition <- function(corpusObj, name, type,
 
   allowedTypes <- c('ITEM', 'SEGMENT', 'EVENT')
   if(!(type %in% allowedTypes)) {
-    stop('Bad type! Must be: ', paste(allowedTypes, collapse = ' | '))
+    cli::cli_abort("Bad type! Must be: {paste(allowedTypes, collapse = ' | ')}")
   }
 
   dbConfig <- load_DBconfig(corpusObj)
@@ -306,7 +306,7 @@ add_levelDefinition <- function(corpusObj, name, type,
   existing_names <- vapply(dbConfig$levelDefinitions, `[[`,
                            character(1), "name")
   if(name %in% existing_names) {
-    stop("Level definition '", name, "' already exists")
+    cli::cli_abort("Level definition {.val {name}} already exists")
   }
 
   # Add new definition
@@ -371,14 +371,13 @@ remove_levelDefinition <- function(corpusObj, name,
                              function(ld) ld$name == name, logical(1)))
 
   if(!level_exists) {
-    stop("Level definition '", name, "' does not exist")
+    cli::cli_abort("Level definition {.val {name}} does not exist")
   }
 
   # Check link references
   for(lkd in dbConfig$linkDefinitions) {
     if(lkd$superlevelName == name || lkd$sublevelName == name) {
-      stop("Cannot remove level '", name,
-           "'. Referenced by link definition")
+      cli::cli_abort("Cannot remove level {.val {name}}: referenced by link definition")
     }
   }
 
@@ -386,17 +385,17 @@ remove_levelDefinition <- function(corpusObj, name,
     # Optimized query
     itemsCnt <- DBI::dbGetQuery(
       corpusObj@connection,
-      sprintf("SELECT COUNT(*) as cnt FROM items WHERE db_uuid='%s' AND level='%s'",
-              corpusObj@UUID, name)
+      "SELECT COUNT(*) as cnt FROM items WHERE db_uuid = ? AND level = ?",
+      params = list(corpusObj@UUID, name)
     )$cnt
 
     if(itemsCnt > 0) {
-      stop("Level is not empty. Remove items first")
+      cli::cli_abort("Level is not empty. Remove items first.")
     }
   } else {
     if(verbose) {
       answ <- readline("Remove all items? (y/n): ")
-      if(!answ %in% c("y", "Y")) stop("Aborted")
+      if(!answ %in% c("y", "Y")) cli::cli_abort("Aborted")
     }
 
     # Batch delete operations
@@ -404,20 +403,20 @@ remove_levelDefinition <- function(corpusObj, name,
       # Delete labels
       DBI::dbExecute(
         corpusObj@connection,
-        sprintf("DELETE FROM labels WHERE EXISTS(
+        "DELETE FROM labels WHERE EXISTS(
                   SELECT 1 FROM items i
-                  WHERE i.db_uuid='%s' AND i.level='%s'
+                  WHERE i.db_uuid = ? AND i.level = ?
                   AND i.session=labels.session
                   AND i.bundle=labels.bundle
                   AND i.item_id=labels.item_id)",
-                corpusObj@UUID, name)
+        params = list(corpusObj@UUID, name)
       )
 
       # Delete items
       DBI::dbExecute(
         corpusObj@connection,
-        sprintf("DELETE FROM items WHERE db_uuid='%s' AND level='%s'",
-                corpusObj@UUID, name)
+        "DELETE FROM items WHERE db_uuid = ? AND level = ?",
+        params = list(corpusObj@UUID, name)
       )
     })
   }
@@ -565,10 +564,10 @@ batch_add_levelDefinitions <- function(corpusObj, definitions,
 
   for(def in definitions) {
     if(!(def$type %in% allowedTypes)) {
-      stop('Bad type in definition: ', def$name)
+      cli::cli_abort("Bad type in definition: {.val {def$name}}")
     }
     if(def$name %in% existing_names) {
-      stop("Level '", def$name, "' already exists")
+      cli::cli_abort("Level {.val {def$name}} already exists")
     }
     existing_names <- c(existing_names, def$name)
   }
@@ -629,7 +628,7 @@ process_bundles <- function(corpusObj, func,
 
     return(results)
   } else {
-    warning("'parallel' package not available, using sequential processing")
+    cli::cli_warn("{.pkg parallel} package not available, using sequential processing")
     bundles <- list_bundles(corpusObj)
     lapply(seq_len(nrow(bundles)), function(i) func(bundles[i,]))
   }
@@ -732,7 +731,7 @@ validate_dbconfig <- function(corpusObj) {
   }
 
   if(length(errors) > 0) {
-    warning("Validation errors found:\n", paste(errors, collapse = "\n"))
+    cli::cli_warn("Validation errors found:\n{paste(errors, collapse = '\n')}")
     return(FALSE)
   }
 

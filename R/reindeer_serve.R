@@ -331,10 +331,10 @@ S7::method(serve, corpus) <- function(corpus,
   }
 
   serverEstablished <- function(ws) {
-    cat("reindeer websocket service established\n")
+    cli::cli_alert_success("reindeer websocket service established")
 
     serverClosed <- function(ws) {
-      cat("reindeer websocket service closed\n")
+      cli::cli_alert_info("reindeer websocket service closed")
     }
 
     sendError <- function(ws, errMsg, callbackID) {
@@ -346,7 +346,7 @@ S7::method(serve, corpus) <- function(corpus,
 
     serverReceive <- function(isBinary, DATA) {
       if (debugLevel >= 4) {
-        cat("onMessage() call, binary:", isBinary, " data: ", DATA, "\n")
+        cli::cli_alert_info("onMessage() call, binary: {isBinary} data: {DATA}")
       }
 
       # Parse message
@@ -355,16 +355,16 @@ S7::method(serve, corpus) <- function(corpus,
       jr <- jsonlite::fromJSON(D, simplifyVector = FALSE)
 
       if (debugLevel >= 2) {
-        cat("Received command from EMU-webApp: ", jr[["type"]], "\n")
+        cli::cli_alert_info("Received command from EMU-webApp: {jr[['type']]}")
         if (debugLevel >= 3) {
           jrNms <- names(jr)
           for (jrNm in jrNms) {
             value <- jr[[jrNm]]
-            cat("param: ", jrNm)
             if (inherits(value, "character")) {
-              cat(": ", jr[[jrNm]])
+              cli::cli_alert_info("param: {jrNm}: {value}")
+            } else {
+              cli::cli_alert_info("param: {jrNm}")
             }
-            cat("\n")
           }
         }
       }
@@ -382,7 +382,7 @@ S7::method(serve, corpus) <- function(corpus,
         )
         responseJSON <- jsonlite::toJSON(response, auto_unbox = TRUE, force = TRUE, pretty = TRUE)
         result <- ws$send(responseJSON)
-        if (debugLevel >= 2) cat("Sent protocol. \n")
+        if (debugLevel >= 2) cli::cli_alert_success("Sent protocol.")
 
       } else if (jr$type == "GETDOUSERMANAGEMENT") {
         response <- list(
@@ -392,11 +392,11 @@ S7::method(serve, corpus) <- function(corpus,
         )
         responseJSON <- jsonlite::toJSON(response, auto_unbox = TRUE, force = TRUE, pretty = TRUE)
         result <- ws$send(responseJSON)
-        if (debugLevel >= 2) cat("Sent user management: no. \n")
+        if (debugLevel >= 2) cli::cli_alert_success("Sent user management: no.")
 
       } else if (jr$type == "GETGLOBALDBCONFIG") {
         if (debugLevel >= 4) {
-          cat("Send config: ", as.character(DBconfig), "\n")
+          cli::cli_alert_info("Send config: {as.character(DBconfig)}")
         }
         response <- list(
           status = list(type = "SUCCESS"),
@@ -406,8 +406,8 @@ S7::method(serve, corpus) <- function(corpus,
         responseJSON <- jsonlite::toJSON(response, auto_unbox = TRUE, force = TRUE, pretty = TRUE)
         result <- ws$send(responseJSON)
         if (debugLevel >= 2) {
-          if (debugLevel >= 4) cat(responseJSON, "\n")
-          cat("Sent config. \n")
+          if (debugLevel >= 4) cli::cli_alert_info("{responseJSON}")
+          cli::cli_alert_success("Sent config.")
         }
 
       } else if (jr$type == "GETBUNDLELIST") {
@@ -445,22 +445,22 @@ S7::method(serve, corpus) <- function(corpus,
         }
 
         responseJSON <- jsonlite::toJSON(response, auto_unbox = TRUE, force = TRUE, pretty = TRUE)
-        if (debugLevel >= 5) cat(responseJSON, "\n")
+        if (debugLevel >= 5) cli::cli_alert_info("{responseJSON}")
         result <- ws$send(responseJSON)
         if (debugLevel >= 2) {
-          cat("Sent utterance list with length: ", nrow(bundlesDf), " \n")
+          cli::cli_alert_success("Sent utterance list with length: {nrow(bundlesDf)}")
         }
 
       } else if (jr$type == "GETBUNDLE") {
         bundleName <- jr[["name"]]
         bundleSess <- jr[["session"]]
         if (debugLevel > 2) {
-          cat("Requested bundle:", bundleName, ",session:", bundleSess, "\n")
+          cli::cli_alert_info("Requested bundle: {bundleName}, session: {bundleSess}")
         }
 
         err <- NULL
         if (debugLevel > 3) {
-          cat("Convert bundle to S3 format", bundleName, "\n")
+          cli::cli_alert_info("Convert bundle to S3 format: {bundleName}")
         }
 
         # Load annotation
@@ -499,11 +499,7 @@ S7::method(serve, corpus) <- function(corpus,
           ssffTrackNmsInUse <- .get_ssff_tracks_in_use(DBconfig)
 
           if (debugLevel >= 4) {
-            cat(length(ssffTrackNmsInUse), " track definitions in use:\n")
-            for (sfInU in ssffTrackNmsInUse) {
-              cat(sfInU, " ")
-            }
-            cat("\n")
+            cli::cli_alert_info("{length(ssffTrackNmsInUse)} track definitions in use: {paste(ssffTrackNmsInUse, collapse = ' ')}")
           }
 
           ssffFiles <- list()
@@ -569,7 +565,7 @@ S7::method(serve, corpus) <- function(corpus,
           )
         } else {
           errMsg <- err[["message"]]
-          cat("Error: ", errMsg, "\n")
+          cli::cli_alert_danger("Error: {errMsg}")
           responseBundle <- list(
             status = list(type = "ERROR", message = errMsg),
             callbackID = jr[["callbackID"]],
@@ -582,8 +578,8 @@ S7::method(serve, corpus) <- function(corpus,
         result <- ws$send(responseBundleJSON)
 
         if (is.null(err) & debugLevel >= 2) {
-          if (debugLevel >= 8) cat(responseBundleJSON, "\n")
-          cat("Sent bundle containing", length(ssffFiles), "SSFF files\n")
+          if (debugLevel >= 8) cli::cli_alert_info("{responseBundleJSON}")
+          cli::cli_alert_success("Sent bundle containing {length(ssffFiles)} SSFF files")
         }
         err <- NULL
 
@@ -594,7 +590,7 @@ S7::method(serve, corpus) <- function(corpus,
         bundleName <- jrData[["annotation"]][["name"]]
 
         if (debugLevel > 3) {
-          cat("Save bundle ", bundleName, " from session ", bundleSession, "\n")
+          cli::cli_alert_info("Save bundle {bundleName} from session {bundleSession}")
         }
 
         err <- NULL
@@ -625,7 +621,7 @@ S7::method(serve, corpus) <- function(corpus,
               err <- simpleError(errMsg)
             } else {
               if (debugLevel > 3) {
-                cat("Writing SSFF track to file: ", sp, "\n")
+                cli::cli_alert_info("Writing SSFF track to file: {sp}")
               }
               ssffTrackBin <- base64enc::base64decode(ssffFile[["data"]])
               ssffCon <- tryCatch(file(sp, "wb"), error = function(e) {
@@ -708,7 +704,7 @@ S7::method(serve, corpus) <- function(corpus,
           )
         } else {
           m <- err[["message"]]
-          cat("Error: ", m, "\n")
+          cli::cli_alert_danger("Error: {m}")
           responseBundle <- list(
             status = list(type = "ERROR", message = m),
             callbackID = jr[["callbackID"]],
@@ -731,7 +727,7 @@ S7::method(serve, corpus) <- function(corpus,
         responseJSON <- jsonlite::toJSON(response, auto_unbox = TRUE, force = TRUE, pretty = TRUE)
         result <- ws$send(responseJSON)
         ws$close()
-        cat("reindeer websocket service closed by EMU-webApp\n")
+        cli::cli_alert_info("reindeer websocket service closed by EMU-webApp")
       }
     }
 

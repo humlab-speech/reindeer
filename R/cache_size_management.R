@@ -55,7 +55,7 @@ parse_size_string <- function(size_string) {
     # No space - split number from unit
     match <- regexpr("[A-Z]+$", size_string)
     if (match == -1) {
-      stop("Invalid size format. Use format like '500 MB' or '2 GB'")
+      cli::cli_abort("Invalid size format. Use format like {.val 500 MB} or {.val 2 GB}")
     }
     number_part <- substr(size_string, 1, match - 1)
     unit_part <- substr(size_string, match, nchar(size_string))
@@ -63,7 +63,7 @@ parse_size_string <- function(size_string) {
   }
 
   if (length(parts) != 2) {
-    stop("Invalid size format. Use format like '500 MB' or '2 GB'")
+    cli::cli_abort("Invalid size format. Use format like {.val 500 MB} or {.val 2 GB}")
   }
 
   number <- as.numeric(parts[1])
@@ -78,7 +78,7 @@ parse_size_string <- function(size_string) {
   )
 
   if (!unit %in% names(multipliers)) {
-    stop("Unknown unit: ", unit, ". Use B, KB, MB, GB, or TB")
+    cli::cli_abort("Unknown unit: {.val {unit}}. Use B, KB, MB, GB, or TB")
   }
 
   unname(number * multipliers[unit])
@@ -549,14 +549,13 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
   }
 
   if (length(results) == 0) {
-    return(data.frame(
+    return(tibble::tibble(
       file = character(0),
       path = character(0),
       size_bytes = numeric(0),
       size_formatted = character(0),
       modified = character(0),
-      type = character(0),
-      stringsAsFactors = FALSE
+      type = character(0)
     ))
   }
 
@@ -564,7 +563,7 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
   rownames(combined) <- NULL
 
   # Sort by size descending
-  combined[order(combined$size_bytes, decreasing = TRUE), ]
+  tibble::as_tibble(combined[order(combined$size_bytes, decreasing = TRUE), ])
 }
 
 # ==============================================================================

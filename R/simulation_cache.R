@@ -89,20 +89,20 @@ reminisce <- function(segment_list,
 #' List available simulations in cache directory
 #'
 #' @param cache_dir Directory containing simulation caches
-#' @return data.table with simulation metadata
+#' @return tibble with simulation metadata
 #' @export
 list_simulations <- function(cache_dir) {
   
   if (!dir.exists(cache_dir)) {
     cli::cli_alert_warning("Cache directory does not exist: {.path {cache_dir}}")
-    return(data.table::data.table())
+    return(tibble::tibble())
   }
-  
+
   cache_files <- list.files(cache_dir, pattern = "\\.sqlite$", full.names = TRUE)
-  
+
   if (length(cache_files) == 0) {
     cli::cli_alert_info("No simulation caches found in {.path {cache_dir}}")
-    return(data.table::data.table())
+    return(tibble::tibble())
   }
   
   # Extract metadata from each cache
@@ -129,10 +129,10 @@ list_simulations <- function(cache_dir) {
   metadata_list <- Filter(Negate(is.null), metadata_list)
   
   if (length(metadata_list) == 0) {
-    return(data.table::data.table())
+    return(tibble::tibble())
   }
-  
-  data.table::rbindlist(metadata_list, fill = TRUE)
+
+  tibble::as_tibble(data.table::rbindlist(metadata_list, fill = TRUE))
 }
 
 # ==============================================================================

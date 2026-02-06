@@ -219,7 +219,7 @@ update_signal_hashes <- function(corpus_obj, bundles = NULL,
 #' @param corpus_obj A corpus object
 #' @param session Session name (optional)
 #' @param bundle Bundle name (optional)
-#' @return data.table with signal hash information
+#' @return tibble with signal hash information
 #' @export
 get_signal_hashes <- function(corpus_obj, session = NULL, bundle = NULL) {
   
@@ -249,17 +249,17 @@ get_signal_hashes <- function(corpus_obj, session = NULL, bundle = NULL) {
   result <- DBI::dbGetQuery(con, query, params = params)
   
   if (nrow(result) == 0) {
-    return(data.table::data.table())
+    return(tibble::tibble(session = character(), bundle = character(), hashes = list()))
   }
-  
+
   # Parse JSON
   result_dt <- data.table::as.data.table(result)
   result_dt$hashes <- lapply(result_dt$signal_hashes_json, function(x) {
     jsonlite::fromJSON(x)
   })
   result_dt$signal_hashes_json <- NULL
-  
-  result_dt
+
+  tibble::as_tibble(result_dt)
 }
 
 # ==============================================================================

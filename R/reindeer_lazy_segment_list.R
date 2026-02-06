@@ -70,7 +70,7 @@ collect.default <- function(lazy_sl, verbose = FALSE) {
   if (inherits(lazy_sl, "segment_list") && !inherits(lazy_sl, "lazy_segment_list")) {
     return(lazy_sl)
   }
-  stop("collect() requires a lazy_segment_list or segment_list object")
+  cli::cli_abort("collect() requires a lazy_segment_list or segment_list object")
 }
 
 #' @export
@@ -124,7 +124,7 @@ collect.lazy_segment_list <- function(lazy_sl, verbose = FALSE) {
 build_sql_from_parts <- function(query_parts, verbose = FALSE) {
   # Start with base query
   if (is.null(query_parts$base)) {
-    stop("No base query found in query_parts")
+    cli::cli_abort("No base query found in query_parts")
   }
   
   base_sql <- query_parts$base
@@ -161,7 +161,7 @@ apply_transform <- function(sql, transform, verbose = FALSE) {
     retreat = apply_retreat_transform(sql, transform$n),
     ascend = apply_ascend_transform(sql, transform$level),
     descend = apply_descend_transform(sql, transform$level),
-    stop("Unknown transform type: ", type)
+    cli::cli_abort("Unknown transform type: {.val {type}}")
   )
 }
 

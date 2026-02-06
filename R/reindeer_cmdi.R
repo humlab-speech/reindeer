@@ -92,7 +92,7 @@ create_cmdi_metadata <- function(corpus,
   } else if (inherits(corpus, "reindeer_corpus")) {
     db_handle <- corpus$emuDBhandle
   } else {
-    stop("corpus must be an emuDBhandle or reindeer_corpus object")
+    cli::cli_abort("corpus must be an emuDBhandle or reindeer_corpus object")
   }
   
   # Load database config

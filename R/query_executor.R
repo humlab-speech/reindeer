@@ -13,7 +13,7 @@ ask_for <- function(emuDB, query, ...) {
     } else if (file.exists(db_path2)) {
       db_path <- db_path2
     } else {
-      stop("SQLite database not found at: ", db_path1, " or ", db_path2)
+      cli::cli_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
     }
     
     database_dir <- base_path
@@ -33,7 +33,7 @@ ask_for <- function(emuDB, query, ...) {
     } else if (file.exists(db_path2)) {
       db_path <- db_path2
     } else {
-      stop("SQLite database not found at: ", db_path1, " or ", db_path2)
+      cli::cli_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
     }
     
     database_dir <- emuDB
@@ -43,7 +43,7 @@ ask_for <- function(emuDB, query, ...) {
     db_name <- attr(emuDB, "dbName")
     
     if (is.null(base_path) || is.null(db_name)) {
-      stop("Invalid emuDB object: missing basePath or dbName attributes")
+      cli::cli_abort("Invalid emuDB object: missing basePath or dbName attributes")
     }
     
     db_path1 <- file.path(base_path, paste0(db_name, "_emuDB.sqlite"))
@@ -54,14 +54,14 @@ ask_for <- function(emuDB, query, ...) {
     } else if (file.exists(db_path2)) {
       db_path <- db_path2
     } else {
-      stop("SQLite database not found at: ", db_path1, " or ", db_path2)
+      cli::cli_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
     }
     
     database_dir <- base_path
   }
   
   if (!file.exists(db_path)) {
-    stop("SQLite database not found at: ", db_path)
+    cli::cli_abort("SQLite database not found at: {.path {db_path}}")
   }
   
   # Check for lazy parameter (default FALSE until lazy evaluation is fully implemented)
@@ -131,7 +131,7 @@ build_base_sql <- function(db_path, parsed, opts = list()) {
     "function" = build_function_query_sql(db_path, parsed),
     "conjunction" = build_conjunction_query_sql(db_path, parsed, result_level),
     "disjunction" = build_disjunction_query_sql(db_path, parsed, result_level),
-    stop("Unknown query type: ", parsed$type)
+    cli::cli_abort("Unknown query type: {.val {parsed$type}}")
   )
   
   return(sql)
@@ -220,13 +220,13 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
       "function" = execute_function_query_corrected(db_path, parsed),
       "conjunction" = execute_conjunction_query(db_path, parsed, result_level),
       "disjunction" = execute_disjunction_query(db_path, parsed, result_level),
-      stop("Unknown query type: ", parsed$type)
+      cli::cli_abort("Unknown query type: {.val {parsed$type}}")
     )
     
     return(format_as_emuRsegs(result))
     
   }, error = function(e) {
-    cat("Query execution failed:", e$message, "\n")
+    cli::cli_alert_danger("Query execution failed: {e$message}")
     return(create_empty_emuRsegs())
   })
 }

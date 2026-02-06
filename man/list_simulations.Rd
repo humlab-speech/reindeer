@@ -10,7 +10,7 @@ list_simulations(cache_dir)
 \item{cache_dir}{Directory containing simulation caches}
 }
 \value{
-data.table with simulation metadata
+tibble with simulation metadata
 }
 \description{
 List available simulations in cache directory

@@ -215,7 +215,7 @@ initialize_database_schema <- function(con, uuid, db_name) {
   DBI::dbExecute(con, "CREATE INDEX label_nameLabel_idx ON labels(db_uuid, bundle, session, item_id)")
 
   # Insert database record
-  DBI::dbExecute(con, sprintf("INSERT INTO emu_db (uuid, name) VALUES ('%s', '%s')", uuid, db_name))
+  DBI::dbExecute(con, "INSERT INTO emu_db (uuid, name) VALUES (?, ?)", params = list(uuid, db_name))
 }
 
 # ==============================================================================
@@ -546,9 +546,9 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   # Clear existing metadata
-  DBI::dbExecute(con, sprintf("DELETE FROM metadata_bundle WHERE db_uuid = '%s'", db_uuid))
-  DBI::dbExecute(con, sprintf("DELETE FROM metadata_session WHERE db_uuid = '%s'", db_uuid))
-  DBI::dbExecute(con, sprintf("DELETE FROM metadata_database WHERE db_uuid = '%s'", db_uuid))
+  DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?", params = list(db_uuid))
+  DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?", params = list(db_uuid))
+  DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?", params = list(db_uuid))
   
   # 1. Database-level metadata
   db_meta_file <- file.path(basePath, metadata.filename)

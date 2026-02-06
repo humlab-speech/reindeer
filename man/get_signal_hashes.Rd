@@ -14,7 +14,7 @@ get_signal_hashes(corpus_obj, session = NULL, bundle = NULL)
 \item{bundle}{Bundle name (optional)}
 }
 \value{
-data.table with signal hash information
+tibble with signal hash information
 }
 \description{
 Get signal file hashes for bundles

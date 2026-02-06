@@ -427,8 +427,7 @@ clear_tidy_cache <- function() {
                                          cache_format = "auto") {
   
   # Convert to data.table for faster operations
-  if (requireNamespace("data.table", quietly = TRUE)) {
-    dt <- data.table::as.data.table(seg_df)
+  dt <- data.table::as.data.table(seg_df)
     
     # Add file paths vectorized
     dt[, signal_file := file.path(
@@ -565,12 +564,6 @@ clear_tidy_cache <- function() {
     
     # Return list of tibbles
     result_list[!vapply(result_list$V1, is.null, logical(1))]$V1
-    
-  } else {
-    # Fall back to non-data.table implementation
-    .process_by_file_batch(seg_df, corpus_obj, dsp_function, dsp_params, 
-                          media_ext, .at, .verbose)
-  }
 }
 
 #' Memory-mapped SSFF file reader for large files

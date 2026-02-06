@@ -87,7 +87,7 @@ segment_list <- S7::new_class(
     if (is.null(db_uuid) && "db_uuid" %in% names(data)) {
       db_uuid_vals <- unique(data$db_uuid)
       if (length(db_uuid_vals) > 1) {
-        warning("Multiple db_uuids found; using first")
+        cli::cli_warn("Multiple db_uuids found; using first")
         db_uuid <- as.character(db_uuid_vals[1])
       } else {
         db_uuid <- as.character(db_uuid_vals[1])
@@ -363,7 +363,7 @@ extended_segment_list <- S7::new_class(
     if (is.null(db_uuid) && "db_uuid" %in% names(data)) {
       db_uuid_vals <- unique(data$db_uuid)
       if (length(db_uuid_vals) > 1) {
-        warning("Multiple db_uuids found; using first")
+        cli::cli_warn("Multiple db_uuids found; using first")
         db_uuid <- as.character(db_uuid_vals[1])
       } else {
         db_uuid <- as.character(db_uuid_vals[1])
@@ -774,7 +774,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   }
 
   # PHASE 2: Choose processing strategy based on optimize flag and available packages
-  if (.optimize && requireNamespace("data.table", quietly = TRUE) && nrow(seg_df) > 100) {
+  if (.optimize && nrow(seg_df) > 100) {
     # Use vectorized processing for large datasets
     if (.verbose) {
       cli::cli_alert_info("Using optimized vectorized processing")
@@ -838,7 +838,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   # Combine all results efficiently
   # PHASE 2: Use data.table for faster binding if available
-  combined <- if (requireNamespace("data.table", quietly = TRUE) && length(results) > 100) {
+  combined <- if (length(results) > 100) {
     data.table::rbindlist(results, fill = TRUE) |>
       tibble::as_tibble()
   } else {

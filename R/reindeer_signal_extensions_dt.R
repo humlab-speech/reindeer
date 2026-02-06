@@ -20,11 +20,6 @@ dspp_metadataParameters_dt <- function(recompute=FALSE,
                                         impute=TRUE,
                                         defaultsEstimatedSampleSize=10){
 
-  # Load data.table if not already loaded
-  if (!requireNamespace("data.table", quietly = TRUE)) {
-    stop("Package 'data.table' is required for this optimized version")
-  }
-
   if(!recompute){
     data(DSPP, package="reindeer")
     return(reindeer::DSPP)
