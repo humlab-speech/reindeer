@@ -21,7 +21,7 @@ if(! exists("database.schema.suffix")){
 #'
 #' @param obj Either a character (basePath) or corpus object
 #' @return List with database configuration
-#' @export
+#' @keywords internal
 load_DBconfig <- function(obj) {
   # Determine basePath based on input type
   if (is.character(obj)) {
@@ -35,13 +35,13 @@ load_DBconfig <- function(obj) {
   } else if (is.list(obj) && !is.null(obj@basePath)) {
     basePath <- obj@basePath
   } else {
-    stop("obj must be a basePath (character) or corpus/emuDBhandle object")
+    cli::cli_abort("obj must be a basePath (character) or corpus/emuDBhandle object")
   }
   
   # Find the DBconfig file
   config_files <- list.files(basePath, pattern = "_DBconfig\\.json$", full.names = TRUE)
   if(length(config_files) == 0) {
-    stop("No DBconfig file found in ", basePath)
+    cli::cli_abort("No DBconfig file found in {.path {basePath}}")
   }
   dbCfgPath <- config_files[1]
   
@@ -56,7 +56,7 @@ load_DBconfig <- function(obj) {
   }
 
   if(!file.exists(dbCfgPath)) {
-    stop(dbCfgPath, " does not exist. Check 'name' entry in DBconfig file.")
+    cli::cli_abort("{.path {dbCfgPath}} does not exist. Check 'name' entry in DBconfig file.")
   }
 
   # Use optimized JSON reading with RcppSimdJson
@@ -253,7 +253,7 @@ get_levelDefinition <- function(corpusObj, name) {
 #' @param obj corpus object or emuDBhandle
 #' @param dbConfig configuration list
 #' @param basePath optional basePath override
-#' @export
+#' @keywords internal
 store_DBconfig <- function(obj, dbConfig, basePath = NULL) {
   # Extract basePath and dbName
   if (is.null(basePath)) {
@@ -264,7 +264,7 @@ store_DBconfig <- function(obj, dbConfig, basePath = NULL) {
       basePath <- obj$basePath
       dbName <- obj$dbName
     } else {
-      stop("Cannot extract basePath from obj")
+      cli::cli_abort("Cannot extract basePath from obj")
     }
   } else {
     # Extract dbName from basePath

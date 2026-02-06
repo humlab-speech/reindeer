@@ -328,7 +328,7 @@ Reindeer uses a three-level hierarchy:
 
 ```{r}
 # View effective metadata for a bundle
-get_metadata(corp, session = "Session1", bundle = "Bundle1")
+get_metadata(corp, session_pattern = "Session1", bundle_pattern = "Bundle1")
 ```
 
 ### Batch Metadata Management

@@ -16,3 +16,4 @@ This is useful for debugging and understanding performance characteristics.
 \examples{
 get_json_strategy()
 }
+\keyword{internal}

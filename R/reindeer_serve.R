@@ -110,7 +110,7 @@ S7::method(serve, corpus) <- function(corpus,
 
   # Get bundle list
   if (is.null(seglist)) {
-    allBundlesDf <- emuR::list_bundles(emuDBhandle)
+    allBundlesDf <- .list_bundles(emuDBhandle)
   } else {
     # Check if seglist is valid
     if (!inherits(seglist, "segment_list") && !is.data.frame(seglist)) {
@@ -163,14 +163,14 @@ S7::method(serve, corpus) <- function(corpus,
     if (!is.null(seglist)) {
       cli::cli_abort("both seglist & bundleListName can't be set at the same time!")
     }
-    bundlesDf <- emuR::read_bundleList(emuDBhandle, bundleListName)
+    bundlesDf <- .read_bundle_list(emuDBhandle$basePath, bundleListName)
 
     # Ensure restrictions are set for bundle comments/editing
     if (is.null(DBconfig$EMUwebAppConfig$restrictions$bundleComments) ||
         is.null(DBconfig$EMUwebAppConfig$restrictions$bundleFinishedEditing)) {
       DBconfig$EMUwebAppConfig$restrictions$bundleComments <- TRUE
       DBconfig$EMUwebAppConfig$restrictions$bundleFinishedEditing <- TRUE
-      emuR::store_DBconfig(emuDBhandle, DBconfig)
+      store_DBconfig(emuDBhandle, DBconfig)
     }
   }
 
@@ -495,8 +495,8 @@ S7::method(serve, corpus) <- function(corpus,
 
         # Load SSFF files
         if (is.null(err)) {
-          ssffTracksInUse <- emuR::get_ssffTracksUsedByDBconfig(DBconfig)
-          ssffTrackNmsInUse <- sapply(ssffTracksInUse, function(x) x[["name"]])
+          ssffTracksInUse <- DBconfig$ssffTrackDefinitions
+          ssffTrackNmsInUse <- .get_ssff_tracks_in_use(DBconfig)
 
           if (debugLevel >= 4) {
             cat(length(ssffTrackNmsInUse), " track definitions in use:\n")
@@ -599,7 +599,7 @@ S7::method(serve, corpus) <- function(corpus,
 
         err <- NULL
         ssffFiles <- jr[["data"]][["ssffFiles"]]
-        oldBundleAnnotDFs <- emuR::load_bundleAnnotDFsDBI(emuDBhandle, bundleSession, bundleName)
+        oldBundleAnnotDFs <- .load_bundle_annot(emuDBhandle$connection, bundleSession, bundleName)
 
         warnOptionSave <- getOption("warn")
         options(warn = 2)
@@ -661,31 +661,39 @@ S7::method(serve, corpus) <- function(corpus,
 
             # Update database
             DBI::dbBegin(emuDBhandle$connection)
-            emuR::remove_bundleDBI(emuDBhandle, sessionName = bundleSession, name = bundleName)
-            emuR::remove_bundleAnnotDBI(emuDBhandle, sessionName = bundleSession, bundleName = bundleName)
+            .remove_bundle_from_db(emuDBhandle$connection, bundleSession, bundleName)
 
             newMD5annotJSON <- tools::md5sum(annotFilePath)
             names(newMD5annotJSON) <- NULL
 
-            bundleAnnotDFs <- emuR::annotJSONcharToBundleAnnotDFs(as.character(json))
-            emuR::add_bundleDBI(emuDBhandle,
-                               sessionName = bundleSession,
-                               name = bundleName,
-                               bundleAnnotDFs$annotates,
-                               bundleAnnotDFs$sampleRate,
-                               newMD5annotJSON)
-            emuR::store_bundleAnnotDFsDBI(emuDBhandle,
-                                         bundleAnnotDFs,
-                                         sessionName = bundleSession,
-                                         bundleName = bundleName)
+            bundleAnnotDFs <- .parse_annot_json(as.character(json))
+            # Fill in db_uuid/session/bundle for parsed annotation DFs
+            for (tbl_name in c("items", "labels", "links")) {
+              if (nrow(bundleAnnotDFs[[tbl_name]]) > 0) {
+                bundleAnnotDFs[[tbl_name]]$db_uuid <- emuDBhandle$UUID
+                bundleAnnotDFs[[tbl_name]]$session <- bundleSession
+                bundleAnnotDFs[[tbl_name]]$bundle <- bundleName
+              }
+            }
+            .add_bundle_to_db(emuDBhandle$connection,
+                              emuDBhandle$UUID,
+                              bundleSession,
+                              bundleName,
+                              bundleAnnotDFs$annotates,
+                              bundleAnnotDFs$sampleRate,
+                              newMD5annotJSON)
+            .store_bundle_annot(emuDBhandle$connection,
+                                bundleAnnotDFs,
+                                bundleSession,
+                                bundleName)
             DBI::dbCommit(emuDBhandle$connection)
 
             # Update bundle list if specified
             if (!is.null(bundleListName)) {
-              bl <- emuR::read_bundleList(emuDBhandle, bundleListName)
+              bl <- .read_bundle_list(emuDBhandle$basePath, bundleListName)
               bl[bl$session == bundleSession & bl$name == bundleName, ]$comment <- jr[["data"]][["comment"]]
               bl[bl$session == bundleSession & bl$name == bundleName, ]$finishedEditing <- jr[["data"]][["finishedEditing"]]
-              emuR::write_bundleList(emuDBhandle, bundleListName, bl)
+              .write_bundle_list(emuDBhandle$basePath, bundleListName, bl)
             }
           }
         }

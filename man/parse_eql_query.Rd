@@ -7,14 +7,10 @@
 parse_eql_query(query_string)
 }
 \arguments{
-\item{emuDB}{Either a path to an emuDB directory, an emuDBhandle, or a corpus object}
-
-\item{query}{EQL query string}
-
-\item{...}{Additional arguments passed to query execution}
+\item{query_string}{EQL query string to parse}
 }
 \value{
-A segment_list object (subclass of tibble)
+A list describing the parsed query structure
 }
 \description{
 This module provides a complete implementation of the EMU Query Language (EQL)
@@ -66,3 +62,4 @@ EQL Specification: https://ips-lmu.github.io/The-EMU-SDMS-Manual/app-chap-EQL-EB
 \author{
 reindeer package
 }
+\keyword{internal}

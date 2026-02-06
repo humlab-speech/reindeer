@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeer_lazy_segment_list.R
 \name{lazy_segment_list}
 \alias{lazy_segment_list}
-\title{S7 class for lazy segment lists}
+\title{Lazy Segment List S7 Class}
 \usage{
 lazy_segment_list(
   corpus = NULL,
@@ -14,5 +14,30 @@ lazy_segment_list(
 )
 }
 \description{
-S7 class for lazy segment lists
+Implements lazy evaluation for EMU query operations. Query chains are built
+up without executing SQL until \code{collect()} is called or the data is needed.
 }
+\section{Benefits}{
+
+\itemize{
+\item Query optimization: Multiple operations can be combined into single SQL query
+\item Reduced memory: Only materialize when needed
+\item Better performance: SQL database handles complex joins efficiently
+}
+}
+
+\examples{
+\dontrun{
+# Build query chain without execution
+lazy_segs <- ask_for(corpus, "Phonetic == t") \%>\%
+  scout(1) \%>\%
+  ascend_to("Word")
+
+# Force execution
+segs <- collect(lazy_segs)
+
+# Or implicitly via print/summary
+print(lazy_segs)  # Shows preview
+}
+}
+\keyword{internal}

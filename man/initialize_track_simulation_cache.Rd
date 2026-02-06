@@ -49,3 +49,4 @@ Extends enrich() to support systematic parameter space exploration for track
 generation with optional preprocessing of media files. Results are cached in
 SQLite database for efficient retrieval.
 }
+\keyword{internal}

@@ -2,22 +2,9 @@
 % Please edit documentation in R/reindeer_enrich.R
 \name{enrich}
 \alias{enrich}
-\alias{furnish}
 \title{Enrich corpus with DSP-derived tracks}
 \usage{
 enrich(
-  corpus_obj,
-  .using,
-  ...,
-  .metadata_fields = c("Gender", "Age"),
-  .signal_extension = NULL,
-  .force = FALSE,
-  .verbose = TRUE,
-  .parallel = TRUE,
-  .workers = NULL
-)
-
-furnish(
   corpus_obj,
   .using,
   ...,

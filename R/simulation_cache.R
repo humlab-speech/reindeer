@@ -245,7 +245,7 @@ summary.simulation_results <- function(object, ...) {
 #' @param .parallel Use parallel processing
 #' @param .workers Number of parallel workers
 #' @return The corpus object (invisibly), or simulation_tracks object if simulating
-#' @export
+#' @keywords internal
 initialize_track_simulation_cache <- function(cache_dir, timestamp, dsp_function_name) {
   
   if (!dir.exists(cache_dir)) {

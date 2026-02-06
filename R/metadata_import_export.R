@@ -273,7 +273,14 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
   # Join with segment list
   result <- segs_tbl %>%
     dplyr::left_join(metadata, by = c("session", "bundle"))
-  
+
+  # Preserve S7 class after join
+  if (inherits(segs_tbl, "extended_segment_list")) {
+    result <- extended_segment_list(data = as.data.frame(result))
+  } else if (inherits(segs_tbl, "segment_list")) {
+    result <- extended_segment_list(data = as.data.frame(result))
+  }
+
   result
 }
 
@@ -330,7 +337,3 @@ list_bundles_from_cache <- function(con, db_uuid) {
     "SELECT session, name FROM bundle WHERE db_uuid = '%s'", db_uuid
   ))
 }
-
-#' Null coalescing operator
-#' @keywords internal
-`%||%` <- function(x, y) if (is.null(x)) y else x

@@ -16,3 +16,4 @@ store_DBconfig(obj, dbConfig, basePath = NULL)
 \description{
 Store database configuration
 }
+\keyword{internal}

@@ -96,7 +96,7 @@ create_cmdi_metadata <- function(corpus,
   }
   
   # Load database config
-  db_config <- emuR:::load_DBconfig(db_handle)
+  db_config <- load_DBconfig(db_handle)
   db_name <- db_config$name
   db_uuid <- db_config$UUID
   db_path <- db_handle$basePath
@@ -164,10 +164,10 @@ collect_database_metadata <- function(db_handle, db_config, verbose = TRUE) {
   metadata$media_extension <- db_config$mediafileExtension
   
   # Count sessions and bundles
-  sessions <- emuR::list_sessions(db_handle)
+  sessions <- .list_sessions(db_handle)
   metadata$n_sessions <- nrow(sessions)
   
-  bundles <- emuR::list_bundles(db_handle)
+  bundles <- .list_bundles(db_handle)
   metadata$n_bundles <- nrow(bundles)
   metadata$bundle_list <- bundles
   
@@ -232,7 +232,7 @@ collect_participant_metadata <- function(db_handle, verbose = TRUE) {
   if (verbose) cat("Collecting participant metadata...\n")
   
   participants <- list()
-  sessions <- emuR::list_sessions(db_handle)
+  sessions <- .list_sessions(db_handle)
   
   for (i in 1:nrow(sessions)) {
     session_name <- sessions$name[i]
@@ -249,7 +249,7 @@ collect_participant_metadata <- function(db_handle, verbose = TRUE) {
     }
     
     # Check for bundle-level .meta_json
-    bundles <- emuR::list_bundles(db_handle, session = session_name)
+    bundles <- .list_bundles(db_handle, session = session_name)
     for (j in 1:nrow(bundles)) {
       bundle_name <- bundles$name[j]
       bundle_dir <- file.path(session_dir, paste0(bundle_name, "_bndl"))
@@ -551,11 +551,4 @@ format_duration <- function(seconds) {
   minutes <- floor((seconds %% 3600) / 60)
   secs <- floor(seconds %% 60)
   sprintf("%02d:%02d:%02d", hours, minutes, secs)
-}
-
-
-#' Null coalescing operator
-#' @keywords internal
-`%||%` <- function(a, b) {
-  if (is.null(a)) b else a
 }

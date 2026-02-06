@@ -186,7 +186,7 @@ to_json_compat <- function(x, auto_unbox = TRUE, ...) {
 #' This is useful for debugging and understanding performance characteristics.
 #'
 #' @return List with parser strategy information
-#' @export
+#' @keywords internal
 #'
 #' @examples
 #' get_json_strategy()

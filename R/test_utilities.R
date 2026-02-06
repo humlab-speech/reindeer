@@ -66,7 +66,6 @@
 #' }
 #'
 #' @keywords internal
-#' @export
 prep_passthrough <- function(listOfFiles,
                               format = NULL,
                               codec = NULL,
@@ -161,7 +160,6 @@ prep_passthrough <- function(listOfFiles,
 #' @param expected_params Named list of expected parameter values
 #' @return Logical; TRUE if parameters match, FALSE otherwise
 #' @keywords internal
-#' @export
 verify_prep_params <- function(result, expected_params) {
 
   # Extract prep_params from result
@@ -202,7 +200,6 @@ verify_prep_params <- function(result, expected_params) {
 #' @param temp_dir Temporary directory for corpus (default: tempdir())
 #' @return Path to created test corpus
 #' @keywords internal
-#' @export
 create_test_corpus_for_simulation <- function(n_bundles = 3, temp_dir = tempdir()) {
 
   # Create unique corpus name

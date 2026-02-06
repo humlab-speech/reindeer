@@ -42,11 +42,9 @@
 
 #' Query EMU database using optimized SQLite backend
 #' 
-#' @param emuDB Either a path to an emuDB directory, an emuDBhandle, or a corpus object
-#' @param query EQL query string
-#' @param ... Additional arguments passed to query execution
-#' @return A segment_list object (subclass of tibble)
-#' @export
+#' @param query_string EQL query string to parse
+#' @return A list describing the parsed query structure
+#' @keywords internal
 parse_eql_query <- function(query_string) {
   query_string <- trimws(query_string)
   
@@ -1044,19 +1042,3 @@ create_empty_emuRsegs <- function() {
   class(empty_df) <- c("emuRsegs", class(empty_df))
   return(empty_df)
 }
-
-# Success message
-cat("Optimized EQL query implementation loaded successfully!\n")
-cat("Usage: result <- ask_for(emuDB, 'Phonetic == t')  # or query() as alias\n")
-cat("\nSupported EQL features:\n")
-cat("  - Simple queries: Level == value, Level != value\n")
-cat("  - Regex queries: Level =~ pattern, Level !~ pattern\n")
-cat("  - Attributes: Level:Attribute == value\n")
-cat("  - Sequence: [Level == a -> Level == b]\n")
-cat("  - Dominance: [Level1 == a ^ Level2 == b]\n")
-cat("  - Projection: #Level marks the side to return\n")
-cat("  - Conjunction: [query1 & query2]\n")
-cat("  - Disjunction: [query1 | query2]\n")
-cat("  - Position functions: Start(parent, child), End(parent, child), Medial(parent, child)\n")
-cat("  - Count function: Num(parent, child) >= n\n")
-cat("\nReturns: segment_list object (compatible with emuR::query results)\n")

@@ -15,3 +15,4 @@ Logical
 \description{
 Check if Object is Lazy
 }
+\keyword{internal}

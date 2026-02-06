@@ -333,6 +333,8 @@ serialize_metadata_value <- function(value) {
     return(list(value = "NULL", type = "NULL"))
   } else if (is.logical(value)) {
     return(list(value = as.character(value), type = "logical"))
+  } else if (is.integer(value)) {
+    return(list(value = as.character(value), type = "integer"))
   } else if (is.numeric(value)) {
     return(list(value = as.character(value), type = "numeric"))
   } else if (inherits(value, "Date")) {
@@ -347,18 +349,21 @@ serialize_metadata_value <- function(value) {
 #' Deserialize a metadata value from storage
 #' @keywords internal
 deserialize_metadata_value <- function(value_str, type_str) {
-  if (is.na(value_str) || value_str == "NULL") {
+  if (is.na(value_str) || value_str == "NULL" || value_str == "NA") {
     return(NA)
   }
-  
-  switch(type_str,
-    "logical" = as.logical(value_str),
-    "numeric" = as.numeric(value_str),
-    "integer" = as.integer(value_str),
-    "date" = as.Date(value_str),
-    "datetime" = as.POSIXct(value_str),
-    "character" = value_str,
-    value_str  # default
+
+  tryCatch(
+    switch(type_str,
+      "logical" = as.logical(value_str),
+      "numeric" = as.numeric(value_str),
+      "integer" = as.integer(value_str),
+      "date" = as.Date(value_str),
+      "datetime" = as.POSIXct(value_str),
+      "character" = value_str,
+      value_str  # default
+    ),
+    error = function(e) value_str
   )
 }
 
@@ -420,7 +425,7 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
   }
   
   if (nrow(bundles_dt) == 0) {
-    return(data.table::data.table())
+    return(tibble::tibble(session = character(), bundle = character()))
   }
   
   # OPTIMIZATION: Single mega-query using PIVOT to get all metadata at once
@@ -467,7 +472,7 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
   
   if (nrow(metadata_long) == 0) {
     # No metadata at all
-    return(bundles_dt[, .(session, bundle)])
+    return(tibble::as_tibble(bundles_dt[, .(session, bundle)]))
   }
   
   # Convert from long to wide format using data.table's dcast (very fast)
@@ -484,8 +489,8 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
   # Reorder columns: session, bundle, then alphabetically
   meta_cols <- setdiff(names(result), c("session", "bundle"))
   data.table::setcolorder(result, c("session", "bundle", sort(meta_cols)))
-  
-  result
+
+  tibble::as_tibble(result)
 }
 
 #' Get values for a single metadata field across bundles - OPTIMIZED
@@ -545,255 +550,8 @@ get_metadata_field <- function(con, db_uuid, field_name, sessions, bundles) {
 }
 
 # ==============================================================================
-# ENHANCED CORPUS SUMMARY
-# ==============================================================================
-
-#' Enhanced summary for corpus objects
-#'
-#' Provides comprehensive information similar to emuR database summary,
-#' plus metadata diagnostics
-#' 
-#' @param object A corpus object
-#' @param ... Additional arguments (ignored)
-#' @export
-summary.corpus <- function(object, ...) {
-  
-  con <- get_corpus_connection(object)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
-  
-  db_uuid <- object@.uuid
-  config <- object@config
-  
-  # Header
-  cli::cli_rule(left = "Summary of emuDB")
-  cat("\n")
-  
-  # Basic info
-  cat(sprintf("%-25s %s\n", "Name:", object@dbName))
-  cat(sprintf("%-25s %s\n", "UUID:", db_uuid))
-  cat(sprintf("%-25s %s\n", "Directory:", object@basePath))
-  
-  # Counts from cache
-  session_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM session WHERE db_uuid = '%s'", db_uuid
-  ))$n
-  
-  bundle_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = '%s'", db_uuid
-  ))$n
-  
-  item_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM items WHERE db_uuid = '%s'", db_uuid
-  ))$n
-  
-  label_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM labels WHERE db_uuid = '%s'", db_uuid
-  ))$n
-  
-  link_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM links WHERE db_uuid = '%s'", db_uuid
-  ))$n
-  
-  cat(sprintf("%-25s %d\n", "Session count:", session_count))
-  cat(sprintf("%-25s %d\n", "Bundle count:", bundle_count))
-  cat(sprintf("%-25s %d\n", "Annotation item count:", item_count))
-  cat(sprintf("%-25s %d\n", "Label count:", label_count))
-  cat(sprintf("%-25s %d\n", "Link count:", link_count))
-  cat("\n")
-  
-  # Database configuration
-  cli::cli_rule(left = "Database configuration")
-  cat("\n")
-  
-  # SSFF track definitions
-  if (!is.null(config$ssffTrackDefinitions) && length(config$ssffTrackDefinitions) > 0) {
-    cat("SSFF track definitions:\n\n")
-    
-    ssff_df <- do.call(rbind, lapply(config$ssffTrackDefinitions, function(x) {
-      data.frame(
-        name = format(x$name %||% "", width = 12),
-        columnName = format(x$columnName %||% "", width = 12),
-        fileExtension = format(x$fileExtension %||% "", width = 14),
-        fileFormat = format(x$fileFormat %||% "", width = 10),
-        stringsAsFactors = FALSE,
-        row.names = NULL
-      )
-    }))
-    
-    print(ssff_df, row.names = FALSE, right = FALSE)
-    cat("\n")
-  }
-  
-  # Level definitions
-  if (!is.null(config$levelDefinitions) && length(config$levelDefinitions) > 0) {
-    cat("Level definitions:\n\n")
-    
-    level_df <- do.call(rbind, lapply(config$levelDefinitions, function(ld) {
-      attr_names <- paste(sapply(ld$attributeDefinitions %||% list(), function(ad) 
-        paste0(ad$name, ";")), collapse = " ")
-      
-      data.frame(
-        name = format(ld$name, width = 13),
-        type = format(ld$type, width = 8),
-        nrOfAttrDefs = format(length(ld$attributeDefinitions %||% list()), width = 12),
-        attrDefNames = attr_names,
-        stringsAsFactors = FALSE,
-        row.names = NULL
-      )
-    }))
-    
-    print(level_df, row.names = FALSE, right = FALSE)
-    cat("\n")
-  }
-  
-  # Link definitions
-  if (!is.null(config$linkDefinitions) && length(config$linkDefinitions) > 0) {
-    cat("Link definitions:\n\n")
-    
-    link_df <- do.call(rbind, lapply(config$linkDefinitions, function(ld) {
-      data.frame(
-        type = format(ld$type, width = 13),
-        superlevelName = format(ld$superlevelName, width = 15),
-        sublevelName = format(ld$sublevelName, width = 13),
-        stringsAsFactors = FALSE,
-        row.names = NULL
-      )
-    }))
-    
-    print(link_df, row.names = FALSE, right = FALSE)
-    cat("\n")
-  }
-  
-  # Metadata diagnostics
-  tryCatch({
-    metadata_summary <- get_metadata_diagnostics_internal(con, db_uuid)
-    if (!is.null(metadata_summary) && nrow(metadata_summary) > 0) {
-      cli::cli_rule(left = "Metadata summary")
-      cat("\n")
-      print(metadata_summary, row.names = FALSE, right = FALSE)
-      cat("\n")
-    }
-  }, error = function(e) {
-    # Silently skip if metadata tables don't exist yet
-  })
-  
-  invisible(object)
-}
-
-#' Get metadata diagnostics
-#' @keywords internal
-get_metadata_diagnostics_internal <- function(con, db_uuid) {
-  # Check if metadata tables exist
-  tables_exist <- DBI::dbGetQuery(con, 
-    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'metadata_%'")
-  
-  if (nrow(tables_exist) == 0) {
-    return(NULL)
-  }
-  
-  # Get field statistics
-  fields <- tryCatch({
-    DBI::dbGetQuery(con, sprintf("
-      SELECT 
-        field_name,
-        field_type,
-        (SELECT COUNT(DISTINCT session || '/' || bundle) 
-         FROM metadata_bundle mb 
-         WHERE mb.field_name = mf.field_name AND mb.db_uuid = '%s') as bundle_count,
-        (SELECT COUNT(DISTINCT session) 
-         FROM metadata_session ms 
-         WHERE ms.field_name = mf.field_name AND ms.db_uuid = '%s') as session_count,
-        (SELECT COUNT(*) 
-         FROM metadata_database md 
-         WHERE md.field_name = mf.field_name AND md.db_uuid = '%s') as db_count
-      FROM metadata_fields mf
-      ORDER BY field_name", db_uuid, db_uuid, db_uuid))
-  }, error = function(e) {
-    return(NULL)
-  })
-  
-  if (is.null(fields) || nrow(fields) == 0) {
-    return(NULL)
-  }
-  
-  # Determine primary level for each field
-  fields$level <- ifelse(fields$bundle_count > 0, "bundle",
-                  ifelse(fields$session_count > 0, "session",
-                  ifelse(fields$db_count > 0, "database", "none")))
-  
-  # Format for display
-  result <- data.frame(
-    Field = format(fields$field_name, width = 20),
-    Type = format(fields$field_type, width = 10),
-    Level = format(fields$level, width = 10),
-    Bundles = format(fields$bundle_count, width = 8),
-    Sessions = format(fields$session_count, width = 9),
-    Database = format(fields$db_count, width = 9),
-    stringsAsFactors = FALSE,
-    row.names = NULL
-  )
-  
-  result
-}
-
-# ==============================================================================
 # PROGRAMMATIC METADATA MANIPULATION
 # ==============================================================================
-
-#' Set metadata for corpus, session, or bundle with validation
-#'
-#' @description
-#' Assign metadata values to a corpus, session, or bundle using bracket notation.
-#'
-#' @param x A corpus object
-#' @param i Session name (optional)
-#' @param j Bundle name (optional)
-#' @param value Named list of metadata values
-#'
-#' @examples
-#' \dontrun{
-#' mycorpus["Session1", "Bundle1"] <- list(Age = 25, Sex = "Male")
-#' }
-#'
-#' @export
-`[<-.corpus` <- function(x, i = NULL, j = NULL, value) {
-  
-  if (!is.list(value)) {
-    cli::cli_abort("Value must be a named list")
-  }
-  
-  if (length(names(value)) == 0 || any(names(value) == "")) {
-    cli::cli_abort("All list elements must be named")
-  }
-  
-  session <- if (!missing(i) && !is.null(i)) i else NULL
-  bundle <- if (!missing(j) && !is.null(j)) j else NULL
-  
-  # Determine level
-  if (is.null(session) && is.null(bundle)) {
-    level <- "database"
-  } else if (!is.null(session) && is.null(bundle)) {
-    level <- "session"
-  } else if (!is.null(session) && !is.null(bundle)) {
-    level <- "bundle"
-  } else {
-    cli::cli_abort("Invalid combination: bundle requires session")
-  }
-  
-  # Validate and set metadata
-  set_metadata_validated(x, value, session, bundle, level)
-  
-  # Update .meta_json files (ground truth)
-  write_metadata_to_json(x, value, session, bundle, level)
-  
-  # Update cache
-  con <- get_connection(x)
-  db_uuid <- get_db_uuid(x)
-  process_metadata_list(con, db_uuid, session, bundle, value, level)
-  DBI::dbDisconnect(con)
-  
-  invisible(x)
-}
 
 #' Validate and set metadata with user interaction for unknown fields
 #' @keywords internal

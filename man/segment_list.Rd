@@ -2,10 +2,44 @@
 % Please edit documentation in R/reindeer_segment_list.R
 \name{segment_list}
 \alias{segment_list}
-\title{S7 class for segment lists}
+\title{Segment List S7 Class}
 \usage{
 segment_list(data, db_uuid = NULL, db_path = NULL)
 }
 \description{
-S7 class for segment lists
+An S7 class representing a segment list returned by EMU queries.
+This class extends tibble with validation to ensure compatibility
+with emuR::query() results.
+}
+\section{Structure}{
+
+A segment_list must contain the following columns:
+\itemize{
+\item labels: Character vector of segment labels
+\item start: Numeric start time in milliseconds
+\item end: Numeric end time in milliseconds
+\item db_uuid: Character UUID of database
+\item session: Character session name
+\item bundle: Character bundle name
+\item start_item_id: Integer start item ID
+\item end_item_id: Integer end item ID
+\item level: Character level name
+\item attribute: Character attribute name
+\item start_item_seq_idx: Integer start sequence index
+\item end_item_seq_idx: Integer end sequence index
+\item type: Character type (SEGMENT, EVENT, ITEM)
+\item sample_start: Integer sample start
+\item sample_end: Integer sample end
+\item sample_rate: Numeric sample rate
+}
+}
+
+\examples{
+\dontrun{
+# Query returns a segment_list
+segs <- query(corpus, "Phonetic == t")
+
+# Apply DSP to segments
+result <- quantify(segs, dsp_function)
+}
 }

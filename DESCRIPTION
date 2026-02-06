@@ -27,7 +27,6 @@ Imports:
     purrr,
     utils,
     logger,
-    testthat,
     assertthat,
     git2r,
     tidyr,
@@ -36,8 +35,15 @@ Imports:
     openssl,
     cli,
     av,
-    Rcpp
+    Rcpp,
+    DBI,
+    RSQLite,
+    tibble,
+    httpuv
 Suggests:
+    testthat (>= 3.0.0),
+    emuR,
+    qs (>= 0.25.0),
     protoscribe
 Remotes:
   github::humlab-speech/superassp

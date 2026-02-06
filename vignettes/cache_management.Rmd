@@ -24,8 +24,9 @@ The **reindeer** package uses intelligent caching to dramatically speed up compu
 Reindeer uses three types of caches:
 
 1. **Quantify/Enrich Cache** (`.quantify_cache/`): Stores results from `quantify()` and `enrich()` operations
-2. **Draft Annotation Cache** (`.draft_cache/`): Stores draft annotations from functions like `draft_momel_intsint()`
-3. **Simulation Cache** (user-specified): Stores results from `quantify_simulate()` and `enrich_simulate()`
+2. **Simulation Cache** (user-specified): Stores results from `quantify_simulate()` and `enrich_simulate()`
+
+> **Note:** Draft annotation caches (`.draft_cache/`) are managed by the [protoscribe](https://github.com/humlab-speech/protoscribe) package as of v0.3.0.
 
 All caches use the high-performance **qs** package for fast serialization, providing:
 
@@ -130,9 +131,6 @@ You'll see warnings like:
 # Check only quantify cache size
 check_quantify_cache_size(corp)
 
-# Check only draft cache size
-check_draft_cache_size(corp)
-
 # Check all caches with detailed breakdown
 check_all_cache_sizes(corp)
 ```
@@ -142,9 +140,6 @@ check_all_cache_sizes(corp)
 ```{r}
 # Clean only quantify caches
 clean_quantify_cache(corp, days_old = 30)
-
-# Clean only draft caches
-clean_draft_cache(corp, days_old = 30)
 
 # Clean all caches at once
 clean_all_caches(corp, days_old = 30, dry_run = FALSE)
@@ -221,9 +216,6 @@ your_db_emuDB/
 ├── .quantify_cache/       # Quantify/enrich results
 │   ├── result_abc123.qs
 │   └── result_def456.qs
-├── .draft_cache/          # Draft annotations
-│   ├── momel_intsint_20251020.sqlite
-│   └── momel_intsint_20251019.sqlite
 └── _emuDBcache.sqlite     # Main database cache
 ```
 
@@ -283,5 +275,4 @@ The cache system in **reindeer** is designed to be transparent and automatic, bu
 
 - `?manage_cache` - Function documentation
 - `?quantify` - Learn about signal quantification
-- `?draft_momel_intsint` - Learn about draft annotations
 - `vignette("simulation-infrastructure")` - Learn about simulation caching

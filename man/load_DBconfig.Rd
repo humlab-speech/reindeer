@@ -15,3 +15,4 @@ List with database configuration
 \description{
 Load database configuration
 }
+\keyword{internal}

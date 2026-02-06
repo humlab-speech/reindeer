@@ -51,14 +51,20 @@
     }
   }
   
-  # Load and cache
-  handle <- emuR::load_emuDB(corp@basePath, verbose = FALSE)
+  # Create native handle (no emuR dependency)
+  handle <- list(
+    dbName = corp@dbName,
+    basePath = corp@basePath,
+    connection = get_connection(corp),
+    UUID = corp@.uuid
+  )
+  class(handle) <- "emuDBhandle"
   assign(cache_key, handle, envir = .tidy_cache)
   return(handle)
 }
 
 #' Clear the tidy trackdata cache
-#' @export
+#' @keywords internal
 clear_tidy_cache <- function() {
   # Close any database connections
   for (obj_name in ls(envir = .tidy_cache)) {

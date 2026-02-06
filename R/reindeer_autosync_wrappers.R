@@ -28,8 +28,8 @@ write_bundle_metadata <- function(db_handle,
                                    trigger_sync = TRUE,
                                    verbose = FALSE) {
   
-  emuR:::check_emuDBhandle(db_handle)
-  
+  .check_db_handle(db_handle)
+
   # Construct path to bundle directory
   bundle_dir <- file.path(
     db_handle$basePath,
@@ -38,7 +38,7 @@ write_bundle_metadata <- function(db_handle,
   )
   
   if (!dir.exists(bundle_dir)) {
-    stop("Bundle directory not found: ", bundle_dir)
+    cli::cli_abort("Bundle directory not found: {.path {bundle_dir}}")
   }
   
   meta_path <- file.path(bundle_dir, metadata.filename)
@@ -89,8 +89,8 @@ write_session_metadata <- function(db_handle,
                                     trigger_sync = TRUE,
                                     verbose = FALSE) {
   
-  emuR:::check_emuDBhandle(db_handle)
-  
+  .check_db_handle(db_handle)
+
   # Construct path to session directory
   session_dir <- file.path(
     db_handle$basePath,
@@ -98,7 +98,7 @@ write_session_metadata <- function(db_handle,
   )
   
   if (!dir.exists(session_dir)) {
-    stop("Session directory not found: ", session_dir)
+    cli::cli_abort("Session directory not found: {.path {session_dir}}")
   }
   
   meta_path <- file.path(session_dir, ".meta_json")
@@ -218,8 +218,8 @@ add_session_with_sync <- function(db_handle,
                                    trigger_sync = TRUE,
                                    verbose = FALSE) {
   
-  # Use emuR's internal function
-  emuR:::add_sessionDBI(db_handle, sessionName = name)
+  # Add session to SQLite cache
+  .add_session_to_db(db_handle$connection, db_handle$UUID, name)
   
   # Create session directory
   session_dir <- file.path(db_handle$basePath, paste0(name, "_ses"))

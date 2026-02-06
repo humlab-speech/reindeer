@@ -403,42 +403,6 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
   invisible(x)
 }
 
-# ==============================================================================
-# INTERACTIVE TESTING
-# ==============================================================================
-
-if (FALSE) {
-  # Test corpus construction and usage
-  library(reindeer)
-  
-  # Create test database
-  reindeer:::create_ae_db(verbose = FALSE) -> ae
-  
-  # Construct corpus
-  VISP <- corpus(ae$basePath, verbose = TRUE)
-  
-  # Print corpus
-  print(VISP)
-  
-  # Summary
-  summary(VISP)
-  
-  # Test subsetting
-  VISP["0000", "msajc003"]  # Specific bundle
-  VISP["0000", ]            # All bundles in session
-  VISP[, "msajc003"]        # Bundle across sessions (if unique)
-  VISP[".*", "msajc.*"]     # Regex patterns
-  
-  # Test metadata assignment
-  VISP["0000", "msajc003"] <- list(Age = 25, Gender = "Male")
-  VISP["0000", ] <- list(Age = 30, Gender = "Female")
-  VISP <- corpus(ae$basePath)  # Reload
-  VISP["0000", "msajc003"]  # Check metadata
-  
-  # Test media import (if media files available)
-  # VISP["0000", "msajc003"] <- "path/to/audio.wav"
-  # VISP["0000", "msajc003"] <- c("path/to/audio.wav", "egg", NULL, "flow")
-}
 
 #' Get or restore database handle for corpus
 #' @param corpus_obj A corpus object
@@ -462,7 +426,14 @@ get_handle <- function(corpus_obj, verbose = FALSE) {
     cli::cli_alert_info("Restoring database connection for {.field {corpus_obj@dbName}}")
   }
 
-  handle <- emuR::load_emuDB(corpus_obj@basePath, verbose = verbose)
+  # Create native handle (no emuR dependency)
+  handle <- list(
+    dbName = corpus_obj@dbName,
+    basePath = corpus_obj@basePath,
+    connection = get_connection(corpus_obj),
+    UUID = corpus_obj@.uuid
+  )
+  class(handle) <- "emuDBhandle"
 
   # Cache the connection in the corpus object
   corpus_obj@.connection <- handle

@@ -17,6 +17,11 @@
 
 NULL
 
-
-
+#' Null coalescing operator
+#' @param x Value to check
+#' @param y Fallback value if x is NULL or length-0
+#' @keywords internal
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0) y else x
+}
 

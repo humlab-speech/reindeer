@@ -87,25 +87,73 @@ create_new_emuDB <- function(path, db_name, verbose = FALSE) {
     cli::cli_h2("Creating new EMU database: {.field {db_name}}")
   }
   
-  # Use emuR to create database structure
+  # Create database structure natively (no emuR dependency)
   tryCatch({
-    emuR::create_emuDB(
-      name = db_name,
-      targetDir = parent_dir,
-      verbose = verbose
+    # Create the _emuDB directory
+    dir.create(path, recursive = TRUE, showWarnings = FALSE)
+
+    # Generate UUID
+    db_uuid <- paste0(
+      paste(sample(c(0:9, letters[1:6]), 8, replace = TRUE), collapse = ""), "-",
+      paste(sample(c(0:9, letters[1:6]), 4, replace = TRUE), collapse = ""), "-",
+      paste(sample(c(0:9, letters[1:6]), 4, replace = TRUE), collapse = ""), "-",
+      paste(sample(c(0:9, letters[1:6]), 4, replace = TRUE), collapse = ""), "-",
+      paste(sample(c(0:9, letters[1:6]), 12, replace = TRUE), collapse = "")
     )
-    
+
+    # Create minimal _DBconfig.json
+    db_config <- list(
+      name = db_name,
+      UUID = db_uuid,
+      mediafileExtension = "wav",
+      ssffTrackDefinitions = list(),
+      levelDefinitions = list(),
+      linkDefinitions = list(),
+      EMUwebAppConfig = list(
+        perspectives = list(
+          list(
+            name = "default",
+            signalCanvases = list(
+              order = list("OSCI", "SPEC"),
+              assign = list(),
+              contourLims = list()
+            ),
+            levelCanvases = list(order = list()),
+            twoDimCanvases = list(order = list())
+          )
+        ),
+        restrictions = list(
+          showPerspectivesSidebar = TRUE
+        )
+      )
+    )
+
+    config_path <- file.path(path, paste0(db_name, "_DBconfig.json"))
+    jsonlite::write_json(db_config, config_path, auto_unbox = TRUE, pretty = TRUE)
+
+    # Create empty SQLite cache
+    cache_path <- file.path(path, paste0(db_name, "_emuDBcache.sqlite"))
+    con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+    # Create core tables matching emuR schema
+    DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS session (db_uuid TEXT, name TEXT, PRIMARY KEY (db_uuid, name))")
+    DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS bundle (db_uuid TEXT, session TEXT, name TEXT, annotates TEXT, sample_rate REAL, md5_annot_json TEXT, PRIMARY KEY (db_uuid, session, name))")
+    DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS items (db_uuid TEXT, session TEXT, bundle TEXT, item_id INTEGER, level TEXT, type TEXT, seq_idx INTEGER, sample_rate REAL, sample_point INTEGER, sample_start INTEGER, sample_dur INTEGER)")
+    DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS labels (db_uuid TEXT, session TEXT, bundle TEXT, item_id INTEGER, label_idx INTEGER, name TEXT, label TEXT)")
+    DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS links (db_uuid TEXT, session TEXT, bundle TEXT, from_id INTEGER, to_id INTEGER, label TEXT)")
+
     if (verbose) {
       cli::cli_alert_success("Database structure created at {.path {path}}")
     }
-    
+
     return(path)
-    
+
   }, error = function(e) {
     cli::cli_abort(c(
       "Failed to create EMU database",
       "x" = as.character(e),
-      "i" = "Check that emuR is installed and the path is writable"
+      "i" = "Check that the path is writable"
     ))
   })
 }

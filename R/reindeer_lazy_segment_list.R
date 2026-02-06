@@ -23,20 +23,19 @@
 #' }
 
 #' @noRd
-library(S7)
 
 #' S7 class for lazy segment lists
 #' @name lazy_segment_list
-#' @export
+#' @keywords internal
 lazy_segment_list <- S7::new_class(
   "lazy_segment_list",
   properties = list(
-    corpus = class_any,  # reindeer::corpus object or NULL
-    query_parts = class_list,  # List of query components
-    db_path = class_character,
-    db_uuid = class_character,
-    materialized = class_logical,
-    cache = class_any  # NULL or data.table when materialized
+    corpus = S7::class_any,  # reindeer::corpus object or NULL
+    query_parts = S7::class_list,  # List of query components
+    db_path = S7::class_character,
+    db_uuid = S7::class_character,
+    materialized = S7::class_logical,
+    cache = S7::class_any  # NULL or data.table when materialized
   ),
   constructor = function(corpus = NULL, query_parts = list(), 
                         db_path = "", db_uuid = "", 
@@ -408,7 +407,7 @@ as.data.frame.lazy_segment_list <- function(x, ...) {
 #'
 #' @param x An object
 #' @return Logical
-#' @export
+#' @keywords internal
 is_lazy <- function(x) {
   inherits(x, "lazy_segment_list") && !x@materialized
 }
@@ -417,7 +416,7 @@ is_lazy <- function(x) {
 #'
 #' @param x An object
 #' @return Logical
-#' @export
+#' @keywords internal
 needs_collect <- function(x) {
   is_lazy(x)
 }

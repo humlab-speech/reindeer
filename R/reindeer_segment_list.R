@@ -33,17 +33,16 @@
 #' }
 
 #' @noRd
-library(S7)
 
 #' S7 class for segment lists
 #' @name segment_list
 #' @export
 segment_list <- S7::new_class(
   "segment_list",
-  parent = class_data.frame,
+  parent = S7::class_data.frame,
   properties = list(
-    db_uuid = class_character,
-    db_path = class_character
+    db_uuid = S7::class_character,
+    db_path = S7::class_character
   ),
   validator = function(self) {
     # Required columns from emuR::query() results
@@ -344,8 +343,8 @@ extended_segment_list <- S7::new_class(
   "extended_segment_list",
   parent = segment_list,
   properties = list(
-    dsp_function = class_character,
-    dsp_columns = class_character
+    dsp_function = S7::class_character,
+    dsp_columns = S7::class_character
   ),
   validator = function(self) {
     # Inherits validation from segment_list
@@ -696,7 +695,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   if (nrow(object) == 0) {
     if (.verbose) cli::cli_alert_warning("Empty segment list")
-    return(tibble::tibble())
+    return(extended_segment_list(data = as.data.frame(object)))
   }
 
   # Validate .at parameter
@@ -834,7 +833,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     if (.verbose) {
       cli::cli_alert_warning("No results generated")
     }
-    return(tibble::tibble())
+    return(extended_segment_list(data = as.data.frame(object)))
   }
 
   # Combine all results efficiently

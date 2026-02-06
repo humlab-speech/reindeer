@@ -160,7 +160,7 @@ update_signal_hashes <- function(corpus_obj, bundles = NULL,
     cl <- parallel::makeCluster(n_cores)
     on.exit(parallel::stopCluster(cl), add = TRUE)
     
-    parallel::clusterEvalQ(cl, library(digest))
+    parallel::clusterEvalQ(cl, requireNamespace("digest", quietly = TRUE))
     parallel::clusterExport(cl, "compute_signal_hash", envir = environment())
     
     hashes <- parallel::parSapply(cl, signal_files_dt$full_path, compute_signal_hash)

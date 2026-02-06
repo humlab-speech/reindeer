@@ -30,7 +30,7 @@ enable_auto_sync <- function(db_handle,
                               cmdi_profile = "speech-corpus",
                               verbose = TRUE) {
   
-  emuR:::check_emuDBhandle(db_handle)
+  .check_db_handle(db_handle)
   
   # Store configuration in database directory
   sync_config_path <- file.path(db_handle$basePath, ".sync_config.json")
@@ -347,7 +347,7 @@ sync_to_cmdi <- function(db_handle, force = FALSE, profile = "speech-corpus", ve
   metadata_changed <- detect_metadata_changes(db_handle)
   
   # Check for session/bundle structure changes
-  sessions <- emuR::list_sessions(db_handle)
+  sessions <- .list_sessions(db_handle)
   state <- load_sync_state(db_handle)
   
   session_count_key <- "session_count"
@@ -471,7 +471,7 @@ sync_database <- function(db_handle,
                           force = FALSE,
                           verbose = TRUE) {
   
-  emuR:::check_emuDBhandle(db_handle)
+  .check_db_handle(db_handle)
   
   config <- load_sync_config(db_handle)
   
@@ -495,10 +495,10 @@ sync_database <- function(db_handle,
     
     changed_bundles <- if (force) {
       # Force sync all bundles
-      sessions <- emuR::list_sessions(db_handle)
+      sessions <- .list_sessions(db_handle)
       all_bundles <- list()
       for (sess in sessions$name) {
-        bundles <- emuR::list_bundles(db_handle, session = sess)
+        bundles <- .list_bundles(db_handle, session = sess)
         if (nrow(bundles) > 0) {
           for (bndl in bundles$name) {
             annot_path <- file.path(
@@ -596,12 +596,6 @@ with_auto_sync <- function(db_handle, fun, ...) {
 # ==============================================================================
 # HELPER FUNCTIONS
 # ==============================================================================
-
-#' Null-coalescing operator
-#' @keywords internal
-`%||%` <- function(x, y) {
-  if (is.null(x) || length(x) == 0) y else x
-}
 
 #' Load sync config from database path (non-handle version)
 #' @keywords internal

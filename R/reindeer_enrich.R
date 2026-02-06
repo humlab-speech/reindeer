@@ -309,7 +309,3 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
   utils::modifyList(params, user_params)
 }
 
-#' Alias for enrich (for backwards compatibility with furnish)
-#' @rdname enrich
-#' @export
-furnish <- enrich
