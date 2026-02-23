@@ -38,3 +38,4 @@ vignettes/*.pdf
 
 # Build logs
 build.log
+.worktrees/
