@@ -89,21 +89,21 @@ create_cmdi_metadata <- function(corpus,
   # Check if corpus is emuDB handle or reindeer corpus object
   if (inherits(corpus, "emuDBhandle")) {
     db_handle <- corpus
-  } else if (inherits(corpus, "reindeer_corpus")) {
-    db_handle <- corpus$emuDBhandle
+  } else if (S7::S7_inherits(corpus, reindeer::corpus)) {
+    db_handle <- get_handle(corpus)
   } else {
-    cli::cli_abort("corpus must be an emuDBhandle or reindeer_corpus object")
+    cli::cli_abort("corpus must be an emuDBhandle or reindeer corpus object")
   }
-  
+
   # Load database config
   db_config <- load_DBconfig(db_handle)
   db_name <- db_config$name
   db_uuid <- db_config$UUID
   db_path <- db_handle$basePath
-  
+
   if (verbose) {
-    cat("Creating CMDI metadata for database:", db_name, "\n")
-    cat("Database UUID:", db_uuid, "\n")
+    cli::cli_alert_info("Creating CMDI metadata for database: {db_name}")
+    cli::cli_alert_info("Database UUID: {db_uuid}")
   }
   
   # Set defaults

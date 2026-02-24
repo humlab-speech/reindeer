@@ -375,10 +375,10 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
 
 parse_annot_json <- function(annot_json, db_uuid, session_name, bundle_name) {
 
-  # Initialize empty data frames
-  items_list <- tibble::tibble()
-  labels_list <- tibble::tibble()
-  links_list <- tibble::tibble()
+  # List collectors (avoid rbind-in-loop quadratic growth)
+  items_collector <- vector("list", 0L)
+  labels_collector <- vector("list", 0L)
+  links_collector <- vector("list", 0L)
 
   # Parse levels if they exist
   if (!is.null(annot_json[["levels"]]) && is.list(annot_json[["levels"]])) {
@@ -406,8 +406,7 @@ parse_annot_json <- function(annot_json, db_uuid, session_name, bundle_name) {
             next
           }
 
-          # Create item row
-          item_row <- tibble::tibble(
+          items_collector[[length(items_collector) + 1L]] <- tibble::tibble(
             db_uuid = db_uuid,
             session = session_name,
             bundle = bundle_name,
@@ -421,8 +420,6 @@ parse_annot_json <- function(annot_json, db_uuid, session_name, bundle_name) {
             sample_dur = if (!is.null(item[["sampleDur"]])) as.integer(item[["sampleDur"]]) else NA_integer_
           )
 
-          items_list <- rbind(items_list, item_row)
-
           # Process labels for this item
           if (!is.null(item[["labels"]]) && is.list(item[["labels"]])) {
             item_labels <- item[["labels"]]
@@ -434,7 +431,7 @@ parse_annot_json <- function(annot_json, db_uuid, session_name, bundle_name) {
                 next
               }
 
-              label_row <- tibble::tibble(
+              labels_collector[[length(labels_collector) + 1L]] <- tibble::tibble(
                 db_uuid = db_uuid,
                 session = session_name,
                 bundle = bundle_name,
@@ -443,8 +440,6 @@ parse_annot_json <- function(annot_json, db_uuid, session_name, bundle_name) {
                 name = as.character(label[["name"]]),
                 label = if (!is.null(label[["value"]])) as.character(label[["value"]]) else ""
               )
-
-              labels_list <- rbind(labels_list, label_row)
             }
           }
         }
@@ -463,7 +458,7 @@ parse_annot_json <- function(annot_json, db_uuid, session_name, bundle_name) {
         next
       }
 
-      link_row <- tibble::tibble(
+      links_collector[[length(links_collector) + 1L]] <- tibble::tibble(
         db_uuid = db_uuid,
         session = session_name,
         bundle = bundle_name,
@@ -471,15 +466,13 @@ parse_annot_json <- function(annot_json, db_uuid, session_name, bundle_name) {
         to_id = as.integer(link[["toID"]]),
         label = if (!is.null(link[["label"]])) as.character(link[["label"]]) else NA_character_
       )
-
-      links_list <- rbind(links_list, link_row)
     }
   }
 
   return(list(
-    items = items_list,
-    labels = labels_list,
-    links = links_list
+    items = if (length(items_collector) > 0) do.call(rbind, items_collector) else tibble::tibble(),
+    labels = if (length(labels_collector) > 0) do.call(rbind, labels_collector) else tibble::tibble(),
+    links = if (length(links_collector) > 0) do.call(rbind, links_collector) else tibble::tibble()
   ))
 }
 

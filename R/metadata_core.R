@@ -371,26 +371,27 @@ deserialize_metadata_value <- function(value_str, type_str) {
 #' @keywords internal
 register_metadata_field <- function(con, field_name, field_type) {
   now <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
-  
+
   # Check if exists
-  existing <- DBI::dbGetQuery(con, sprintf(
-    "SELECT field_name FROM metadata_fields WHERE field_name = %s",
-    DBI::dbQuoteString(con, field_name)
-  ))
-  
+  existing <- DBI::dbGetQuery(
+    con,
+    "SELECT field_name FROM metadata_fields WHERE field_name = ?",
+    params = list(field_name)
+  )
+
   if (nrow(existing) == 0) {
-    # Insert new
-    DBI::dbExecute(con, sprintf(
-      "INSERT INTO metadata_fields (field_name, field_type, first_seen, last_modified) 
-       VALUES (%s, '%s', '%s', '%s')",
-      DBI::dbQuoteString(con, field_name), field_type, now, now
-    ))
+    DBI::dbExecute(
+      con,
+      "INSERT INTO metadata_fields (field_name, field_type, first_seen, last_modified)
+       VALUES (?, ?, ?, ?)",
+      params = list(field_name, field_type, now, now)
+    )
   } else {
-    # Update timestamp
-    DBI::dbExecute(con, sprintf(
-      "UPDATE metadata_fields SET last_modified = '%s' WHERE field_name = %s",
-      now, DBI::dbQuoteString(con, field_name)
-    ))
+    DBI::dbExecute(
+      con,
+      "UPDATE metadata_fields SET last_modified = ? WHERE field_name = ?",
+      params = list(now, field_name)
+    )
   }
 }
 
@@ -430,34 +431,34 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
   
   # OPTIMIZATION: Single mega-query using PIVOT to get all metadata at once
   # This is MUCH faster than looping through fields
-  query <- sprintf("
+  query <- "
     WITH all_metadata AS (
       -- Bundle-level metadata
-      SELECT 
+      SELECT
         session, bundle, field_name, field_value, 1 as priority
       FROM metadata_bundle
-      WHERE db_uuid = '%s'
-      
+      WHERE db_uuid = ?
+
       UNION ALL
-      
-      -- Session-level metadata  
-      SELECT 
+
+      -- Session-level metadata
+      SELECT
         ms.session, b.name as bundle, ms.field_name, ms.field_value, 2 as priority
       FROM metadata_session ms
       CROSS JOIN bundle b
-      WHERE ms.db_uuid = '%s' AND b.db_uuid = '%s' AND b.session = ms.session
-      
+      WHERE ms.db_uuid = ? AND b.db_uuid = ? AND b.session = ms.session
+
       UNION ALL
-      
+
       -- Database-level metadata
       SELECT
         b.session, b.name as bundle, md.field_name, md.field_value, 3 as priority
       FROM metadata_database md
       CROSS JOIN bundle b
-      WHERE md.db_uuid = '%s' AND b.db_uuid = '%s'
+      WHERE md.db_uuid = ? AND b.db_uuid = ?
     ),
     ranked_metadata AS (
-      SELECT 
+      SELECT
         session, bundle, field_name, field_value,
         ROW_NUMBER() OVER (PARTITION BY session, bundle, field_name ORDER BY priority) as rn
       FROM all_metadata
@@ -465,10 +466,13 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
     SELECT session, bundle, field_name, field_value
     FROM ranked_metadata
     WHERE rn = 1
-  ", db_uuid, db_uuid, db_uuid, db_uuid, db_uuid)
-  
+  "
+
   # Execute query - get all metadata in one go
-  metadata_long <- data.table::setDT(DBI::dbGetQuery(con, query))
+  metadata_long <- data.table::setDT(DBI::dbGetQuery(
+    con, query,
+    params = list(db_uuid, db_uuid, db_uuid, db_uuid, db_uuid)
+  ))
   
   if (nrow(metadata_long) == 0) {
     # No metadata at all

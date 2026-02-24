@@ -1,6 +1,6 @@
 Package: reindeer
 Type: Package
-Title: This package extends the capabilities of emuR to work with speech data in a nordic climate
+Title: Extend emuR for Speech Data in a Nordic Climate
 Version: 0.3.2
 Date: 2026-02-05
 Authors@R: c(
@@ -8,9 +8,9 @@ Authors@R: c(
            comment = c(ORCID = "0000-0003-3373-0934"))
   )
 Maintainer: Fredrik Nylén <fredrik.nylen@umu.se>
-Description: The purpose of this package is to provide a systematic framework for speech corpora managemnet that retains emuR compatability, but provides provides
+Description: A systematic framework for speech corpora management that retains emuR compatibility, but provides
   expanded ability to store metadata associated with the recording, use the metadata to guide signal processing when appropriate, and support the user in future archiving and FAIR use
-  by automating the creation, and continnous updating, of standard compliant metadata files for corpora. 
+  by automating the creation, and continuous updating, of standard compliant metadata files for corpora.
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
@@ -26,13 +26,13 @@ Imports:
     Rdpack,
     purrr,
     utils,
-    logger,
     assertthat,
-    git2r,
     tidyr,
     stringr,
     tidyselect,
-    openssl,
+    future,
+    furrr,
+    future.apply,
     cli,
     av,
     Rcpp,

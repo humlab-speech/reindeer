@@ -82,22 +82,23 @@
     sub(paste0(session.suffix, "$"), "", ses_dirs[grepl(paste0(session.suffix, "$"), ses_dirs)])
   }
 
-  result <- data.frame(session = character(), name = character(), stringsAsFactors = FALSE)
-  for (sess in sessions) {
+  result_collector <- vector("list", length(sessions))
+  for (i in seq_along(sessions)) {
+    sess <- sessions[i]
     ses_dir <- file.path(basePath, paste0(sess, session.suffix))
     if (!dir.exists(ses_dir)) next
 
     bndl_dirs <- list.dirs(ses_dir, full.names = FALSE, recursive = FALSE)
     bndl_dirs <- bndl_dirs[grepl(paste0(bundle.dir.suffix, "$"), bndl_dirs)]
     if (length(bndl_dirs) > 0) {
-      result <- rbind(result, data.frame(
+      result_collector[[i]] <- data.frame(
         session = sess,
         name = sub(paste0(bundle.dir.suffix, "$"), "", bndl_dirs),
         stringsAsFactors = FALSE
-      ))
+      )
     }
   }
-  tibble::as_tibble(result)
+  tibble::as_tibble(do.call(rbind, result_collector))
 }
 
 #' List perspectives from DBconfig
