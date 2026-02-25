@@ -102,7 +102,6 @@ NULL
   # Get summary statistics
   tryCatch({
     con <- get_corpus_connection(x)
-    on.exit(DBI::dbDisconnect(con), add = TRUE)
     
     # Count basic entities
     stats <- list(
@@ -166,7 +165,6 @@ NULL
 #' @keywords internal
 .summary_corpus <- function(object, ...) {
   con <- get_corpus_connection(object)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   cli::cli_rule("Summary of emuDB")
   cli::cli_text("")
@@ -321,7 +319,6 @@ glimpse_corpus_impl <- function(x, ...) {
   cli::cli_h2("Corpus: {.field {x@dbName}}")
   
   con <- get_corpus_connection(x)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   # Get sample data for levels
   levels_query <- sprintf(
@@ -409,60 +406,62 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
 #' @param verbose Whether to show loading messages
 #' @return An emuDBhandle with valid connection
 get_handle <- function(corpus_obj, verbose = FALSE) {
-  # Check if we have a valid cached connection
-  if (!is.null(corpus_obj@.connection) && corpus_obj@.connection_valid) {
-    tryCatch({
-      # Test connection validity
-      if (DBI::dbIsValid(corpus_obj@.connection$connection)) {
-        return(corpus_obj@.connection)
-      }
-    }, error = function(e) {
-      # Connection is invalid, need to reload
-    })
-  }
-
-  # Load fresh handle
-  if (verbose) {
-    cli::cli_alert_info("Restoring database connection for {.field {corpus_obj@dbName}}")
-  }
-
-  # Create native handle (no emuR dependency)
+  # Create native handle using cached connection
   handle <- list(
     dbName = corpus_obj@dbName,
     basePath = corpus_obj@basePath,
-    connection = get_connection(corpus_obj),
+    connection = get_or_create_connection(corpus_obj),
     UUID = corpus_obj@.uuid
   )
   class(handle) <- "emuDBhandle"
-
-  # Cache the connection in the corpus object
-  corpus_obj@.connection <- handle
-  corpus_obj@.connection_valid <- TRUE
-
-  return(handle)
+  handle
 }
 
 # ==============================================================================
 # HELPER FUNCTIONS FOR CORPUS OPERATIONS
 # ==============================================================================
 
-#' Get SQLite connection for corpus cache
+#' Get or create a cached SQLite connection for the corpus cache
+#'
+#' Uses environment property for reference semantics so the same connection
+#' is reused across calls. Falls back to creating a new connection if the
+#' cached one is invalid.
+#' @param corpus_obj A corpus object
+#' @return A DBI connection to the cache SQLite database
 #' @keywords internal
-get_corpus_connection <- function(corpus_obj) {
+get_or_create_connection <- function(corpus_obj) {
+  env <- corpus_obj@.connection
+  if (!is.null(env$con) && DBI::dbIsValid(env$con)) return(env$con)
   cache_path <- file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, "_emuDBcache.sqlite"))
-  
   if (!file.exists(cache_path)) {
     cli::cli_abort("Cache file not found at {.path {cache_path}}. Run corpus(path) to rebuild.")
   }
-  
-  DBI::dbConnect(RSQLite::SQLite(), cache_path)
+  env$con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
+  env$con
+}
+
+#' Close the cached connection
+#' @param corpus_obj A corpus object
+#' @keywords internal
+close_connection <- function(corpus_obj) {
+  env <- corpus_obj@.connection
+  if (!is.null(env$con) && DBI::dbIsValid(env$con)) {
+    DBI::dbDisconnect(env$con)
+  }
+  env$con <- NULL
+  invisible(corpus_obj)
+}
+
+#' Get SQLite connection for corpus cache (delegates to cached connection)
+#' @keywords internal
+get_corpus_connection <- function(corpus_obj) {
+  get_or_create_connection(corpus_obj)
 }
 
 #' Get metadata for bundles matching patterns
 #' @keywords internal
 get_metadata_for_patterns <- function(corpus_obj, session_pattern, bundle_pattern) {
   con <- get_corpus_connection(corpus_obj)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   # Get all bundles
   bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)

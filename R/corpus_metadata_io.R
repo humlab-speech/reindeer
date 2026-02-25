@@ -51,7 +51,6 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
   
   # Update cache
   con <- get_corpus_connection(corpus_obj)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   process_metadata_list(con, corpus_obj@.uuid, NULL, NULL, metadata_list, "database")
   
@@ -62,7 +61,6 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
 #' @keywords internal
 set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
   con <- get_corpus_connection(corpus_obj)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   # Find matching sessions
   sessions <- list_sessions_from_cache(con, corpus_obj@.uuid)
@@ -116,7 +114,6 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
 #' @keywords internal
 set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, metadata_list) {
   con <- get_corpus_connection(corpus_obj)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   # Find matching bundles
   bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)
@@ -181,7 +178,6 @@ corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, med
   
   # Find the unique bundle
   con <- get_corpus_connection(corpus_obj)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)
   session_matches <- bundles$session == session_pattern
@@ -191,15 +187,11 @@ corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, med
   
   # If bundle doesn't exist, create it
   if (nrow(matching_bundles) == 0) {
-    DBI::dbDisconnect(con)  # Close connection before creating
-    on.exit()  # Remove the on.exit handler
-    
     cli::cli_alert_info("Creating new session/bundle: {.field {session_pattern}}/{.field {bundle_pattern}}")
     create_session_and_bundle(corpus_obj, session_pattern, bundle_pattern, verbose = TRUE)
-    
-    # Reconnect and verify
+
+    # Re-fetch connection and verify
     con <- get_corpus_connection(corpus_obj)
-    on.exit(DBI::dbDisconnect(con), add = TRUE)
     bundles <- list_bundles_from_cache(con, corpus_obj@.uuid)
     matching_bundles <- bundles[bundles$session == session_pattern & bundles$name == bundle_pattern, ]
   }

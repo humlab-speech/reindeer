@@ -19,8 +19,7 @@
 #'   \item{basePath}{Full path to the database directory}
 #'   \item{config}{Database configuration (DBconfig) loaded from JSON}
 #'   \item{.uuid}{Database UUID for identification}
-#'   \item{.connection}{Cached SQLite database connection}
-#'   \item{.connection_valid}{Whether the cached connection is valid}
+#'   \item{.connection}{Environment holding cached SQLite connection (reference semantics)}
 #' }
 #'
 #' @section Usage:
@@ -43,8 +42,7 @@ corpus <- S7::new_class(
     basePath = S7::class_character,
     config = S7::class_any,
     .uuid = S7::class_character,
-    .connection = S7::class_any,
-    .connection_valid = S7::class_logical
+    .connection = S7::class_any
   ),
   constructor = function(path, verbose = FALSE, create = FALSE) {
     # Input validation with assertthat
@@ -132,8 +130,7 @@ corpus <- S7::new_class(
       basePath = basePath,
       config = config,
       .uuid = config$UUID,
-      .connection = NULL,
-      .connection_valid = FALSE
+      .connection = new.env(parent = emptyenv())
     )
     
     # Add "corpus" as FIRST class for S3 method dispatch priority
@@ -147,9 +144,8 @@ corpus <- S7::new_class(
     }
 
     # Gather metadata after object creation
-    con <- get_corpus_connection(corpus_obj)
+    con <- get_or_create_connection(corpus_obj)
     initialize_metadata_schema(con)
-    DBI::dbDisconnect(con)
 
     # Gather from .meta_json files (ground truth)
     gather_metadata_internal(corpus_obj, verbose = verbose)

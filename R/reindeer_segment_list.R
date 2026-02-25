@@ -740,7 +740,6 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     if (.verbose) cli::cli_alert_info("Fetching metadata for {nrow(object)} segments")
 
     con <- get_corpus_connection(corpus_obj)
-    on.exit(DBI::dbDisconnect(con), add = TRUE)
 
     # Get unique bundles from segment list
     unique_bundles <- unique(as.data.frame(object)[, c("session", "bundle")])

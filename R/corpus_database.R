@@ -536,7 +536,6 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   basePath <- corpus_obj@basePath
   db_uuid <- corpus_obj@.uuid
   con <- get_corpus_connection(corpus_obj)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   # Clear existing metadata
   DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?", params = list(db_uuid))

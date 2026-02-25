@@ -310,16 +310,10 @@ get_db_uuid <- function(corpus_obj) {
   config$UUID
 }
 
-#' Get connection from corpus object
+#' Get connection from corpus object (delegates to cached connection)
 #' @keywords internal
 get_connection <- function(corpus_obj) {
-  cache_path <- file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, "_emuDBcache.sqlite"))
-  
-  if (!file.exists(cache_path)) {
-    cli::cli_abort("Cache file not found. Run build_emuDB_cache() first.")
-  }
-  
-  DBI::dbConnect(RSQLite::SQLite(), cache_path)
+  get_or_create_connection(corpus_obj)
 }
 
 #' List sessions from cache
