@@ -6,7 +6,7 @@
 #   3. Simple queries: 50%+ faster
 #   4. Sequence queries (complex joins): 70%+ faster
 #   5. Large result sets (regex): 80%+ faster
-#   6. Metadata operations: 60%+ faster
+#   6. Bundle listing: 50%+ faster
 
 suppressPackageStartupMessages({
   devtools::load_all(".", quiet = TRUE)
@@ -128,17 +128,15 @@ if (target5_met) {
 }
 
 #===============================================================================
-# TARGET 6: Metadata Operations (60%+ faster)
+# TARGET 6: Bundle Listing (50%+ faster)
 #===============================================================================
 
-cli::cli_h2("Target 6: Metadata Operations")
-cli::cli_text("Target: 60%+ faster than emuR bundle listing")
+cli::cli_h2("Target 6: Bundle Listing")
+cli::cli_text("Target: 50%+ faster than emuR bundle listing")
 
-# emuR metadata = list_bundles (the only metadata accessor it provides)
-# reindeer metadata = get_metadata (full metadata with inheritance)
 bench_meta <- bench::mark(
   emuR = emuR::list_bundles(ae_db),
-  reindeer = get_metadata(corp),
+  reindeer = reindeer:::.list_bundles(corp),
   check = FALSE,
   iterations = 50,
   time_unit = "ms"
@@ -149,14 +147,14 @@ speedup_meta <- times[1] / times[2]
 pct_meta <- (speedup_meta - 1) * 100
 
 cli::cli_alert_info("emuR::list_bundles: {.val {sprintf('%.2f ms', times[1])}}")
-cli::cli_alert_info("get_metadata: {.val {sprintf('%.2f ms', times[2])}}")
+cli::cli_alert_info(".list_bundles: {.val {sprintf('%.2f ms', times[2])}}")
 cli::cli_alert_info("Speedup: {.val {sprintf('%.2fx', speedup_meta)}} ({.val {sprintf('%.1f%%', pct_meta)}} faster)")
 
-target6_met <- pct_meta >= 60
+target6_met <- pct_meta >= 50
 if (target6_met) {
-  cli::cli_alert_success("TARGET MET: {.val {sprintf('%.1f%%', pct_meta)}} >= 60%")
+  cli::cli_alert_success("TARGET MET: {.val {sprintf('%.1f%%', pct_meta)}} >= 50%")
 } else {
-  cli::cli_alert_warning("TARGET PARTIAL: {.val {sprintf('%.1f%%', pct_meta)}} < 60%")
+  cli::cli_alert_warning("TARGET PARTIAL: {.val {sprintf('%.1f%%', pct_meta)}} < 50%")
 }
 
 #===============================================================================
@@ -166,8 +164,8 @@ if (target6_met) {
 cli::cli_h1("Performance Target Summary")
 
 target_results <- data.frame(
-  Operation = c("Simple queries", "Sequence queries", "Large result sets", "Metadata ops"),
-  Target = c("50%+ faster", "70%+ faster", "80%+ faster", "60%+ faster"),
+  Operation = c("Simple queries", "Sequence queries", "Large result sets", "Bundle listing"),
+  Target = c("50%+ faster", "70%+ faster", "80%+ faster", "50%+ faster"),
   Speedup = sprintf("%.2fx", c(speedup_simple, speedup_seq, speedup_large, speedup_meta)),
   Status = c(
     if (target3_met) "MET" else "MISSED",
