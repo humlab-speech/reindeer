@@ -146,9 +146,9 @@ print.simulation_results <- function(x, ...) {
   prep_params <- attr(x, "prep_params")
   prep_function <- attr(x, "prep_function")
 
-  cat("\n")
-  cat("══ Simulation Results ══\n")
-  cat("\n")
+  cli::cli_text("")
+  cli::cli_rule("Simulation Results")
+  cli::cli_text("")
   cat(sprintf("DSP function: %s\n", attr(x, 'dsp_function')))
 
   if (!is.null(prep_function)) {

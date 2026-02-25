@@ -1,3 +1,16 @@
+#' Build or rebuild the SQLite cache for an emuDB database
+#'
+#' Parses all annotation JSON files and populates the SQLite cache
+#' with items, labels, links, and bundle metadata. Uses parallel
+#' processing by default for large databases.
+#'
+#' @param database_dir Path to the `_emuDB` directory
+#' @param parallel Whether to use parallel processing (default TRUE)
+#' @param workers Number of parallel workers
+#' @param batch_size Number of bundles per batch
+#' @param verbose Whether to show progress messages
+#' @return Invisible NULL, called for side effects
+#' @keywords internal
 build_emuDB_cache <- function(database_dir,
                               parallel = TRUE,
                               workers = future::availableCores() - 1,
@@ -524,7 +537,7 @@ insert_batch_results <- function(con, results, db_uuid) {
     DBI::dbCommit(con)
   }, error = function(e) {
     DBI::dbRollback(con)
-    stop(e)
+    cli::cli_abort("Cache build failed: {conditionMessage(e)}", parent = e)
   })
 }#' Gather all metadata from .meta_json files (internal, called during construction)
 #' @keywords internal

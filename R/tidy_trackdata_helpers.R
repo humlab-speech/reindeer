@@ -357,7 +357,7 @@ clear_tidy_cache <- function() {
           if (requireNamespace("qs", quietly = TRUE)) {
             qs::qdeserialize(blob)
           } else {
-            stop(e)
+            cli::cli_abort("Deserialization failed: {conditionMessage(e)}", parent = e)
           }
         }
       }, error = function(e2) {
