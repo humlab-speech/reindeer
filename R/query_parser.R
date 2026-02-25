@@ -344,13 +344,22 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   left_query <- parsed_query$left
   right_query <- parsed_query$right
   
-  left_level <- extract_level_from_query(left_query)
-  right_level <- extract_level_from_query(right_query)
-  
+  left_level_raw <- extract_level_from_query(left_query)
+  right_level_raw <- extract_level_from_query(right_query)
+
+  # Resolve attribute names to actual level names (e.g. "Text" → "Word")
+  left_resolved <- .resolve_level_attribute(con, left_level_raw, left_level_raw)
+  right_resolved <- .resolve_level_attribute(con, right_level_raw, right_level_raw)
+  left_level <- left_resolved$level
+  right_level <- right_resolved$level
+  # Track original names as attribute fallbacks
+  left_attr_default <- left_resolved$attribute
+  right_attr_default <- right_resolved$attribute
+
   if (left_level != right_level) {
     cli::cli_abort("Sequence queries require both sides to be from the same level")
   }
-  
+
   # Determine result level and side based on projection
   result_side <- "both"  # Track which side to return
   if (is.null(result_level)) {
@@ -423,8 +432,8 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   if (return_both) {
     # Return sequence span
     # Get attribute names for label retrieval
-    left_attr <- if (!is.null(left_query$attribute)) left_query$attribute else left_level
-    right_attr <- if (!is.null(right_query$attribute)) right_query$attribute else right_level
+    left_attr <- if (!is.null(left_query$attribute)) left_query$attribute else left_attr_default
+    right_attr <- if (!is.null(right_query$attribute)) right_query$attribute else right_attr_default
 
     # Build left_matches CTE
     if (left_needs_label_join) {
@@ -512,9 +521,9 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   } else {
     # Return only specified element
     result_attr <- if (result_level == left_level) {
-      if (!is.null(left_query$attribute)) left_query$attribute else left_level
+      if (!is.null(left_query$attribute)) left_query$attribute else left_attr_default
     } else {
-      if (!is.null(right_query$attribute)) right_query$attribute else right_level
+      if (!is.null(right_query$attribute)) right_query$attribute else right_attr_default
     }
 
     # Build left_matches CTE
@@ -595,6 +604,12 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
   left_level <- extract_level_from_query(left_query)
   right_level <- extract_level_from_query(right_query)
 
+  # Resolve attribute names to actual level names (e.g. "Text" → "Word")
+  left_resolved <- .resolve_level_attribute(con, left_level, left_level)
+  right_resolved <- .resolve_level_attribute(con, right_level, right_level)
+  left_level <- left_resolved$level
+  right_level <- right_resolved$level
+
   # Determine result level based on projection
   if (is.null(result_level)) {
     if (!is.null(left_query$projection) && left_query$projection) {
@@ -648,7 +663,11 @@ execute_function_query_corrected <- function(db_path, parsed_query) {
   operator <- parsed_query$operator
   value <- as.numeric(parsed_query$value)
   position <- parsed_query$position  # May be NULL
-  
+
+  # Resolve attribute names to actual level names (e.g. "Text" → "Word")
+  level1 <- .resolve_level_attribute(con, level1, level1)$level
+  level2 <- .resolve_level_attribute(con, level2, level2)$level
+
   if (func_name %in% c("Start", "End", "Medial")) {
     return(execute_position_function(con, func_name, level1, level2, operator, value, position))
   } else if (func_name == "Num") {

@@ -699,13 +699,10 @@ describe("Deep Nesting and Complex Queries", {
   })
 
   # Phase 3.9: Complex nested queries from EQL docs
-  # TODO: Requires attribute→level resolution in hierarchy for Num(Text, Syllable)
-  #   where "Text" is an attribute of "Word" level, not a level itself.
   test_that("documented complex queries work", {
-    # Simpler version using actual level names
-    query <- "[[[Num(Word, Syllable) == 3] ^ [Phoneme == @ ^ Start(Word, Syllable) == 1]] -> #Word =~ .*]"
-    result <- ask_for(ae_path, query)
-    expect_true(nrow(result) >= 0)  # May be 0 depending on data, just ensure no error
+    # Uses "Text" which is an attribute of "Word" level — tests attribute→level resolution
+    query <- "[[[Num(Text, Syllable) == 3] ^ [Phoneme == @ ^ Start(Word, Syllable) == 1]] -> #Text == his]"
+    expect_query_equivalent(query, ae_path, ae)
   })
 })
 
