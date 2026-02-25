@@ -24,7 +24,7 @@ additional columns added by DSP processing via quantify().
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Query and quantify
 segs <- query(corpus, "Phonetic == t")
 extended <- quantify(segs, superassp::forest)
@@ -32,6 +32,5 @@ extended <- quantify(segs, superassp::forest)
 # Extended segment list contains formant measurements
 print(extended)
 summary(extended)
-}
-
+\dontshow{\}) # examplesIf}
 }

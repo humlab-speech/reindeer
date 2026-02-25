@@ -21,8 +21,8 @@ Checks cache sizes for quantify/enrich and simulation caches.
 For draft annotation cache management, use protoscribe package functions.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")
 check_all_cache_sizes(corp)
-}
+\dontshow{\}) # examplesIf}
 }

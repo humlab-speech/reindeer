@@ -288,11 +288,9 @@ check_simulation_cache_size <- function(simulation_store,
 #' @return List with all cache sizes
 #' @export
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' check_all_cache_sizes(corp)
-#' }
 check_all_cache_sizes <- function(corpus_obj,
                                    simulation_store = NULL,
                                    verbose = TRUE) {
@@ -457,8 +455,7 @@ clean_simulation_cache <- function(simulation_store,
 #' @return Named list with number of files deleted from each cache
 #' @export
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #'
 #' # Dry run - see what would be deleted
@@ -469,7 +466,6 @@ clean_simulation_cache <- function(simulation_store,
 #'
 #' # Delete files older than 7 days
 #' clean_all_caches(corp, days_old = 7)
-#' }
 clean_all_caches <- function(corpus_obj,
                               simulation_store = NULL,
                               days_old = 30,
@@ -528,12 +524,10 @@ get_quantify_cache_dir <- function(corpus_obj) {
 #' @return Data frame with cache file information
 #' @export
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' list_cache_files(corp, "quantify")
 #' list_cache_files(corp, "all")
-#' }
 list_cache_files <- function(corpus_obj, cache_type = "all") {
 
   cache_type <- match.arg(cache_type, c("all", "quantify"))
@@ -597,8 +591,7 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #'
 #' @export
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Check cache status
 #' manage_cache(corpus)
 #'
@@ -613,7 +606,6 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #'
 #' # List only quantify caches
 #' manage_cache(corpus, action = "list", cache_type = "quantify")
-#' }
 manage_cache <- function(corpus,
                         action = c("status", "list", "clean"),
                         days_old = 30,

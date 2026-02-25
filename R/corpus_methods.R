@@ -56,15 +56,13 @@ NULL
 #' @param value Either a named list (metadata) or character vector (media files)
 #' @return Modified corpus object (invisibly)
 #' 
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Set metadata
 #' corpus["Session1", "Bundle1"] <- list(Age = 25, Gender = "F")
-#' 
+#'
 #' # Import media file
 #' corpus["Session1", "Bundle1"] <- "path/to/audio.wav"
-#' }
-#' 
+#'
 #' @export
 `[<-.corpus` <- function(x, i, j, ..., value) {
   # Determine what type of assignment this is

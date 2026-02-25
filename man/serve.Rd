@@ -82,7 +82,7 @@ Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Serve entire corpus
 corp <- corpus("path/to/mydb_emuDB")
 serve(corp)
@@ -102,6 +102,5 @@ serve(corp, port = 8080)
 
 # Stop the server
 httpuv::stopAllServers()
-}
-
+\dontshow{\}) # examplesIf}
 }

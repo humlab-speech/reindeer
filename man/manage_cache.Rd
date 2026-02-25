@@ -48,7 +48,7 @@ cache data for quantify/enrich and simulation caches.
 For draft annotation cache management, use protoscribe package functions.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Check cache status
 manage_cache(corpus)
 
@@ -63,5 +63,5 @@ manage_cache(corpus, action = "clean", days_old = 30, dry_run = FALSE)
 
 # List only quantify caches
 manage_cache(corpus, action = "list", cache_type = "quantify")
-}
+\dontshow{\}) # examplesIf}
 }

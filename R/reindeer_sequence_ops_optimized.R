@@ -30,21 +30,19 @@
 #' @return segment_list (or lazy_segment_list if collect=FALSE)
 #' @export
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Get next phoneme
 #' next_phone <- scout(segments, steps_forward = 1)
-#' 
-#' # Get previous phoneme  
+#'
+#' # Get previous phoneme
 #' prev_phone <- scout(segments, steps_forward = -1)
-#' 
+#'
 #' # Get next 2 phonemes
 #' next_two <- scout(segments, steps_forward = 1, capture = 2)
-#' 
+#'
 #' # Lazy version
 #' lazy_next <- scout(segments, steps_forward = 1, collect = FALSE)
 #' result <- collect(lazy_next)
-#' }
 scout <- function(.segments, 
                   steps_forward,
                   count_from = "START",
@@ -290,14 +288,12 @@ scout_dt <- function(.segments,
 #' @return segment_list (or lazy_segment_list if collect=FALSE)
 #' @export
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Get previous phoneme
 #' prev_phone <- retreat(segments, steps_backward = 1)
-#' 
+#'
 #' # Equivalent to:
 #' prev_phone <- scout(segments, steps_forward = -1)
-#' }
 retreat <- function(.segments, steps_backward, ...) {
   scout(.segments, steps_forward = -abs(steps_backward), ...)
 }

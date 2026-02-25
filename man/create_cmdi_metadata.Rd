@@ -93,7 +93,7 @@ The generated CMDI file follows the CLARIN metadata standards and can be
 ingested into CLARIN repositories.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Load corpus
 corpus <- load_emuDB("/path/to/ae_emuDB")
 
@@ -111,6 +111,5 @@ create_cmdi_metadata(
   license = "CC-BY-4.0",
   profile = "speech-corpus"
 )
-}
-
+\dontshow{\}) # examplesIf}
 }

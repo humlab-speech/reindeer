@@ -25,12 +25,11 @@ Converts cache entries from RDS to qs format for improved performance.
 This requires the qs package to be installed.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Convert all RDS entries to qs
 convert_cache_format()
 
 # Convert with smaller batch size
 convert_cache_format(batch_size = 50)
-}
-
+\dontshow{\}) # examplesIf}
 }

@@ -17,9 +17,8 @@ Returns information about the current cache state including size,
 number of entries, and format distribution.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 stats <- cache_summary()
 print(stats)
-}
-
+\dontshow{\}) # examplesIf}
 }

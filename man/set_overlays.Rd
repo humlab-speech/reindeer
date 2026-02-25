@@ -20,7 +20,7 @@ set_osciOverlay(emuDBhandle, perspective, trackname)
 The Emu transcription web application allow SSFF tracks to be overlaid on the oscillogram or the spectrogram. Only one track may be set as an overlay
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 reindeer:::create_ae_db() -> ae
 #Set up some suitable tracks for overlaying on an oscillogram or spectrogram
 remove_ssffTrackDefinition(ae,name="fm",deleteFiles = FALSE)
@@ -32,6 +32,5 @@ set_specOverlay(ae,"default","FORMANTS")
 #Set the RMS amplitude track as overlays on the waveform (oscillogram)
 set_osciOverlay(ae,"default","rms")
 serve(ae)
-}
-
+\dontshow{\}) # examplesIf}
 }

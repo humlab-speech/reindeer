@@ -31,7 +31,7 @@ Cleans quantify/enrich and simulation caches. For draft annotation cache
 cleanup, use protoscribe package functions.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")
 
 # Dry run - see what would be deleted
@@ -42,5 +42,5 @@ clean_all_caches(corp)
 
 # Delete files older than 7 days
 clean_all_caches(corp, days_old = 7)
-}
+\dontshow{\}) # examplesIf}
 }

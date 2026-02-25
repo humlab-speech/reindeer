@@ -13,7 +13,10 @@ enrich(
   .force = FALSE,
   .verbose = TRUE,
   .parallel = TRUE,
-  .workers = NULL
+  .workers = NULL,
+  .use_cache = FALSE,
+  .cache_dir = NULL,
+  .cache_format = c("auto", "qs", "rds")
 )
 }
 \arguments{
@@ -36,6 +39,12 @@ Default: NULL (uses mediafileExtension from corpus config)}
 \item{.parallel}{Logical; use parallel processing (default TRUE)}
 
 \item{.workers}{Number of parallel workers (default: parallel::detectCores() - 1)}
+
+\item{.use_cache}{Logical; enable persistent caching of processed bundles (default FALSE)}
+
+\item{.cache_dir}{Character; cache directory path (default: tempdir()/reindeer_cache)}
+
+\item{.cache_format}{Character; serialization format - "auto", "qs", or "rds"}
 }
 \value{
 The corpus object (invisibly), with new SSFF track files created
@@ -67,19 +76,18 @@ Parallel processing is used by default for improved performance on multi-core sy
 Set .parallel = FALSE to disable parallel processing (useful for debugging).
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Enrich corpus with formant tracks
 corp \%>\% enrich(.using = superassp::forest)
 
 # With explicit parameters
-corp \%>\% enrich(.using = superassp::ksvF0, 
+corp \%>\% enrich(.using = superassp::ksvF0,
                 minF = 75, maxF = 500,
                 .force = TRUE)
 
 # Disable parallel processing
 corp \%>\% enrich(.using = superassp::forest, .parallel = FALSE)
-}
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=quantify]{quantify()}}

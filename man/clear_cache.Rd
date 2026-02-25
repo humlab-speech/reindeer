@@ -17,7 +17,7 @@ clear_cache(cache_dir = NULL, older_than = NULL, format = NULL)
 Removes all entries from the cache or entries matching specific criteria.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Clear entire cache
 clear_cache()
 
@@ -26,6 +26,5 @@ clear_cache(older_than = 30)
 
 # Clear only RDS format entries
 clear_cache(format = "rds")
-}
-
+\dontshow{\}) # examplesIf}
 }

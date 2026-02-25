@@ -57,8 +57,7 @@
 #' Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
 #' ```
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Serve entire corpus
 #' corp <- corpus("path/to/mydb_emuDB")
 #' serve(corp)
@@ -78,7 +77,6 @@
 #'
 #' # Stop the server
 #' httpuv::stopAllServers()
-#' }
 #'
 #' @export
 serve <- S7::new_generic("serve", "corpus")

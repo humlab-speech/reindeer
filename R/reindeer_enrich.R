@@ -16,6 +16,9 @@
 #' @param .verbose Logical; show progress and diagnostic messages
 #' @param .parallel Logical; use parallel processing (default TRUE)
 #' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
+#' @param .use_cache Logical; enable persistent caching of processed bundles (default FALSE)
+#' @param .cache_dir Character; cache directory path (default: tempdir()/reindeer_cache)
+#' @param .cache_format Character; serialization format - "auto", "qs", or "rds"
 #' 
 #' @return The corpus object (invisibly), with new SSFF track files created
 #' 
@@ -35,29 +38,31 @@
 #' Parallel processing is used by default for improved performance on multi-core systems.
 #' Set .parallel = FALSE to disable parallel processing (useful for debugging).
 #' 
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Enrich corpus with formant tracks
 #' corp %>% enrich(.using = superassp::forest)
-#' 
+#'
 #' # With explicit parameters
-#' corp %>% enrich(.using = superassp::ksvF0, 
+#' corp %>% enrich(.using = superassp::ksvF0,
 #'                 minF = 75, maxF = 500,
 #'                 .force = TRUE)
-#' 
+#'
 #' # Disable parallel processing
 #' corp %>% enrich(.using = superassp::forest, .parallel = FALSE)
-#' }
 #' 
 #' @seealso [quantify()]
 #' @export
-enrich <- function(corpus_obj, .using, ..., 
+enrich <- function(corpus_obj, .using, ...,
                    .metadata_fields = c("Gender", "Age"),
                    .signal_extension = NULL,
                    .force = FALSE,
                    .verbose = TRUE,
                    .parallel = TRUE,
-                   .workers = NULL) {
+                   .workers = NULL,
+                   .use_cache = FALSE,
+                   .cache_dir = NULL,
+                   .cache_format = c("auto", "qs", "rds")) {
+  .cache_format <- match.arg(.cache_format)
   
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
@@ -121,9 +126,7 @@ enrich <- function(corpus_obj, .using, ...,
     all_meta %>%
       dplyr::semi_join(signal_files, by = c("session", "bundle"))
   })
-  
-  DBI::dbDisconnect(con)
-  
+
   # Pre-join metadata with signal files for efficiency
   signal_files_with_meta <- signal_files %>%
     dplyr::left_join(bundle_metadata, by = c("session", "bundle"))
@@ -149,11 +152,18 @@ enrich <- function(corpus_obj, .using, ...,
     cli::cli_progress_bar("Processing bundles", total = nrow(signal_files_with_meta))
   }
   
+  # Setup persistent cache if requested
+  cache_conn <- NULL
+  if (.use_cache) {
+    cache_conn <- .get_persistent_cache_connection(.cache_dir, verbose = .verbose)
+  }
+
   # Define processing function
-  process_bundle <- function(i, signal_files_with_meta, dsp_fun, 
-                             metadata_fields, user_params, verbose = FALSE) {
+  process_bundle <- function(i, signal_files_with_meta, dsp_fun,
+                             metadata_fields, user_params, verbose = FALSE,
+                             cache_conn = NULL, cache_format = "auto") {
     bundle_row <- signal_files_with_meta[i, ]
-    
+
     # Derive DSP parameters from metadata
     dsp_params <- derive_dsp_parameters(
       dsp_fun = dsp_fun,
@@ -161,7 +171,21 @@ enrich <- function(corpus_obj, .using, ...,
       metadata_fields = metadata_fields,
       user_params = user_params
     )
-    
+
+    # Check cache if enabled
+    if (!is.null(cache_conn)) {
+      cache_key <- digest::digest(list(
+        bundle_row$full_path,
+        file.info(bundle_row$full_path)$mtime,
+        dsp_params
+      ))
+      cached <- .get_persistent_cache(cache_conn, cache_key)
+      if (!is.null(cached)) {
+        return(list(success = TRUE, bundle = bundle_row$bundle,
+                    session = bundle_row$session, cached = TRUE))
+      }
+    }
+
     # Apply DSP function
     tryCatch({
       result <- do.call(dsp_fun, c(
@@ -169,7 +193,12 @@ enrich <- function(corpus_obj, .using, ...,
         dsp_params,
         list(toFile = TRUE, verbose = FALSE)
       ))
-      
+
+      # Store in cache if enabled
+      if (!is.null(cache_conn)) {
+        .set_persistent_cache(cache_conn, cache_key, TRUE, format = cache_format)
+      }
+
       list(success = TRUE, bundle = bundle_row$bundle, session = bundle_row$session)
     }, error = function(e) {
       list(success = FALSE, bundle = bundle_row$bundle, session = bundle_row$session,
@@ -187,6 +216,8 @@ enrich <- function(corpus_obj, .using, ...,
       metadata_fields = .metadata_fields,
       user_params = list(...),
       verbose = FALSE,
+      cache_conn = cache_conn,
+      cache_format = .cache_format,
       .progress = .verbose,
       .options = furrr::furrr_options(seed = TRUE)
     )
@@ -195,7 +226,8 @@ enrich <- function(corpus_obj, .using, ...,
     for (i in seq_len(nrow(signal_files_with_meta))) {
       results[[i]] <- process_bundle(
         i, signal_files_with_meta, dsp_fun,
-        .metadata_fields, list(...), FALSE
+        .metadata_fields, list(...), FALSE,
+        cache_conn = cache_conn, cache_format = .cache_format
       )
       if (.verbose) {
         cli::cli_progress_update()

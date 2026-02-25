@@ -39,7 +39,7 @@ acoustic measurements for each segment. This is equivalent to emuR::get_trackdat
 but allows for custom DSP functions with metadata-driven parameters.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 segs <- ask_for(corpus, "Phonetic == t")
 formants <- quantify(segs, superassp::forest)
 
@@ -55,6 +55,5 @@ formants <- quantify(segs, superassp::forest, .use_cache = TRUE)
 
 # Force base R serialization
 formants <- quantify(segs, superassp::forest, .use_cache = TRUE, .cache_format = "rds")
-}
-
+\dontshow{\}) # examplesIf}
 }

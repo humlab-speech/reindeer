@@ -14,11 +14,9 @@ NULL
 #'
 #' @return A list with cache statistics
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' stats <- cache_summary()
 #' print(stats)
-#' }
 #'
 #' @export
 cache_summary <- function(cache_dir = NULL) {
@@ -96,17 +94,15 @@ cache_summary <- function(cache_dir = NULL) {
 #' @param older_than Remove entries older than this many days (optional)
 #' @param format Remove entries of specific format: "qs" or "rds" (optional)
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Clear entire cache
 #' clear_cache()
-#' 
+#'
 #' # Clear entries older than 30 days
 #' clear_cache(older_than = 30)
-#' 
+#'
 #' # Clear only RDS format entries
 #' clear_cache(format = "rds")
-#' }
 #'
 #' @export
 clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
@@ -170,14 +166,12 @@ clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
 #' @param to_format Target format to convert to (default: "qs")
 #' @param batch_size Number of entries to convert at once (default: 100)
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Convert all RDS entries to qs
 #' convert_cache_format()
-#' 
+#'
 #' # Convert with smaller batch size
 #' convert_cache_format(batch_size = 50)
-#' }
 #'
 #' @export
 convert_cache_format <- function(cache_dir = NULL, 

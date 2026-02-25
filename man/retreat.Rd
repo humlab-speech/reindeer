@@ -20,11 +20,11 @@ segment_list (or lazy_segment_list if collect=FALSE)
 Convenience function for moving backward. Simply calls scout with negative offset.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Get previous phoneme
 prev_phone <- retreat(segments, steps_backward = 1)
 
 # Equivalent to:
 prev_phone <- scout(segments, steps_forward = -1)
-}
+\dontshow{\}) # examplesIf}
 }

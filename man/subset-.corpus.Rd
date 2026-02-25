@@ -24,12 +24,11 @@ Modified corpus object (invisibly)
 Assign metadata or import media files to corpus bundles using bracket notation.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Set metadata
 corpus["Session1", "Bundle1"] <- list(Age = 25, Gender = "F")
 
 # Import media file
 corpus["Session1", "Bundle1"] <- "path/to/audio.wav"
-}
-
+\dontshow{\}) # examplesIf}
 }

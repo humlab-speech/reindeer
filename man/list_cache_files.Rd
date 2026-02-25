@@ -19,9 +19,9 @@ Lists quantify/enrich cache files. For draft annotation cache files,
 use protoscribe package functions.
 }
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")
 list_cache_files(corp, "quantify")
 list_cache_files(corp, "all")
-}
+\dontshow{\}) # examplesIf}
 }

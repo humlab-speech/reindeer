@@ -28,8 +28,7 @@ quantify <- S7::new_generic("quantify", "object")
 #'
 #' @return An extended_segment_list with segment information and DSP-derived measurements
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' segs <- ask_for(corpus, "Phonetic == t")
 #' formants <- quantify(segs, superassp::forest)
 #'
@@ -45,7 +44,6 @@ quantify <- S7::new_generic("quantify", "object")
 #'
 #' # Force base R serialization
 #' formants <- quantify(segs, superassp::forest, .use_cache = TRUE, .cache_format = "rds")
-#' }
 #'
 #' @name quantify.segment_list
 S7::method(quantify, segment_list) <- function(object, dsp_function, ...,

@@ -11,8 +11,7 @@
 #' @export
 #' @rdname set_overlays
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' reindeer:::create_ae_db() -> ae
 #' #Set up some suitable tracks for overlaying on an oscillogram or spectrogram
 #' remove_ssffTrackDefinition(ae,name="fm",deleteFiles = FALSE)
@@ -24,7 +23,6 @@
 #' #Set the RMS amplitude track as overlays on the waveform (oscillogram)
 #' set_osciOverlay(ae,"default","rms")
 #' serve(ae)
-#' }
 #'
 set_specOverlay <- function(emuDBhandle,perspective,trackname){
   perspectiveNames <- .list_perspectives(emuDBhandle)$name

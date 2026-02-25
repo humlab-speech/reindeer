@@ -51,14 +51,13 @@
 #' The generated CMDI file follows the CLARIN metadata standards and can be
 #' ingested into CLARIN repositories.
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Load corpus
 #' corpus <- load_emuDB("/path/to/ae_emuDB")
-#' 
+#'
 #' # Generate CMDI with defaults
 #' create_cmdi_metadata(corpus)
-#' 
+#'
 #' # Generate CMDI with custom information
 #' create_cmdi_metadata(
 #'   corpus,
@@ -70,7 +69,6 @@
 #'   license = "CC-BY-4.0",
 #'   profile = "speech-corpus"
 #' )
-#' }
 #'
 #' @export
 create_cmdi_metadata <- function(corpus,

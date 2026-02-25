@@ -56,11 +56,11 @@ lazy evaluation through SQL query building.
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Get next phoneme
 next_phone <- scout(segments, steps_forward = 1)
 
-# Get previous phoneme  
+# Get previous phoneme
 prev_phone <- scout(segments, steps_forward = -1)
 
 # Get next 2 phonemes
@@ -69,7 +69,7 @@ next_two <- scout(segments, steps_forward = 1, capture = 2)
 # Lazy version
 lazy_next <- scout(segments, steps_forward = 1, collect = FALSE)
 result <- collect(lazy_next)
-}
+\dontshow{\}) # examplesIf}
 }
 \author{
 reindeer package

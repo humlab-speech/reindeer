@@ -140,8 +140,7 @@ is_segment_list <- function(x) {
 #' An extended_segment_list contains all segment_list columns plus
 #' additional columns added by DSP processing via quantify().
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Query and quantify
 #' segs <- query(corpus, "Phonetic == t")
 #' extended <- quantify(segs, superassp::forest)
@@ -149,7 +148,6 @@ is_segment_list <- function(x) {
 #' # Extended segment list contains formant measurements
 #' print(extended)
 #' summary(extended)
-#' }
 #'
 #' @export
 extended_segment_list <- S7::new_class(
