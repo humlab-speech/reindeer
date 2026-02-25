@@ -285,13 +285,13 @@ parse_function_query <- function(query_string) {
 .resolve_level_attribute <- function(con, level, attribute) {
   # Check if level exists in items table
   check <- DBI::dbGetQuery(con,
-    sprintf("SELECT 1 FROM items WHERE level = '%s' LIMIT 1", gsub("'", "''", level)))
+    "SELECT 1 FROM items WHERE level = ? LIMIT 1", params = list(level))
   if (nrow(check) > 0) return(list(level = level, attribute = attribute))
 
   # Level not found — check if it's an attribute name in labels
   attr_check <- DBI::dbGetQuery(con,
-    sprintf("SELECT DISTINCT i.level FROM items i JOIN labels l ON i.db_uuid=l.db_uuid AND i.session=l.session AND i.bundle=l.bundle AND i.item_id=l.item_id WHERE l.name='%s' LIMIT 1",
-    gsub("'", "''", level)))
+    "SELECT DISTINCT i.level FROM items i JOIN labels l ON i.db_uuid=l.db_uuid AND i.session=l.session AND i.bundle=l.bundle AND i.item_id=l.item_id WHERE l.name=? LIMIT 1",
+    params = list(level))
   if (nrow(attr_check) > 0) {
     return(list(level = attr_check$level[1], attribute = level))
   }
@@ -315,8 +315,8 @@ execute_simple_query_corrected <- function(db_path, parsed_query) {
   parsed_query$attribute <- resolved$attribute
   parsed_query$level <- resolved$level
 
-  condition <- extract_condition_from_query(parsed_query)
-  
+  cond <- extract_condition_from_query(parsed_query)
+
   sql <- sprintf("
     SELECT DISTINCT
       i.db_uuid, i.session, i.bundle, i.item_id,
@@ -328,12 +328,12 @@ execute_simple_query_corrected <- function(db_path, parsed_query) {
       AND i.session = l.session
       AND i.bundle = l.bundle
       AND i.item_id = l.item_id
-    WHERE i.level = '%s' AND %s
+    WHERE i.level = ? AND %s
     ORDER BY i.session, i.bundle, i.seq_idx",
-    level, condition
+    cond$sql
   )
-  
-  return(DBI::dbGetQuery(con, sql))
+
+  return(DBI::dbGetQuery(con, sql, params = c(list(level), cond$params)))
 }
 
 # Sequence query execution
@@ -393,85 +393,93 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   if (left_query$type != "simple") {
     left_preexec <- execute_subquery(db_path, left_query)
     if (nrow(left_preexec) == 0) return(create_empty_result())
+    left_cond <- NULL
   } else {
-    left_condition <- extract_condition_from_query(left_query)
+    left_cond <- extract_condition_from_query(left_query)
   }
   if (right_query$type != "simple") {
     right_preexec <- execute_subquery(db_path, right_query)
     if (nrow(right_preexec) == 0) return(create_empty_result())
+    right_cond <- NULL
   } else {
-    right_condition <- extract_condition_from_query(right_query)
+    right_cond <- extract_condition_from_query(right_query)
   }
 
-  # Build CTE WHERE clauses
-  build_match_where <- function(level, condition, preexec) {
+  # Build CTE WHERE clauses with parameterized conditions
+  # Returns list(sql = "...", params = list(...))
+  build_match_where <- function(level, cond, preexec) {
     if (!is.null(preexec)) {
-      # Use item_id IN (...) from pre-executed results
+      # Pre-executed: use item_id IN (...) — these are internal IDs, not user input
       id_col <- if ("item_id" %in% names(preexec)) "item_id" else names(preexec)[grep("item_id", names(preexec))[1]]
       keys <- paste0(
         "(i.db_uuid='", preexec$db_uuid, "' AND i.session='", preexec$session,
         "' AND i.bundle='", preexec$bundle, "' AND i.item_id=", preexec[[id_col]], ")"
       )
-      return(paste0("i.level = '", level, "' AND (", paste(keys, collapse = " OR "), ")"))
+      return(list(
+        sql = paste0("i.level = ? AND (", paste(keys, collapse = " OR "), ")"),
+        params = list(level)
+      ))
     } else {
-      return(paste0("i.level = '", level, "' AND ", condition))
+      return(list(
+        sql = paste0("i.level = ? AND ", cond$sql),
+        params = c(list(level), cond$params)
+      ))
     }
   }
 
   left_needs_label_join <- is.null(left_preexec)
   right_needs_label_join <- is.null(right_preexec)
 
-  left_where <- build_match_where(left_level, left_condition, left_preexec)
-  right_where <- build_match_where(right_level, right_condition, right_preexec)
+  left_w <- build_match_where(left_level, left_cond, left_preexec)
+  right_w <- build_match_where(right_level, right_cond, right_preexec)
 
   # Check if we return both elements or just one
-  # projection is FALSE when no # marker, TRUE when # present
   return_both <- (is.null(left_query$projection) || !left_query$projection) &&
                   (is.null(right_query$projection) || !right_query$projection)
 
+  # Collect all params in order as we build the SQL
+  all_params <- list()
+
   if (return_both) {
-    # Return sequence span
-    # Get attribute names for label retrieval
     left_attr <- if (!is.null(left_query$attribute)) left_query$attribute else left_attr_default
     right_attr <- if (!is.null(right_query$attribute)) right_query$attribute else right_attr_default
 
     # Build left_matches CTE
-    if (left_needs_label_join) {
-      left_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
-                i.sample_start, i.sample_dur, i.sample_rate
-         FROM items i
-         INNER JOIN labels l ON i.db_uuid = l.db_uuid
-           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
-         WHERE %s", left_where)
+    left_cte_sql <- if (left_needs_label_join) {
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+              i.sample_start, i.sample_dur, i.sample_rate
+       FROM items i
+       INNER JOIN labels l ON i.db_uuid = l.db_uuid
+         AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+       WHERE ", left_w$sql)
     } else {
-      left_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
-                i.sample_start, i.sample_dur, i.sample_rate
-         FROM items i
-         WHERE %s", left_where)
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+              i.sample_start, i.sample_dur, i.sample_rate
+       FROM items i
+       WHERE ", left_w$sql)
     }
+    all_params <- c(all_params, left_w$params)
 
     # Build right_matches CTE
-    if (right_needs_label_join) {
-      right_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
-                i.sample_start, i.sample_dur, i.sample_rate
-         FROM items i
-         INNER JOIN labels l ON i.db_uuid = l.db_uuid
-           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
-         WHERE %s", right_where)
+    right_cte_sql <- if (right_needs_label_join) {
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+              i.sample_start, i.sample_dur, i.sample_rate
+       FROM items i
+       INNER JOIN labels l ON i.db_uuid = l.db_uuid
+         AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+       WHERE ", right_w$sql)
     } else {
-      right_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
-                i.sample_start, i.sample_dur, i.sample_rate
-         FROM items i
-         WHERE %s", right_where)
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+              i.sample_start, i.sample_dur, i.sample_rate
+       FROM items i
+       WHERE ", right_w$sql)
     }
+    all_params <- c(all_params, right_w$params)
 
-    sql <- sprintf("
-      WITH left_matches AS (%s),
-      right_matches AS (%s),
+    # level, left_attr, right_attr are structural (from parser), parameterize them too
+    sql <- paste0("
+      WITH left_matches AS (", left_cte_sql, "),
+      right_matches AS (", right_cte_sql, "),
       sequence_pairs AS (
         SELECT
           lm.db_uuid, lm.session, lm.bundle,
@@ -490,7 +498,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
         sp.db_uuid, sp.session, sp.bundle,
         sp.left_id as item_id,
         sp.right_id as end_item_id,
-        '%s' as level, li.type as type,
+        ? as level, li.type as type,
         sp.left_seq as seq_idx,
         sp.right_seq as end_seq_idx,
         sp.sample_rate,
@@ -507,19 +515,15 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
         AND sp.session = ll.session
         AND sp.bundle = ll.bundle
         AND sp.left_id = ll.item_id
-        AND ll.name = '%s'
+        AND ll.name = ?
       INNER JOIN labels rl ON sp.db_uuid = rl.db_uuid
         AND sp.session = rl.session
         AND sp.bundle = rl.bundle
         AND sp.right_id = rl.item_id
-        AND rl.name = '%s'
-      ORDER BY sp.session, sp.bundle, sp.left_seq",
-      left_cte, right_cte,
-      left_level,
-      left_attr, right_attr
-    )
+        AND rl.name = ?
+      ORDER BY sp.session, sp.bundle, sp.left_seq")
+    all_params <- c(all_params, list(left_level, left_attr, right_attr))
   } else {
-    # Return only specified element
     result_attr <- if (result_level == left_level) {
       if (!is.null(left_query$attribute)) left_query$attribute else left_attr_default
     } else {
@@ -527,38 +531,36 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
     }
 
     # Build left_matches CTE
-    if (left_needs_label_join) {
-      left_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
-         FROM items i
-         INNER JOIN labels l ON i.db_uuid = l.db_uuid
-           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
-         WHERE %s", left_where)
+    left_cte_sql <- if (left_needs_label_join) {
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+       FROM items i
+       INNER JOIN labels l ON i.db_uuid = l.db_uuid
+         AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+       WHERE ", left_w$sql)
     } else {
-      left_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
-         FROM items i
-         WHERE %s", left_where)
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+       FROM items i
+       WHERE ", left_w$sql)
     }
+    all_params <- c(all_params, left_w$params)
 
     # Build right_matches CTE
-    if (right_needs_label_join) {
-      right_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
-         FROM items i
-         INNER JOIN labels l ON i.db_uuid = l.db_uuid
-           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
-         WHERE %s", right_where)
+    right_cte_sql <- if (right_needs_label_join) {
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+       FROM items i
+       INNER JOIN labels l ON i.db_uuid = l.db_uuid
+         AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+       WHERE ", right_w$sql)
     } else {
-      right_cte <- sprintf(
-        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
-         FROM items i
-         WHERE %s", right_where)
+      paste0("SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+       FROM items i
+       WHERE ", right_w$sql)
     }
+    all_params <- c(all_params, right_w$params)
 
-    sql <- sprintf("
-      WITH left_matches AS (%s),
-      right_matches AS (%s),
+    sql <- paste0("
+      WITH left_matches AS (", left_cte_sql, "),
+      right_matches AS (", right_cte_sql, "),
       sequence_pairs AS (
         SELECT lm.item_id as left_id, rm.item_id as right_id,
                lm.db_uuid, lm.session, lm.bundle
@@ -574,7 +576,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
         i.sample_point, i.sample_start, i.sample_dur,
         l.label, l.name as attribute
       FROM sequence_pairs sp
-      INNER JOIN items i ON sp.%s_id = i.item_id
+      INNER JOIN items i ON sp.", result_side, "_id = i.item_id
         AND sp.db_uuid = i.db_uuid
         AND sp.session = i.session
         AND sp.bundle = i.bundle
@@ -582,15 +584,12 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
         AND i.session = l.session
         AND i.bundle = l.bundle
         AND i.item_id = l.item_id
-        AND l.name = '%s'
-      ORDER BY i.session, i.bundle, i.seq_idx",
-      left_cte, right_cte,
-      result_side,
-      result_attr
-    )
+        AND l.name = ?
+      ORDER BY i.session, i.bundle, i.seq_idx")
+    all_params <- c(all_params, list(result_attr))
   }
-  
-  return(DBI::dbGetQuery(con, sql))
+
+  return(DBI::dbGetQuery(con, sql, params = all_params))
 }
 
 # Dominance query execution - the key fix
@@ -643,12 +642,12 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
     right_item_ids <- right_result
   }
 
-  sql <- build_corrected_dominance_sql(
+  dom_sql <- build_corrected_dominance_sql(
     left_query, right_query, left_level, right_level, result_level, hierarchy_info,
     left_item_ids = left_item_ids, right_item_ids = right_item_ids
   )
 
-  result <- DBI::dbGetQuery(con, sql)
+  result <- DBI::dbGetQuery(con, dom_sql$sql, params = dom_sql$params)
   return(result)
 }
 
@@ -739,34 +738,36 @@ extract_condition_from_query <- function(query) {
     operator <- query$operator
     value <- query$value
     attribute <- if (!is.null(query$attribute)) query$attribute else query$level
-    
+
     # Check for label alternatives
     alternatives <- query$alternatives
 
-    # Escape single quotes for safe SQL interpolation
-    esc_value <- gsub("'", "''", value)
-    esc_attr <- gsub("'", "''", attribute)
-
-    # Build condition based on operator
+    # Build parameterized condition (sql fragment + params list)
     if (operator %in% c("==", "=")) {
       if (!is.null(alternatives)) {
-        quoted <- paste0("'", gsub("'", "''", alternatives), "'", collapse = ", ")
-        return(sprintf("l.label IN (%s) AND l.name = '%s'", quoted, esc_attr))
+        placeholders <- paste(rep("?", length(alternatives)), collapse = ", ")
+        return(list(
+          sql = sprintf("l.label IN (%s) AND l.name = ?", placeholders),
+          params = c(as.list(alternatives), list(attribute))
+        ))
       }
-      return(sprintf("l.label = '%s' AND l.name = '%s'", esc_value, esc_attr))
+      return(list(sql = "l.label = ? AND l.name = ?", params = list(value, attribute)))
     } else if (operator == "!=") {
       if (!is.null(alternatives)) {
-        quoted <- paste0("'", gsub("'", "''", alternatives), "'", collapse = ", ")
-        return(sprintf("l.label NOT IN (%s) AND l.name = '%s'", quoted, esc_attr))
+        placeholders <- paste(rep("?", length(alternatives)), collapse = ", ")
+        return(list(
+          sql = sprintf("l.label NOT IN (%s) AND l.name = ?", placeholders),
+          params = c(as.list(alternatives), list(attribute))
+        ))
       }
-      return(sprintf("l.label != '%s' AND l.name = '%s'", esc_value, esc_attr))
+      return(list(sql = "l.label != ? AND l.name = ?", params = list(value, attribute)))
     } else if (operator == "=~") {
-      return(sprintf("l.label REGEXP '%s' AND l.name = '%s'", esc_value, esc_attr))
+      return(list(sql = "l.label REGEXP ? AND l.name = ?", params = list(value, attribute)))
     } else if (operator == "!~") {
-      return(sprintf("l.label NOT REGEXP '%s' AND l.name = '%s'", esc_value, esc_attr))
+      return(list(sql = "l.label NOT REGEXP ? AND l.name = ?", params = list(value, attribute)))
     }
   }
-  
+
   cli::cli_abort("Cannot extract condition from query")
 }
 
@@ -812,29 +813,31 @@ create_empty_result <- function() {
   ))
 }
 
-# Dominance SQL builder
+# Dominance SQL builder — returns list(sql, params) for parameterized execution
 build_corrected_dominance_sql <- function(left_query, right_query, left_level, right_level,
                                           result_level, hierarchy_info,
                                           left_item_ids = NULL, right_item_ids = NULL) {
-  # Build conditions: use label conditions for simple queries, item_id IN for pre-executed
+  all_params <- list()
+
+  # Build conditions: parameterized for simple queries, item_id IN for pre-executed
   if (is.null(left_item_ids)) {
-    left_condition <- extract_condition_from_query(left_query)
+    left_cond <- extract_condition_from_query(left_query)
   } else {
-    # Build item_id IN (...) condition from pre-executed results
+    # Pre-executed: internal IDs, not user input
     ids <- unique(paste0(
       "(i.db_uuid='", left_item_ids$db_uuid, "' AND i.session='", left_item_ids$session,
       "' AND i.bundle='", left_item_ids$bundle, "' AND i.item_id=", left_item_ids$item_id, ")"
     ))
-    left_condition <- paste0("(", paste(ids, collapse = " OR "), ")")
+    left_cond <- list(sql = paste0("(", paste(ids, collapse = " OR "), ")"), params = list())
   }
   if (is.null(right_item_ids)) {
-    right_condition <- extract_condition_from_query(right_query)
+    right_cond <- extract_condition_from_query(right_query)
   } else {
     ids <- unique(paste0(
       "(i.db_uuid='", right_item_ids$db_uuid, "' AND i.session='", right_item_ids$session,
       "' AND i.bundle='", right_item_ids$bundle, "' AND i.item_id=", right_item_ids$item_id, ")"
     ))
-    right_condition <- paste0("(", paste(ids, collapse = " OR "), ")")
+    right_cond <- list(sql = paste0("(", paste(ids, collapse = " OR "), ")"), params = list())
   }
 
   # Get attribute for final label display
@@ -850,21 +853,21 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
     cli::cli_abort("No dominance path found")
   }
 
-  with_clauses <- build_dominance_chain_cte(path_info, left_condition, right_condition,
-                                            left_preexecuted = !is.null(left_item_ids),
-                                            right_preexecuted = !is.null(right_item_ids))
-  
-  # Build the main SQL with correct string interpolation
+  cte_result <- build_dominance_chain_cte(path_info, left_cond, right_cond,
+                                           left_preexecuted = !is.null(left_item_ids),
+                                           right_preexecuted = !is.null(right_item_ids))
+  all_params <- c(all_params, cte_result$params)
+
   result_side <- if(result_level == left_level) "left" else "right"
-  
-  main_sql <- sprintf("
+
+  main_sql <- paste0("
     SELECT DISTINCT
       i.db_uuid, i.session, i.bundle, i.item_id,
       i.level, i.type, i.seq_idx, i.sample_rate,
       i.sample_point, i.sample_start, i.sample_dur,
       l.label, l.name as attribute
     FROM dominance_pairs dp
-    INNER JOIN items i ON dp.%s_id = i.item_id
+    INNER JOIN items i ON dp.", result_side, "_id = i.item_id
       AND dp.db_uuid = i.db_uuid
       AND dp.session = i.session
       AND dp.bundle = i.bundle
@@ -872,34 +875,33 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
       AND i.session = l.session
       AND i.bundle = l.bundle
       AND i.item_id = l.item_id
-      AND l.name = '%s'
-    WHERE i.level = '%s'
-    ORDER BY i.session, i.bundle, i.seq_idx",
-    result_side,
-    result_attr,
-    result_level
-  )
-  
-  return(paste(with_clauses, main_sql, sep = "\n"))
+      AND l.name = ?
+    WHERE i.level = ?
+    ORDER BY i.session, i.bundle, i.seq_idx")
+  all_params <- c(all_params, list(result_attr, result_level))
+
+  return(list(sql = paste(cte_result$sql, main_sql, sep = "\n"), params = all_params))
 }
 
-build_dominance_chain_cte <- function(path_info, left_condition, right_condition,
+# Returns list(sql = "WITH ...", params = list(...))
+build_dominance_chain_cte <- function(path_info, left_cond, right_cond,
                                       left_preexecuted = FALSE, right_preexecuted = FALSE) {
   path <- path_info$path
   directions <- path_info$directions
   ctes <- c()
+  all_params <- list()
 
-  # Build left_matches CTE — skip label join if pre-executed (condition uses i.* only)
+  # Build left_matches CTE
   left_level <- path[1]
   if (left_preexecuted) {
-    ctes <- c(ctes, sprintf("
+    ctes <- c(ctes, paste0("
       left_matches AS (
         SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
         FROM items i
-        WHERE i.level = '%s' AND %s
-      )", left_level, left_condition))
+        WHERE i.level = ? AND ", left_cond$sql, "
+      )"))
   } else {
-    ctes <- c(ctes, sprintf("
+    ctes <- c(ctes, paste0("
       left_matches AS (
         SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
         FROM items i
@@ -907,21 +909,22 @@ build_dominance_chain_cte <- function(path_info, left_condition, right_condition
           AND i.session = l.session
           AND i.bundle = l.bundle
           AND i.item_id = l.item_id
-        WHERE i.level = '%s' AND %s
-      )", left_level, left_condition))
+        WHERE i.level = ? AND ", left_cond$sql, "
+      )"))
   }
+  all_params <- c(all_params, list(left_level), left_cond$params)
 
   # Build right_matches CTE
   right_level <- path[length(path)]
   if (right_preexecuted) {
-    ctes <- c(ctes, sprintf("
+    ctes <- c(ctes, paste0("
       right_matches AS (
         SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
         FROM items i
-        WHERE i.level = '%s' AND %s
-      )", right_level, right_condition))
+        WHERE i.level = ? AND ", right_cond$sql, "
+      )"))
   } else {
-    ctes <- c(ctes, sprintf("
+    ctes <- c(ctes, paste0("
       right_matches AS (
         SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
         FROM items i
@@ -929,23 +932,21 @@ build_dominance_chain_cte <- function(path_info, left_condition, right_condition
           AND i.session = l.session
           AND i.bundle = l.bundle
           AND i.item_id = l.item_id
-        WHERE i.level = '%s' AND %s
-      )", right_level, right_condition))
+        WHERE i.level = ? AND ", right_cond$sql, "
+      )"))
   }
+  all_params <- c(all_params, list(right_level), right_cond$params)
 
   if (length(path) == 2) {
-    # Single link step — direction determines join columns
     dir <- directions[1]
     if (dir == "down") {
-      # parent→child: from_id = left, to_id = right
       lm_col <- "from_id"
       rm_col <- "to_id"
     } else {
-      # child→parent: to_id = left, from_id = right
       lm_col <- "to_id"
       rm_col <- "from_id"
     }
-    ctes <- c(ctes, sprintf("
+    ctes <- c(ctes, paste0("
       dominance_pairs AS (
         SELECT lm.db_uuid, lm.session, lm.bundle,
                lm.item_id as left_id, rm.item_id as right_id
@@ -953,18 +954,18 @@ build_dominance_chain_cte <- function(path_info, left_condition, right_condition
         INNER JOIN links lnk ON lm.db_uuid = lnk.db_uuid
           AND lm.session = lnk.session
           AND lm.bundle = lnk.bundle
-          AND lm.item_id = lnk.%s
+          AND lm.item_id = lnk.", lm_col, "
         INNER JOIN right_matches rm ON lnk.db_uuid = rm.db_uuid
           AND lnk.session = rm.session
           AND lnk.bundle = rm.bundle
-          AND lnk.%s = rm.item_id
-      )", lm_col, rm_col))
+          AND lnk.", rm_col, " = rm.item_id
+      )"))
   } else {
     chain_sql <- build_recursive_dominance_chain(path_info)
     ctes <- c(ctes, chain_sql)
   }
 
-  return(paste("WITH", paste(ctes, collapse = ",\n")))
+  return(list(sql = paste("WITH", paste(ctes, collapse = ",\n")), params = all_params))
 }
 
 build_recursive_dominance_chain <- function(path_info) {
@@ -1072,7 +1073,7 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
   
   sql <- sprintf("
     WITH child_positions AS (
-      SELECT 
+      SELECT
         c.db_uuid, c.session, c.bundle, c.item_id,
         c.level, c.type, c.seq_idx, c.sample_rate,
         c.sample_point, c.sample_start, c.sample_dur,
@@ -1082,15 +1083,15 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
         ) as child_rank,
         COUNT(*) OVER (PARTITION BY p.db_uuid, p.session, p.bundle, p.item_id) as max_rank
       FROM items p
-      INNER JOIN links lnk ON p.db_uuid = lnk.db_uuid 
-        AND p.session = lnk.session 
-        AND p.bundle = lnk.bundle 
+      INNER JOIN links lnk ON p.db_uuid = lnk.db_uuid
+        AND p.session = lnk.session
+        AND p.bundle = lnk.bundle
         AND p.item_id = lnk.from_id
-      INNER JOIN items c ON lnk.db_uuid = c.db_uuid 
-        AND lnk.session = c.session 
-        AND lnk.bundle = c.bundle 
+      INNER JOIN items c ON lnk.db_uuid = c.db_uuid
+        AND lnk.session = c.session
+        AND lnk.bundle = c.bundle
         AND lnk.to_id = c.item_id
-      WHERE p.level = '%s' AND c.level = '%s'
+      WHERE p.level = ? AND c.level = ?
     )
     SELECT DISTINCT
       cp.db_uuid, cp.session, cp.bundle, cp.item_id,
@@ -1102,35 +1103,35 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
       AND cp.session = l.session
       AND cp.bundle = l.bundle
       AND cp.item_id = l.item_id
-      AND l.name = '%s'
+      AND l.name = ?
     WHERE %s
     ORDER BY cp.session, cp.bundle, cp.seq_idx",
-    parent_level, child_level, child_level, position_condition
+    position_condition
   )
-  
-  return(DBI::dbGetQuery(con, sql))
+
+  return(DBI::dbGetQuery(con, sql, params = list(parent_level, child_level, child_level)))
 }
 
 # Count function
 execute_count_function <- function(con, parent_level, child_level, operator, value) {
   sql <- sprintf("
     WITH child_counts AS (
-      SELECT 
+      SELECT
         p.db_uuid, p.session, p.bundle, p.item_id,
         p.level, p.type, p.seq_idx, p.sample_rate,
         p.sample_point, p.sample_start, p.sample_dur,
         COUNT(c.item_id) as child_count
       FROM items p
-      LEFT JOIN links lnk ON p.db_uuid = lnk.db_uuid 
-        AND p.session = lnk.session 
-        AND p.bundle = lnk.bundle 
+      LEFT JOIN links lnk ON p.db_uuid = lnk.db_uuid
+        AND p.session = lnk.session
+        AND p.bundle = lnk.bundle
         AND p.item_id = lnk.from_id
-      LEFT JOIN items c ON lnk.db_uuid = c.db_uuid 
-        AND lnk.session = c.session 
-        AND lnk.bundle = c.bundle 
-        AND lnk.to_id = c.item_id 
-        AND c.level = '%s'
-      WHERE p.level = '%s'
+      LEFT JOIN items c ON lnk.db_uuid = c.db_uuid
+        AND lnk.session = c.session
+        AND lnk.bundle = c.bundle
+        AND lnk.to_id = c.item_id
+        AND c.level = ?
+      WHERE p.level = ?
       GROUP BY p.db_uuid, p.session, p.bundle, p.item_id,
                p.level, p.type, p.seq_idx, p.sample_rate,
                p.sample_point, p.sample_start, p.sample_dur
@@ -1145,13 +1146,13 @@ execute_count_function <- function(con, parent_level, child_level, operator, val
       AND cc.session = l.session
       AND cc.bundle = l.bundle
       AND cc.item_id = l.item_id
-      AND l.name = '%s'
+      AND l.name = ?
     WHERE cc.child_count %s %d
     ORDER BY cc.session, cc.bundle, cc.seq_idx",
-    child_level, parent_level, parent_level, operator, value
+    operator, value
   )
-  
-  return(DBI::dbGetQuery(con, sql))
+
+  return(DBI::dbGetQuery(con, sql, params = list(child_level, parent_level, parent_level)))
 }
 
 # Hierarchy functions

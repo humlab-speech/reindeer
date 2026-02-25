@@ -136,6 +136,16 @@ describe("Simple Queries", {
     expect_query_equivalent("Phonetic == V", ae_path, ae)
     expect_query_equivalent("Phonetic == @", ae_path, ae)
   })
+
+  # Phase 3.10: Labels with special characters
+  test_that("labels with SQL-sensitive characters don't cause errors", {
+    # Single quotes in label values — tests SQL escaping
+    result <- ask_for(ae_path, "Phonetic == O'Brien")
+    expect_equal(nrow(result), 0)  # No match but no SQL error
+
+    # Asterisk (used in Tone level as H*)
+    expect_query_equivalent("Tone == H*", ae_path, ae)
+  })
 })
 
 # =============================================================================
