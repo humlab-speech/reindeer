@@ -73,28 +73,37 @@ parse_simple_query <- function(query_string) {
   if (has_projection) {
     query_string <- sub("^#", "", query_string)
   }
-  
+
   # Match attribute definition: Level:Attribute or just Level
-  # Pattern now supports attribute specification
+  # Value can contain pipe-separated alternatives: m | n | p
   pattern <- "^([A-Za-z_]+)(?::([A-Za-z_]+))?\\s*(==|!=|=~|!~|=)\\s*['\"]?([^'\"]+)['\"]?$"
   match <- regexec(pattern, query_string)
   matches <- regmatches(query_string, match)[[1]]
-  
+
   if (length(matches) < 4) {
     cli::cli_abort("Cannot parse simple query: {.val {query_string}}")
   }
-  
+
   level <- matches[2]
   attribute <- if (length(matches) >= 3 && matches[3] != "") matches[3] else level
   operator <- matches[ifelse(length(matches) >= 5, 4, 3)]
-  value <- matches[ifelse(length(matches) >= 5, 5, 4)]
-  
+  value <- trimws(matches[ifelse(length(matches) >= 5, 5, 4)])
+
+  # Check for label alternatives (pipe-separated): m | n | p
+  # Only for == and != operators (not regex)
+  alternatives <- NULL
+  if (operator %in% c("==", "=", "!=") && grepl("\\|", value)) {
+    alternatives <- trimws(strsplit(value, "\\|")[[1]])
+    value <- alternatives[1]  # Keep first as primary
+  }
+
   return(list(
     type = "simple",
     level = level,
     attribute = attribute,
-    operator = operator, 
+    operator = operator,
     value = value,
+    alternatives = alternatives,
     projection = has_projection
   ))
 }
@@ -203,62 +212,107 @@ split_on_operator <- function(string, operator) {
 }
 
 parse_function_query <- function(query_string) {
+  # Normalize TRUE/FALSE/T/F to 1/0
+  .normalize_bool_value <- function(v) {
+    v <- trimws(v)
+    if (v %in% c("TRUE", "T")) return("1")
+    if (v %in% c("FALSE", "F")) return("0")
+    v
+  }
+
   # Try 3-parameter pattern first (for Medial with position)
-  pattern_3param <- "^(Medial)\\(([A-Za-z_]+),\\s*([A-Za-z_]+),\\s*([0-9]+)\\)$"
+  pattern_3param <- "^(Medial)\\(([A-Za-z_]+),\\s*([A-Za-z_]+),\\s*([0-9]+|TRUE|FALSE|T|F)\\)$"
   match_3 <- regexec(pattern_3param, query_string)
   matches_3 <- regmatches(query_string, match_3)[[1]]
-  
+
   if (length(matches_3) == 5) {
-    # Medial(parent, child, position) - special case
+    val <- .normalize_bool_value(matches_3[5])
     return(list(
       type = "function",
       func_name = matches_3[2],
       level1 = matches_3[3],
       level2 = matches_3[4],
-      operator = "==",  # Implicit equality for position
-      value = matches_3[5],
-      position = as.numeric(matches_3[5])
+      operator = "==",
+      value = val,
+      position = as.numeric(val)
     ))
   }
-  
+
   # Try 2-parameter pattern with comparison
-  pattern_2param <- "^(Start|End|Medial|Num)\\(([A-Za-z_]+),\\s*([A-Za-z_]+)\\)\\s*(==|!=|=|>|<|>=|<=)\\s*([0-9]+)$"
+  pattern_2param <- "^(Start|End|Medial|Num)\\(([A-Za-z_]+),\\s*([A-Za-z_]+)\\)\\s*(==|!=|=|>|<|>=|<=)\\s*([0-9]+|TRUE|FALSE|T|F)$"
   match_2 <- regexec(pattern_2param, query_string)
   matches_2 <- regmatches(query_string, match_2)[[1]]
-  
+
   if (length(matches_2) == 6) {
+    val <- .normalize_bool_value(matches_2[6])
     return(list(
       type = "function",
       func_name = matches_2[2],
       level1 = matches_2[3],
       level2 = matches_2[4],
       operator = matches_2[5],
-      value = matches_2[6],
+      value = val,
       position = NULL
     ))
   }
-  
+
   cli::cli_abort("Cannot parse function query: {.val {query_string}}")
+}
+
+# Open a query connection with REGEXP support
+.open_query_connection <- function(db_path) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  # Register R's grepl as SQLite REGEXP function for =~/!~ operators
+  RSQLite::initRegExp(con)
+  con
+}
+
+# Resolve level/attribute: if "level" is actually an attribute name, find the real level
+.resolve_level_attribute <- function(con, level, attribute) {
+  # Check if level exists in items table
+  check <- DBI::dbGetQuery(con,
+    sprintf("SELECT 1 FROM items WHERE level = '%s' LIMIT 1", gsub("'", "''", level)))
+  if (nrow(check) > 0) return(list(level = level, attribute = attribute))
+
+  # Level not found — check if it's an attribute name in labels
+  attr_check <- DBI::dbGetQuery(con,
+    sprintf("SELECT DISTINCT i.level FROM items i JOIN labels l ON i.db_uuid=l.db_uuid AND i.session=l.session AND i.bundle=l.bundle AND i.item_id=l.item_id WHERE l.name='%s' LIMIT 1",
+    gsub("'", "''", level)))
+  if (nrow(attr_check) > 0) {
+    return(list(level = attr_check$level[1], attribute = level))
+  }
+
+  # Fall back to original
+  list(level = level, attribute = attribute)
 }
 
 # Simple query execution
 execute_simple_query_corrected <- function(db_path, parsed_query) {
-  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
-  
+
   level <- extract_level_from_query(parsed_query)
+  attribute <- if (!is.null(parsed_query$attribute)) parsed_query$attribute else level
+
+  # Resolve attribute-as-level
+  resolved <- .resolve_level_attribute(con, level, attribute)
+  level <- resolved$level
+  # Update the parsed query's attribute for condition extraction
+  parsed_query$attribute <- resolved$attribute
+  parsed_query$level <- resolved$level
+
   condition <- extract_condition_from_query(parsed_query)
   
   sql <- sprintf("
-    SELECT DISTINCT 
-      i.db_uuid, i.session, i.bundle, i.item_id, 
+    SELECT DISTINCT
+      i.db_uuid, i.session, i.bundle, i.item_id,
       i.level, i.type, i.seq_idx, i.sample_rate,
       i.sample_point, i.sample_start, i.sample_dur,
-      l.label
+      l.label, l.name as attribute
     FROM items i
-    INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-      AND i.session = l.session 
-      AND i.bundle = l.bundle 
+    INNER JOIN labels l ON i.db_uuid = l.db_uuid
+      AND i.session = l.session
+      AND i.bundle = l.bundle
       AND i.item_id = l.item_id
     WHERE i.level = '%s' AND %s
     ORDER BY i.session, i.bundle, i.seq_idx",
@@ -270,7 +324,7 @@ execute_simple_query_corrected <- function(db_path, parsed_query) {
 
 # Sequence query execution
 execute_sequence_query_corrected <- function(db_path, parsed_query, result_level = NULL) {
-  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
   
   left_query <- parsed_query$left
@@ -356,26 +410,31 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
           AND lm.bundle = rm.bundle
           AND rm.seq_idx = lm.seq_idx + 1
       )
-      SELECT DISTINCT 
-        sp.db_uuid, sp.session, sp.bundle, 
+      SELECT DISTINCT
+        sp.db_uuid, sp.session, sp.bundle,
         sp.left_id as item_id,
         sp.right_id as end_item_id,
-        '%s' as level, 'ITEM' as type, 
+        '%s' as level, li.type as type,
         sp.left_seq as seq_idx,
         sp.right_seq as end_seq_idx,
         sp.sample_rate,
-        NULL as sample_point, sp.start_sample as sample_start, 
+        NULL as sample_point, sp.start_sample as sample_start,
         sp.end_sample - sp.start_sample as sample_dur,
-        ll.label || '->' || rl.label as label
+        ll.label || '->' || rl.label as label,
+        ll.name as attribute
       FROM sequence_pairs sp
-      INNER JOIN labels ll ON sp.db_uuid = ll.db_uuid 
-        AND sp.session = ll.session 
-        AND sp.bundle = ll.bundle 
+      INNER JOIN items li ON sp.db_uuid = li.db_uuid
+        AND sp.session = li.session
+        AND sp.bundle = li.bundle
+        AND sp.left_id = li.item_id
+      INNER JOIN labels ll ON sp.db_uuid = ll.db_uuid
+        AND sp.session = ll.session
+        AND sp.bundle = ll.bundle
         AND sp.left_id = ll.item_id
         AND ll.name = '%s'
-      INNER JOIN labels rl ON sp.db_uuid = rl.db_uuid 
-        AND sp.session = rl.session 
-        AND sp.bundle = rl.bundle 
+      INNER JOIN labels rl ON sp.db_uuid = rl.db_uuid
+        AND sp.session = rl.session
+        AND sp.bundle = rl.bundle
         AND sp.right_id = rl.item_id
         AND rl.name = '%s'
       ORDER BY sp.session, sp.bundle, sp.left_seq",
@@ -420,19 +479,19 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
           AND lm.bundle = rm.bundle
           AND rm.seq_idx = lm.seq_idx + 1
       )
-      SELECT DISTINCT 
-        i.db_uuid, i.session, i.bundle, i.item_id, 
+      SELECT DISTINCT
+        i.db_uuid, i.session, i.bundle, i.item_id,
         i.level, i.type, i.seq_idx, i.sample_rate,
         i.sample_point, i.sample_start, i.sample_dur,
-        l.label
+        l.label, l.name as attribute
       FROM sequence_pairs sp
       INNER JOIN items i ON sp.%s_id = i.item_id
         AND sp.db_uuid = i.db_uuid
         AND sp.session = i.session
         AND sp.bundle = i.bundle
-      INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-        AND i.session = l.session 
-        AND i.bundle = l.bundle 
+      INNER JOIN labels l ON i.db_uuid = l.db_uuid
+        AND i.session = l.session
+        AND i.bundle = l.bundle
         AND i.item_id = l.item_id
         AND l.name = '%s'
       ORDER BY i.session, i.bundle, i.seq_idx",
@@ -448,7 +507,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
 
 # Dominance query execution - the key fix
 execute_dominance_query_corrected <- function(db_path, parsed_query, result_level = NULL) {
-  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
   
   left_query <- parsed_query$left
@@ -470,7 +529,9 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
     }
   }
   
-  hierarchy_info <- get_hierarchy_info(con)
+  # Derive emuDB directory from db_path (SQLite file is inside the _emuDB dir)
+  db_dir <- dirname(db_path)
+  hierarchy_info <- get_hierarchy_info(db_dir)
   
   if (!can_dominate(hierarchy_info, left_level, right_level)) {
     cli::cli_warn("No dominance relationship possible between {.val {left_level}} and {.val {right_level}}")
@@ -487,7 +548,7 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
 
 # Function query execution
 execute_function_query_corrected <- function(db_path, parsed_query) {
-  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
   
   func_name <- parsed_query$func_name
@@ -508,7 +569,7 @@ execute_function_query_corrected <- function(db_path, parsed_query) {
 
 # Conjunction query execution (AND)
 execute_conjunction_query <- function(db_path, parsed_query, result_level = NULL) {
-  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
   
   # Execute both sub-queries
@@ -524,9 +585,9 @@ execute_conjunction_query <- function(db_path, parsed_query, result_level = NULL
   )
   
   # Keep only the columns from left result (or merge intelligently)
-  keep_cols <- c("db_uuid", "session", "bundle", "item_id", "level", "type", 
-                 "seq_idx", "sample_rate", "sample_point", "sample_start", 
-                 "sample_dur", "label")
+  keep_cols <- c("db_uuid", "session", "bundle", "item_id", "level", "type",
+                 "seq_idx", "sample_rate", "sample_point", "sample_start",
+                 "sample_dur", "label", "attribute")
   
   result <- result[, intersect(names(result), keep_cols), drop = FALSE]
   
@@ -571,28 +632,30 @@ extract_condition_from_query <- function(query) {
     value <- query$value
     attribute <- if (!is.null(query$attribute)) query$attribute else query$level
     
+    # Check for label alternatives
+    alternatives <- query$alternatives
+
+    # Escape single quotes for safe SQL interpolation
+    esc_value <- gsub("'", "''", value)
+    esc_attr <- gsub("'", "''", attribute)
+
     # Build condition based on operator
     if (operator %in% c("==", "=")) {
-      return(sprintf("l.label = '%s' AND l.name = '%s'", value, attribute))
+      if (!is.null(alternatives)) {
+        quoted <- paste0("'", gsub("'", "''", alternatives), "'", collapse = ", ")
+        return(sprintf("l.label IN (%s) AND l.name = '%s'", quoted, esc_attr))
+      }
+      return(sprintf("l.label = '%s' AND l.name = '%s'", esc_value, esc_attr))
     } else if (operator == "!=") {
-      return(sprintf("(l.label != '%s' OR l.name != '%s')", value, attribute))
+      if (!is.null(alternatives)) {
+        quoted <- paste0("'", gsub("'", "''", alternatives), "'", collapse = ", ")
+        return(sprintf("l.label NOT IN (%s) AND l.name = '%s'", quoted, esc_attr))
+      }
+      return(sprintf("l.label != '%s' AND l.name = '%s'", esc_value, esc_attr))
     } else if (operator == "=~") {
-      # Use GLOB for pattern matching (SQLite built-in, case-sensitive)
-      # Convert regex-like patterns to GLOB patterns
-      glob_pattern <- value
-      # Common regex to GLOB conversions
-      glob_pattern <- gsub("\\.", "?", glob_pattern)
-      glob_pattern <- gsub("\\*", "%", glob_pattern)
-      glob_pattern <- gsub("%", "*", glob_pattern)
-      
-      return(sprintf("l.label GLOB '*%s*' AND l.name = '%s'", glob_pattern, attribute))
+      return(sprintf("l.label REGEXP '%s' AND l.name = '%s'", esc_value, esc_attr))
     } else if (operator == "!~") {
-      glob_pattern <- value
-      glob_pattern <- gsub("\\.", "?", glob_pattern)
-      glob_pattern <- gsub("\\*", "%", glob_pattern)
-      glob_pattern <- gsub("%", "*", glob_pattern)
-      
-      return(sprintf("l.label NOT GLOB '*%s*' AND l.name = '%s'", glob_pattern, attribute))
+      return(sprintf("l.label NOT REGEXP '%s' AND l.name = '%s'", esc_value, esc_attr))
     }
   }
   
@@ -620,6 +683,7 @@ create_empty_result <- function() {
     sample_start = integer(0),
     sample_dur = integer(0),
     label = character(0),
+    attribute = character(0),
     stringsAsFactors = FALSE
   ))
 }
@@ -636,31 +700,31 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
     if (!is.null(right_query$attribute)) right_query$attribute else right_level
   }
   
-  path <- find_dominance_path(hierarchy_info, left_level, right_level)
-  
-  if (length(path) == 0) {
+  path_info <- find_dominance_path(hierarchy_info, left_level, right_level)
+
+  if (length(path_info$path) == 0) {
     cli::cli_abort("No dominance path found")
   }
-  
-  with_clauses <- build_dominance_chain_cte(path, left_condition, right_condition)
+
+  with_clauses <- build_dominance_chain_cte(path_info, left_condition, right_condition)
   
   # Build the main SQL with correct string interpolation
   result_side <- if(result_level == left_level) "left" else "right"
   
   main_sql <- sprintf("
-    SELECT DISTINCT 
-      i.db_uuid, i.session, i.bundle, i.item_id, 
+    SELECT DISTINCT
+      i.db_uuid, i.session, i.bundle, i.item_id,
       i.level, i.type, i.seq_idx, i.sample_rate,
       i.sample_point, i.sample_start, i.sample_dur,
-      l.label
+      l.label, l.name as attribute
     FROM dominance_pairs dp
     INNER JOIN items i ON dp.%s_id = i.item_id
       AND dp.db_uuid = i.db_uuid
       AND dp.session = i.session
       AND dp.bundle = i.bundle
-    INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-      AND i.session = l.session 
-      AND i.bundle = l.bundle 
+    INNER JOIN labels l ON i.db_uuid = l.db_uuid
+      AND i.session = l.session
+      AND i.bundle = l.bundle
       AND i.item_id = l.item_id
       AND l.name = '%s'
     WHERE i.level = '%s'
@@ -673,80 +737,105 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
   return(paste(with_clauses, main_sql, sep = "\n"))
 }
 
-build_dominance_chain_cte <- function(path, left_condition, right_condition) {
+build_dominance_chain_cte <- function(path_info, left_condition, right_condition) {
+  path <- path_info$path
+  directions <- path_info$directions
   ctes <- c()
-  
+
   left_level <- path[1]
   ctes <- c(ctes, sprintf("
     left_matches AS (
       SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
       FROM items i
-      INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-        AND i.session = l.session 
-        AND i.bundle = l.bundle 
+      INNER JOIN labels l ON i.db_uuid = l.db_uuid
+        AND i.session = l.session
+        AND i.bundle = l.bundle
         AND i.item_id = l.item_id
       WHERE i.level = '%s' AND %s
     )", left_level, left_condition))
-  
+
   right_level <- path[length(path)]
   ctes <- c(ctes, sprintf("
     right_matches AS (
       SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
       FROM items i
-      INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-        AND i.session = l.session 
-        AND i.bundle = l.bundle 
+      INNER JOIN labels l ON i.db_uuid = l.db_uuid
+        AND i.session = l.session
+        AND i.bundle = l.bundle
         AND i.item_id = l.item_id
       WHERE i.level = '%s' AND %s
     )", right_level, right_condition))
-  
+
   if (length(path) == 2) {
-    ctes <- c(ctes, "
+    # Single link step — direction determines join columns
+    dir <- directions[1]
+    if (dir == "down") {
+      # parent→child: from_id = left, to_id = right
+      lm_col <- "from_id"
+      rm_col <- "to_id"
+    } else {
+      # child→parent: to_id = left, from_id = right
+      lm_col <- "to_id"
+      rm_col <- "from_id"
+    }
+    ctes <- c(ctes, sprintf("
       dominance_pairs AS (
         SELECT lm.db_uuid, lm.session, lm.bundle,
                lm.item_id as left_id, rm.item_id as right_id
         FROM left_matches lm
-        INNER JOIN links lnk ON lm.db_uuid = lnk.db_uuid 
-          AND lm.session = lnk.session 
-          AND lm.bundle = lnk.bundle 
-          AND lm.item_id = lnk.from_id
-        INNER JOIN right_matches rm ON lnk.db_uuid = rm.db_uuid 
-          AND lnk.session = rm.session 
-          AND lnk.bundle = rm.bundle 
-          AND lnk.to_id = rm.item_id
-      )")
+        INNER JOIN links lnk ON lm.db_uuid = lnk.db_uuid
+          AND lm.session = lnk.session
+          AND lm.bundle = lnk.bundle
+          AND lm.item_id = lnk.%s
+        INNER JOIN right_matches rm ON lnk.db_uuid = rm.db_uuid
+          AND lnk.session = rm.session
+          AND lnk.bundle = rm.bundle
+          AND lnk.%s = rm.item_id
+      )", lm_col, rm_col))
   } else {
-    chain_sql <- build_recursive_dominance_chain(path)
+    chain_sql <- build_recursive_dominance_chain(path_info)
     ctes <- c(ctes, chain_sql)
   }
-  
+
   return(paste("WITH", paste(ctes, collapse = ",\n")))
 }
 
-build_recursive_dominance_chain <- function(path) {
+build_recursive_dominance_chain <- function(path_info) {
+  path <- path_info$path
+  directions <- path_info$directions
+
   if (length(path) <= 2) {
     cli::cli_abort("build_recursive_dominance_chain called for direct dominance")
   }
-  
+
+  # Helper: for a given direction, determine which link columns to join
+  # "down" = parent→child: from_id is current, to_id is next
+  # "up" = child→parent: to_id is current, from_id is next
+  link_cols <- function(dir) {
+    if (dir == "down") list(match = "from_id", next_col = "to_id")
+    else list(match = "to_id", next_col = "from_id")
+  }
+
   joins <- c()
-  
+
   for (i in 1:(length(path) - 1)) {
+    lc <- link_cols(directions[i])
     if (i == 1) {
       joins <- c(joins, sprintf("
         link%d AS (
           SELECT lm.db_uuid, lm.session, lm.bundle,
-                 lm.item_id as level_%s_id, lnk.to_id as level_%s_id
+                 lm.item_id as level_%s_id, lnk.%s as level_%s_id
           FROM left_matches lm
-          INNER JOIN links lnk ON lm.db_uuid = lnk.db_uuid 
-            AND lm.session = lnk.session 
-            AND lm.bundle = lnk.bundle 
-            AND lm.item_id = lnk.from_id
-          INNER JOIN items i ON lnk.db_uuid = i.db_uuid 
-            AND lnk.session = i.session 
-            AND lnk.bundle = i.bundle 
-            AND lnk.to_id = i.item_id 
+          INNER JOIN links lnk ON lm.db_uuid = lnk.db_uuid
+            AND lm.session = lnk.session
+            AND lm.bundle = lnk.bundle
+            AND lm.item_id = lnk.%s
+          INNER JOIN items i ON lnk.db_uuid = i.db_uuid
+            AND lnk.session = i.session
+            AND lnk.bundle = i.bundle
+            AND lnk.%s = i.item_id
             AND i.level = '%s'
-        )", i, path[i], path[i+1], path[i+1]))
+        )", i, path[i], lc$next_col, path[i+1], lc$match, lc$next_col, path[i+1]))
     } else if (i == length(path) - 1) {
       joins <- c(joins, sprintf("
         dominance_pairs AS (
@@ -756,31 +845,31 @@ build_recursive_dominance_chain <- function(path) {
           INNER JOIN links lnk ON l%d.db_uuid = lnk.db_uuid
             AND l%d.session = lnk.session
             AND l%d.bundle = lnk.bundle
-            AND l%d.level_%s_id = lnk.from_id
+            AND l%d.level_%s_id = lnk.%s
           INNER JOIN right_matches rm ON lnk.db_uuid = rm.db_uuid
             AND lnk.session = rm.session
             AND lnk.bundle = rm.bundle
-            AND lnk.to_id = rm.item_id
-        )", i-1, i-1, i-1, i-1, path[1], i-1, i-1, i-1, i-1, i-1, i-1, path[i]))
+            AND lnk.%s = rm.item_id
+        )", i-1, i-1, i-1, i-1, path[1], i-1, i-1, i-1, i-1, i-1, i-1, path[i], lc$match, lc$next_col))
     } else {
       joins <- c(joins, sprintf("
         link%d AS (
           SELECT l%d.db_uuid, l%d.session, l%d.bundle,
-                 l%d.level_%s_id, lnk.to_id as level_%s_id
+                 l%d.level_%s_id, lnk.%s as level_%s_id
           FROM link%d l%d
           INNER JOIN links lnk ON l%d.db_uuid = lnk.db_uuid
             AND l%d.session = lnk.session
             AND l%d.bundle = lnk.bundle
-            AND l%d.level_%s_id = lnk.from_id
+            AND l%d.level_%s_id = lnk.%s
           INNER JOIN items i ON lnk.db_uuid = i.db_uuid
             AND lnk.session = i.session
             AND lnk.bundle = i.bundle
-            AND lnk.to_id = i.item_id 
+            AND lnk.%s = i.item_id
             AND i.level = '%s'
-        )", i, i-1, i-1, i-1, i-1, path[1], path[i+1], i-1, i-1, i-1, i-1, i-1, i-1, path[i], path[i+1]))
+        )", i, i-1, i-1, i-1, i-1, path[1], lc$next_col, path[i+1], i-1, i-1, i-1, i-1, i-1, i-1, path[i], lc$match, lc$next_col, path[i+1]))
     }
   }
-  
+
   return(paste(joins, collapse = ",\n"))
 }
 
@@ -836,15 +925,15 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
         AND lnk.to_id = c.item_id
       WHERE p.level = '%s' AND c.level = '%s'
     )
-    SELECT DISTINCT 
+    SELECT DISTINCT
       cp.db_uuid, cp.session, cp.bundle, cp.item_id,
       cp.level, cp.type, cp.seq_idx, cp.sample_rate,
       cp.sample_point, cp.sample_start, cp.sample_dur,
-      l.label
+      l.label, l.name as attribute
     FROM child_positions cp
-    INNER JOIN labels l ON cp.db_uuid = l.db_uuid 
-      AND cp.session = l.session 
-      AND cp.bundle = l.bundle 
+    INNER JOIN labels l ON cp.db_uuid = l.db_uuid
+      AND cp.session = l.session
+      AND cp.bundle = l.bundle
       AND cp.item_id = l.item_id
       AND l.name = '%s'
     WHERE %s
@@ -879,15 +968,15 @@ execute_count_function <- function(con, parent_level, child_level, operator, val
                p.level, p.type, p.seq_idx, p.sample_rate,
                p.sample_point, p.sample_start, p.sample_dur
     )
-    SELECT DISTINCT 
+    SELECT DISTINCT
       cc.db_uuid, cc.session, cc.bundle, cc.item_id,
       cc.level, cc.type, cc.seq_idx, cc.sample_rate,
       cc.sample_point, cc.sample_start, cc.sample_dur,
-      l.label
+      l.label, l.name as attribute
     FROM child_counts cc
-    INNER JOIN labels l ON cc.db_uuid = l.db_uuid 
-      AND cc.session = l.session 
-      AND cc.bundle = l.bundle 
+    INNER JOIN labels l ON cc.db_uuid = l.db_uuid
+      AND cc.session = l.session
+      AND cc.bundle = l.bundle
       AND cc.item_id = l.item_id
       AND l.name = '%s'
     WHERE cc.child_count %s %d
@@ -899,76 +988,168 @@ execute_count_function <- function(con, parent_level, child_level, operator, val
 }
 
 # Hierarchy functions
-get_hierarchy_info <- function(con) {
-  list(
-    links = list(
-      list(type = "ONE_TO_MANY", super = "Utterance", sub = "Intonational"),
-      list(type = "ONE_TO_MANY", super = "Intonational", sub = "Intermediate"), 
-      list(type = "ONE_TO_MANY", super = "Intermediate", sub = "Word"),
-      list(type = "ONE_TO_MANY", super = "Word", sub = "Syllable"),
-      list(type = "ONE_TO_MANY", super = "Syllable", sub = "Phoneme"),
-      list(type = "MANY_TO_MANY", super = "Phoneme", sub = "Phonetic"),
-      list(type = "ONE_TO_MANY", super = "Syllable", sub = "Tone"),
-      list(type = "ONE_TO_MANY", super = "Intonational", sub = "Foot"),
-      list(type = "ONE_TO_MANY", super = "Foot", sub = "Syllable")
-    )
-  )
+get_hierarchy_info <- function(db_dir) {
+  # Load hierarchy dynamically from DBconfig JSON
+  dbconfig <- load_DBconfig(db_dir)
+  link_defs <- dbconfig$linkDefinitions
+  if (is.null(link_defs) || length(link_defs) == 0) {
+    cli::cli_abort("No linkDefinitions found in DBconfig for {.path {db_dir}}")
+  }
+  links <- lapply(link_defs, function(ld) {
+    list(type = ld$type, super = ld$superlevelName, sub = ld$sublevelName)
+  })
+  list(links = links)
 }
 
 can_dominate <- function(hierarchy_info, level_a, level_b) {
-  path <- find_dominance_path(hierarchy_info, level_a, level_b)
-  return(length(path) > 0)
+  result <- find_dominance_path(hierarchy_info, level_a, level_b)
+  return(length(result$path) > 0)
 }
 
 find_dominance_path <- function(hierarchy_info, from_level, to_level) {
   if (from_level == to_level) {
-    return(c(from_level))
+    return(list(path = c(from_level), directions = character(0)))
   }
-  
+
+  # Build set of direct links for direction lookup
+  link_set <- list()
   adj_list <- list()
   for (link in hierarchy_info$links) {
     super <- link$super
     sub <- link$sub
-    if (is.null(adj_list[[super]])) {
-      adj_list[[super]] <- c()
-    }
+    # parent → child (down)
+    if (is.null(adj_list[[super]])) adj_list[[super]] <- c()
     adj_list[[super]] <- c(adj_list[[super]], sub)
+    # child → parent (up)
+    if (is.null(adj_list[[sub]])) adj_list[[sub]] <- c()
+    adj_list[[sub]] <- c(adj_list[[sub]], super)
+    # Record link direction
+    link_set[[paste0(super, "->", sub)]] <- "down"
+    link_set[[paste0(sub, "->", super)]] <- "up"
   }
-  
-  queue <- list(list(level = from_level, path = c(from_level)))
+
+  queue <- list(list(level = from_level, path = c(from_level), directions = character(0)))
   visited <- c()
-  
+
   while (length(queue) > 0) {
     current <- queue[[1]]
     queue <- queue[-1]
-    
+
     current_level <- current$level
     current_path <- current$path
-    
+    current_dirs <- current$directions
+
     if (current_level == to_level) {
-      return(current_path)
+      return(list(path = current_path, directions = current_dirs))
     }
-    
-    if (current_level %in% visited) {
-      next
-    }
-    
+
+    if (current_level %in% visited) next
     visited <- c(visited, current_level)
-    
-    children <- adj_list[[current_level]]
-    if (!is.null(children)) {
-      for (child in children) {
-        if (!(child %in% visited)) {
+
+    neighbors <- adj_list[[current_level]]
+    if (!is.null(neighbors)) {
+      for (neighbor in neighbors) {
+        if (!(neighbor %in% visited)) {
+          dir <- link_set[[paste0(current_level, "->", neighbor)]]
           queue <- append(queue, list(list(
-            level = child, 
-            path = c(current_path, child)
+            level = neighbor,
+            path = c(current_path, neighbor),
+            directions = c(current_dirs, dir)
           )))
         }
       }
     }
   }
-  
-  return(c())
+
+  return(list(path = c(), directions = c()))
+}
+
+# Deduce times for ITEM-type levels by finding time-bearing descendants
+deduce_item_times <- function(result_df, db_path) {
+  if (nrow(result_df) == 0) return(result_df)
+
+  # Find rows needing time deduction (ITEM type with NULL sample_start)
+  needs_times <- which(result_df$type == "ITEM" & is.na(result_df$sample_start))
+  if (length(needs_times) == 0) return(result_df)
+
+  con <- .open_query_connection(db_path)
+  on.exit(DBI::dbDisconnect(con))
+
+  # Collect all item_ids that need time deduction (including end_item_id for sequences)
+  has_end_id <- "end_item_id" %in% names(result_df)
+
+  sql <- "
+    WITH RECURSIVE descendants AS (
+      SELECT from_id as ancestor_id, to_id as item_id,
+             db_uuid, session, bundle
+      FROM links
+      UNION ALL
+      SELECT d.ancestor_id, lnk.to_id,
+             lnk.db_uuid, lnk.session, lnk.bundle
+      FROM descendants d
+      INNER JOIN links lnk ON d.db_uuid = lnk.db_uuid
+        AND d.session = lnk.session
+        AND d.bundle = lnk.bundle
+        AND d.item_id = lnk.from_id
+    )
+    SELECT d.ancestor_id, d.db_uuid, d.session, d.bundle,
+           MIN(i.sample_start) as min_sample_start,
+           MAX(CASE
+             WHEN i.type = 'EVENT' THEN i.sample_point
+             ELSE i.sample_start + i.sample_dur
+           END) as max_sample_end,
+           MAX(i.sample_rate) as sample_rate
+    FROM descendants d
+    INNER JOIN items i ON d.db_uuid = i.db_uuid
+      AND d.session = i.session
+      AND d.bundle = i.bundle
+      AND d.item_id = i.item_id
+    WHERE i.sample_start IS NOT NULL OR i.sample_point IS NOT NULL
+    GROUP BY d.ancestor_id, d.db_uuid, d.session, d.bundle
+  "
+
+  time_info <- DBI::dbGetQuery(con, sql)
+  if (nrow(time_info) == 0) return(result_df)
+
+  # Helper to look up deduced times
+  .lookup <- function(item_id, db_uuid, session, bundle) {
+    m <- time_info[
+      time_info$ancestor_id == item_id &
+      time_info$db_uuid == db_uuid &
+      time_info$session == session &
+      time_info$bundle == bundle, , drop = FALSE
+    ]
+    if (nrow(m) > 0) m[1, ] else NULL
+  }
+
+  for (idx in needs_times) {
+    row <- result_df[idx, ]
+    # Deduce start from left/start item
+    start_info <- .lookup(row$item_id, row$db_uuid, row$session, row$bundle)
+
+    if (has_end_id && !is.na(row[["end_item_id"]]) && row[["end_item_id"]] != row$item_id) {
+      # Sequence span: start from left item, end from right item
+      end_info <- .lookup(row[["end_item_id"]], row$db_uuid, row$session, row$bundle)
+      if (!is.null(start_info) && !is.null(end_info)) {
+        result_df$sample_start[idx] <- start_info$min_sample_start
+        result_df$sample_dur[idx] <- end_info$max_sample_end - start_info$min_sample_start
+        if (is.na(result_df$sample_rate[idx]) || result_df$sample_rate[idx] == 0) {
+          result_df$sample_rate[idx] <- start_info$sample_rate
+        }
+      }
+    } else {
+      # Single item: use its own descendants
+      if (!is.null(start_info)) {
+        result_df$sample_start[idx] <- start_info$min_sample_start
+        result_df$sample_dur[idx] <- start_info$max_sample_end - start_info$min_sample_start
+        if (is.na(result_df$sample_rate[idx]) || result_df$sample_rate[idx] == 0) {
+          result_df$sample_rate[idx] <- start_info$sample_rate
+        }
+      }
+    }
+  }
+
+  result_df
 }
 
 # Result formatting
@@ -977,8 +1158,21 @@ format_as_emuRsegs <- function(result_df) {
     return(create_empty_emuRsegs())
   }
   
-  start_times <- result_df$sample_start / result_df$sample_rate
-  end_times <- (result_df$sample_start + result_df$sample_dur) / result_df$sample_rate
+  # Compute times in milliseconds (emuR convention)
+  # Handle EVENT type (uses sample_point), SEGMENT (sample_start/sample_dur), ITEM (may be NULL)
+  is_event <- !is.na(result_df$sample_point)
+
+  start_times <- ifelse(
+    is_event,
+    (result_df$sample_point / result_df$sample_rate) * 1000,
+    (result_df$sample_start / result_df$sample_rate) * 1000
+  )
+  # emuR returns 0 for EVENT end times
+  end_times <- ifelse(
+    is_event,
+    0,
+    ((result_df$sample_start + result_df$sample_dur) / result_df$sample_rate) * 1000
+  )
   
   # Check if we have separate end_item_id and end_seq_idx (from sequence queries)
   has_end_id <- "end_item_id" %in% names(result_df)
@@ -995,12 +1189,12 @@ format_as_emuRsegs <- function(result_df) {
     start_item_id = result_df$item_id,
     end_item_id = if(has_end_id) result_df$end_item_id else result_df$item_id,
     level = result_df$level,
-    attribute = result_df$level,
+    attribute = if ("attribute" %in% names(result_df)) result_df$attribute else result_df$level,
     start_item_seq_idx = result_df$seq_idx,
     end_item_seq_idx = if(has_end_seq) result_df$end_seq_idx else result_df$seq_idx,
     type = result_df$type,
-    sample_start = result_df$sample_start,
-    sample_end = result_df$sample_start + result_df$sample_dur,
+    sample_start = ifelse(is_event, result_df$sample_point, result_df$sample_start),
+    sample_end = ifelse(is_event, result_df$sample_point, result_df$sample_start + result_df$sample_dur),
     sample_rate = result_df$sample_rate,
     stringsAsFactors = FALSE
   )

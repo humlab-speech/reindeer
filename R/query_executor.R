@@ -227,6 +227,8 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
       cli::cli_abort("Unknown query type: {.val {parsed$type}}")
     )
     
+    # Deduce times for ITEM-type levels before formatting
+    result <- deduce_item_times(result, db_path)
     return(format_as_emuRsegs(result))
     
   }, error = function(e) {
