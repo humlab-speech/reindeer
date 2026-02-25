@@ -191,7 +191,6 @@ quantify_simulate(
 **Use Cases**:
 - Integrating automatic speech recognition
 - Forced alignment workflows
-- MOMEL/INTSINT pitch annotation
 - Systematic annotation validation
 
 **Example Integration**:

@@ -106,13 +106,6 @@ reference:
   - transcribe
   - transcribe_parallel
 
-- title: "Annotation"
-  desc: "Automated annotation functions"
-  contents:
-  - draft_intsint_momel
-  - has_python_annotations
-  - test_python_annotations
-
 - title: "Cache Management"
   desc: "Cache monitoring and cleanup utilities"
   contents:

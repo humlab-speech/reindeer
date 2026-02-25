@@ -492,25 +492,7 @@ Efficient parallel processing with smart caching:
 
 ## Prosodic Analysis with MOMEL/INTSINT
 
-Reindeer includes Python-based implementations of MOMEL (MOdélisation de MELodie) and INTSINT for prosodic analysis:
-
-```{r momel-intsint, eval=FALSE}
-# Draft INTSINT annotations
-intsint_suggestions <- draft(
-  my_corpus,
-  .using = annotate_intsint,
-  f0_track = "ksvF0"
-)
-
-# Assess suggestions
-assess(intsint_suggestions)
-
-# Apply to database
-transcription_log <- transcribe(intsint_suggestions)
-
-# Can be reversed if needed
-reverse(transcription_log)
-```
+For MOMEL/INTSINT prosodic annotation, see the [protoscribe](https://github.com/humlab-speech/protoscribe) companion package.
 
 ## Custom DSP Functions
 

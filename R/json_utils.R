@@ -49,7 +49,7 @@ read_json_fast <- function(path, simplifyVector = TRUE, ...) {
 
   tryCatch({
     # Use RcppSimdJson for fast parsing
-    result <- RcppSimdJson::fload(path, query = "/", max_simplify_lvl = "data_frame")
+    result <- RcppSimdJson::fload(path, max_simplify_lvl = "data_frame")
 
     # If simplifyVector is FALSE, we need to de-simplify
     # RcppSimdJson always simplifies, so fall back to jsonlite for this case
@@ -94,7 +94,7 @@ parse_json_fast <- function(txt, simplifyVector = TRUE, ...) {
 
   tryCatch({
     # Use RcppSimdJson for fast parsing
-    result <- RcppSimdJson::fparse(txt, query = "/", max_simplify_lvl = "data_frame")
+    result <- RcppSimdJson::fparse(txt, max_simplify_lvl = "data_frame")
 
     # If simplifyVector is FALSE, fall back to jsonlite
     if (!simplifyVector) {
