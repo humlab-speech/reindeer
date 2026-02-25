@@ -10,10 +10,12 @@
 #
 # ==============================================================================
 
-library(reindeer)
-library(bench)
-library(data.table)
-library(ggplot2)
+suppressPackageStartupMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(bench)
+  library(data.table)
+  library(ggplot2)
+})
 
 # Setup --------------------------------------------------------------------
 

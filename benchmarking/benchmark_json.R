@@ -11,9 +11,11 @@
 # - Large files (> 100KB): 5-10x faster
 #
 
-library(reindeer)
-library(bench)
-library(ggplot2)
+suppressPackageStartupMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(bench)
+  library(ggplot2)
+})
 
 # ==============================================================================
 # SETUP: Create test JSON files of different sizes

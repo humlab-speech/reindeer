@@ -1,12 +1,14 @@
 # Comprehensive Benchmarking Suite for Optimized EQL Implementation
 # Compare performance of ask_for() vs emuR::query()
 
-library(emuR)
-library(reindeer)
-library(bench)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
+suppressPackageStartupMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(emuR)
+  library(bench)
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+})
 
 #' Setup test database
 #' @return list with path, db handle, and corpus object
@@ -54,16 +56,14 @@ benchmark_query <- function(query_str, ae_corpus, ae_db, iterations = 50) {
 #' @param query_str EQL query string
 #' @return character string describing query type
 classify_query_type <- function(query_str) {
-  if (grepl("^\\[.*\\^.*\\]$", query_str)) {
+  if (grepl("\\^", query_str) && grepl("^\\[", query_str)) {
     return("Dominance")
-  } else if (grepl("^\\[.*->.*\\]$", query_str)) {
+  } else if (grepl("->", query_str, fixed = TRUE)) {
     return("Sequence")
-  } else if (grepl("^\\[.*[&|].*\\]$", query_str)) {
-    if (grepl("&", query_str, fixed = TRUE)) {
-      return("Conjunction")
-    } else {
-      return("Disjunction")
-    }
+  } else if (grepl(" & ", query_str, fixed = TRUE)) {
+    return("Conjunction")
+  } else if (grepl(" \\| ", query_str)) {
+    return("Disjunction")
   } else if (grepl("^(Start|End|Medial|Num)\\(", query_str)) {
     return("Function")
   } else if (grepl("=~|!~", query_str)) {
@@ -120,11 +120,17 @@ run_benchmark_suite <- function(iterations = 50) {
       "[Intermediate == L- ^ Phoneme == n]"
     ),
     
-    # Boolean operations
-    boolean = c(
+    # Conjunction
+    conjunction = c(
       "[Phonetic == t & Phonetic == t]",
+      "[Start(Syllable, Phoneme) == 1 & Phoneme == n]"
+    ),
+
+    # Disjunction (label alternatives)
+    disjunction = c(
       "[Phonetic == t | Phonetic == k]",
-      "[Phoneme == n | Phoneme == m]"
+      "[Phoneme == n | Phoneme == m]",
+      "Phonetic == t | k | p"
     ),
     
     # Function queries

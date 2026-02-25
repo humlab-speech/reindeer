@@ -1,179 +1,70 @@
 #!/usr/bin/env Rscript
-# Run All Benchmarks (EQL Query + MOMEL/INTSINT + Quantify + Simulation)
-# Usage: Rscript run_benchmarks.R [iterations] [momel] [quantify] [simulation]
+# Run All Benchmarks
+# Usage: Rscript benchmarking/run_benchmarks.R [iterations]
 
 args <- commandArgs(trailingOnly = TRUE)
 iterations <- if (length(args) > 0) as.integer(args[1]) else 50
-run_momel <- if (length(args) > 1) as.logical(args[2]) else TRUE
-run_quantify <- if (length(args) > 2) as.logical(args[3]) else TRUE
-run_simulation <- if (length(args) > 3) as.logical(args[4]) else TRUE
 
 cat("\n")
-cat("╔════════════════════════════════════════════════════════════════════╗\n")
-cat("║          REINDEER BENCHMARK RUNNER                                 ║\n")
-cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
+cat("======================================================================\n")
+cat("  REINDEER BENCHMARK RUNNER\n")
+cat("======================================================================\n\n")
 
 cat(sprintf("Query iterations: %d\n", iterations))
-cat(sprintf("Run MOMEL/INTSINT benchmarks: %s\n", run_momel))
-cat(sprintf("Run Quantify benchmarks: %s\n", run_quantify))
-cat(sprintf("Run Simulation benchmarks: %s\n", run_simulation))
-cat("Loading packages...\n")
+cat("Loading package...\n")
 
 suppressPackageStartupMessages({
+  devtools::load_all(".", quiet = TRUE)
   library(emuR)
   library(bench)
   library(dplyr)
   library(tidyr)
   library(ggplot2)
+  library(cli)
 })
 
-# ==============================================================================
-# EQL Query Benchmarks
-# ==============================================================================
-
-cat("\n")
-cat("╔════════════════════════════════════════════════════════════════════╗\n")
-cat("║          EMU QUERY LANGUAGE BENCHMARKS                             ║\n")
-cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-
-cat("Sourcing implementation...\n")
-source("R/reindeer_query_optimized.r")
-source("benchmarking/benchmark_queries.R")
-
-cat("\n")
-cat("Running query benchmarks (this may take a few minutes)...\n\n")
-
-# Run benchmarks
-results <- run_benchmark_suite(iterations = iterations)
-summary <- summarize_benchmarks(results)
-
-# Print summary
-print_summary(summary)
-
-# Create plots
-cat("\nGenerating plots...\n")
-plots <- create_benchmark_plots(results, summary)
-
-# Save results
-cat("Saving results...\n")
-save_benchmark_results(results, summary, plots)
-
-cat("\n")
-cat("╔════════════════════════════════════════════════════════════════════╗\n")
-cat("║  EQL QUERY BENCHMARKS COMPLETE                                     ║\n")
-cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-
-# ==============================================================================
-# MOMEL/INTSINT Benchmarks
-# ==============================================================================
-
-if (run_momel) {
+# Helper: run a benchmark script with error handling
+run_section <- function(label, script_path) {
   cat("\n")
-  cat("╔════════════════════════════════════════════════════════════════════╗\n")
-  cat("║          MOMEL/INTSINT BENCHMARKS                                  ║\n")
-  cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-  
-  cat("Running MOMEL/INTSINT benchmarks...\n\n")
-  
+  cat("======================================================================\n")
+  cat(sprintf("  %s\n", label))
+  cat("======================================================================\n\n")
+
   tryCatch({
-    source("benchmarking/benchmark_momel_intsint.R")
-    cat("\n")
-    cat("╔════════════════════════════════════════════════════════════════════╗\n")
-    cat("║  MOMEL/INTSINT BENCHMARKS COMPLETE                                 ║\n")
-    cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
+    source(script_path, local = new.env(parent = globalenv()))
+    cat(sprintf("\n  [OK] %s complete\n", label))
   }, error = function(e) {
-    cat("\n")
-    cat("⚠️  MOMEL/INTSINT benchmarks failed:\n")
-    cat(sprintf("   %s\n", e$message))
-    cat("   (Continuing with query benchmarks only)\n\n")
+    cat(sprintf("\n  [FAIL] %s: %s\n", label, e$message))
   })
 }
 
 # ==============================================================================
-# Quantify Benchmarks
+# Head-to-head vs emuR benchmarks
 # ==============================================================================
 
-if (run_quantify) {
-  cat("\n")
-  cat("╔════════════════════════════════════════════════════════════════════╗\n")
-  cat("║          QUANTIFY BENCHMARKS                                       ║\n")
-  cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-  
-  cat("Running Quantify benchmarks...\n\n")
-  
-  tryCatch({
-    source("benchmarking/benchmark_quantify.R")
-    cat("\n")
-    cat("╔════════════════════════════════════════════════════════════════════╗\n")
-    cat("║  QUANTIFY BENCHMARKS COMPLETE                                      ║\n")
-    cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-  }, error = function(e) {
-    cat("\n")
-    cat("⚠️  Quantify benchmarks failed:\n")
-    cat(sprintf("   %s\n", e$message))
-    cat("   (Continuing without quantify benchmarks)\n\n")
-  })
-}
+run_section("EQL QUERY BENCHMARKS", "benchmarking/benchmark_queries.R")
+run_section("HIERARCHY BENCHMARKS (requery_hier vs ascend/descend)", "benchmarking/benchmark_hierarchy.R")
+run_section("SEQUENCE BENCHMARKS (requery_seq vs scout/retreat)", "benchmarking/benchmark_requery_seq.R")
+run_section("TRACK DATA BENCHMARKS (get_trackdata vs quantify)", "benchmarking/benchmark_trackdata.R")
+run_section("METADATA BENCHMARKS", "benchmarking/benchmark_metadata.R")
+run_section("PERFORMANCE TARGETS", "benchmarking/benchmark_performance_targets.R")
 
 # ==============================================================================
-# Simulation Benchmarks
+# Internal optimization benchmarks (no emuR comparison)
 # ==============================================================================
 
-if (run_simulation) {
-  cat("\n")
-  cat("╔════════════════════════════════════════════════════════════════════╗\n")
-  cat("║          SIMULATION INFRASTRUCTURE BENCHMARKS                      ║\n")
-  cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-  
-  cat("Running Simulation benchmarks...\n\n")
-  
-  tryCatch({
-    source("benchmarking/benchmark_simulation.R")
-    cat("\n")
-    cat("╔════════════════════════════════════════════════════════════════════╗\n")
-    cat("║  SIMULATION BENCHMARKS COMPLETE                                    ║\n")
-    cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-  }, error = function(e) {
-    cat("\n")
-    cat("⚠️  Simulation benchmarks failed:\n")
-    cat(sprintf("   %s\n", e$message))
-    cat("   (Continuing without simulation benchmarks)\n\n")
-  })
-}
-
-# ==============================================================================
-# Performance Targets Verification
-# ==============================================================================
-
-cat("\n")
-cat("╔════════════════════════════════════════════════════════════════════╗\n")
-cat("║          PERFORMANCE TARGETS VERIFICATION                          ║\n")
-cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-
-cat("Verifying documented performance targets...\n\n")
-
-tryCatch({
-  source("benchmarking/benchmark_performance_targets.R")
-  cat("\n")
-  cat("╔════════════════════════════════════════════════════════════════════╗\n")
-  cat("║  PERFORMANCE TARGETS VERIFICATION COMPLETE                         ║\n")
-  cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
-}, error = function(e) {
-  cat("\n")
-  cat("⚠️  Performance targets verification failed:\n")
-  cat(sprintf("   %s\n", e$message))
-  cat("   (Continuing without target verification)\n\n")
-})
+run_section("DSPP: dplyr vs data.table", "benchmarking/benchmark_dspp.R")
+run_section("SERIALIZATION: base vs qs", "benchmarking/benchmark_serialization.R")
+run_section("JSON: jsonlite vs RcppSimdJson", "benchmarking/benchmark_json.R")
+run_section("SIMULATION INFRASTRUCTURE", "benchmarking/benchmark_simulation.R")
+run_section("QUANTIFY INTERNALS", "benchmarking/benchmark_quantify.R")
 
 # ==============================================================================
 # Final Summary
 # ==============================================================================
 
 cat("\n")
-cat("╔════════════════════════════════════════════════════════════════════╗\n")
-cat("║  ALL BENCHMARKS COMPLETE                                           ║\n")
-cat("║                                                                    ║\n")
-cat("║  Results saved to: benchmarking/                                   ║\n")
-cat("║  Render vignette with:                                             ║\n")
-cat("║    Rscript render_vignette.R                                       ║\n")
-cat("╚════════════════════════════════════════════════════════════════════╝\n\n")
+cat("======================================================================\n")
+cat("  ALL BENCHMARKS COMPLETE\n")
+cat("  Results saved to: benchmarking/\n")
+cat("======================================================================\n\n")
