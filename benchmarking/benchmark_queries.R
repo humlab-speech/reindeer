@@ -34,7 +34,7 @@ benchmark_query <- function(query_str, ae_corpus, ae_db, iterations = 50) {
   
   tryCatch({
     bm <- bench::mark(
-      emuR = emuR::query(ae_db, query_str),
+      emuR = suppressWarnings(emuR::query(ae_db, query_str)),
       optimized = ask_for(ae_corpus, query_str),
       iterations = iterations,
       check = FALSE,

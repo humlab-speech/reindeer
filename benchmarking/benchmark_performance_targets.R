@@ -103,7 +103,7 @@ cli::cli_text("Target: 80%+ faster for large datasets")
 regex_query <- "Phonetic =~ .*"
 
 bench_large <- bench::mark(
-  emuR = emuR::query(ae_db, sprintf("[%s]", regex_query), resultType = "tibble"),
+  emuR = suppressWarnings(emuR::query(ae_db, sprintf("[%s]", regex_query), resultType = "tibble")),
   reindeer = ask_for(corp, regex_query),
   check = FALSE,
   iterations = 30,

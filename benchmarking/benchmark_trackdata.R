@@ -54,7 +54,7 @@ cli::cli_alert_info("emuR::get_trackdata (filtered): {.val {sprintf('%.2f ms', a
 
 cli::cli_h2("get_trackdata: all segments")
 
-all_segs_emur <- emuR::query(ae_db, "[Phonetic =~ .*]")
+all_segs_emur <- suppressWarnings(emuR::query(ae_db, "[Phonetic =~ .*]"))
 cli::cli_alert_info("Segment count: {.val {nrow(all_segs_emur)}}")
 
 bench_all <- bench::mark(

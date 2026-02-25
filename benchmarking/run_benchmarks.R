@@ -30,12 +30,18 @@ run_section <- function(label, script_path) {
   cat(sprintf("  %s\n", label))
   cat("======================================================================\n\n")
 
-  tryCatch({
-    source(script_path, local = new.env(parent = globalenv()))
-    cat(sprintf("\n  [OK] %s complete\n", label))
-  }, error = function(e) {
-    cat(sprintf("\n  [FAIL] %s: %s\n", label, e$message))
-  })
+  tryCatch(
+    withCallingHandlers({
+      source(script_path, local = new.env(parent = globalenv()))
+      cat(sprintf("\n  [OK] %s complete\n", label))
+    }, warning = function(w) {
+      if (grepl("=~ now requires", conditionMessage(w)))
+        invokeRestart("muffleWarning")
+    }),
+    error = function(e) {
+      cat(sprintf("\n  [FAIL] %s: %s\n", label, e$message))
+    }
+  )
 }
 
 # ==============================================================================

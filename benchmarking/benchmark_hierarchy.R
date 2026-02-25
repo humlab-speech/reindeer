@@ -22,7 +22,7 @@ corp <- corpus(ae_path, verbose = FALSE)
 segs_emur <- emuR::query(ae_db, "[Phonetic == t]")
 segs_rein <- ask_for(corp, "Phonetic == t")
 
-word_segs_emur <- emuR::query(ae_db, "Word =~ .*")
+word_segs_emur <- suppressWarnings(emuR::query(ae_db, "Word =~ .*"))
 word_segs_rein <- ask_for(corp, "Word =~ .*")
 
 #===============================================================================
