@@ -47,21 +47,30 @@
 #' @keywords internal
 parse_eql_query <- function(query_string) {
   query_string <- trimws(query_string)
-  
-  # Check for conjunction/disjunction first (they wrap other operations)
-  if (grepl("^\\[.*[&|].*\\]$", query_string)) {
-    if (grepl("&", query_string, fixed = TRUE)) {
+
+  # For bracket-wrapped queries, strip outer brackets and detect top-level operator
+  if (grepl("^\\[.*\\]$", query_string)) {
+    inner <- substr(query_string, 2, nchar(query_string) - 1)
+
+    # Try operators in precedence order using bracket-aware splitting
+    # Conjunction/disjunction first, then sequence, then dominance
+    if (!is.null(split_on_operator(inner, "&"))) {
       return(parse_conjunction_query(query_string))
-    } else if (grepl("|", query_string, fixed = TRUE)) {
+    }
+    if (!is.null(split_on_operator(inner, "|"))) {
       return(parse_disjunction_query(query_string))
     }
+    if (!is.null(split_on_operator(inner, "->"))) {
+      return(parse_sequence_query(query_string))
+    }
+    if (!is.null(split_on_operator(inner, "^"))) {
+      return(parse_dominance_query(query_string))
+    }
+    # No top-level operator found — strip redundant brackets and re-parse
+    return(parse_eql_query(inner))
   }
-  
-  if (grepl("^\\[.*\\^.*\\]$", query_string)) {
-    return(parse_dominance_query(query_string))
-  } else if (grepl("^\\[.*->.*\\]$", query_string)) {
-    return(parse_sequence_query(query_string))
-  } else if (grepl("^(Start|End|Medial|Num)\\(", query_string)) {
+
+  if (grepl("^(Start|End|Medial|Num)\\(", query_string)) {
     return(parse_function_query(query_string))
   } else {
     return(parse_simple_query(query_string))
@@ -110,12 +119,12 @@ parse_simple_query <- function(query_string) {
 
 parse_dominance_query <- function(query_string) {
   inner <- sub("^\\[(.*)\\]$", "\\1", query_string)
-  parts <- strsplit(inner, "\\^")[[1]]
-  
-  if (length(parts) != 2) {
+  parts <- split_on_operator(inner, "^")
+
+  if (is.null(parts) || length(parts) != 2) {
     cli::cli_abort("Invalid dominance query: {.val {query_string}}")
   }
-  
+
   left_query <- parse_eql_query(trimws(parts[1]))
   right_query <- parse_eql_query(trimws(parts[2]))
   
@@ -128,12 +137,12 @@ parse_dominance_query <- function(query_string) {
 
 parse_sequence_query <- function(query_string) {
   inner <- sub("^\\[(.*)\\]$", "\\1", query_string)
-  parts <- strsplit(inner, "->")[[1]]
-  
-  if (length(parts) != 2) {
+  parts <- split_on_operator(inner, "->")
+
+  if (is.null(parts) || length(parts) != 2) {
     cli::cli_abort("Invalid sequence query: {.val {query_string}}")
   }
-  
+
   left_query <- parse_eql_query(trimws(parts[1]))
   right_query <- parse_eql_query(trimws(parts[2]))
   
@@ -185,29 +194,34 @@ parse_disjunction_query <- function(query_string) {
 }
 
 # Helper to split on operator accounting for nested brackets
+# Supports multi-char operators like "->"
 split_on_operator <- function(string, operator) {
   bracket_depth <- 0
   op_pos <- -1
   chars <- strsplit(string, "")[[1]]
-  
+  op_len <- nchar(operator)
+
   for (i in seq_along(chars)) {
     if (chars[i] == "[") {
       bracket_depth <- bracket_depth + 1
     } else if (chars[i] == "]") {
       bracket_depth <- bracket_depth - 1
-    } else if (chars[i] == operator && bracket_depth == 0) {
-      op_pos <- i
-      break
+    } else if (bracket_depth == 0 && i + op_len - 1 <= length(chars)) {
+      candidate <- paste0(chars[i:(i + op_len - 1)], collapse = "")
+      if (candidate == operator) {
+        op_pos <- i
+        break
+      }
     }
   }
-  
+
   if (op_pos == -1) {
     return(NULL)
   }
-  
+
   left <- substr(string, 1, op_pos - 1)
-  right <- substr(string, op_pos + 1, nchar(string))
-  
+  right <- substr(string, op_pos + op_len, nchar(string))
+
   return(c(left, right))
 }
 
@@ -361,43 +375,96 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
     }
   }
   
-  left_condition <- extract_condition_from_query(left_query)
-  right_condition <- extract_condition_from_query(right_query)
-  
+  # Pre-execute non-simple sub-queries to get item IDs
+  left_preexec <- NULL
+  right_preexec <- NULL
+  left_condition <- NULL
+  right_condition <- NULL
+
+  if (left_query$type != "simple") {
+    left_preexec <- execute_subquery(db_path, left_query)
+    if (nrow(left_preexec) == 0) return(create_empty_result())
+  } else {
+    left_condition <- extract_condition_from_query(left_query)
+  }
+  if (right_query$type != "simple") {
+    right_preexec <- execute_subquery(db_path, right_query)
+    if (nrow(right_preexec) == 0) return(create_empty_result())
+  } else {
+    right_condition <- extract_condition_from_query(right_query)
+  }
+
+  # Build CTE WHERE clauses
+  build_match_where <- function(level, condition, preexec) {
+    if (!is.null(preexec)) {
+      # Use item_id IN (...) from pre-executed results
+      id_col <- if ("item_id" %in% names(preexec)) "item_id" else names(preexec)[grep("item_id", names(preexec))[1]]
+      keys <- paste0(
+        "(i.db_uuid='", preexec$db_uuid, "' AND i.session='", preexec$session,
+        "' AND i.bundle='", preexec$bundle, "' AND i.item_id=", preexec[[id_col]], ")"
+      )
+      return(paste0("i.level = '", level, "' AND (", paste(keys, collapse = " OR "), ")"))
+    } else {
+      return(paste0("i.level = '", level, "' AND ", condition))
+    }
+  }
+
+  left_needs_label_join <- is.null(left_preexec)
+  right_needs_label_join <- is.null(right_preexec)
+
+  left_where <- build_match_where(left_level, left_condition, left_preexec)
+  right_where <- build_match_where(right_level, right_condition, right_preexec)
+
   # Check if we return both elements or just one
   # projection is FALSE when no # marker, TRUE when # present
-  return_both <- (is.null(left_query$projection) || !left_query$projection) && 
+  return_both <- (is.null(left_query$projection) || !left_query$projection) &&
                   (is.null(right_query$projection) || !right_query$projection)
-  
+
   if (return_both) {
     # Return sequence span
     # Get attribute names for label retrieval
     left_attr <- if (!is.null(left_query$attribute)) left_query$attribute else left_level
     right_attr <- if (!is.null(right_query$attribute)) right_query$attribute else right_level
-    
+
+    # Build left_matches CTE
+    if (left_needs_label_join) {
+      left_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+                i.sample_start, i.sample_dur, i.sample_rate
+         FROM items i
+         INNER JOIN labels l ON i.db_uuid = l.db_uuid
+           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+         WHERE %s", left_where)
+    } else {
+      left_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+                i.sample_start, i.sample_dur, i.sample_rate
+         FROM items i
+         WHERE %s", left_where)
+    }
+
+    # Build right_matches CTE
+    if (right_needs_label_join) {
+      right_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+                i.sample_start, i.sample_dur, i.sample_rate
+         FROM items i
+         INNER JOIN labels l ON i.db_uuid = l.db_uuid
+           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+         WHERE %s", right_where)
+    } else {
+      right_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
+                i.sample_start, i.sample_dur, i.sample_rate
+         FROM items i
+         WHERE %s", right_where)
+    }
+
     sql <- sprintf("
-      WITH left_matches AS (
-        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
-               i.sample_start, i.sample_dur, i.sample_rate
-        FROM items i
-        INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-          AND i.session = l.session 
-          AND i.bundle = l.bundle 
-          AND i.item_id = l.item_id
-        WHERE i.level = '%s' AND %s
-      ),
-      right_matches AS (
-        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx,
-               i.sample_start, i.sample_dur, i.sample_rate
-        FROM items i
-        INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-          AND i.session = l.session 
-          AND i.bundle = l.bundle 
-          AND i.item_id = l.item_id
-        WHERE i.level = '%s' AND %s
-      ),
+      WITH left_matches AS (%s),
+      right_matches AS (%s),
       sequence_pairs AS (
-        SELECT 
+        SELECT
           lm.db_uuid, lm.session, lm.bundle,
           lm.item_id as left_id, rm.item_id as right_id,
           lm.seq_idx as left_seq, rm.seq_idx as right_seq,
@@ -405,8 +472,8 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
           rm.sample_start + rm.sample_dur as end_sample,
           lm.sample_rate
         FROM left_matches lm
-        INNER JOIN right_matches rm ON lm.db_uuid = rm.db_uuid 
-          AND lm.session = rm.session 
+        INNER JOIN right_matches rm ON lm.db_uuid = rm.db_uuid
+          AND lm.session = rm.session
           AND lm.bundle = rm.bundle
           AND rm.seq_idx = lm.seq_idx + 1
       )
@@ -438,8 +505,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
         AND sp.right_id = rl.item_id
         AND rl.name = '%s'
       ORDER BY sp.session, sp.bundle, sp.left_seq",
-      left_level, left_condition,
-      right_level, right_condition,
+      left_cte, right_cte,
       left_level,
       left_attr, right_attr
     )
@@ -450,32 +516,46 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
     } else {
       if (!is.null(right_query$attribute)) right_query$attribute else right_level
     }
-    
+
+    # Build left_matches CTE
+    if (left_needs_label_join) {
+      left_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+         FROM items i
+         INNER JOIN labels l ON i.db_uuid = l.db_uuid
+           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+         WHERE %s", left_where)
+    } else {
+      left_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+         FROM items i
+         WHERE %s", left_where)
+    }
+
+    # Build right_matches CTE
+    if (right_needs_label_join) {
+      right_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+         FROM items i
+         INNER JOIN labels l ON i.db_uuid = l.db_uuid
+           AND i.session = l.session AND i.bundle = l.bundle AND i.item_id = l.item_id
+         WHERE %s", right_where)
+    } else {
+      right_cte <- sprintf(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
+         FROM items i
+         WHERE %s", right_where)
+    }
+
     sql <- sprintf("
-      WITH left_matches AS (
-        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
-        FROM items i
-        INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-          AND i.session = l.session 
-          AND i.bundle = l.bundle 
-          AND i.item_id = l.item_id
-        WHERE i.level = '%s' AND %s
-      ),
-      right_matches AS (
-        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id, i.seq_idx
-        FROM items i
-        INNER JOIN labels l ON i.db_uuid = l.db_uuid 
-          AND i.session = l.session 
-          AND i.bundle = l.bundle 
-          AND i.item_id = l.item_id
-        WHERE i.level = '%s' AND %s
-      ),
+      WITH left_matches AS (%s),
+      right_matches AS (%s),
       sequence_pairs AS (
         SELECT lm.item_id as left_id, rm.item_id as right_id,
                lm.db_uuid, lm.session, lm.bundle
         FROM left_matches lm
-        INNER JOIN right_matches rm ON lm.db_uuid = rm.db_uuid 
-          AND lm.session = rm.session 
+        INNER JOIN right_matches rm ON lm.db_uuid = rm.db_uuid
+          AND lm.session = rm.session
           AND lm.bundle = rm.bundle
           AND rm.seq_idx = lm.seq_idx + 1
       )
@@ -495,8 +575,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
         AND i.item_id = l.item_id
         AND l.name = '%s'
       ORDER BY i.session, i.bundle, i.seq_idx",
-      left_level, left_condition,
-      right_level, right_condition,
+      left_cte, right_cte,
       result_side,
       result_attr
     )
@@ -509,39 +588,51 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
 execute_dominance_query_corrected <- function(db_path, parsed_query, result_level = NULL) {
   con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
-  
+
   left_query <- parsed_query$left
   right_query <- parsed_query$right
-  
+
   left_level <- extract_level_from_query(left_query)
   right_level <- extract_level_from_query(right_query)
-  
+
   # Determine result level based on projection
-  # In EQL: # marks the side TO RETURN (project this side)
   if (is.null(result_level)) {
-    # Check if either side has projection marker
     if (!is.null(left_query$projection) && left_query$projection) {
-      result_level <- left_level  # # on left means return left
+      result_level <- left_level
     } else if (!is.null(right_query$projection) && right_query$projection) {
-      result_level <- right_level  # # on right means return right
+      result_level <- right_level
     } else {
-      result_level <- left_level  # Default: return left (dominant)
+      result_level <- left_level
     }
   }
-  
-  # Derive emuDB directory from db_path (SQLite file is inside the _emuDB dir)
+
   db_dir <- dirname(db_path)
   hierarchy_info <- get_hierarchy_info(db_dir)
-  
+
   if (!can_dominate(hierarchy_info, left_level, right_level)) {
     cli::cli_warn("No dominance relationship possible between {.val {left_level}} and {.val {right_level}}")
     return(create_empty_result())
   }
-  
+
+  # For non-simple sub-queries, pre-execute to get item IDs
+  left_item_ids <- NULL
+  right_item_ids <- NULL
+  if (left_query$type != "simple") {
+    left_result <- execute_subquery(db_path, left_query)
+    if (nrow(left_result) == 0) return(create_empty_result())
+    left_item_ids <- left_result
+  }
+  if (right_query$type != "simple") {
+    right_result <- execute_subquery(db_path, right_query)
+    if (nrow(right_result) == 0) return(create_empty_result())
+    right_item_ids <- right_result
+  }
+
   sql <- build_corrected_dominance_sql(
-    left_query, right_query, left_level, right_level, result_level, hierarchy_info
+    left_query, right_query, left_level, right_level, result_level, hierarchy_info,
+    left_item_ids = left_item_ids, right_item_ids = right_item_ids
   )
-  
+
   result <- DBI::dbGetQuery(con, sql)
   return(result)
 }
@@ -569,9 +660,7 @@ execute_function_query_corrected <- function(db_path, parsed_query) {
 
 # Conjunction query execution (AND)
 execute_conjunction_query <- function(db_path, parsed_query, result_level = NULL) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
-  
+  # No connection needed here — sub-queries open their own
   # Execute both sub-queries
   left_result <- execute_subquery(db_path, parsed_query$left)
   right_result <- execute_subquery(db_path, parsed_query$right)
@@ -663,8 +752,24 @@ extract_condition_from_query <- function(query) {
 }
 
 extract_level_from_query <- function(query) {
-  if (is.list(query) && !is.null(query$level)) {
-    return(query$level)
+  if (is.list(query)) {
+    if (!is.null(query$level)) return(query$level)
+    # Function queries: the result level is level1 (parent) for Num, level2 (child) for position
+    if (query$type == "function") {
+      if (query$func_name == "Num") return(query$level1)
+      return(query$level2)  # Start/End/Medial return child items
+    }
+    # Dominance: result level depends on projection
+    if (query$type == "dominance") {
+      if (!is.null(query$right$projection) && query$right$projection) {
+        return(extract_level_from_query(query$right))
+      }
+      return(extract_level_from_query(query$left))
+    }
+    # Other compound queries: extract from left side
+    if (query$type %in% c("conjunction", "disjunction", "sequence")) {
+      return(extract_level_from_query(query$left))
+    }
   }
   cli::cli_abort("Cannot extract level from query")
 }
@@ -689,24 +794,46 @@ create_empty_result <- function() {
 }
 
 # Dominance SQL builder
-build_corrected_dominance_sql <- function(left_query, right_query, left_level, right_level, result_level, hierarchy_info) {
-  left_condition <- extract_condition_from_query(left_query)
-  right_condition <- extract_condition_from_query(right_query)
-  
+build_corrected_dominance_sql <- function(left_query, right_query, left_level, right_level,
+                                          result_level, hierarchy_info,
+                                          left_item_ids = NULL, right_item_ids = NULL) {
+  # Build conditions: use label conditions for simple queries, item_id IN for pre-executed
+  if (is.null(left_item_ids)) {
+    left_condition <- extract_condition_from_query(left_query)
+  } else {
+    # Build item_id IN (...) condition from pre-executed results
+    ids <- unique(paste0(
+      "(i.db_uuid='", left_item_ids$db_uuid, "' AND i.session='", left_item_ids$session,
+      "' AND i.bundle='", left_item_ids$bundle, "' AND i.item_id=", left_item_ids$item_id, ")"
+    ))
+    left_condition <- paste0("(", paste(ids, collapse = " OR "), ")")
+  }
+  if (is.null(right_item_ids)) {
+    right_condition <- extract_condition_from_query(right_query)
+  } else {
+    ids <- unique(paste0(
+      "(i.db_uuid='", right_item_ids$db_uuid, "' AND i.session='", right_item_ids$session,
+      "' AND i.bundle='", right_item_ids$bundle, "' AND i.item_id=", right_item_ids$item_id, ")"
+    ))
+    right_condition <- paste0("(", paste(ids, collapse = " OR "), ")")
+  }
+
   # Get attribute for final label display
   result_attr <- if (result_level == left_level) {
     if (!is.null(left_query$attribute)) left_query$attribute else left_level
   } else {
     if (!is.null(right_query$attribute)) right_query$attribute else right_level
   }
-  
+
   path_info <- find_dominance_path(hierarchy_info, left_level, right_level)
 
   if (length(path_info$path) == 0) {
     cli::cli_abort("No dominance path found")
   }
 
-  with_clauses <- build_dominance_chain_cte(path_info, left_condition, right_condition)
+  with_clauses <- build_dominance_chain_cte(path_info, left_condition, right_condition,
+                                            left_preexecuted = !is.null(left_item_ids),
+                                            right_preexecuted = !is.null(right_item_ids))
   
   # Build the main SQL with correct string interpolation
   result_side <- if(result_level == left_level) "left" else "right"
@@ -737,34 +864,55 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
   return(paste(with_clauses, main_sql, sep = "\n"))
 }
 
-build_dominance_chain_cte <- function(path_info, left_condition, right_condition) {
+build_dominance_chain_cte <- function(path_info, left_condition, right_condition,
+                                      left_preexecuted = FALSE, right_preexecuted = FALSE) {
   path <- path_info$path
   directions <- path_info$directions
   ctes <- c()
 
+  # Build left_matches CTE — skip label join if pre-executed (condition uses i.* only)
   left_level <- path[1]
-  ctes <- c(ctes, sprintf("
-    left_matches AS (
-      SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
-      FROM items i
-      INNER JOIN labels l ON i.db_uuid = l.db_uuid
-        AND i.session = l.session
-        AND i.bundle = l.bundle
-        AND i.item_id = l.item_id
-      WHERE i.level = '%s' AND %s
-    )", left_level, left_condition))
+  if (left_preexecuted) {
+    ctes <- c(ctes, sprintf("
+      left_matches AS (
+        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
+        FROM items i
+        WHERE i.level = '%s' AND %s
+      )", left_level, left_condition))
+  } else {
+    ctes <- c(ctes, sprintf("
+      left_matches AS (
+        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
+        FROM items i
+        INNER JOIN labels l ON i.db_uuid = l.db_uuid
+          AND i.session = l.session
+          AND i.bundle = l.bundle
+          AND i.item_id = l.item_id
+        WHERE i.level = '%s' AND %s
+      )", left_level, left_condition))
+  }
 
+  # Build right_matches CTE
   right_level <- path[length(path)]
-  ctes <- c(ctes, sprintf("
-    right_matches AS (
-      SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
-      FROM items i
-      INNER JOIN labels l ON i.db_uuid = l.db_uuid
-        AND i.session = l.session
-        AND i.bundle = l.bundle
-        AND i.item_id = l.item_id
-      WHERE i.level = '%s' AND %s
-    )", right_level, right_condition))
+  if (right_preexecuted) {
+    ctes <- c(ctes, sprintf("
+      right_matches AS (
+        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
+        FROM items i
+        WHERE i.level = '%s' AND %s
+      )", right_level, right_condition))
+  } else {
+    ctes <- c(ctes, sprintf("
+      right_matches AS (
+        SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id
+        FROM items i
+        INNER JOIN labels l ON i.db_uuid = l.db_uuid
+          AND i.session = l.session
+          AND i.bundle = l.bundle
+          AND i.item_id = l.item_id
+        WHERE i.level = '%s' AND %s
+      )", right_level, right_condition))
+  }
 
   if (length(path) == 2) {
     # Single link step — direction determines join columns
