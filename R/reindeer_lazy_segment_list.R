@@ -37,8 +37,26 @@ lazy_segment_list <- S7::new_class(
     materialized = S7::class_logical,
     cache = S7::class_any  # NULL or data.table when materialized
   ),
-  constructor = function(corpus = NULL, query_parts = list(), 
-                        db_path = "", db_uuid = "", 
+  validator = function(self) {
+    if (!is.null(self@corpus) && !S7::S7_inherits(self@corpus, corpus)) {
+      return("corpus must be NULL or a reindeer corpus object")
+    }
+    if (!is.list(self@query_parts)) {
+      return("query_parts must be a list")
+    }
+    if (self@materialized && is.null(self@cache)) {
+      return("materialized=TRUE requires non-NULL cache")
+    }
+    if (!self@materialized && !is.null(self@cache)) {
+      return("materialized=FALSE but cache is non-NULL")
+    }
+    if (!is.character(self@db_uuid) || length(self@db_uuid) != 1) {
+      return("db_uuid must be a single character string")
+    }
+    NULL
+  },
+  constructor = function(corpus = NULL, query_parts = list(),
+                        db_path = "", db_uuid = "",
                         materialized = FALSE, cache = NULL) {
     S7::new_object(
       S7::S7_object(),

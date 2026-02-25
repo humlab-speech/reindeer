@@ -2,11 +2,11 @@
 % Please edit documentation in R/corpus_methods.R
 \name{get_corpus_connection}
 \alias{get_corpus_connection}
-\title{Get SQLite connection for corpus cache}
+\title{Get SQLite connection for corpus cache (delegates to cached connection)}
 \usage{
 get_corpus_connection(corpus_obj)
 }
 \description{
-Get SQLite connection for corpus cache
+Get SQLite connection for corpus cache (delegates to cached connection)
 }
 \keyword{internal}

@@ -27,8 +27,7 @@ annotations, metadata, and signal data stored in an Emu-SDMS database.
 \item{basePath}{Full path to the database directory}
 \item{config}{Database configuration (DBconfig) loaded from JSON}
 \item{.uuid}{Database UUID for identification}
-\item{.connection}{Cached SQLite database connection}
-\item{.connection_valid}{Whether the cached connection is valid}
+\item{.connection}{Environment holding cached SQLite connection (reference semantics)}
 }
 }
 

@@ -2,11 +2,11 @@
 % Please edit documentation in R/metadata_import_export.R
 \name{get_connection}
 \alias{get_connection}
-\title{Get connection from corpus object}
+\title{Get connection from corpus object (delegates to cached connection)}
 \usage{
 get_connection(corpus_obj)
 }
 \description{
-Get connection from corpus object
+Get connection from corpus object (delegates to cached connection)
 }
 \keyword{internal}

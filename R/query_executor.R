@@ -199,13 +199,17 @@ build_function_query_sql <- function(db_path, parsed) {
 }
 
 build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
-  # TODO: Implement
-  return(NULL)
+  left_sql <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
+  right_sql <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
+  if (is.null(left_sql) || is.null(right_sql)) return(NULL)
+  paste0("(", left_sql, ") INTERSECT (", right_sql, ")")
 }
 
 build_disjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
-  # TODO: Implement
-  return(NULL)
+  left_sql <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
+  right_sql <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
+  if (is.null(left_sql) || is.null(right_sql)) return(NULL)
+  paste0("(", left_sql, ") UNION (", right_sql, ")")
 }
 
 # Main execution dispatcher
