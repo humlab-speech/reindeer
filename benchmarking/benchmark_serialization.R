@@ -10,9 +10,7 @@ library(ggplot2)
 if (!requireNamespace("qs", quietly = TRUE)) {
   message("qs package not installed. Install with: install.packages('qs')")
 }
-if (!requireNamespace("fst", quietly = TRUE)) {
-  message("fst package not installed. Install with: install.packages('fst')")
-}
+has_fst <- requireNamespace("fst", quietly = TRUE)
 
 # ============================================================================
 # Generate Test Data
