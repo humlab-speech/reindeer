@@ -1243,14 +1243,38 @@ deduce_item_times <- function(result_df, db_path) {
   con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
 
-  # Collect all item_ids that need time deduction (including end_item_id for sequences)
   has_end_id <- "end_item_id" %in% names(result_df)
 
+  # Collect all unique (db_uuid, session, bundle, item_id) tuples that need resolution
+  needed <- result_df[needs_times, c("db_uuid", "session", "bundle", "item_id"), drop = FALSE]
+  if (has_end_id) {
+    end_rows <- result_df[needs_times, , drop = FALSE]
+    end_mask <- !is.na(end_rows[["end_item_id"]]) & end_rows[["end_item_id"]] != end_rows$item_id
+    if (any(end_mask)) {
+      end_needed <- end_rows[end_mask, c("db_uuid", "session", "bundle"), drop = FALSE]
+      end_needed$item_id <- end_rows[["end_item_id"]][end_mask]
+      needed <- rbind(needed, end_needed)
+    }
+  }
+  needed <- unique(needed)
+
+  # Populate temp table with only the item_ids we need
+
+  DBI::dbExecute(con, "CREATE TEMP TABLE needed_items (db_uuid TEXT, session TEXT, bundle TEXT, item_id INTEGER)")
+  if (nrow(needed) > 0) {
+    DBI::dbAppendTable(con, "needed_items", needed)
+  }
+
+  # Scoped recursive CTE: only traverse from needed item_ids
   sql <- "
     WITH RECURSIVE descendants AS (
-      SELECT from_id as ancestor_id, to_id as item_id,
-             db_uuid, session, bundle
-      FROM links
+      SELECT lnk.from_id AS ancestor_id, lnk.to_id AS item_id,
+             lnk.db_uuid, lnk.session, lnk.bundle
+      FROM links lnk
+      INNER JOIN needed_items ni ON lnk.db_uuid = ni.db_uuid
+        AND lnk.session = ni.session
+        AND lnk.bundle = ni.bundle
+        AND lnk.from_id = ni.item_id
       UNION ALL
       SELECT d.ancestor_id, lnk.to_id,
              lnk.db_uuid, lnk.session, lnk.bundle
@@ -1261,12 +1285,12 @@ deduce_item_times <- function(result_df, db_path) {
         AND d.item_id = lnk.from_id
     )
     SELECT d.ancestor_id, d.db_uuid, d.session, d.bundle,
-           MIN(i.sample_start) as min_sample_start,
+           MIN(i.sample_start) AS min_sample_start,
            MAX(CASE
              WHEN i.type = 'EVENT' THEN i.sample_point
              ELSE i.sample_start + i.sample_dur
-           END) as max_sample_end,
-           MAX(i.sample_rate) as sample_rate
+           END) AS max_sample_end,
+           MAX(i.sample_rate) AS sample_rate
     FROM descendants d
     INNER JOIN items i ON d.db_uuid = i.db_uuid
       AND d.session = i.session
@@ -1277,43 +1301,56 @@ deduce_item_times <- function(result_df, db_path) {
   "
 
   time_info <- DBI::dbGetQuery(con, sql)
+  DBI::dbExecute(con, "DROP TABLE IF EXISTS needed_items")
   if (nrow(time_info) == 0) return(result_df)
 
-  # Helper to look up deduced times
-  .lookup <- function(item_id, db_uuid, session, bundle) {
-    m <- time_info[
-      time_info$ancestor_id == item_id &
-      time_info$db_uuid == db_uuid &
-      time_info$session == session &
-      time_info$bundle == bundle, , drop = FALSE
-    ]
-    if (nrow(m) > 0) m[1, ] else NULL
+  # Vectorized merge instead of row-by-row lookup
+  # Build a key for fast matching
+  ti_key <- paste(time_info$ancestor_id, time_info$db_uuid, time_info$session, time_info$bundle, sep = "\x1f")
+  ti_lookup <- match  # alias for clarity
+
+  # Process all needs_times rows vectorized
+  res_ids <- result_df$item_id[needs_times]
+  res_keys <- paste(res_ids, result_df$db_uuid[needs_times],
+                    result_df$session[needs_times], result_df$bundle[needs_times], sep = "\x1f")
+  start_match <- match(res_keys, ti_key)
+
+  # Determine which rows are sequence spans needing end_item_id lookup
+  if (has_end_id) {
+    end_item_ids <- result_df[["end_item_id"]][needs_times]
+    is_span <- !is.na(end_item_ids) & end_item_ids != res_ids
+  } else {
+    is_span <- rep(FALSE, length(needs_times))
   }
 
-  for (idx in needs_times) {
-    row <- result_df[idx, ]
-    # Deduce start from left/start item
-    start_info <- .lookup(row$item_id, row$db_uuid, row$session, row$bundle)
+  # Single-item rows (not spans): direct assignment
+  single <- !is_span & !is.na(start_match)
+  if (any(single)) {
+    si <- start_match[single]
+    idx <- needs_times[single]
+    result_df$sample_start[idx] <- time_info$min_sample_start[si]
+    result_df$sample_dur[idx] <- time_info$max_sample_end[si] - time_info$min_sample_start[si]
+    na_rate <- is.na(result_df$sample_rate[idx]) | result_df$sample_rate[idx] == 0
+    result_df$sample_rate[idx[na_rate]] <- time_info$sample_rate[si[na_rate]]
+  }
 
-    if (has_end_id && !is.na(row[["end_item_id"]]) && row[["end_item_id"]] != row$item_id) {
-      # Sequence span: start from left item, end from right item
-      end_info <- .lookup(row[["end_item_id"]], row$db_uuid, row$session, row$bundle)
-      if (!is.null(start_info) && !is.null(end_info)) {
-        result_df$sample_start[idx] <- start_info$min_sample_start
-        result_df$sample_dur[idx] <- end_info$max_sample_end - start_info$min_sample_start
-        if (is.na(result_df$sample_rate[idx]) || result_df$sample_rate[idx] == 0) {
-          result_df$sample_rate[idx] <- start_info$sample_rate
-        }
-      }
-    } else {
-      # Single item: use its own descendants
-      if (!is.null(start_info)) {
-        result_df$sample_start[idx] <- start_info$min_sample_start
-        result_df$sample_dur[idx] <- start_info$max_sample_end - start_info$min_sample_start
-        if (is.na(result_df$sample_rate[idx]) || result_df$sample_rate[idx] == 0) {
-          result_df$sample_rate[idx] <- start_info$sample_rate
-        }
-      }
+  # Sequence span rows: lookup both start and end
+  if (any(is_span)) {
+    span_idx <- needs_times[is_span]
+    span_start_match <- start_match[is_span]
+    end_keys <- paste(end_item_ids[is_span], result_df$db_uuid[span_idx],
+                      result_df$session[span_idx], result_df$bundle[span_idx], sep = "\x1f")
+    span_end_match <- match(end_keys, ti_key)
+
+    both_found <- !is.na(span_start_match) & !is.na(span_end_match)
+    if (any(both_found)) {
+      bf_idx <- span_idx[both_found]
+      bf_si <- span_start_match[both_found]
+      bf_ei <- span_end_match[both_found]
+      result_df$sample_start[bf_idx] <- time_info$min_sample_start[bf_si]
+      result_df$sample_dur[bf_idx] <- time_info$max_sample_end[bf_ei] - time_info$min_sample_start[bf_si]
+      na_rate <- is.na(result_df$sample_rate[bf_idx]) | result_df$sample_rate[bf_idx] == 0
+      result_df$sample_rate[bf_idx[na_rate]] <- time_info$sample_rate[bf_si[na_rate]]
     }
   }
 
