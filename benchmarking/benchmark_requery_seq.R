@@ -15,8 +15,9 @@ cli::cli_h1("Sequential Navigation: requery_seq vs scout/retreat")
 ae_path <- file.path(tempdir(), "emuR_demoData", "ae_emuDB")
 if (!dir.exists(ae_path)) emuR::create_emuRdemoData(tempdir())
 
-ae_db <- load_emuDB(ae_path, verbose = FALSE)
+# Create corpus first (rebuilds cache), then load emuR handle
 corp <- corpus(ae_path, verbose = FALSE)
+ae_db <- load_emuDB(ae_path, verbose = FALSE)
 
 # Pre-compute segments
 segs_emur <- emuR::query(ae_db, "[Phonetic == t]")
@@ -30,7 +31,7 @@ cli::cli_h2("Next segment (offset +1)")
 
 bench_next <- bench::mark(
   emuR = emuR::requery_seq(ae_db, segs_emur, offset = 1),
-  reindeer = scout(segs_rein, 1),
+  reindeer = scout(segs_rein, 1, .from = corp),
   check = FALSE,
   iterations = 30,
   time_unit = "ms"
@@ -49,7 +50,7 @@ cli::cli_h2("Previous segment (offset -1)")
 
 bench_prev <- bench::mark(
   emuR = emuR::requery_seq(ae_db, segs_emur, offset = -1),
-  reindeer = retreat(segs_rein, 1),
+  reindeer = retreat(segs_rein, 1, .from = corp),
   check = FALSE,
   iterations = 30,
   time_unit = "ms"
@@ -67,8 +68,8 @@ cli::cli_alert_info("Speedup: {.val {sprintf('%.2fx', times[1]/times[2])}}")
 cli::cli_h2("Two segments ahead (offset +2)")
 
 bench_two <- bench::mark(
-  emuR = emuR::requery_seq(ae_db, segs_emur, offset = 2),
-  reindeer = scout(segs_rein, 2),
+  emuR = emuR::requery_seq(ae_db, segs_emur, offset = 2, ignoreOutOfBounds = TRUE),
+  reindeer = scout(segs_rein, 2, .from = corp),
   check = FALSE,
   iterations = 30,
   time_unit = "ms"

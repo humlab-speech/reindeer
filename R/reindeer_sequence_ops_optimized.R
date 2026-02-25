@@ -139,15 +139,9 @@ scout_dt <- function(.segments,
     cli::cli_abort("Cannot determine corpus. Provide via {.arg .from}")
   }
   
-  # Get database connection
-  db_file <- file.path(corp@basePath, paste0(corp@dbName, "_emuDB.sqlite"))
-  if (!file.exists(db_file)) {
-    db_file <- file.path(corp@basePath, paste0(corp@dbName, "_emuDBcache.sqlite"))
-  }
-  
-  conn <- DBI::dbConnect(RSQLite::SQLite(), db_file)
-  on.exit(DBI::dbDisconnect(conn))
-  
+  # Get database connection — reuse cached connection for corpus objects
+  conn <- get_or_create_connection(corp)
+
   # Query all items on the same levels
   levels <- unique(dt$level)
   level_filter <- paste0("'", levels, "'", collapse = ", ")
@@ -158,7 +152,14 @@ scout_dt <- function(.segments,
   )
   
   all_items_dt <- data.table::setDT(DBI::dbGetQuery(conn, items_query))
-  
+
+  # Compute sample_end from sample_start + sample_dur (emuR stores duration, not end)
+  all_items_dt[, sample_end := data.table::fifelse(
+    type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
+    sample_start + sample_dur - 1L,
+    NA_integer_
+  )]
+
   # Query labels
   labels_query <- sprintf(
     "SELECT db_uuid, session, bundle, item_id, label 
@@ -368,15 +369,9 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     cli::cli_abort("Cannot determine corpus")
   }
   
-  # Get database connection
-  db_file <- file.path(corp@basePath, paste0(corp@dbName, "_emuDB.sqlite"))
-  if (!file.exists(db_file)) {
-    db_file <- file.path(corp@basePath, paste0(corp@dbName, "_emuDBcache.sqlite"))
-  }
-  
-  conn <- DBI::dbConnect(RSQLite::SQLite(), db_file)
-  on.exit(DBI::dbDisconnect(conn))
-  
+  # Get database connection — reuse cached connection for corpus objects
+  conn <- get_or_create_connection(corp)
+
   # Query for upward links
   # We need to find items at the target level that link down to our segments
   links_query <- sprintf(
@@ -400,53 +395,60 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   )
   
   target_items_dt <- data.table::setDT(DBI::dbGetQuery(conn, items_query))
-  
+
+  # Compute sample_end from sample_start + sample_dur
+  target_items_dt[, sample_end := data.table::fifelse(
+    type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
+    sample_start + sample_dur - 1L,
+    NA_integer_
+  )]
+
   # Query labels for target level
   labels_query <- sprintf(
-    "SELECT db_uuid, session, bundle, item_id, label 
-     FROM labels 
+    "SELECT db_uuid, session, bundle, item_id, label
+     FROM labels
      WHERE db_uuid = '%s'",
     db_uuid
   )
-  
+
   labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query))
-  
+
   # Set keys
   data.table::setkey(links_dt, db_uuid, session, bundle, to_id)
   data.table::setkey(target_items_dt, db_uuid, session, bundle, item_id)
   data.table::setkey(labels_dt, db_uuid, session, bundle, item_id)
-  
+
   # For each segment, find parent at target level
   dt[, seg_idx := .I]
-  
+
   # Join segments with links (segments are "to" side, parents are "from" side)
-  seg_links <- links_dt[dt, 
+  seg_links <- links_dt[dt,
                         on = .(db_uuid, session, bundle, to_id = start_item_id),
                         nomatch = NULL]
-  
+
   # Join with target level items
   result_dt <- target_items_dt[seg_links,
                                on = .(db_uuid, session, bundle, item_id = from_id),
                                nomatch = NULL]
-  
+
   # Join with labels
   result_dt <- labels_dt[result_dt,
                          on = .(db_uuid, session, bundle, item_id),
                          nomatch = NULL]
-  
+
   data.table::setnames(result_dt, "label", "labels", skip_absent = TRUE)
-  
+
   # Calculate times if available
   result_dt[, `:=`(
-    start = if (type == "SEGMENT" || type == "EVENT") sample_start / sample_rate * 1000 else NA_real_,
-    end = if (type == "SEGMENT" || type == "EVENT") sample_end / sample_rate * 1000 else NA_real_,
+    start = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_start / sample_rate * 1000, NA_real_),
+    end = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_end / sample_rate * 1000, NA_real_),
     start_item_id = item_id,
     end_item_id = item_id,
     start_item_seq_idx = seq_idx,
     end_item_seq_idx = seq_idx,
     attribute = level  # Default attribute is level name
   )]
-  
+
   # Select required columns
   result_cols <- c(
     "labels", "start", "end", "db_uuid", "session", "bundle",
@@ -454,16 +456,16 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     "start_item_seq_idx", "end_item_seq_idx", "type",
     "sample_start", "sample_end", "sample_rate"
   )
-  
+
   result_dt <- result_dt[, ..result_cols]
-  
+
   # Convert to segment_list
   result <- segment_list(
     data = as.data.frame(result_dt),
     db_uuid = db_uuid,
     db_path = db_path
   )
-  
+
   return(result)
 }
 
@@ -536,15 +538,9 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     cli::cli_abort("Cannot determine corpus")
   }
   
-  # Get database connection
-  db_file <- file.path(corp@basePath, paste0(corp@dbName, "_emuDB.sqlite"))
-  if (!file.exists(db_file)) {
-    db_file <- file.path(corp@basePath, paste0(corp@dbName, "_emuDBcache.sqlite"))
-  }
-  
-  conn <- DBI::dbConnect(RSQLite::SQLite(), db_file)
-  on.exit(DBI::dbDisconnect(conn))
-  
+  # Get database connection — reuse cached connection for corpus objects
+  conn <- get_or_create_connection(corp)
+
   # Query for downward links (from our segments to target level)
   links_query <- sprintf(
     "SELECT * FROM links WHERE db_uuid = '%s'",
@@ -560,17 +556,24 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   )
   
   target_items_dt <- data.table::setDT(DBI::dbGetQuery(conn, items_query))
-  
+
+  # Compute sample_end from sample_start + sample_dur
+  target_items_dt[, sample_end := data.table::fifelse(
+    type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
+    sample_start + sample_dur - 1L,
+    NA_integer_
+  )]
+
   # Query labels
   labels_query <- sprintf(
-    "SELECT db_uuid, session, bundle, item_id, label 
-     FROM labels 
+    "SELECT db_uuid, session, bundle, item_id, label
+     FROM labels
      WHERE db_uuid = '%s'",
     db_uuid
   )
-  
+
   labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query))
-  
+
   # Set keys
   data.table::setkey(links_dt, db_uuid, session, bundle, from_id)
   data.table::setkey(target_items_dt, db_uuid, session, bundle, item_id)
@@ -595,8 +598,8 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   
   # Calculate times
   result_dt[, `:=`(
-    start = if (type == "SEGMENT" || type == "EVENT") sample_start / sample_rate * 1000 else NA_real_,
-    end = if (type == "SEGMENT" || type == "EVENT") sample_end / sample_rate * 1000 else NA_real_,
+    start = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_start / sample_rate * 1000, NA_real_),
+    end = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_end / sample_rate * 1000, NA_real_),
     start_item_id = item_id,
     end_item_id = item_id,
     start_item_seq_idx = seq_idx,

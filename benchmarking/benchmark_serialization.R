@@ -39,7 +39,7 @@ generate_test_data <- function(n_rows, n_cols) {
   )
   
   # Add DSP columns
-  for (i in seq_len(n_cols - ncol(data))) {
+  for (i in seq_len(max(0, n_cols - ncol(data)))) {
     col_name <- paste0("dsp_col_", i)
     data[[col_name]] <- rnorm(n_rows, mean = 1000, sd = 200)
   }

@@ -22,7 +22,7 @@ suppressPackageStartupMessages({
 cat("\n=== Simulation Infrastructure Benchmarks ===\n\n")
 
 # Create test database
-emuR::create_emuRdemoData(dir = tempdir())
+if (!dir.exists(file.path(tempdir(), "emuR_demoData"))) emuR::create_emuRdemoData(dir = tempdir())
 ae_path <- file.path(tempdir(), "emuR_demoData", "ae_emuDB")
 corp <- corpus(ae_path)
 
@@ -127,104 +127,119 @@ print(cache_init_benchmarks[, c("expression", "min", "median", "mem_alloc")])
 cat("\nBenchmarking simulation execution...\n")
 
 # Get test segment list
-segs <- ask_for(corp, "[Phonetic = a]")
+segs <- ask_for(corp, "Phonetic == V")
+attr(segs, "corpus") <- corp
 
-# Small parameter space
-small_sim_bench <- bench::mark(
-  small_space = {
-    cache_subdir <- file.path(cache_dir, "small")
-    dir.create(cache_subdir, showWarnings = FALSE)
-    quantify_simulate(
-      segs,
-      .using = simple_dsp,
-      .simulate = list(
-        multiplier = c(1.0, 2.0),
-        offset = c(0, 10)
-      ),
-      .simulation_store = cache_subdir,
-      .verbose = FALSE
-    )
-    unlink(cache_subdir, recursive = TRUE)
-  },
-  
-  check = FALSE,
-  iterations = 5
-)
+# quantify_simulate/enrich_simulate depend on peek_signals() which may not be available
+# Wrap in tryCatch to allow non-simulation benchmarks to complete
+small_sim_bench <- medium_sim_bench <- NULL
+tryCatch({
+  # Small parameter space
+  small_sim_bench <- bench::mark(
+    small_space = {
+      cache_subdir <- file.path(cache_dir, "small")
+      dir.create(cache_subdir, showWarnings = FALSE)
+      quantify_simulate(
+        segs,
+        .using = simple_dsp,
+        .simulate = list(
+          multiplier = c(1.0, 2.0),
+          offset = c(0, 10)
+        ),
+        .simulation_store = cache_subdir,
+        .verbose = FALSE
+      )
+      unlink(cache_subdir, recursive = TRUE)
+    },
+    check = FALSE,
+    iterations = 5
+  )
 
-# Medium parameter space
-medium_sim_bench <- bench::mark(
-  medium_space = {
-    cache_subdir <- file.path(cache_dir, "medium")
-    dir.create(cache_subdir, showWarnings = FALSE)
-    quantify_simulate(
-      segs,
-      .using = simple_dsp,
-      .simulate = list(
-        multiplier = seq(0.5, 2.0, by = 0.5),
-        offset = seq(0, 20, by = 5)
-      ),
-      .simulation_store = cache_subdir,
-      .verbose = FALSE
-    )
-    unlink(cache_subdir, recursive = TRUE)
-  },
-  
-  check = FALSE,
-  iterations = 3
-)
+  # Medium parameter space
+  medium_sim_bench <- bench::mark(
+    medium_space = {
+      cache_subdir <- file.path(cache_dir, "medium")
+      dir.create(cache_subdir, showWarnings = FALSE)
+      quantify_simulate(
+        segs,
+        .using = simple_dsp,
+        .simulate = list(
+          multiplier = seq(0.5, 2.0, by = 0.5),
+          offset = seq(0, 20, by = 5)
+        ),
+        .simulation_store = cache_subdir,
+        .verbose = FALSE
+      )
+      unlink(cache_subdir, recursive = TRUE)
+    },
+    check = FALSE,
+    iterations = 3
+  )
+}, error = function(e) {
+  cat(sprintf("  Skipping simulation execution benchmarks: %s\n", e$message))
+})
 
-cat("\nSimulation Execution Results:\n")
-cat("Small parameter space (4 combinations):\n")
-print(small_sim_bench[, c("expression", "min", "median", "mem_alloc")])
-cat("\nMedium parameter space (20 combinations):\n")
-print(medium_sim_bench[, c("expression", "min", "median", "mem_alloc")])
+if (!is.null(small_sim_bench)) {
+  cat("\nSimulation Execution Results:\n")
+  cat("Small parameter space (4 combinations):\n")
+  print(small_sim_bench[, c("expression", "min", "median", "mem_alloc")])
+  cat("\nMedium parameter space (20 combinations):\n")
+  print(medium_sim_bench[, c("expression", "min", "median", "mem_alloc")])
+} else {
+  cat("\nSimulation execution benchmarks skipped (peek_signals unavailable)\n")
+}
 
 # Benchmark 4: Reminisce Performance ---------------------------------------
 
 cat("\nBenchmarking reminisce operations...\n")
 
-# First, create a simulation to reminisce from
-setup_cache <- file.path(cache_dir, "reminisce_test")
-dir.create(setup_cache, showWarnings = FALSE)
+reminisce_benchmarks <- NULL
+tryCatch({
+  # First, create a simulation to reminisce from
+  setup_cache <- file.path(cache_dir, "reminisce_test")
+  dir.create(setup_cache, showWarnings = FALSE)
 
-sim_results <- quantify_simulate(
-  segs,
-  .using = simple_dsp,
-  .simulate = list(
-    multiplier = seq(0.5, 2.0, by = 0.25),
-    offset = seq(0, 30, by = 10)
-  ),
-  .simulation_store = setup_cache,
-  .verbose = FALSE
-)
-
-cache_file <- attr(sim_results, "cache_file")
-
-reminisce_benchmarks <- bench::mark(
-  first_params = reminisce(
+  sim_results <- quantify_simulate(
     segs,
-    parameters = list(multiplier = 0.5, offset = 0),
-    cache_path = cache_file
-  ),
-  
-  middle_params = reminisce(
-    segs,
-    parameters = list(multiplier = 1.25, offset = 15),
-    cache_path = cache_file
-  ),
-  
-  last_params = reminisce(
-    segs,
-    parameters = list(multiplier = 2.0, offset = 30),
-    cache_path = cache_file
-  ),
-  
-  check = FALSE,
-  iterations = 20
-)
+    .using = simple_dsp,
+    .simulate = list(
+      multiplier = seq(0.5, 2.0, by = 0.25),
+      offset = seq(0, 30, by = 10)
+    ),
+    .simulation_store = setup_cache,
+    .verbose = FALSE
+  )
 
-cat("\nReminisce Performance Results:\n")
-print(reminisce_benchmarks[, c("expression", "min", "median", "mem_alloc")])
+  cache_file <- attr(sim_results, "cache_file")
+
+  reminisce_benchmarks <- bench::mark(
+    first_params = reminisce(
+      segs,
+      parameters = list(multiplier = 0.5, offset = 0),
+      cache_path = cache_file
+    ),
+
+    middle_params = reminisce(
+      segs,
+      parameters = list(multiplier = 1.25, offset = 15),
+      cache_path = cache_file
+    ),
+
+    last_params = reminisce(
+      segs,
+      parameters = list(multiplier = 2.0, offset = 30),
+      cache_path = cache_file
+    ),
+
+    check = FALSE,
+    iterations = 20
+  )
+
+  cat("\nReminisce Performance Results:\n")
+  print(reminisce_benchmarks[, c("expression", "min", "median", "mem_alloc")])
+}, error = function(e) {
+  cat(sprintf("  Skipping reminisce benchmarks: %s\n", e$message))
+})
 
 # Benchmark 5: Cache Listing -----------------------------------------------
 
@@ -267,55 +282,61 @@ print(listing_benchmarks[, c("expression", "min", "median", "mem_alloc")])
 
 cat("\nBenchmarking enrich simulation...\n")
 
-enrich_sim_bench <- bench::mark(
-  enrich_small = {
-    cache_subdir <- file.path(cache_dir, "enrich_small")
-    dir.create(cache_subdir, showWarnings = FALSE)
-    enrich_simulate(
-      corp,
-      .using = track_dsp,
-      .simulate = list(
-        window_size = c(256, 512),
-        hop_size = c(128, 256)
-      ),
-      .simulation_store = cache_subdir,
-      .verbose = FALSE
-    )
-    unlink(cache_subdir, recursive = TRUE)
-  },
-  
-  check = FALSE,
-  iterations = 3
-)
+enrich_sim_bench <- NULL
+tryCatch({
+  enrich_sim_bench <- bench::mark(
+    enrich_small = {
+      cache_subdir <- file.path(cache_dir, "enrich_small")
+      dir.create(cache_subdir, showWarnings = FALSE)
+      enrich_simulate(
+        corp,
+        .using = track_dsp,
+        .simulate = list(
+          window_size = c(256, 512),
+          hop_size = c(128, 256)
+        ),
+        .simulation_store = cache_subdir,
+        .verbose = FALSE
+      )
+      unlink(cache_subdir, recursive = TRUE)
+    },
+    check = FALSE,
+    iterations = 3
+  )
 
-cat("\nEnrich Simulation Results:\n")
-print(enrich_sim_bench[, c("expression", "min", "median", "mem_alloc")])
+  cat("\nEnrich Simulation Results:\n")
+  print(enrich_sim_bench[, c("expression", "min", "median", "mem_alloc")])
+}, error = function(e) {
+  cat(sprintf("  Skipping enrich simulation benchmarks: %s\n", e$message))
+})
 
 # Benchmark 7: Signal Hash Computation -------------------------------------
 
 cat("\nBenchmarking signal hash computation...\n")
 
-# Get paths to actual signal files
-signal_files <- peek_signals(corp)
-test_signals <- head(signal_files$full_path, 5)
+hash_benchmarks <- NULL
+tryCatch({
+  signal_files <- peek_signals(corp)
+  test_signals <- head(signal_files$full_path, 5)
 
-hash_benchmarks <- bench::mark(
-  single_hash = compute_signal_hash(test_signals[1]),
-  
-  five_hashes = lapply(test_signals, compute_signal_hash),
-  
-  check = FALSE,
-  iterations = 20
-)
+  hash_benchmarks <- bench::mark(
+    single_hash = compute_signal_hash(test_signals[1]),
+    five_hashes = lapply(test_signals, compute_signal_hash),
+    check = FALSE,
+    iterations = 20
+  )
 
-cat("\nSignal Hash Computation Results:\n")
-print(hash_benchmarks[, c("expression", "min", "median", "mem_alloc")])
+  cat("\nSignal Hash Computation Results:\n")
+  print(hash_benchmarks[, c("expression", "min", "median", "mem_alloc")])
+}, error = function(e) {
+  cat(sprintf("  Skipping signal hash benchmarks: %s\n", e$message))
+})
 
 # Summary Statistics -------------------------------------------------------
 
 cat("\n=== Summary of Simulation Benchmarks ===\n\n")
 
-all_benchmarks <- list(
+all_benchmarks <- Filter(Negate(is.null), list(
   grid_creation = grid_benchmarks,
   cache_init = cache_init_benchmarks,
   simulation_small = small_sim_bench,
@@ -324,7 +345,7 @@ all_benchmarks <- list(
   cache_listing = listing_benchmarks,
   enrich_sim = enrich_sim_bench,
   signal_hash = hash_benchmarks
-)
+))
 
 # Extract summary statistics
 summary_stats <- lapply(names(all_benchmarks), function(name) {
@@ -421,31 +442,33 @@ cat("=== Key Performance Insights ===\n\n")
 
 cat("1. Parameter Grid Creation:\n")
 grid_summary <- summary_stats[benchmark_category == "grid_creation"]
-cat(sprintf("   - Small grid (10 combos): %.2f ms\n", 
-            grid_summary[operation == "small_grid", median_time_ms]))
-cat(sprintf("   - Medium grid (200 combos): %.2f ms\n",
-            grid_summary[operation == "medium_grid", median_time_ms]))
-cat(sprintf("   - Large grid (660 combos): %.2f ms\n",
-            grid_summary[operation == "large_grid", median_time_ms]))
+if (nrow(grid_summary) > 0) {
+  cat(sprintf("   - Small grid (10 combos): %.2f ms\n",
+              grid_summary[operation == "small_grid", median_time_ms]))
+  cat(sprintf("   - Medium grid (200 combos): %.2f ms\n",
+              grid_summary[operation == "medium_grid", median_time_ms]))
+  cat(sprintf("   - Large grid (660 combos): %.2f ms\n",
+              grid_summary[operation == "large_grid", median_time_ms]))
+}
 
-cat("\n2. Simulation Execution:\n")
 sim_summary <- summary_stats[grepl("simulation", benchmark_category)]
-cat(sprintf("   - 4 parameter combinations: %.2f ms\n",
-            sim_summary[operation == "small_space", median_time_ms]))
-cat(sprintf("   - 20 parameter combinations: %.2f ms\n",
-            sim_summary[operation == "medium_space", median_time_ms]))
-cat(sprintf("   - Time per combination (small): %.2f ms\n",
-            sim_summary[operation == "small_space", median_time_ms] / 4))
-cat(sprintf("   - Time per combination (medium): %.2f ms\n",
-            sim_summary[operation == "medium_space", median_time_ms] / 20))
+if (nrow(sim_summary) > 0) {
+  cat("\n2. Simulation Execution:\n")
+  cat(sprintf("   - 4 parameter combinations: %.2f ms\n",
+              sim_summary[operation == "small_space", median_time_ms]))
+  cat(sprintf("   - 20 parameter combinations: %.2f ms\n",
+              sim_summary[operation == "medium_space", median_time_ms]))
+}
 
-cat("\n3. Cache Retrieval (Reminisce):\n")
 rem_summary <- summary_stats[benchmark_category == "reminisce"]
-cat(sprintf("   - Average retrieval time: %.2f ms\n",
-            mean(rem_summary$median_time_ms)))
-cat(sprintf("   - Min: %.2f ms, Max: %.2f ms\n",
-            min(rem_summary$median_time_ms),
-            max(rem_summary$median_time_ms)))
+if (nrow(rem_summary) > 0) {
+  cat("\n3. Cache Retrieval (Reminisce):\n")
+  cat(sprintf("   - Average retrieval time: %.2f ms\n",
+              mean(rem_summary$median_time_ms)))
+  cat(sprintf("   - Min: %.2f ms, Max: %.2f ms\n",
+              min(rem_summary$median_time_ms),
+              max(rem_summary$median_time_ms)))
+}
 
 cat("\n4. Memory Efficiency:\n")
 cat(sprintf("   - Average memory per operation: %.2f MB\n",

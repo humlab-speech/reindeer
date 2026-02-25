@@ -54,9 +54,9 @@ simple_dsp <- function(listOfFiles, beginTime, endTime,
 }
 
 # Get segments for benchmarking
-query_str <- "Phonetic =~ [ptk]"
+query_str <- "[Phonetic =~ p|t|k]"
 segs_emur <- query(ae_db, query_str, resultType = "tibble")
-segs_reindeer <- ask_for(corp, query_str)
+segs_reindeer <- ask_for(corp, "Phonetic =~ p|t|k")
 segs_reindeer@db_path <- ae_path
 
 cat(sprintf("Testing with %d segments\n", nrow(segs_emur)))
@@ -80,10 +80,11 @@ bench_simple <- bench::mark(
       segs_reindeer[1:min(10, nrow(segs_reindeer)), ],
       simple_dsp,
       .parallel = FALSE,
-      .verbose = FALSE
+      .verbose = FALSE,
+      .use_metadata = FALSE
     )
   },
-  
+
   check = FALSE,  # Results won't match exactly due to random values
   iterations = 10,
   time_unit = "ms"
@@ -100,7 +101,7 @@ cat("Benchmark 2: Extract at multiple time points\n")
 cat("─────────────────────────────────────────────────────────────\n\n")
 
 # DSP that returns multiple frames (simulating track data)
-track_dsp <- function(listOfFiles, beginTime, endTime, 
+track_dsp <- function(listOfFiles, beginTime, endTime,
                       toFile = FALSE, verbose = FALSE, ...) {
   n_frames <- 20
   obj <- data.frame(
@@ -134,14 +135,15 @@ bench_timepoints <- bench::mark(
     }
     bind_rows(results)
   },
-  
+
   quantify_at = {
     quantify(
       segs_reindeer[1:min(5, nrow(segs_reindeer)), ],
       track_dsp,
       .at = time_points,
       .parallel = FALSE,
-      .verbose = FALSE
+      .verbose = FALSE,
+      .use_metadata = FALSE
     )
   },
   
@@ -180,17 +182,19 @@ if (requireNamespace("future", quietly = TRUE) &&
         segs_subset,
         slow_dsp,
         .parallel = FALSE,
-        .verbose = FALSE
+        .verbose = FALSE,
+        .use_metadata = FALSE
       )
     },
-    
+
     parallel_2_workers = {
       quantify(
         segs_subset,
         slow_dsp,
         .parallel = TRUE,
         .workers = 2,
-        .verbose = FALSE
+        .verbose = FALSE,
+        .use_metadata = FALSE
       )
     },
     

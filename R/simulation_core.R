@@ -8,7 +8,7 @@ quantify_simulate <- function(.what, .using, ...,
                                .verbose = TRUE) {
   
   # Validate inputs
-  if (!inherits(.what, "segment_list")) {
+  if (!S7::S7_inherits(.what, segment_list)) {
     cli::cli_abort(".what must be a segment_list object")
   }
   
@@ -733,7 +733,7 @@ assess <- function(segment_list,
                    .verbose = TRUE) {
   
   # Validate inputs
-  if (!inherits(segment_list, "segment_list")) {
+  if (!S7::S7_inherits(segment_list, reindeer::segment_list)) {
     cli::cli_abort("First argument must be a segment_list")
   }
   

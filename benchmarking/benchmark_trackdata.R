@@ -35,9 +35,9 @@ track_name <- "fm"
 # 1. get_trackdata with filtered segments
 #===============================================================================
 
-cli::cli_h2("get_trackdata: filtered segments (Phonetic == a)")
+cli::cli_h2("get_trackdata: filtered segments (Phonetic == V)")
 
-segs_emur <- emuR::query(ae_db, "[Phonetic == a]")
+segs_emur <- emuR::query(ae_db, "[Phonetic == V]")
 cli::cli_alert_info("Segment count: {.val {nrow(segs_emur)}}")
 
 bench_filtered <- bench::mark(
@@ -74,11 +74,11 @@ cli::cli_text("Measures emuR query+trackdata pipeline overhead")
 
 bench_e2e <- bench::mark(
   emuR_query_plus_track = {
-    s <- emuR::query(ae_db, "[Phonetic == a]")
+    s <- emuR::query(ae_db, "[Phonetic == V]")
     emuR::get_trackdata(ae_db, s, ssffTrackName = track_name)
   },
   reindeer_query_only = {
-    ask_for(corp, "Phonetic == a")
+    ask_for(corp, "Phonetic == V")
   },
   check = FALSE,
   iterations = 10,

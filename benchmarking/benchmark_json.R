@@ -107,9 +107,9 @@ setup_test_files <- function() {
 
 benchmark_json_reading <- function(files) {
   cat("\n")
-  cat("=" %R% 70, "\n")
+  cat(strrep("=", 70), "\n")
   cat("JSON READING PERFORMANCE BENCHMARK\n")
-  cat("=" %R% 70, "\n\n")
+  cat(strrep("=", 70), "\n\n")
 
   results <- list()
 
@@ -118,7 +118,7 @@ benchmark_json_reading <- function(files) {
     file_size <- file.size(file_path)
 
     cat(sprintf("\n%s FILE (%s)\n", toupper(name), format(object.size(file_size), units = "auto")))
-    cat("-" %R% 50, "\n")
+    cat(strrep("-", 50), "\n")
 
     # Benchmark with simplifyVector = TRUE (most common use case)
     bm <- bench::mark(
@@ -154,9 +154,9 @@ benchmark_json_reading <- function(files) {
 
 benchmark_metadata_loading <- function() {
   cat("\n\n")
-  cat("=" %R% 70, "\n")
+  cat(strrep("=", 70), "\n")
   cat("REAL-WORLD SCENARIO: Loading 100 metadata files\n")
-  cat("=" %R% 70, "\n\n")
+  cat(strrep("=", 70), "\n\n")
 
   temp_dir <- tempdir()
   meta_dir <- file.path(temp_dir, "metadata_test")
@@ -267,9 +267,9 @@ if (interactive() || !exists("BENCHMARK_QUIET")) {
 
   # Summary
   cat("\n")
-  cat("=" %R% 70, "\n")
+  cat(strrep("=", 70), "\n")
   cat("SUMMARY\n")
-  cat("=" %R% 70, "\n")
+  cat(strrep("=", 70), "\n")
   cat("\nRcppSimdJson provides significant performance improvements:\n")
   cat("  • Small files (configs):       2-3x faster\n")
   cat("  • Medium files (metadata):     3-5x faster\n")

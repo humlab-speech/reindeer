@@ -21,8 +21,14 @@
   basePath <- bp$basePath
   dbName <- bp$dbName
 
-  # Try SQLite cache first
+  # Use cached connection for corpus S7 objects
+  if (S7::S7_inherits(obj, corpus)) {
+    con <- get_or_create_connection(obj)
+    result <- DBI::dbGetQuery(con, "SELECT name FROM session ORDER BY name")
+    return(tibble::as_tibble(result))
+  }
 
+  # Try SQLite cache for other object types
   cache_path <- file.path(basePath, paste0(dbName, database.cache.suffix))
   if (file.exists(cache_path)) {
     con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
@@ -53,7 +59,25 @@
   basePath <- bp$basePath
   dbName <- bp$dbName
 
-  # Try SQLite cache first
+  # Use cached connection for corpus S7 objects
+  if (S7::S7_inherits(obj, corpus)) {
+    con <- get_or_create_connection(obj)
+    if (!is.null(session)) {
+      result <- DBI::dbGetQuery(
+        con,
+        "SELECT session, name FROM bundle WHERE session = ? ORDER BY session, name",
+        params = list(session)
+      )
+    } else {
+      result <- DBI::dbGetQuery(
+        con,
+        "SELECT session, name FROM bundle ORDER BY session, name"
+      )
+    }
+    return(tibble::as_tibble(result))
+  }
+
+  # Try SQLite cache for other object types
   cache_path <- file.path(basePath, paste0(dbName, database.cache.suffix))
   if (file.exists(cache_path)) {
     con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
