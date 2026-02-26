@@ -127,9 +127,8 @@ run_benchmark_suite <- function(iterations = 50) {
     ),
 
     # Disjunction (label alternatives)
+    # Note: [A == x | B == y] syntax is reindeer-only; emuR rejects it
     disjunction = c(
-      "[Phonetic == t | Phonetic == k]",
-      "[Phoneme == n | Phoneme == m]",
       "Phonetic == t | k | p"
     ),
     
@@ -164,12 +163,16 @@ run_benchmark_suite <- function(iterations = 50) {
   }
   
   combined <- bind_rows(all_results)
-  
+
+  # Close DB connections to avoid finalizer warnings
+  DBI::dbDisconnect(ae$connection)
+  DBI::dbDisconnect(ae_corpus@.connection$con)
+
   cat("\n")
   cat("=" , rep("=", 70), "\n", sep="")
   cat("  BENCHMARK COMPLETE\n")
   cat("=" , rep("=", 70), "\n\n", sep="")
-  
+
   return(combined)
 }
 

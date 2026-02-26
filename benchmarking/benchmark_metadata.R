@@ -94,7 +94,9 @@ cache_file <- file.path(ae_path, paste0("ae", "_emuDBcache.sqlite"))
 bench_cache <- bench::mark(
   emuR = {
     unlink(cache_file)
-    emuR::load_emuDB(ae_path, verbose = FALSE)
+    .h <- emuR::load_emuDB(ae_path, verbose = FALSE)
+    DBI::dbDisconnect(.h$connection)
+    .h
   },
   reindeer = {
     unlink(cache_file)

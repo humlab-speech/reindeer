@@ -472,9 +472,9 @@ if (nrow(rem_summary) > 0) {
 
 cat("\n4. Memory Efficiency:\n")
 cat(sprintf("   - Average memory per operation: %.2f MB\n",
-            mean(summary_stats$mem_alloc_mb)))
+            mean(summary_stats$mem_alloc_mb, na.rm = TRUE)))
 cat(sprintf("   - Peak memory usage: %.2f MB (in %s)\n",
-            max(summary_stats$mem_alloc_mb),
+            max(summary_stats$mem_alloc_mb, na.rm = TRUE),
             summary_stats[which.max(mem_alloc_mb), operation]))
 
 cat("\n==============================================\n\n")

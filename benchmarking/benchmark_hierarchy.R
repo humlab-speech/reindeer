@@ -123,3 +123,4 @@ saveRDS(results, "benchmarking/hierarchy_benchmark_results.rds")
 cli::cli_alert_success("Saved to benchmarking/hierarchy_benchmark_results.rds")
 
 DBI::dbDisconnect(ae_db$connection)
+DBI::dbDisconnect(corp@.connection$con)
