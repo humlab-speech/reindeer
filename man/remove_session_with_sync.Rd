@@ -18,3 +18,4 @@ remove_session_with_sync(db_handle, name, trigger_sync = TRUE, verbose = FALSE)
 \description{
 Wrapper for session removal that triggers CMDI sync
 }
+\keyword{internal}

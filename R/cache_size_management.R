@@ -231,7 +231,7 @@ get_cache_dir_summary <- function(cache_dir, pattern = NULL) {
 #' @param max_threshold Maximum threshold (default: 2 GB)
 #' @param verbose Show messages
 #' @return Cache size information
-#' @export
+#' @keywords internal
 check_quantify_cache_size <- function(corpus_obj,
                                        warn_threshold = "500 MB",
                                        max_threshold = "2 GB",
@@ -255,7 +255,7 @@ check_quantify_cache_size <- function(corpus_obj,
 #' @param max_threshold Maximum threshold (default: 5 GB)
 #' @param verbose Show messages
 #' @return Cache size information
-#' @export
+#' @keywords internal
 check_simulation_cache_size <- function(simulation_store,
                                          warn_threshold = "1 GB",
                                          max_threshold = "5 GB",
@@ -286,7 +286,7 @@ check_simulation_cache_size <- function(simulation_store,
 #' @param simulation_store Optional simulation store directory
 #' @param verbose Show messages
 #' @return List with all cache sizes
-#' @export
+#' @keywords internal
 #'
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
@@ -405,7 +405,7 @@ remove_old_cache_files <- function(cache_dir,
 #' @param dry_run If TRUE, only show what would be deleted
 #' @param verbose Show messages
 #' @return Number of files deleted
-#' @export
+#' @keywords internal
 clean_quantify_cache <- function(corpus_obj,
                                   days_old = 30,
                                   dry_run = FALSE,
@@ -428,7 +428,7 @@ clean_quantify_cache <- function(corpus_obj,
 #' @param dry_run If TRUE, only show what would be deleted
 #' @param verbose Show messages
 #' @return Number of files deleted
-#' @export
+#' @keywords internal
 clean_simulation_cache <- function(simulation_store,
                                     days_old = 30,
                                     dry_run = FALSE,
@@ -453,7 +453,7 @@ clean_simulation_cache <- function(simulation_store,
 #' @param dry_run If TRUE, only show what would be deleted
 #' @param verbose Show messages
 #' @return Named list with number of files deleted from each cache
-#' @export
+#' @keywords internal
 #'
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
@@ -522,7 +522,7 @@ get_quantify_cache_dir <- function(corpus_obj) {
 #' @param corpus_obj A corpus object
 #' @param cache_type Type of cache: "quantify" or "all" (same as "quantify")
 #' @return Data frame with cache file information
-#' @export
+#' @keywords internal
 #'
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")

@@ -22,3 +22,4 @@ stats <- cache_summary()
 print(stats)
 \dontshow{\}) # examplesIf}
 }
+\keyword{internal}

@@ -26,3 +26,4 @@ Cache size information
 \description{
 Check simulation cache sizes
 }
+\keyword{internal}

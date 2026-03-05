@@ -26,3 +26,4 @@ corp <- corpus("path/to/db_emuDB")
 check_all_cache_sizes(corp)
 \dontshow{\}) # examplesIf}
 }
+\keyword{internal}

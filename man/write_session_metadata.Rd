@@ -29,3 +29,4 @@ write_session_metadata(
 \description{
 Updates .meta_json file for a session and triggers CMDI sync if enabled
 }
+\keyword{internal}

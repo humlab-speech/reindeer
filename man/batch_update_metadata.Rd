@@ -18,3 +18,4 @@ batch_update_metadata(db_handle, updates, trigger_sync = TRUE, verbose = TRUE)
 \description{
 Update metadata for multiple bundles at once
 }
+\keyword{internal}

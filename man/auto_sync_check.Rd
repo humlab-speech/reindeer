@@ -7,7 +7,7 @@
 auto_sync_check(db_handle)
 }
 \arguments{
-\item{db_handle}{An emuDBhandle object}
+\item{db_handle}{An emuDBhandle or corpus S7 object}
 }
 \description{
 This function should be called after operations that modify the database

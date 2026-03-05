@@ -4,7 +4,14 @@
 \alias{corpus}
 \title{Corpus Class - Represents an EmuR database with persistent connection and metadata management}
 \usage{
-corpus(path, verbose = FALSE, create = FALSE)
+corpus(
+  path,
+  verbose = FALSE,
+  create = FALSE,
+  sync_eaf = FALSE,
+  sync_cmdi = FALSE,
+  cache_dir = NULL
+)
 }
 \arguments{
 \item{path}{Either a file path ending in '_emuDB' or an emuDBhandle object}
@@ -12,6 +19,12 @@ corpus(path, verbose = FALSE, create = FALSE)
 \item{verbose}{Show progress messages during construction}
 
 \item{create}{Logical; if TRUE and path doesn't exist, create a new database}
+
+\item{sync_eaf}{Logical; enable auto-sync of EAF files on annotation changes}
+
+\item{sync_cmdi}{Logical; enable auto-sync of CMDI metadata file on changes}
+
+\item{cache_dir}{Character; path to quantify cache dir (default: {basePath}/.quantify_cache)}
 }
 \value{
 A corpus object with access to database contents
@@ -28,6 +41,8 @@ annotations, metadata, and signal data stored in an Emu-SDMS database.
 \item{config}{Database configuration (DBconfig) loaded from JSON}
 \item{.uuid}{Database UUID for identification}
 \item{.connection}{Environment holding cached SQLite connection (reference semantics)}
+\item{.cache_dir}{Path to the quantify/enrich cache directory}
+\item{.sync}{Sync configuration list, or NULL if sync not configured}
 }
 }
 
@@ -35,6 +50,7 @@ annotations, metadata, and signal data stored in an Emu-SDMS database.
 
 \describe{
 \item{\code{corpus(path)}}{Create corpus from path or emuDBhandle}
+\item{\code{corpus(path, sync_eaf=TRUE)}}{Enable EAF auto-sync}
 \item{\code{corp["Session","Bundle"]}}{Get bundle metadata}
 \item{\code{corp["Session",]}}{Get all bundles in session}
 \item{\code{corp[,"Bundle"]}}{Get bundle across sessions (if unique)}

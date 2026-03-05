@@ -26,3 +26,4 @@ Cache size information
 \description{
 Check quantify/enrich persistent cache size
 }
+\keyword{internal}

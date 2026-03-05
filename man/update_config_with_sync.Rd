@@ -23,3 +23,4 @@ update_config_with_sync(
 \description{
 Wrapper for configuration updates that triggers CMDI sync
 }
+\keyword{internal}

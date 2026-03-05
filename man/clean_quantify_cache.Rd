@@ -26,3 +26,4 @@ Number of files deleted
 \description{
 Clean quantify/enrich cache
 }
+\keyword{internal}

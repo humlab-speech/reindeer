@@ -19,7 +19,7 @@
 #' @param trigger_sync Logical; trigger auto-sync after write (default TRUE)
 #' @param verbose Logical; show messages
 #'
-#' @export
+#' @keywords internal
 write_bundle_metadata <- function(db_handle,
                                    session,
                                    bundle,
@@ -81,7 +81,7 @@ write_bundle_metadata <- function(db_handle,
 #' @param trigger_sync Logical; trigger auto-sync after write (default TRUE)
 #' @param verbose Logical; show messages
 #'
-#' @export
+#' @keywords internal
 write_session_metadata <- function(db_handle,
                                     session,
                                     metadata,
@@ -212,7 +212,7 @@ save_annotation_with_sync <- function(db_handle,
 #' @param trigger_sync Logical; trigger auto-sync after adding
 #' @param verbose Logical; show messages
 #'
-#' @export
+#' @keywords internal
 add_session_with_sync <- function(db_handle,
                                    name,
                                    trigger_sync = TRUE,
@@ -256,7 +256,7 @@ add_session_with_sync <- function(db_handle,
 #' @param trigger_sync Logical; trigger auto-sync after removal
 #' @param verbose Logical; show messages
 #'
-#' @export
+#' @keywords internal
 remove_session_with_sync <- function(db_handle,
                                       name,
                                       trigger_sync = TRUE,
@@ -308,7 +308,7 @@ remove_session_with_sync <- function(db_handle,
 #' @param trigger_sync Logical; trigger auto-sync after update
 #' @param verbose Logical; show messages
 #'
-#' @export
+#' @keywords internal
 update_config_with_sync <- function(db_handle,
                                      config,
                                      trigger_sync = TRUE,
@@ -363,7 +363,7 @@ update_config_with_sync <- function(db_handle,
 #' @param trigger_sync Logical; trigger auto-sync after all updates
 #' @param verbose Logical; show progress
 #'
-#' @export
+#' @keywords internal
 batch_update_metadata <- function(db_handle,
                                    updates,
                                    trigger_sync = TRUE,

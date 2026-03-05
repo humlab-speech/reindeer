@@ -18,7 +18,7 @@ NULL
 #' stats <- cache_summary()
 #' print(stats)
 #'
-#' @export
+#' @keywords internal
 cache_summary <- function(cache_dir = NULL) {
   if (is.null(cache_dir)) {
     cache_dir <- file.path(tempdir(), "reindeer_cache")
@@ -104,7 +104,7 @@ cache_summary <- function(cache_dir = NULL) {
 #' # Clear only RDS format entries
 #' clear_cache(format = "rds")
 #'
-#' @export
+#' @keywords internal
 clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
   if (is.null(cache_dir)) {
     cache_dir <- file.path(tempdir(), "reindeer_cache")
@@ -156,130 +156,3 @@ clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
   invisible(to_delete)
 }
 
-#' Convert cache format
-#'
-#' Converts cache entries from RDS to qs format for improved performance.
-#' This requires the qs package to be installed.
-#'
-#' @param cache_dir Cache directory path. If NULL, uses default location.
-#' @param from_format Source format to convert from (default: "rds")
-#' @param to_format Target format to convert to (default: "qs")
-#' @param batch_size Number of entries to convert at once (default: 100)
-#'
-#' @examplesIf interactive()
-#' # Convert all RDS entries to qs
-#' convert_cache_format()
-#'
-#' # Convert with smaller batch size
-#' convert_cache_format(batch_size = 50)
-#'
-#' @export
-convert_cache_format <- function(cache_dir = NULL, 
-                                  from_format = "rds",
-                                  to_format = "qs",
-                                  batch_size = 100) {
-  
-  if (to_format == "qs" && !requireNamespace("qs", quietly = TRUE)) {
-    cli::cli_abort("qs package required for cache conversion. Install with: install.packages('qs')")
-  }
-  
-  if (is.null(cache_dir)) {
-    cache_dir <- file.path(tempdir(), "reindeer_cache")
-  }
-  
-  cache_file <- file.path(cache_dir, "quantify_cache.sqlite")
-  
-  if (!file.exists(cache_file)) {
-    cli::cli_alert_info("No cache found at {.path {cache_file}}")
-    return(invisible(NULL))
-  }
-  
-  conn <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
-  on.exit(DBI::dbDisconnect(conn), add = TRUE)
-  
-  # Get entries to convert
-  entries <- DBI::dbGetQuery(conn, sprintf("
-    SELECT cache_key, result_blob 
-    FROM cache 
-    WHERE format = '%s' OR format IS NULL
-  ", from_format))
-  
-  if (nrow(entries) == 0) {
-    cli::cli_alert_info("No entries to convert")
-    return(invisible(0))
-  }
-  
-  cli::cli_alert_info("Converting {nrow(entries)} cache entr{?y/ies} from {from_format} to {to_format}")
-  
-  # Process in batches
-  n_batches <- ceiling(nrow(entries) / batch_size)
-  converted <- 0
-  failed <- 0
-  
-  for (batch in seq_len(n_batches)) {
-    start_idx <- (batch - 1) * batch_size + 1
-    end_idx <- min(batch * batch_size, nrow(entries))
-    
-    cli::cli_progress_step(
-      "Processing batch {batch}/{n_batches}",
-      msg_done = "Batch {batch}/{n_batches} complete"
-    )
-    
-    for (i in start_idx:end_idx) {
-      tryCatch({
-        # Deserialize with old format
-        obj <- if (from_format == "rds") {
-          unserialize(entries$result_blob[[i]])
-        } else if (from_format == "qs") {
-          qs::qdeserialize(entries$result_blob[[i]])
-        }
-        
-        # Reserialize with new format
-        new_blob <- if (to_format == "qs") {
-          qs::qserialize(obj, preset = "fast")
-        } else {
-          serialize(obj, NULL)
-        }
-        
-        # Update in database
-        DBI::dbExecute(conn, "
-          UPDATE cache 
-          SET result_blob = ?, format = ?, size_bytes = ?
-          WHERE cache_key = ?
-        ", params = list(list(new_blob), to_format, length(new_blob), entries$cache_key[i]))
-        
-        converted <- converted + 1
-      }, error = function(e) {
-        if (batch == 1 && i == start_idx) {
-          cli::cli_alert_warning("Failed to convert entry: {entries$cache_key[i]}")
-          cli::cli_alert_info("Error: {conditionMessage(e)}")
-        }
-        failed <- failed + 1
-      })
-    }
-  }
-  
-  if (failed > 0) {
-    cli::cli_alert_warning("{failed} entr{?y/ies} failed to convert")
-  }
-  
-  cli::cli_alert_success("Successfully converted {converted} cache entr{?y/ies}")
-  
-  # Show size comparison
-  if (converted > 0) {
-    old_size <- sum(vapply(entries$result_blob, length, integer(1)))
-    new_stats <- DBI::dbGetQuery(conn, sprintf("
-      SELECT SUM(size_bytes) as total_size
-      FROM cache
-      WHERE format = '%s'
-    ", to_format))
-    new_size <- new_stats$total_size
-    
-    savings_pct <- round(100 * (1 - new_size / old_size), 1)
-    cli::cli_alert_info(
-      "Storage: {round(old_size / 1024^2, 1)} MB → {round(new_size / 1024^2, 1)} MB ({savings_pct}% savings)"
-    )
-  }
-  
-  invisible(converted)
-}

@@ -18,3 +18,4 @@ add_session_with_sync(db_handle, name, trigger_sync = TRUE, verbose = FALSE)
 \description{
 Wrapper for emuR::add_session that triggers CMDI sync
 }
+\keyword{internal}

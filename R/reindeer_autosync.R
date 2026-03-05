@@ -21,7 +21,7 @@
 #' @param cmdi_profile Character; CMDI profile to use ("media-corpus", "speech-corpus", "speech-corpus-dlu")
 #' @param verbose Logical; show sync messages
 #'
-#' @export
+#' @keywords internal
 enable_auto_sync <- function(db_handle, 
                               enable = TRUE,
                               sync_eaf = TRUE,
@@ -464,7 +464,7 @@ extract_cmdi_metadata <- function(cmdi_path) {
 #' @param force Logical; force sync even if no changes detected
 #' @param verbose Logical; show progress
 #'
-#' @export
+#' @keywords internal
 sync_database <- function(db_handle, 
                           sync_eaf = TRUE, 
                           sync_cmdi = TRUE,
@@ -560,22 +560,32 @@ sync_database <- function(db_handle,
 #'
 #' This function should be called after operations that modify the database
 #'
-#' @param db_handle An emuDBhandle object
+#' @param db_handle An emuDBhandle or corpus S7 object
 #' @keywords internal
 auto_sync_check <- function(db_handle) {
-  config <- load_sync_config(db_handle)
-  
+  # If corpus S7 object, read config from .sync property (avoid disk I/O)
+  if (S7::S7_inherits(db_handle, reindeer::corpus)) {
+    config <- db_handle@.sync
+  } else {
+    config <- load_sync_config(db_handle)
+  }
+
   if (is.null(config) || !config$enabled) {
     return(invisible(NULL))
   }
-  
+
+  # For corpus objects, we need an emuDBhandle-like object for the sync fns
+  if (S7::S7_inherits(db_handle, reindeer::corpus)) {
+    db_handle <- get_emuDBhandle(db_handle)
+  }
+
   # Run sync quietly
   sync_database(
     db_handle,
-    sync_eaf = config$sync_eaf,
-    sync_cmdi = config$sync_cmdi,
+    sync_eaf = isTRUE(config$sync_eaf),
+    sync_cmdi = isTRUE(config$sync_cmdi),
     force = FALSE,
-    verbose = config$verbose
+    verbose = isTRUE(config$verbose)
   )
 }
 
@@ -601,10 +611,63 @@ with_auto_sync <- function(db_handle, fun, ...) {
 #' @keywords internal
 load_sync_config_from_path <- function(basePath) {
   sync_config_path <- file.path(basePath, ".sync_config.json")
-  
+
   if (!file.exists(sync_config_path)) {
     return(NULL)
   }
-  
+
   jsonlite::read_json(sync_config_path)
+}
+
+#' Initialize or update sync configuration file
+#'
+#' @param basePath Path to database directory
+#' @param sync_eaf Logical; enable EAF sync
+#' @param sync_cmdi Logical; enable CMDI sync
+#' @param align_items Logical; for EAF sync, align ITEMs with time info
+#' @param cmdi_profile Character; CMDI profile name
+#' @param existing Existing sync config list to inherit optional fields from
+#' @return The written config list (invisibly)
+#' @keywords internal
+.init_sync_config <- function(basePath, sync_eaf, sync_cmdi,
+                               align_items = TRUE,
+                               cmdi_profile = "speech-corpus",
+                               existing = NULL) {
+  cfg <- list(
+    enabled    = TRUE,
+    sync_eaf   = sync_eaf,
+    sync_cmdi  = sync_cmdi,
+    align_items  = existing$align_items  %||% align_items,
+    cmdi_profile = existing$cmdi_profile %||% cmdi_profile
+  )
+  jsonlite::write_json(
+    cfg,
+    file.path(basePath, ".sync_config.json"),
+    pretty = TRUE, auto_unbox = TRUE
+  )
+  cfg
+}
+
+#' Disable automatic synchronization for a corpus
+#'
+#' Writes `enabled: false` to the corpus `.sync_config.json`. Re-enable by
+#' passing `sync_eaf = TRUE` or `sync_cmdi = TRUE` to `corpus()`.
+#'
+#' @param corpus_obj A corpus object
+#' @return The corpus object (invisibly)
+#'
+#' @export
+disable_sync <- function(corpus_obj) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
+    cli::cli_abort("{.arg corpus_obj} must be a corpus object")
+  }
+
+  path <- file.path(corpus_obj@basePath, ".sync_config.json")
+  cfg <- load_sync_config_from_path(corpus_obj@basePath) %||% list()
+  cfg$enabled <- FALSE
+  jsonlite::write_json(cfg, path, pretty = TRUE, auto_unbox = TRUE)
+  cli::cli_alert_info(
+    "Sync disabled. Re-enable: {.code corpus({.val {corpus_obj@basePath}}, sync_eaf=TRUE)}"
+  )
+  invisible(corpus_obj)
 }

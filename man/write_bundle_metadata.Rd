@@ -37,3 +37,4 @@ Write bundle metadata with auto-sync
 \details{
 Updates .meta_json file for a bundle and triggers CMDI sync if enabled
 }
+\keyword{internal}

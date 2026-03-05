@@ -17,7 +17,7 @@
 #' @param .parallel Logical; use parallel processing (default TRUE)
 #' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
 #' @param .use_cache Logical; enable persistent caching of processed bundles (default FALSE)
-#' @param .cache_dir Character; cache directory path (default: tempdir()/reindeer_cache)
+#' @param .cache_dir Character; cache directory path (default: corpus@.cache_dir, i.e. {basePath}/.quantify_cache)
 #' @param .cache_format Character; serialization format - "auto", "qs", or "rds"
 #' 
 #' @return The corpus object (invisibly), with new SSFF track files created
@@ -155,7 +155,8 @@ enrich <- function(corpus_obj, .using, ...,
   # Setup persistent cache if requested
   cache_conn <- NULL
   if (.use_cache) {
-    cache_conn <- .get_persistent_cache_connection(.cache_dir, verbose = .verbose)
+    resolved_cache_dir <- .cache_dir %||% corpus_obj@.cache_dir
+    cache_conn <- .get_persistent_cache_connection(resolved_cache_dir, verbose = .verbose)
   }
 
   # Define processing function

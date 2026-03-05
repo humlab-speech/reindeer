@@ -42,7 +42,7 @@ Default: NULL (uses mediafileExtension from corpus config)}
 
 \item{.use_cache}{Logical; enable persistent caching of processed bundles (default FALSE)}
 
-\item{.cache_dir}{Character; cache directory path (default: tempdir()/reindeer_cache)}
+\item{.cache_dir}{Character; cache directory path (default: corpus@.cache_dir, i.e. {basePath}/.quantify_cache)}
 
 \item{.cache_format}{Character; serialization format - "auto", "qs", or "rds"}
 }

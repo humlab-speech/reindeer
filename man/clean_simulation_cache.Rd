@@ -26,3 +26,4 @@ Number of files deleted
 \description{
 Clean simulation cache
 }
+\keyword{internal}

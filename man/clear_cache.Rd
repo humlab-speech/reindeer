@@ -28,3 +28,4 @@ clear_cache(older_than = 30)
 clear_cache(format = "rds")
 \dontshow{\}) # examplesIf}
 }
+\keyword{internal}

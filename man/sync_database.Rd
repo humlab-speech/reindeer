@@ -26,3 +26,4 @@ sync_database(
 \description{
 Manually trigger synchronization
 }
+\keyword{internal}

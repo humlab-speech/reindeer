@@ -10,6 +10,9 @@
 #' @param path Either a file path ending in '_emuDB' or an emuDBhandle object
 #' @param verbose Show progress messages during construction
 #' @param create Logical; if TRUE and path doesn't exist, create a new database
+#' @param sync_eaf Logical; enable auto-sync of EAF files on annotation changes
+#' @param sync_cmdi Logical; enable auto-sync of CMDI metadata file on changes
+#' @param cache_dir Character; path to quantify cache dir (default: {basePath}/.quantify_cache)
 #'
 #' @returns A corpus object with access to database contents
 #'
@@ -20,11 +23,14 @@
 #'   \item{config}{Database configuration (DBconfig) loaded from JSON}
 #'   \item{.uuid}{Database UUID for identification}
 #'   \item{.connection}{Environment holding cached SQLite connection (reference semantics)}
+#'   \item{.cache_dir}{Path to the quantify/enrich cache directory}
+#'   \item{.sync}{Sync configuration list, or NULL if sync not configured}
 #' }
 #'
 #' @section Usage:
 #' \describe{
 #'   \item{`corpus(path)`}{Create corpus from path or emuDBhandle}
+#'   \item{`corpus(path, sync_eaf=TRUE)`}{Enable EAF auto-sync}
 #'   \item{`corp["Session","Bundle"]`}{Get bundle metadata}
 #'   \item{`corp["Session",]`}{Get all bundles in session}
 #'   \item{`corp[,"Bundle"]`}{Get bundle across sessions (if unique)}
@@ -42,9 +48,13 @@ corpus <- S7::new_class(
     basePath = S7::class_character,
     config = S7::class_any,
     .uuid = S7::class_character,
-    .connection = S7::class_any
+    .connection = S7::class_any,
+    .cache_dir = S7::class_character,
+    .sync = S7::class_any
   ),
-  constructor = function(path, verbose = FALSE, create = FALSE) {
+  constructor = function(path, verbose = FALSE, create = FALSE,
+                         sync_eaf = FALSE, sync_cmdi = FALSE,
+                         cache_dir = NULL) {
     # Input validation with assertthat
     assertthat::assert_that(
       !is.null(path),
@@ -123,6 +133,22 @@ corpus <- S7::new_class(
     # Load configuration
     config <- load_DBconfig(basePath)
 
+    # Resolve cache directory
+    resolved_cache_dir <- cache_dir %||% file.path(basePath, ".quantify_cache")
+
+    # Handle sync configuration
+    if (sync_eaf || sync_cmdi) {
+      existing_sync <- load_sync_config_from_path(basePath)
+      sync_config <- .init_sync_config(basePath, sync_eaf, sync_cmdi,
+                                        existing = existing_sync)
+    } else {
+      sync_config <- load_sync_config_from_path(basePath)
+    }
+
+    if (!is.null(sync_config) && sync_config$enabled && verbose) {
+      cli::cli_alert_info("Auto-sync is enabled for this database")
+    }
+
     # Create corpus object
     corpus_obj <- S7::new_object(
       S7::S7_object(),
@@ -130,18 +156,14 @@ corpus <- S7::new_class(
       basePath = basePath,
       config = config,
       .uuid = config$UUID,
-      .connection = new.env(parent = emptyenv())
+      .connection = new.env(parent = emptyenv()),
+      .cache_dir = resolved_cache_dir,
+      .sync = sync_config
     )
-    
+
     # Add "corpus" as FIRST class for S3 method dispatch priority
     # This allows [<-.corpus to work, taking precedence over S7's subsettability check
     class(corpus_obj) <- c("corpus", class(corpus_obj))
-
-    # Check for auto-sync on load
-    sync_config <- load_sync_config_from_path(basePath)
-    if (!is.null(sync_config) && sync_config$enabled && verbose) {
-      cli::cli_alert_info("Auto-sync is enabled for this database")
-    }
 
     # Gather metadata after object creation
     con <- get_or_create_connection(corpus_obj)

@@ -41,3 +41,4 @@ The system uses file modification timestamps and MD5 checksums to detect changes
 and trigger appropriate updates.
 Enable or disable automatic synchronization
 }
+\keyword{internal}
