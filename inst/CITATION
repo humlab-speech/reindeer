@@ -1,0 +1,18 @@
+bibentry(
+  bibtype = "Manual",
+  title = "reindeer: Extend emuR for Speech Data in a Nordic Climate",
+  author = c(
+    person("Fredrik", "Nylén", role = c("aut", "cre"),
+           email = "fredrik.nylen@umu.se",
+           comment = c(ORCID = "0000-0003-3373-0934"))
+  ),
+  year = 2026,
+  note = "R package version 0.4.1",
+  url = "https://github.com/humlab-speech/reindeer",
+
+  textVersion =
+  paste("Nylén, Fredrik (2026).",
+        "reindeer: Extend emuR for Speech Data in a Nordic Climate.",
+        "R package version 0.4.1.",
+        "https://github.com/humlab-speech/reindeer")
+)
