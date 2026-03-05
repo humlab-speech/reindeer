@@ -750,3 +750,22 @@ if(FALSE){
   cfg <- load_DBconfig(corpusObj)
 
 }
+
+# ==============================================================================
+# TEST HELPERS (internal)
+# ==============================================================================
+
+#' Create the ae demo database for testing
+#'
+#' Creates the emuR demo database in a temp directory and returns its path.
+#' Used internally by tests and examples.
+#'
+#' @param verbose Logical; show progress
+#' @return Character path to the ae_emuDB directory
+#' @keywords internal
+create_ae_db <- function(verbose = FALSE) {
+  tmp_dir <- tempfile("reindeer_ae_")
+  dir.create(tmp_dir, recursive = TRUE)
+  suppressMessages(emuR::create_emuRdemoData(dir = tmp_dir))
+  file.path(tmp_dir, "emuR_demoData", "ae_emuDB")
+}

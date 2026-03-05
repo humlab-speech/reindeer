@@ -247,7 +247,7 @@ clear_tidy_cache <- function() {
 #' 
 #' @noRd
 #' @keywords internal
-..get_persistent_cache_connection <- function(cache_dir = NULL, verbose = TRUE) {
+.get_persistent_cache_connection <- function(cache_dir = NULL, verbose = TRUE) {
   if (is.null(cache_dir)) {
     cache_dir <- file.path(tempdir(), "reindeer_cache")
   }
@@ -397,7 +397,7 @@ clear_tidy_cache <- function() {
   total_size_query <- "SELECT SUM(size_bytes) as total FROM cache"
   total_size <- DBI::dbGetQuery(conn, total_size_query)$total
   
-  if (!is.null(total_size) && total_size > max_cache_size_mb * 1024^2) {
+  if (isTRUE(total_size > max_cache_size_mb * 1024^2)) {
     # Remove oldest 25% of entries
     remove_query <- "
       DELETE FROM cache 

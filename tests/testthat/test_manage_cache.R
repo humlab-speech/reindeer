@@ -107,9 +107,6 @@ test_that("manage_cache list action works", {
   quantify_files <- manage_cache(corp, action = "list", cache_type = "quantify")
   expect_true(is.data.frame(quantify_files))
 
-  draft_files <- manage_cache(corp, action = "list", cache_type = "draft")
-  expect_true(is.data.frame(draft_files))
-
   # Clean up
   unlink(db_path, recursive = TRUE)
 })
@@ -175,10 +172,10 @@ test_that("corpus constructor validates inputs", {
     "does not exist"
   )
 
-  # Test path without _emuDB suffix
+  # Test path without _emuDB suffix (auto-appends _emuDB, then fails as non-existent)
   expect_error(
     corpus(tempdir()),
-    "should end with '_emuDB'"
+    "does not exist"
   )
 
   # Test invalid verbose
@@ -235,10 +232,9 @@ test_that("quantify validates inputs with assertthat", {
     sample_rate = 44100
   ), db_path = db_path)
 
-  # Test invalid object type
+  # Test invalid object type (S7 dispatch error for non-segment_list)
   expect_error(
-    quantify(data.frame(x = 1:10), function(x) x),
-    "object must be a segment_list"
+    quantify(data.frame(x = 1:10), function(x) x)
   )
 
   # Test invalid dsp_function
@@ -289,90 +285,7 @@ test_that("quantify validates inputs with assertthat", {
   unlink(db_path, recursive = TRUE)
 })
 
-test_that("store_draft_annotations validates inputs", {
-  temp_cache <- tempfile(fileext = ".sqlite")
-  on.exit(unlink(temp_cache))
-
-  con <- reindeer:::initialize_draft_cache(temp_cache, "test_function")
-
-  test_annot <- data.frame(start = 100, end = 200, label = "a")
-  params <- list(param1 = 10)
-
-  # Test invalid connection
-  expect_error(
-    reindeer:::store_draft_annotations(
-      "not_a_connection", "S1", "B1", "L1", "SEGMENT", "A1",
-      test_annot, params
-    ),
-    "con must be a SQLite database connection"
-  )
-
-  # Test invalid strings
-  expect_error(
-    reindeer:::store_draft_annotations(
-      con, 123, "B1", "L1", "SEGMENT", "A1",
-      test_annot, params
-    ),
-    "must be character strings"
-  )
-
-  # Test invalid parameters
-  expect_error(
-    reindeer:::store_draft_annotations(
-      con, "S1", "B1", "L1", "SEGMENT", "A1",
-      test_annot, "not_a_list"
-    ),
-    "parameters must be a list"
-  )
-
-  # Test invalid error_occurred flag
-  expect_error(
-    reindeer:::store_draft_annotations(
-      con, "S1", "B1", "L1", "SEGMENT", "A1",
-      test_annot, params,
-      error_occurred = "yes"
-    ),
-    "error_occurred must be TRUE or FALSE"
-  )
-
-  # Test error_occurred=TRUE requires error_message
-  expect_error(
-    reindeer:::store_draft_annotations(
-      con, "S1", "B1", "L1", "SEGMENT", "A1",
-      NULL, params,
-      error_occurred = TRUE,
-      error_message = NULL
-    ),
-    "error_message must be provided when error_occurred is TRUE"
-  )
-
-  # Test error_occurred=FALSE requires annotations
-  expect_error(
-    reindeer:::store_draft_annotations(
-      con, "S1", "B1", "L1", "SEGMENT", "A1",
-      NULL, params,
-      error_occurred = FALSE
-    ),
-    "annotations must be provided when error_occurred is FALSE"
-  )
-
-  DBI::dbDisconnect(con)
-})
-
-test_that("initialize_draft_cache validates inputs", {
-  # Test invalid cache_path
-  expect_error(
-    reindeer:::initialize_draft_cache(123, "test_function"),
-    "cache_path must be a character string"
-  )
-
-  # Test invalid draft_function_name
-  temp_cache <- tempfile(fileext = ".sqlite")
-  expect_error(
-    reindeer:::initialize_draft_cache(temp_cache, 123),
-    "draft_function_name must be a character string"
-  )
-})
+# store_draft_annotations / initialize_draft_cache moved to protoscribe package
 
 test_that("Edge case: empty segment_list", {
   skip_if_not_installed("emuR")
@@ -448,8 +361,8 @@ test_that("Edge case: segment_list with single segment", {
     sample_rate = 44100
   ), db_path = db_path)
 
-  # Should work without error
-  expect_s3_class(single_seg, "segment_list")
+  # Should work without error (S7 class name is "reindeer::segment_list")
+  expect_true(S7::S7_inherits(single_seg, segment_list))
   expect_equal(nrow(single_seg), 1)
 
   # Clean up
