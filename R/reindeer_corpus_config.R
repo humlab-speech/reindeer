@@ -766,6 +766,10 @@ if(FALSE){
 create_ae_db <- function(verbose = FALSE) {
   tmp_dir <- tempfile("reindeer_ae_")
   dir.create(tmp_dir, recursive = TRUE)
-  suppressMessages(emuR::create_emuRdemoData(dir = tmp_dir))
+  if (verbose) {
+    emuR::create_emuRdemoData(dir = tmp_dir)
+  } else {
+    suppressMessages(emuR::create_emuRdemoData(dir = tmp_dir))
+  }
   file.path(tmp_dir, "emuR_demoData", "ae_emuDB")
 }
