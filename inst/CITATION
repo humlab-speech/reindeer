@@ -7,12 +7,12 @@ bibentry(
            comment = c(ORCID = "0000-0003-3373-0934"))
   ),
   year = 2026,
-  note = "R package version 0.4.8",
+  note = "R package version 0.4.9",
   url = "https://github.com/humlab-speech/reindeer",
 
   textVersion =
   paste("Nylén, Fredrik (2026).",
         "reindeer: Extend emuR for Speech Data in a Nordic Climate.",
-        "R package version 0.4.8.",
+        "R package version 0.4.9.",
         "https://github.com/humlab-speech/reindeer")
 )

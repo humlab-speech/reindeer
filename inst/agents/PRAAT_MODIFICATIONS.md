@@ -3,7 +3,7 @@
 This document tracks the origin, version, and modification status of all Praat
 scripts and related code bundled with the reindeer package.
 
-Last updated: 2026-03-09 (reindeer v0.4.8)
+Last updated: 2026-03-09 (reindeer v0.4.9)
 
 ## Overview
 
@@ -250,15 +250,22 @@ spectral tilt measures.
 
 **Functions:**
 
-| Function | Lines | Reimplements |
+| Function | Lines | Reimplements / Purpose |
 |---|---|---|
+| `intsint_linear()` | 38-40 | Helper: semitone → Hz (`pow(2, x)`) |
+| `intsint_octave()` | 42-43 | Helper: Hz → semitone (`log2(x)`) |
+| `intsint_round()` | 45-46 | Helper: round half-up |
+| `getSound()` | 48-58 | Load audio file or segment via parselmouth |
 | `automatic_min_max_fo()` | 61-68 | Hirst's `automatic_min_max_f0.praat` |
 | `momel()` | 72-96 | Wraps momel binary via subprocess/stdin |
 | `code_with_intsint()` | 98-132 | Wraps modified `intsint.pl` via subprocess/stdin |
-| `spectral_tilt()` | 263-331 | Ported from praatsauce/OpenSauce |
-| `prosody_index()` | 346-381 | Orchestration: all of the above combined |
+| `correct_iseli_z()` | 137-146 | Ported from praatsauce/OpenSauce: Iseli-Alwan correction |
+| `getbw_HawksMiller()` | 150-? | Ported from praatsauce/OpenSauce: Hawks-Miller bandwidth |
 | `correction_iseli_i()` | 163-200 | Iseli-Alwan harmonic amplitude correction |
 | `bandwidth_hawks_miller()` | 202-258 | Hawks-Miller bandwidth estimation |
+| `spectral_tilt()` | 263-331 | Ported from praatsauce/OpenSauce |
+| `prosody_index_old()` | 334-343 | Dead code — has type errors (see Known Issues) |
+| `prosody_index()` | 346-381 | Orchestration: all of the above combined |
 
 **Dependencies:** parselmouth, numpy, scipy, pandas
 
@@ -272,9 +279,60 @@ spectral tilt measures.
 - Hawks & Miller 1995 (formant bandwidth estimation)
 - Iseli & Alwan (harmonic magnitude correction)
 
-**OpenSauce attribution:** `correction_iseli_i()` and `bandwidth_hawks_miller()`
-explicitly cite their port from
+**OpenSauce attribution:** `correct_iseli_z()`, `correction_iseli_i()` and
+`bandwidth_hawks_miller()` / `getbw_HawksMiller()` are ported from
 [OpenSauce](https://github.com/voicesauce/opensauce-python) (lines 181, 219).
+
+### Known Issues in momelintsint.py
+
+**1. Live executable code at lines 400-408 (CRITICAL)**
+
+Lines 400-408 are not inside any function or `if __name__ == "__main__"` guard.
+They run unconditionally on `import`:
+
+```python
+li = glob.glob("/Users/frkkan96/Documents/forskning/Parkinson/...", recursive=True)
+ti = time.time()
+df = pd.DataFrame(li, ...)
+df = df.head(5)
+dfout = df.apply(lambda x: prosody_index(x['soundPath']), ...)
+print(time.time()-ti)
+```
+
+This will fail on any machine other than the author's (the hardcoded path does
+not exist), but will silently produce an empty DataFrame rather than an error if
+the glob returns nothing. **Do not import this module directly** without wrapping
+in a subprocess or moving lines 400-408 behind a guard.
+
+**2. Linux binary naming mismatch (line 79)**
+
+The `momel()` function selects the binary as:
+```python
+momel_exec = "./momel_linux_intel"   # line 79
+```
+But the actual bundled binary (in both `inst/pymomelintsint/` and
+`inst/praat/Momel-Intsint/plugin_momel-intsint/analysis/`) is named
+`momel_linux`, not `momel_linux_intel`. Running `momel()` on Linux will raise
+`FileNotFoundError`. Fix: rename binary or change line 79.
+
+**3. Hardcoded path in `getSound()` (line 55)**
+
+When `beginTime` or `endTime` is non-zero, `getSound()` ignores the `file`
+argument and opens a hardcoded path:
+```python
+ls = parselmouth.praat.call("Open long sound file", "~/Desktop/input/test.wav")
+```
+This is clearly a development artifact. `getSound()` with time arguments is
+broken on all machines.
+
+**4. `prosody_index_old()` type errors (lines 334-343)**
+
+`prosody_index_old()` references variables in the wrong order:
+- Line 340: `intensityObj` used before it is assigned
+- Line 343: `snd` is not a parameter of this function (should be `sound`)
+
+This function is dead code (never called from R or `prosody_index()`), but it
+will raise `NameError` if invoked.
 
 ### python_only_momelintsint.py (215 lines)
 
@@ -322,6 +380,9 @@ temporary file I/O overhead.
   H1-A1, H1-A2, H1-A3 computation)
 - **Note:** Contains Windows-specific paths. Likely included as reference
   material for the spectral tilt implementation. Provenance unclear.
+- **Known issues:** Undefined variable `snd` used at line 343;
+  `intensityObj` referenced before assignment at line 343. Script is
+  reference-only and should not be executed.
 
 ---
 

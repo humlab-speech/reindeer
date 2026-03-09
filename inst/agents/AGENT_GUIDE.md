@@ -28,6 +28,11 @@ corpus@dbName
 corpus@config
 ```
 
+**S7 class checks**: Use `S7::S7_inherits(x, segment_list)`, NOT
+`inherits(x, "segment_list")`. S7 uses namespaced class names at runtime.
+Helper predicates `is_segment_list(x)` and `is_extended_segment_list(x)` are
+also exported.
+
 ### Key User-Facing Functions
 
 ```r
@@ -41,9 +46,9 @@ segs <- ask_for(corp, "[Phonetic == t -> Phonetic == s]")      # sequence
 segs <- ask_for(corp, "[Phonetic == t ^ Syllable == stressed]") # dominance
 
 # Apply DSP to segments (returns extended_segment_list)
-formants <- quantify(segs, superassp::forest)
-formants <- quantify(segs, superassp::forest, .at = 0.5)         # midpoint
-formants <- quantify(segs, superassp::forest, .use_cache = TRUE)  # cached
+formants <- quantify(segs, dsp_function = superassp::forest)
+formants <- quantify(segs, dsp_function = superassp::forest, .at = 0.5)        # midpoint
+formants <- quantify(segs, dsp_function = superassp::forest, .use_cache = TRUE) # cached
 
 # Apply DSP to whole corpus (writes SSFF track files)
 enrich(corp, .using = superassp::forest)
@@ -54,6 +59,22 @@ get_metadata(corp)
 add_metadata(corp, list(Age = 25, Gender = "Male"), session = "S1", bundle = "B1")
 biographize(segs, corp)   # enrich segment_list with metadata columns
 
+# Sequence navigation (move forward/backward relative to query results)
+next_phone <- scout(segs, steps_forward = 1)        # next item in tier
+prev_phone <- scout(segs, steps_forward = -1)       # previous item
+context     <- scout(segs, steps_forward = 1, capture = 2)  # capture 2 items
+retreat(segs, steps_backward = 1)                   # alias: move backward
+ascend_to(segs, level = "Syllable")                 # navigate up in hierarchy
+descend_to(segs, level = "Phonetic")                # navigate down in hierarchy
+
+# Corpus inspection
+peek_signals(corp)                     # list available SSFF signal tracks
+peek_signals(corp, extension = "fms")  # filter by extension
+
+# Cache management
+manage_cache(corp, action = "check")   # check cache health
+manage_cache(corp, action = "clean")   # remove old cache files
+
 # Serve interactive annotation UI
 serve(corp)
 ```
@@ -62,15 +83,17 @@ serve(corp)
 
 ```
 corpus --> enrich(.using = dsp_func)     --> SSFF files in bundle dirs
-segment_list --> quantify(dsp_func)      --> extended_segment_list with measurements
+segment_list --> quantify(dsp_function)  --> extended_segment_list with measurements
 ```
 
 Both `enrich()` and `quantify()` support:
 - **Metadata-driven parameters**: Age/Gender metadata automatically maps to
   DSP function parameters (formant settings, pitch range, etc.) via
-  `derive_dsp_parameters()` in `R/reindeer_enrich.R:277`
+  `derive_dsp_parameters()` in `R/reindeer_enrich.R`
 - **Persistent caching**: `.use_cache = TRUE` stores results in SQLite
 - **Parallel processing**: `.parallel = TRUE` (default) via `future`/`furrr`
+- **Cache format**: `.cache_format = "auto"` uses `qs` if available (faster,
+  smaller), falls back to base R serialize
 
 ### Parameter Derivation from Metadata
 
@@ -101,6 +124,7 @@ quantify_simulate(
 
 list_simulations("simulations/formants")
 reminisce("simulations/formants", simulation_id = "...")
+reminisce_tracks(corp, simulation_store = "simulations/formants")
 ```
 
 ## Bundled Praat Scripts
@@ -127,10 +151,16 @@ MOMEL/INTSINT pipeline:
 
 | File | Purpose |
 |---|---|
-| `momelintsint.py` | Full reimplementation: `automatic_min_max_fo()`, `momel()`, `code_with_intsint()`, `spectral_tilt()`, `prosody_index()` |
-| `python_only_momelintsint.py` | Pure Python INTSINT optimizer (no Perl dependency) |
+| `momelintsint.py` | Full reimplementation: `automatic_min_max_fo()`, `momel()`, `code_with_intsint()`, `spectral_tilt()`, `prosody_index()`, plus Iseli-Alwan and Hawks-Miller helpers |
+| `python_only_momelintsint.py` | Pure Python INTSINT optimizer (no Perl dependency); Swedish-language comments; development/exploratory |
 | `intsint.pl` | Modified v2.12 of Hirst's Perl INTSINT (STDIN/STDOUT I/O instead of file-based) |
 | `orig_intsint.pl` | Preserved original v2.11 for reference |
+| `scriptPharyFullV3.praat` | Pharyngealization analysis reference (unknown provenance; Windows paths; included for reference only) |
+
+**Note:** `momelintsint.py` ends with live executable code (lines 400-408)
+with hardcoded corpus paths. These lines run when the module is imported and
+will fail in any environment other than the original author's machine. Wrap
+imports in `if __name__ == "__main__":` or refactor before using as a module.
 
 See `PRAAT_MODIFICATIONS.md` for detailed provenance and modification history.
 
@@ -182,7 +212,9 @@ For faithful reimplementation, use `wrassp` (bundled with emuR) or
 
 ### 4. Write the R Function
 
-Follow this template for a `quantify()`-compatible DSP function:
+The `quantify()` S7 generic dispatches on a `segment_list` first argument.
+The `dsp_function` argument must follow the `wrassp`/`superassp` calling
+convention: `f(listOfFiles, beginTime, endTime, ...)`.
 
 ```r
 #' My reimplemented DSP function
@@ -193,7 +225,6 @@ Follow this template for a `quantify()`-compatible DSP function:
 #' @param ... Additional parameters
 #' @return An SSFF (Simple Signal File Format) object, or a data.frame
 my_dsp_function <- function(listOfFiles, beginTime = 0, endTime = 0, ...) {
-  # Process each file
   results <- lapply(listOfFiles, function(f) {
     # Read audio
     snd <- wrassp::read.AsspDataObj(f)
@@ -220,9 +251,9 @@ my_dsp_function <- function(listOfFiles, beginTime = 0, endTime = 0, ...) {
 Once your function follows the `listOfFiles` calling convention:
 
 ```r
-# Use with quantify (per-segment)
+# Use with quantify (per-segment) -- note: dsp_function is the second argument
 segs <- ask_for(corp, "Phonetic == t")
-results <- quantify(segs, my_dsp_function, .use_cache = TRUE)
+results <- quantify(segs, dsp_function = my_dsp_function, .use_cache = TRUE)
 
 # Use with enrich (whole corpus)
 enrich(corp, .using = my_dsp_function, .force = TRUE)
@@ -254,7 +285,7 @@ The script detects periodic peaks and measures intensity at each peak.
 
 **Praat algorithm:**
 1. `To Intensity: minimum_f0, 0.0, 1` -- intensity contour
-2. `To PointProcess (periodic, peaks): minimum_f0, maximum_f0, 1, 0` -- peak detection
+2. `To PointProcess (periodic, peaks): min_f0, max_f0, 1, 0` -- peak detection
 3. For each peak: query intensity at that time
 
 **R reimplementation approach:**
@@ -278,7 +309,7 @@ pp <- praat$praat$call(snd, "To PointProcess (periodic, peaks)",
 **Praat algorithm:**
 1. `To Intensity: minimum_pitch, 0, "yes"` -- intensity contour
 2. `To TextGrid (silences): threshold, min_silent, min_sounding, C, V` -- segment
-3. Identify DDK sequence boundaries from coarser silence detection
+3. Identify DDK sequence boundaries from coarser silence detection (-25 dB)
 4. Output timing table
 
 **R reimplementation approach:**
@@ -321,19 +352,16 @@ The spectral tilt implementation in `momelintsint.py::spectral_tilt()` ports
 algorithms from OpenSauce/praatsauce:
 
 **Measures computed:**
-- H1-H2 (raw and Iseli-Alwan corrected)
-- H1*-A3* (corrected harmonic-to-formant amplitude)
+- H1-H2 (raw `L2L1` and Iseli-Alwan corrected `L2cL1c`)
+- H1*-A3* (corrected `L1cLF3c`, uncorrected `L1LF3`)
 - Spectral balance (0-500 Hz vs 500-1000 Hz energy ratio)
-- SLF (spectral linear fit 100-5000 Hz)
+- SLF (spectral linear fit 100-5000 Hz, logarithmic)
 - C1 (first MFCC coefficient -- spectral tilt proxy)
 
-**R reimplementation:**
-```r
-# Use wrassp for base measurements
-formants <- wrassp::forest("file.wav")
-spectrum <- stats::spectrum(audio_vector, plot = FALSE)
+**Key helper functions (port these to R):**
 
-# Iseli-Alwan correction (port from momelintsint.py lines 163-200)
+`correction_iseli_i()` (lines 163-200) -- Iseli-Alwan harmonic amplitude correction:
+```r
 correction_iseli_i <- function(f, F_i, B_i, fs) {
   r_i <- exp(-pi * B_i / fs)
   omega_i <- 2 * pi * F_i / fs
@@ -343,13 +371,23 @@ correction_iseli_i <- function(f, F_i, B_i, fs) {
   denom_factor2 <- r_i^2 + 1 - 2 * r_i * cos(omega_i - omega)
   20 * log10(numerator_sqrt) - 10 * log10(denom_factor1) - 10 * log10(denom_factor2)
 }
+```
 
-# Hawks-Miller bandwidth estimation (port from momelintsint.py lines 202-258)
+`bandwidth_hawks_miller()` (lines 202-258) -- Hawks-Miller bandwidth estimation:
+```r
 bandwidth_hawks_miller <- function(F_i, F0) {
   S <- 1 + 0.25 * (F0 - 132) / 88
-  # ... see momelintsint.py for full coefficients
+  C1 <- c(165.327516, -6.73636734e-1, 1.80874446e-3, -4.52201682e-6, 7.49514000e-9, -4.70219241e-12)
+  C2 <- c(15.8146139, 8.10159009e-2, -9.79728215e-5, 5.28725064e-8, -1.07099364e-11, 7.91528509e-16)
+  # Evaluate 5th-order polynomial, choose C1 or C2 based on F_i < 500
+  coef <- ifelse(F_i < 500, C1, C2)  # simplified; full version uses matrix ops
+  S * sum(coef * F_i^(0:5))
 }
 ```
+
+Note also `correct_iseli_z()` (lines 137-146), an older scalar version of the
+same correction that is NOT vectorized. Use `correction_iseli_i()` (vectorized)
+for production code.
 
 ## Psychoacoustic Scales
 
@@ -380,6 +418,8 @@ Rscript -e "devtools::check()"
 Tests use the `ae` demo database from emuR: `reindeer:::create_ae_db()` returns
 a path to a temporary database.
 
+Current test status (v0.4.9): 0 failures, 1407 passing, 50 skips (all intentional).
+
 ## Dependencies
 
 **Required (Imports):** S7, data.table, DBI, RSQLite, wrassp, cli, digest,
@@ -398,6 +438,7 @@ remotes::install_github("humlab-speech/superassp")
 
 1. **S7 class checks**: Use `S7::S7_inherits(x, segment_list)`, NOT
    `inherits(x, "segment_list")`. S7 uses namespaced class names at runtime.
+   Use `is_segment_list()` / `is_extended_segment_list()` for convenience.
 
 2. **corpus constructor**: `corpus("path")` expects a path ending in `_emuDB`.
    It auto-appends the suffix if missing.
@@ -417,3 +458,18 @@ remotes::install_github("humlab-speech/superassp")
 
 6. **SQL security**: All queries use parameterized SQL. Never concatenate user
    input into SQL strings.
+
+7. **quantify() argument names**: `dsp_function` is the second argument name.
+   Using positional form `quantify(segs, superassp::forest)` works but naming
+   it explicitly (`dsp_function = superassp::forest`) is safer against future
+   signature changes.
+
+8. **momelintsint.py module import**: The file ends with live executable code
+   (lines 400-408) including a `glob.glob()` call to hardcoded paths. This code
+   runs on import. Do not `import momelintsint` directly; extract only the
+   needed functions, or add a `if __name__ == "__main__":` guard first.
+
+9. **momel binary naming**: In `momelintsint.py` the Linux binary is referenced
+   as `momel_linux_intel` (line 79), but the actual file in
+   `plugin_momel-intsint/analysis/` is named `momel_linux`. Ensure the binary
+   path is resolved correctly when deploying on Linux.
