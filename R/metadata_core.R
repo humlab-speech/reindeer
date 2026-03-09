@@ -451,7 +451,7 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
     WITH all_metadata AS (
       -- Bundle-level metadata
       SELECT
-        session, bundle, field_name, field_value, 1 as priority
+        session, bundle, field_name, field_value, field_type, 1 as priority
       FROM metadata_bundle
       WHERE db_uuid = ?
 
@@ -459,7 +459,7 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
 
       -- Session-level metadata
       SELECT
-        ms.session, b.name as bundle, ms.field_name, ms.field_value, 2 as priority
+        ms.session, b.name as bundle, ms.field_name, ms.field_value, ms.field_type, 2 as priority
       FROM metadata_session ms
       CROSS JOIN bundle b
       WHERE ms.db_uuid = ? AND b.db_uuid = ? AND b.session = ms.session
@@ -468,18 +468,18 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
 
       -- Database-level metadata
       SELECT
-        b.session, b.name as bundle, md.field_name, md.field_value, 3 as priority
+        b.session, b.name as bundle, md.field_name, md.field_value, md.field_type, 3 as priority
       FROM metadata_database md
       CROSS JOIN bundle b
       WHERE md.db_uuid = ? AND b.db_uuid = ?
     ),
     ranked_metadata AS (
       SELECT
-        session, bundle, field_name, field_value,
+        session, bundle, field_name, field_value, field_type,
         ROW_NUMBER() OVER (PARTITION BY session, bundle, field_name ORDER BY priority) as rn
       FROM all_metadata
     )
-    SELECT session, bundle, field_name, field_value
+    SELECT session, bundle, field_name, field_value, field_type
     FROM ranked_metadata
     WHERE rn = 1
   "
@@ -495,6 +495,13 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
     return(tibble::as_tibble(bundles_dt[, .(session, bundle)]))
   }
   
+  # Build a type lookup: field_name -> field_type (take first non-NA type per field)
+  type_lookup <- metadata_long[
+    !is.na(field_type) & field_type != "",
+    .(field_type = field_type[1]),
+    by = field_name
+  ]
+  
   # Convert from long to wide format using data.table's dcast (very fast)
   metadata_wide <- data.table::dcast(
     metadata_long,
@@ -502,6 +509,30 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
     value.var = "field_value",
     fun.aggregate = function(x) x[1]  # Take first value if duplicates
   )
+  
+  # Apply type deserialization to restore proper R types
+  for (i in seq_len(nrow(type_lookup))) {
+    fname <- type_lookup$field_name[i]
+    ftype <- type_lookup$field_type[i]
+    if (fname %in% names(metadata_wide) && !is.null(ftype) && ftype != "character") {
+      metadata_wide[[fname]] <- vapply(
+        metadata_wide[[fname]],
+        function(v) {
+          if (is.na(v)) return(switch(ftype,
+            "numeric" = NA_real_,
+            "integer" = NA_integer_,
+            "logical" = NA,
+            NA_real_))
+          deserialize_metadata_value(v, ftype)
+        },
+        switch(ftype,
+          "numeric" = numeric(1),
+          "integer" = integer(1),
+          "logical" = logical(1),
+          character(1))
+      )
+    }
+  }
   
   # Join with bundles to ensure all bundles are present (even those without metadata)
   result <- metadata_wide[bundles_dt[, .(session, bundle)], on = .(session, bundle)]
@@ -675,6 +706,9 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
       paste0(bundle, "_bndl"),
       metadata.filename
     )
+    
+    # Ensure bundle directory exists
+    dir.create(dirname(meta_file), recursive = TRUE, showWarnings = FALSE)
     
     # Read existing or create new
     if (file.exists(meta_file)) {

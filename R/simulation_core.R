@@ -18,7 +18,7 @@ quantify_simulate <- function(.what, .using, ...,
   
   # If not simulating, use regular quantify
   if (is.null(.simulate) && is.null(.prep_simulate)) {
-    return(quantify(.what, .using = .using, ...))
+    return(quantify(.what, dsp_function = .using, ...))
   }
 
   # Validate prep function if prep simulation is requested
@@ -30,11 +30,9 @@ quantify_simulate <- function(.what, .using, ...,
     cli::cli_abort(".prep_function must be a function")
   }
   
-  # Simulation mode
+  # Simulation mode — default store location
   if (is.null(.simulation_store)) {
-    cli::cli_abort(
-      ".simulation_store directory must be specified when using .simulate"
-    )
+    .simulation_store <- ".simulations"
   }
   
   # Get corpus object — try attribute first, fall back to db_path resolution
@@ -48,15 +46,20 @@ quantify_simulate <- function(.what, .using, ...,
     .simulation_timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
   }
   
-  # Get DSP function name
-  dsp_name <- deparse(substitute(.using))
+  # Get DSP function name — collapse to single string and sanitize for filenames
+  dsp_name <- paste(deparse(substitute(.using)), collapse = " ")
   if (is.character(.using)) {
     dsp_name <- .using
   }
+  # Sanitize: keep only alphanumeric, dots, underscores
+  dsp_name <- gsub("[^A-Za-z0-9._]", "_", dsp_name)
+  dsp_name <- gsub("_+", "_", dsp_name)  # collapse multiple underscores
+  dsp_name <- gsub("^_|_$", "", dsp_name)  # trim leading/trailing
+  if (nchar(dsp_name) > 60) dsp_name <- substr(dsp_name, 1, 60)
 
   # Get prep function name if provided
   prep_name <- if (!is.null(.prep_function)) {
-    prep_fn_name <- deparse(substitute(.prep_function))
+    prep_fn_name <- paste(deparse(substitute(.prep_function)), collapse = " ")
     if (is.character(.prep_function)) {
       .prep_function
     } else {
@@ -241,13 +244,13 @@ quantify_simulate <- function(.what, .using, ...,
       }
 
       result <- do.call(quantify, c(
-        list(.what = .what, .using = wrapped_dsp),
+        list(object = .what, dsp_function = wrapped_dsp),
         all_dsp_params
       ))
     } else {
       # No preprocessing, use DSP function directly
       result <- do.call(quantify, c(
-        list(.what = .what, .using = .using),
+        list(object = .what, dsp_function = .using),
         all_dsp_params
       ))
     }
@@ -288,7 +291,7 @@ quantify_simulate <- function(.what, .using, ...,
               param_id, seg_idx,
               result$session[seg_idx], result$bundle[seg_idx],
               result$start[seg_idx], result$end[seg_idx],
-              sig_hashes[seg_idx], blobs[[seg_idx]]
+              sig_hashes[seg_idx], list(blobs[[seg_idx]])
             )
           )
         }
@@ -425,17 +428,22 @@ enrich_simulate <- function(corpus_obj, .using, ...,
     .simulation_timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
   }
   
-  # Get DSP function name
-  dsp_name <- deparse(substitute(.using))
+  # Get DSP function name — collapse to single string and sanitize for filenames
+  dsp_name <- paste(deparse(substitute(.using)), collapse = " ")
   if (is.character(.using)) {
     dsp_name <- .using
   } else if (is.function(.using)) {
-    dsp_name <- as.character(substitute(.using))
+    fn_name <- as.character(substitute(.using))
+    if (length(fn_name) == 1 && fn_name != "") dsp_name <- fn_name
   }
+  dsp_name <- gsub("[^A-Za-z0-9._]", "_", dsp_name)
+  dsp_name <- gsub("_+", "_", dsp_name)
+  dsp_name <- gsub("^_|_$", "", dsp_name)
+  if (nchar(dsp_name) > 60) dsp_name <- substr(dsp_name, 1, 60)
 
   # Get prep function name if provided
   prep_name <- if (!is.null(.prep_function)) {
-    prep_fn_name <- deparse(substitute(.prep_function))
+    prep_fn_name <- paste(deparse(substitute(.prep_function)), collapse = " ")
     if (is.character(.prep_function)) {
       .prep_function
     } else {

@@ -83,9 +83,28 @@ parse_simple_query <- function(query_string) {
     query_string <- sub("^#", "", query_string)
   }
 
+  # Handle bare level name (no operator) — means "all items on this level"
+  bare_level_pattern <- "^([A-Za-z_]+)(?::([A-Za-z_]+))?$"
+  bare_match <- regexec(bare_level_pattern, query_string)
+  bare_matches <- regmatches(query_string, bare_match)[[1]]
+  if (length(bare_matches) >= 1 && bare_matches[1] != "") {
+    level <- bare_matches[2]
+    attribute <- if (length(bare_matches) >= 3 && bare_matches[3] != "") bare_matches[3] else level
+    return(list(
+      type = "simple",
+      level = level,
+      attribute = attribute,
+      operator = "=~",
+      value = ".*",
+      alternatives = NULL,
+      projection = has_projection
+    ))
+  }
+
   # Match attribute definition: Level:Attribute or just Level
   # Value can contain pipe-separated alternatives: m | n | p
-  pattern <- "^([A-Za-z_]+)(?::([A-Za-z_]+))?\\s*(==|!=|=~|!~|=)\\s*['\"]?([^'\"]+)['\"]?$"
+  # Allow embedded apostrophes/quotes in unquoted values
+  pattern <- "^([A-Za-z_]+)(?::([A-Za-z_]+))?\\s*(==|!=|=~|!~|=)\\s*(?:'([^']*)'|\"([^\"]*)\"|(.+))$"
   match <- regexec(pattern, query_string)
   matches <- regmatches(query_string, match)[[1]]
 
@@ -95,8 +114,15 @@ parse_simple_query <- function(query_string) {
 
   level <- matches[2]
   attribute <- if (length(matches) >= 3 && matches[3] != "") matches[3] else level
-  operator <- matches[ifelse(length(matches) >= 5, 4, 3)]
-  value <- trimws(matches[ifelse(length(matches) >= 5, 5, 4)])
+  operator <- matches[4]
+  # Value is in group 5 (single-quoted), 6 (double-quoted), or 7 (unquoted)
+  value <- if (matches[5] != "") {
+    matches[5]
+  } else if (matches[6] != "") {
+    matches[6]
+  } else {
+    trimws(matches[7])
+  }
 
   # Check for label alternatives (pipe-separated): m | n | p
   # Only for == and != operators (not regex)
@@ -362,6 +388,39 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   left_attr_default <- left_resolved$attribute
   right_attr_default <- right_resolved$attribute
 
+  # Pre-execute non-simple sub-queries BEFORE level check — compound sub-queries
+  # (e.g., dominance) may resolve to a different level than extract_level_from_query reports
+  left_preexec <- NULL
+  right_preexec <- NULL
+  left_cond <- NULL
+  right_cond <- NULL
+
+  if (left_query$type != "simple") {
+    left_preexec <- execute_subquery(db_path, left_query, con = con)
+    if (nrow(left_preexec) == 0) return(create_empty_result())
+    # Derive actual level from pre-executed results
+    if ("level" %in% names(left_preexec)) {
+      left_level <- left_preexec$level[1]
+      left_resolved <- .resolve_level_attribute(con, left_level, left_level)
+      left_level <- left_resolved$level
+      left_attr_default <- left_resolved$attribute
+    }
+  } else {
+    left_cond <- extract_condition_from_query(left_query)
+  }
+  if (right_query$type != "simple") {
+    right_preexec <- execute_subquery(db_path, right_query, con = con)
+    if (nrow(right_preexec) == 0) return(create_empty_result())
+    if ("level" %in% names(right_preexec)) {
+      right_level <- right_preexec$level[1]
+      right_resolved <- .resolve_level_attribute(con, right_level, right_level)
+      right_level <- right_resolved$level
+      right_attr_default <- right_resolved$attribute
+    }
+  } else {
+    right_cond <- extract_condition_from_query(right_query)
+  }
+
   if (left_level != right_level) {
     cli::cli_abort("Sequence queries require both sides to be from the same level")
   }
@@ -393,27 +452,6 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   # Validate result_side to prevent column name injection
   if (!result_side %in% c("left", "right", "both")) {
     cli::cli_abort("Internal error: invalid result_side {.val {result_side}}")
-  }
-
-  # Pre-execute non-simple sub-queries to get item IDs
-  left_preexec <- NULL
-  right_preexec <- NULL
-  left_condition <- NULL
-  right_condition <- NULL
-
-  if (left_query$type != "simple") {
-    left_preexec <- execute_subquery(db_path, left_query, con = con)
-    if (nrow(left_preexec) == 0) return(create_empty_result())
-    left_cond <- NULL
-  } else {
-    left_cond <- extract_condition_from_query(left_query)
-  }
-  if (right_query$type != "simple") {
-    right_preexec <- execute_subquery(db_path, right_query, con = con)
-    if (nrow(right_preexec) == 0) return(create_empty_result())
-    right_cond <- NULL
-  } else {
-    right_cond <- extract_condition_from_query(right_query)
   }
 
   # Build CTE WHERE clauses with parameterized conditions
@@ -538,10 +576,12 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
       ORDER BY sp.session, sp.bundle, sp.left_seq")
     all_params <- c(all_params, list(left_level, left_attr, right_attr))
   } else {
-    result_attr <- if (result_level == left_level) {
-      if (!is.null(left_query$attribute)) left_query$attribute else left_attr_default
+    # Use result_side (not level equality) to determine which side's attribute to display,
+    # since both sides may resolve to the same level (e.g., "Word") but with different attributes
+    result_attr <- if (result_side == "left") {
+      extract_attribute_from_query(left_query)
     } else {
-      if (!is.null(right_query$attribute)) right_query$attribute else right_attr_default
+      extract_attribute_from_query(right_query)
     }
 
     # Build left_matches CTE
@@ -813,6 +853,31 @@ extract_level_from_query <- function(query) {
   cli::cli_abort("Cannot extract level from query")
 }
 
+# Extract the display attribute name from any query type.
+# For simple queries: attribute field (e.g. "Text" from "Text == his")
+# For function queries: level1 for Num, level2 for position functions
+# For dominance/sequence/conjunction: recurse based on projection
+extract_attribute_from_query <- function(query) {
+  if (is.list(query)) {
+    if (!is.null(query$attribute)) return(query$attribute)
+    if (query$type == "function") {
+      if (query$func_name == "Num") return(query$level1)
+      return(query$level2)
+    }
+    if (query$type == "dominance") {
+      if (!is.null(query$right$projection) && query$right$projection) {
+        return(extract_attribute_from_query(query$right))
+      }
+      return(extract_attribute_from_query(query$left))
+    }
+    if (query$type %in% c("conjunction", "disjunction", "sequence")) {
+      return(extract_attribute_from_query(query$left))
+    }
+  }
+  # Fallback: use level
+  return(extract_level_from_query(query))
+}
+
 create_empty_result <- function() {
   return(data.frame(
     db_uuid = character(0),
@@ -863,11 +928,12 @@ build_corrected_dominance_sql <- function(con, left_query, right_query, left_lev
     right_cond <- list(sql = paste0("(", paste(ids, collapse = " OR "), ")"), params = list())
   }
 
-  # Get attribute for final label display
+  # Get attribute for final label display — use result_level to pick side,
+  # then extract_attribute_from_query handles function/dominance/compound queries
   result_attr <- if (result_level == left_level) {
-    if (!is.null(left_query$attribute)) left_query$attribute else left_level
+    extract_attribute_from_query(left_query)
   } else {
-    if (!is.null(right_query$attribute)) right_query$attribute else right_level
+    extract_attribute_from_query(right_query)
   }
 
   path_info <- find_dominance_path(hierarchy_info, left_level, right_level)

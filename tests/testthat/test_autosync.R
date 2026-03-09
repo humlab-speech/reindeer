@@ -265,7 +265,7 @@ test_that("Metadata writing functions trigger syncs", {
   expect_true(is.character(result) || is.null(result))
   
   # Check metadata file was created
-  meta_file <- file.path(session_path, bundles[1], ".meta_json")
+  meta_file <- file.path(session_path, bundles[1], "METADATA.json")
   expect_true(file.exists(meta_file))
   
   # Verify CMDI exists
@@ -381,7 +381,7 @@ test_that("Batch metadata updates work efficiently", {
     meta_file <- file.path(
       session_path,
       paste0(bundle_names[i], "_bndl"),
-      ".meta_json"
+      "METADATA.json"
     )
     expect_true(file.exists(meta_file))
   }

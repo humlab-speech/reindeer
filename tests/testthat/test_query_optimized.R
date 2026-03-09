@@ -520,9 +520,13 @@ describe("Complex Multi-Level Queries", {
     expect_query_equivalent("[Syllable == S ^ Phonetic == t]", ae_path, ae)
   })
 
-  test_that("combined sequence and dominance work", {
-    result <- ask_for(ae_path, "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]")
-    expect_true(S7::S7_inherits(result, reindeer::segment_list) || inherits(result, "emuRsegs"))
+  test_that("combined sequence and dominance rejects mismatched levels", {
+    # This query mixes levels in a sequence: the dominance result is at Syllable level
+    # but the right side is Phoneme level. emuR also rejects this.
+    expect_error(
+      ask_for(ae_path, "[[Syllable == S ^ Phoneme == n] -> Phoneme == t]"),
+      "same level"
+    )
   })
 
   test_that("multiple projections work", {

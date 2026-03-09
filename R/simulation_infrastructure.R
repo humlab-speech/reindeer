@@ -407,14 +407,18 @@ create_parameter_grid <- function(simulate_spec, prep_simulate_spec = NULL) {
   }
 
   # Add parameter hash for efficient lookup (hash includes both DSP and prep params)
+  # Must reconstruct lists element-by-element to avoid data.table/expand.grid ALTREP
+  # serialization artifacts that cause hash mismatches with hash_parameters()
   grid$param_hash <- sapply(seq_len(nrow(grid)), function(i) {
     dsp_params <- if (length(dsp_param_names) > 0) {
-      as.list(grid[i, ..dsp_param_names])
+      row <- as.list(grid[i, ..dsp_param_names])
+      setNames(lapply(dsp_param_names, function(nm) row[[nm]]), dsp_param_names)
     } else {
       list()
     }
     prep_params <- if (length(prep_param_names) > 0) {
-      as.list(grid[i, ..prep_param_names])
+      row <- as.list(grid[i, ..prep_param_names])
+      setNames(lapply(prep_param_names, function(nm) row[[nm]]), prep_param_names)
     } else {
       list()
     }
@@ -430,11 +434,15 @@ create_parameter_grid <- function(simulate_spec, prep_simulate_spec = NULL) {
 
 #' Hash parameter combination for lookup
 #'
-#' @param params Named list of parameter values
+#' Hashes using the same structure as create_parameter_grid: list(dsp = ..., prep = ...)
+#' so that storage and retrieval produce identical hashes.
+#'
+#' @param params Named list of DSP parameter values
+#' @param prep_params Named list of preprocessing parameter values (default: empty list)
 #' @return MD5 hash string
 #' @keywords internal
-hash_parameters <- function(params) {
-  digest::digest(params, algo = "md5")
+hash_parameters <- function(params, prep_params = list()) {
+  digest::digest(list(dsp = params, prep = prep_params), algo = "md5")
 }
 
 # ==============================================================================

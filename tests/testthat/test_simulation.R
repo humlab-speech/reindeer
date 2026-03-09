@@ -352,8 +352,8 @@ test_that("quantify simulation end-to-end workflow", {
   # Create corpus
   corp <- corpus(ae_path)
   
-  # Get segment list
-  segs <- ask_for(corp, "[Phonetic = a]")
+  # Get segment list — use label that exists in ae (V, m, n, s, t, etc.)
+  segs <- ask_for(corp, "Phonetic == V")
   expect_true(is_segment_list(segs))
   
   # Create simple test DSP function
@@ -384,8 +384,8 @@ test_that("quantify simulation end-to-end workflow", {
   expect_s3_class(results, "simulation_results")
   expect_equal(length(results), 4)  # 2 * 2 combinations
   
-  # Check cache was created
-  cache_files <- list.files(cache_dir, pattern = "quantify_.*\\.sqlite$")
+  # Check cache was created — naming: {timestamp}_{dsp_name}.sqlite
+  cache_files <- list.files(cache_dir, pattern = ".*_test_dsp\\.sqlite$")
   expect_equal(length(cache_files), 1)
   
   # List simulations
@@ -456,8 +456,8 @@ test_that("enrich simulation end-to-end workflow", {
   expect_s3_class(results, "simulation_tracks")
   expect_equal(length(results), 9)  # 3 * 3 combinations
   
-  # Check cache was created
-  cache_files <- list.files(cache_dir, pattern = "enrich_.*\\.sqlite$")
+  # Check cache was created — naming: {timestamp}_{dsp_name}.sqlite
+  cache_files <- list.files(cache_dir, pattern = ".*_test_track_dsp\\.sqlite$")
   expect_equal(length(cache_files), 1)
   
   # Reminisce specific track results
@@ -495,7 +495,7 @@ test_that("simulation respects default cache location", {
   emuR::create_emuRdemoData(dir = tempdir())
   ae_path <- file.path(tempdir(), "emuR_demoData", "ae_emuDB")
   corp <- corpus(ae_path)
-  segs <- ask_for(corp, "[Phonetic = a]")
+  segs <- ask_for(corp, "Phonetic == V")
   
   test_dsp <- function(signal, sample_rate, p = 1) {
     list(val = rep(p, length(signal)))
@@ -511,7 +511,7 @@ test_that("simulation respects default cache location", {
   
   # Check default location was used
   expect_true(dir.exists(".simulations"))
-  cache_files <- list.files(".simulations", pattern = "quantify_.*\\.sqlite$")
+  cache_files <- list.files(".simulations", pattern = ".*_test_dsp\\.sqlite$")
   expect_equal(length(cache_files), 1)
   
   # Cleanup
