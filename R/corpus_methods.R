@@ -356,19 +356,20 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
     n <- getOption("pillar.print_max", 10)
   }
   
+  n_bundles <- nrow(x)
   cli::cli_rule(
     left = cli::style_bold("bundle_list"),
-    right = "{cli::col_silver('{nrow(x@.data)} bundle{?s}')}"
+    right = cli::col_silver("{n_bundles} bundle{?s}")
   )
   
-  if (nrow(x@.data) == 0) {
+  if (nrow(x) == 0) {
     cli::cli_alert_warning("Empty bundle list")
     return(invisible(x))
   }
   
   # Quick stats
-  n_sessions <- length(unique(x@.data$session))
-  metadata_cols <- setdiff(names(x@.data), c("session", "bundle"))
+  n_sessions <- length(unique(x$session))
+  metadata_cols <- setdiff(names(x), c("session", "bundle"))
   
   cli::cli_text("")
   cli::cli_text(
@@ -384,7 +385,7 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
   cli::cli_text("")
   
   # Use tibble for nice display
-  print(tibble::as_tibble(x@.data), n = n, ...)
+  print(tibble::as_tibble(x), n = n, ...)
   
   invisible(x)
 }

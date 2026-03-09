@@ -217,29 +217,29 @@ corpus <- S7::new_class(
 #' @export
 bundle_list <- S7::new_class(
   "bundle_list",
-  parent = S7::new_S3_class("tbl_df"),
-  properties = list(
-    .data = S7::class_any
-  ),
-  constructor = function(.data = tibble::tibble()) {
+  parent = S7::class_data.frame,
+  constructor = function(.data = data.frame(session = character(), bundle = character(),
+                                            stringsAsFactors = FALSE)) {
     # Ensure required columns exist
     if (!all(c("session", "bundle") %in% names(.data))) {
-      .data <- tibble::tibble(session = character(), bundle = character())
+      .data <- data.frame(session = character(), bundle = character(),
+                          stringsAsFactors = FALSE)
     }
 
-    # Convert to tibble if needed
-    if (!inherits(.data, "tbl_df")) {
-      .data <- tibble::as_tibble(.data)
+    # Coerce to plain data.frame (S7 class_data.frame parent requires it)
+    if (!is.data.frame(.data)) {
+      .data <- as.data.frame(.data, stringsAsFactors = FALSE)
+    } else if (inherits(.data, "data.table")) {
+      .data <- as.data.frame(.data, stringsAsFactors = FALSE)
     }
 
     S7::new_object(
-      S7::S7_object(),
-      .data = .data
+      .parent = .data
     )
   },
   validator = function(self) {
     required_cols <- c("session", "bundle")
-    if (!all(required_cols %in% names(self@.data))) {
+    if (!all(required_cols %in% names(self))) {
       sprintf("bundle_list must contain columns: %s",
               paste(required_cols, collapse = ", "))
     }

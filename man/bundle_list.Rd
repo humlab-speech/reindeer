@@ -4,7 +4,10 @@
 \alias{bundle_list}
 \title{Bundle List Class - Tibble with session/bundle information and metadata}
 \usage{
-bundle_list(.data = tibble::tibble())
+bundle_list(
+  .data = data.frame(session = character(), bundle = character(), stringsAsFactors =
+    FALSE)
+)
 }
 \description{
 An S7 class that extends tibble to represent a list of bundles with

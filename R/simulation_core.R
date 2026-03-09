@@ -37,10 +37,10 @@ quantify_simulate <- function(.what, .using, ...,
     )
   }
   
-  # Get corpus object
-  corpus_obj <- attr(.what, "corpus")
+  # Get corpus object — try attribute first, fall back to db_path resolution
+  corpus_obj <- attr(.what, "corpus") %||% .get_corpus_cached(.what, NULL)
   if (is.null(corpus_obj)) {
-    cli::cli_abort("segment_list must have corpus attribute")
+    cli::cli_abort("segment_list must have corpus attribute or valid db_path")
   }
   
   # Generate timestamp if not provided
@@ -136,15 +136,16 @@ quantify_simulate <- function(.what, .using, ...,
   base_params <- list(...)
   
   # Ensure signal hashes are up to date
+  what_df <- as.data.frame(.what)
   update_signal_hashes(corpus_obj, 
-                       bundles = unique(.what[, .(session, bundle)]),
+                       bundles = unique(what_df[, c("session", "bundle")]),
                        verbose = FALSE)
   
   # Get signal hashes for segments
   signal_hashes <- get_signal_hashes(corpus_obj)
   .what_with_hash <- merge(
     data.table::as.data.table(.what),
-    signal_hashes[, .(session, bundle, hashes)],
+    signal_hashes[, c("session", "bundle", "hashes")],
     by = c("session", "bundle"),
     all.x = TRUE
   )
@@ -158,7 +159,7 @@ quantify_simulate <- function(.what, .using, ...,
     params = list(
       .simulation_timestamp,
       dsp_name,
-      prep_name,
+      prep_name %||% "",
       as.character(Sys.time()),
       corpus_obj@basePath,
       corpus_obj@config$UUID,
@@ -512,7 +513,7 @@ enrich_simulate <- function(corpus_obj, .using, ...,
     params = list(
       .simulation_timestamp,
       dsp_name,
-      prep_name,
+      prep_name %||% "",
       as.character(Sys.time()),
       corpus_obj@basePath,
       corpus_obj@config$UUID,
@@ -524,7 +525,7 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   )
   
   # Get metadata for bundles
-  bundle_metadata <- get_all_bundle_metadata(corpus_obj)
+  bundle_metadata <- get_metadata(corpus_obj)
   signal_files_with_meta <- merge(signal_files, bundle_metadata, by = c("session", "bundle"), all.x = TRUE)
   
   # Get base parameters
@@ -773,7 +774,9 @@ assess <- function(segment_list,
     cli::cli_abort("Second argument must be simulation_tracks from enrich_simulate")
   }
   
-  corpus_obj <- attr(segment_list, "corpus") %||% attr(simulation_results, "corpus")
+  corpus_obj <- attr(segment_list, "corpus") %||%
+    attr(simulation_results, "corpus") %||%
+    .get_corpus_cached(segment_list, NULL)
   if (is.null(corpus_obj)) {
     cli::cli_abort("Cannot find corpus object in segment_list or simulation_results")
   }

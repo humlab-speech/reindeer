@@ -2,13 +2,12 @@
 % Please edit documentation in R/reindeer_enrich.R
 \name{derive_dsp_parameters}
 \alias{derive_dsp_parameters}
-\title{Derive DSP parameters from bundle metadata (with caching)}
+\title{Derive DSP parameters from bundle metadata}
 \usage{
 derive_dsp_parameters(dsp_fun, metadata, metadata_fields, user_params)
 }
 \description{
 Internal function to map metadata fields to DSP function parameters.
 Uses age and gender to estimate formant frequencies when applicable.
-Results are cached based on metadata values for efficiency.
 }
 \keyword{internal}

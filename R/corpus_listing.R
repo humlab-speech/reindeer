@@ -195,6 +195,78 @@
 }
 
 # ==============================================================================
+# SIGNAL FILE DISCOVERY
+# ==============================================================================
+
+#' List signal (media) files in a corpus
+#'
+#' Queries the SQLite cache for all bundles and constructs the file paths
+#' to their media files. Only files that exist on disk are returned.
+#' This is a fast, emuR-independent replacement for \code{emuR::list_files()}.
+#'
+#' @param corpus_obj A \code{\link{corpus}} S7 object
+#' @param extension Optional media file extension override. Defaults to the
+#'   value in the database configuration (\code{mediafileExtension}), falling
+#'   back to \code{"wav"}.
+#' @return A \code{data.table} with columns:
+#'   \describe{
+#'     \item{session}{Session name (character)}
+#'     \item{bundle}{Bundle name (character)}
+#'     \item{name}{Signal filename including extension, e.g. \code{"msajc003.wav"} (character)}
+#'     \item{extension}{File extension, e.g. \code{"wav"} (character)}
+#'     \item{full_path}{Absolute path to the signal file (character)}
+#'   }
+#' @examples
+#' \dontrun{
+#' corp <- corpus("path/to/ae_emuDB")
+#' sig <- peek_signals(corp)
+#' sig$full_path[1]
+#' }
+#' @export
+peek_signals <- function(corpus_obj, extension = NULL) {
+  if (!S7::S7_inherits(corpus_obj, corpus)) {
+    cli::cli_abort("{.arg corpus_obj} must be a {.cls corpus} object")
+  }
+
+  ext <- extension %||% corpus_obj@config$mediafileExtension %||% "wav"
+  basePath <- corpus_obj@basePath
+
+  con <- get_or_create_connection(corpus_obj)
+  bundles <- DBI::dbGetQuery(
+    con,
+    "SELECT session, name FROM bundle ORDER BY session, name"
+  )
+
+  if (nrow(bundles) == 0L) {
+    return(data.table::data.table(
+      session   = character(0L),
+      bundle    = character(0L),
+      name      = character(0L),
+      extension = character(0L),
+      full_path = character(0L)
+    ))
+  }
+
+  dt <- data.table::as.data.table(bundles)
+  data.table::setnames(dt, "name", "bundle")
+
+  dt[, full_path := file.path(
+    basePath,
+    paste0(session, "_ses"),
+    paste0(bundle, "_bndl"),
+    paste0(bundle, ".", ext)
+  )]
+  dt[, name := paste0(bundle, ".", ext)]
+  dt[, extension := ext]
+
+  # Keep only files that actually exist on disk
+  dt <- dt[file.exists(full_path)]
+
+  # Return in canonical column order
+  dt[, .(session, bundle, name, extension, full_path)]
+}
+
+# ==============================================================================
 # INTERNAL HELPER
 # ==============================================================================
 

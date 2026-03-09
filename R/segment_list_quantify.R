@@ -129,10 +129,12 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     # Get unique bundles from segment list
     unique_bundles <- unique(as.data.frame(object)[, c("session", "bundle")])
 
-    # Fetch only needed metadata
+    # Fetch only needed metadata from correct table (metadata_bundle)
+    db_uuid <- corpus_obj@.uuid
     all_bundle_meta <- DBI::dbGetQuery(con,
-      "SELECT session, bundle, key, value, value_type
-       FROM bundle_metadata")
+      "SELECT session, bundle, field_name AS key, field_value AS value, field_type AS value_type
+       FROM metadata_bundle WHERE db_uuid = ?",
+      params = list(db_uuid))
     # Semi-join: keep only rows matching unique_bundles
     meta_keys <- paste(all_bundle_meta$session, all_bundle_meta$bundle, sep = "\x01")
     ub_keys <- paste(unique_bundles$session, unique_bundles$bundle, sep = "\x01")

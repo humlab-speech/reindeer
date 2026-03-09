@@ -107,6 +107,7 @@ enrich <- function(corpus_obj, .using, ...,
   
   # Get metadata for all bundles - optimized query to only fetch needed bundles
   con <- get_corpus_connection(corpus_obj)
+  db_uuid <- corpus_obj@.uuid
   
   # Only fetch metadata for bundles we're actually processing
   needed_bundles <- unique(paste(signal_files$session, signal_files$bundle, sep = "||"))
@@ -114,20 +115,32 @@ enrich <- function(corpus_obj, .using, ...,
   # More efficient: query only the metadata we need using parameterized IN clause
   placeholders <- paste(rep("?", length(needed_bundles)), collapse = ", ")
   bundle_metadata_query <- sprintf(
-    "SELECT * FROM bundle_metadata WHERE (session || '||' || bundle) IN (%s)",
+    "SELECT session, bundle, field_name, field_value FROM metadata_bundle WHERE db_uuid = ? AND (session || '||' || bundle) IN (%s)",
     placeholders
   )
   
   # Fallback to simpler approach if query fails
-  bundle_metadata <- tryCatch({
-    DBI::dbGetQuery(con, bundle_metadata_query, params = as.list(needed_bundles))
+  bundle_metadata_long <- tryCatch({
+    DBI::dbGetQuery(con, bundle_metadata_query, params = c(list(db_uuid), as.list(needed_bundles)))
   }, error = function(e) {
     # Fallback: get all and filter in R
-    all_meta <- DBI::dbReadTable(con, "bundle_metadata")
+    all_meta <- DBI::dbReadTable(con, "metadata_bundle")
+    all_meta <- all_meta[all_meta$db_uuid == db_uuid, ]
     sf_keys <- paste(signal_files$session, signal_files$bundle, sep = "||")
     meta_keys <- paste(all_meta$session, all_meta$bundle, sep = "||")
-    all_meta[meta_keys %in% sf_keys, ]
+    all_meta[meta_keys %in% sf_keys, c("session", "bundle", "field_name", "field_value")]
   })
+  
+  # Pivot long-form metadata to wide
+  if (nrow(bundle_metadata_long) > 0) {
+    dt_meta <- data.table::as.data.table(bundle_metadata_long)
+    bundle_metadata <- data.table::dcast(dt_meta, session + bundle ~ field_name,
+                                         value.var = "field_value")
+    bundle_metadata <- as.data.frame(bundle_metadata, stringsAsFactors = FALSE)
+  } else {
+    bundle_metadata <- data.frame(session = character(), bundle = character(),
+                                  stringsAsFactors = FALSE)
+  }
 
   # Pre-join metadata with signal files for efficiency
   signal_files_with_meta <- merge(signal_files, bundle_metadata, by = c("session", "bundle"), all.x = TRUE)
@@ -255,39 +268,18 @@ enrich <- function(corpus_obj, .using, ...,
   invisible(corpus_obj)
 }
 
-#' Derive DSP parameters from bundle metadata (with caching)
+#' Derive DSP parameters from bundle metadata
 #' 
 #' Internal function to map metadata fields to DSP function parameters.
 #' Uses age and gender to estimate formant frequencies when applicable.
-#' Results are cached based on metadata values for efficiency.
 #' 
 #' @keywords internal
 derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_params) {
   
-  # Create cache key from metadata values (for memoization)
-  cache_key <- paste(
-    as.character(metadata$Gender %||% "NA"),
-    as.character(metadata$Age %||% "NA"),
-    paste(metadata[metadata_fields], collapse = "|"),
-    sep = "||"
-  )
-  
-  # Check if we've already computed params for this combination
-  if (!exists(".dsp_param_cache", envir = .GlobalEnv)) {
-    assign(".dsp_param_cache", new.env(parent = emptyenv()), envir = .GlobalEnv)
-  }
-  cache_env <- get(".dsp_param_cache", envir = .GlobalEnv)
-  
-  if (exists(cache_key, envir = cache_env)) {
-    cached_params <- get(cache_key, envir = cache_env)
-    # Merge with user params (user params override)
-    return(utils::modifyList(cached_params, user_params))
-  }
-  
-  # Get formal arguments of DSP function (cached per function)
+  # Get formal arguments of DSP function
   fun_formals <- names(formals(dsp_fun))
   
-  # Start with user-provided parameters
+  # Start with empty parameter list
   params <- list()
   
   # Extract metadata values
@@ -335,9 +327,6 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
       params[[field]] <- meta_list[[field]]
     }
   }
-  
-  # Cache the computed params
-  assign(cache_key, params, envir = cache_env)
   
   # Merge with user params (user params override)
   utils::modifyList(params, user_params)
