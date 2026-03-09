@@ -8,7 +8,7 @@ output faithful to the original Praat scripts.
 
 reindeer extends [emuR](https://github.com/IPS-LMU/emuR) for speech corpus
 management. The package handles corpus loading, metadata, querying, and signal
-processing. Draft annotation generation (MOMEL/INTSINT, periods, VOT, VAD) lives
+processing. Draft annotation generation (periods, VOT, VAD) lives
 in the companion package [protoscribe](https://github.com/humlab-speech/protoscribe).
 
 ### Core Classes (S7)
@@ -139,30 +139,13 @@ called by the protoscribe companion package or used standalone.
 |---|---|---|---|
 | praat_periods | `inst/praat/praat_periods.praat` | F. Karlsson (original) | Glottal cycle detection + intensity |
 | DDK segmentation | `inst/praat/DDK/ddk_segment.praat` | F. Karlsson (original) | Diadochokinetic syllable segmentation |
-| processINTSINTMOMEL | `inst/praat/Momel-Intsint/processINTSINTMOMEL.praat` | F. Karlsson (original wrapper) | Batch MOMEL/INTSINT processing |
-| Momel-Intsint plugin | `inst/praat/Momel-Intsint/plugin_momel-intsint/` | D. Hirst (unmodified) | MOMEL target detection + INTSINT coding |
 | praatdet | `inst/praat/praatdet/` | J. Kirby (unmodified, git submodule) | EGG open quotient analysis |
 | Prosogram | `inst/praat/prosogram_v300f/` | P. Mertens (unmodified) | Prosodic analysis + visualization |
 
 ### Python Reimplementations
 
-`inst/pymomelintsint/` contains Python/Parselmouth reimplementations of the
-MOMEL/INTSINT pipeline:
-
-| File | Purpose |
-|---|---|
-| `momelintsint.py` | Full reimplementation: `automatic_min_max_fo()`, `momel()`, `code_with_intsint()`, `spectral_tilt()`, `prosody_index()`, plus Iseli-Alwan and Hawks-Miller helpers |
-| `python_only_momelintsint.py` | Pure Python INTSINT optimizer (no Perl dependency); Swedish-language comments; development/exploratory |
-| `intsint.pl` | Modified v2.12 of Hirst's Perl INTSINT (STDIN/STDOUT I/O instead of file-based) |
-| `orig_intsint.pl` | Preserved original v2.11 for reference |
-| `scriptPharyFullV3.praat` | Pharyngealization analysis reference (unknown provenance; Windows paths; included for reference only) |
-
-**Note:** `momelintsint.py` ends with live executable code (lines 400-408)
-with hardcoded corpus paths. These lines run when the module is imported and
-will fail in any environment other than the original author's machine. Wrap
-imports in `if __name__ == "__main__":` or refactor before using as a module.
-
-See `PRAAT_MODIFICATIONS.md` for detailed provenance and modification history.
+None currently bundled. For MOMEL/INTSINT prosodic annotation use the
+[protoscribe](https://github.com/humlab-speech/protoscribe) companion package.
 
 ## Reimplementation Strategy
 
@@ -205,8 +188,8 @@ For faithful reimplementation, use `wrassp` (bundled with emuR) or
 | `To PointProcess (periodic, peaks)` | No direct equivalent -- reimplement in R |
 | `To Spectrum` / `To Ltas` | `stats::spectrum()` or use `superassp` |
 | `To MFCC` | `tuneR::melfcc()` or `superassp::praat_mfcc()` |
-| MOMEL target detection | `inst/pymomelintsint/momelintsint.py::momel()` or use protoscribe |
-| INTSINT coding | `inst/pymomelintsint/python_only_momelintsint.py::code_with_intsint()` |
+| MOMEL target detection | Use [protoscribe](https://github.com/humlab-speech/protoscribe) |
+| INTSINT coding | Use [protoscribe](https://github.com/humlab-speech/protoscribe) |
 | EGG Oq (praatdet) | No R equivalent yet -- candidate for reimplementation |
 | DDK segmentation | No R equivalent yet -- candidate for reimplementation |
 
@@ -328,10 +311,9 @@ rle_result <- rle(is_silent)
 # 5. Create segment table
 ```
 
-### MOMEL/INTSINT --> R (via protoscribe)
+### MOMEL/INTSINT (via protoscribe)
 
-The MOMEL/INTSINT pipeline is already reimplemented in Python
-(`inst/pymomelintsint/momelintsint.py`). For R integration, use protoscribe:
+For MOMEL/INTSINT prosodic annotation, use the protoscribe companion package:
 
 ```r
 library(protoscribe)
@@ -340,16 +322,10 @@ protoscribe::assess(suggestions)
 protoscribe::transcribe(suggestions)
 ```
 
-If reimplementing in pure R (no Python):
-1. Use the algorithm from `python_only_momelintsint.py::code_with_intsint()`
-2. The INTSINT optimizer is a grid search over pitch range and key parameters
-3. The momel binary (`inst/pymomelintsint/momel_osx_intel`) can be called via
-   `system2()` -- it reads F0 values from stdin, writes target points to stdout
-
 ### Spectral Tilt Measures --> R
 
-The spectral tilt implementation in `momelintsint.py::spectral_tilt()` ports
-algorithms from OpenSauce/praatsauce:
+Spectral tilt algorithms (H1-H2, H1*-A3*, spectral balance, SLF, C1) are ported
+from OpenSauce/praatsauce. If reimplementing in R:
 
 **Measures computed:**
 - H1-H2 (raw `L2L1` and Iseli-Alwan corrected `L2cL1c`)
@@ -463,13 +439,3 @@ remotes::install_github("humlab-speech/superassp")
    Using positional form `quantify(segs, superassp::forest)` works but naming
    it explicitly (`dsp_function = superassp::forest`) is safer against future
    signature changes.
-
-8. **momelintsint.py module import**: The file ends with live executable code
-   (lines 400-408) including a `glob.glob()` call to hardcoded paths. This code
-   runs on import. Do not `import momelintsint` directly; extract only the
-   needed functions, or add a `if __name__ == "__main__":` guard first.
-
-9. **momel binary naming**: In `momelintsint.py` the Linux binary is referenced
-   as `momel_linux_intel` (line 79), but the actual file in
-   `plugin_momel-intsint/analysis/` is named `momel_linux`. Ensure the binary
-   path is resolved correctly when deploying on Linux.

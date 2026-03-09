@@ -490,10 +490,6 @@ Efficient parallel processing with smart caching:
 
 # Advanced Topics
 
-## Prosodic Analysis with MOMEL/INTSINT
-
-For MOMEL/INTSINT prosodic annotation, see the [protoscribe](https://github.com/humlab-speech/protoscribe) companion package.
-
 ## Custom DSP Functions
 
 You can use any R function that follows the superassp interface:

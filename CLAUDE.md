@@ -242,7 +242,7 @@ quantify_simulate(
 
 **As of v0.3.0**, all draft annotation functionality has been moved to the **[protoscribe](https://github.com/humlab-speech/protoscribe)** package.
 
-For draft annotation generation (MOMEL/INTSINT, periods, VOT, VAD, creak, etc.), use:
+For draft annotation generation (periods, VOT, VAD, creak, etc.), use:
 
 ```r
 library(protoscribe)
@@ -251,7 +251,7 @@ library(reindeer)
 # Get audio file paths from corpus
 corp <- corpus("path/to/db")
 # ... use protoscribe draft functions
-suggestions <- protoscribe::draft_momel_intsint(...)
+suggestions <- protoscribe::draft_vad(corpus = corp)
 protoscribe::assess(suggestions)
 protoscribe::transcribe(suggestions)
 ```
@@ -432,7 +432,7 @@ Key dependencies:
 - **emuR** (>= 2.0.2): Base EMU-SDMS functionality
 - **S7**: Modern OOP system
 - **data.table** (>= 1.14.0): High-performance data manipulation
-- **reticulate**: Python integration (for Parselmouth/MOMEL)
+- **reticulate**: Python integration (if needed for custom DSP)
 - **superassp**: Advanced signal processing (from GitHub: humlab-speech/superassp)
 - **qs** (>= 0.25.0): Fast serialization (in Imports as of recent optimization)
 - **DBI, RSQLite**: SQLite database access

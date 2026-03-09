@@ -76,7 +76,6 @@ Output example:
 
 Found 15 cache files:
 
-momel_intsint_20251020.sqlite (245.67 MB) [draft]
 forest_results.qs (123.45 MB) [quantify]
 ksvF0_results.qs (98.32 MB) [quantify]
 ...

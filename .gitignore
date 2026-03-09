@@ -47,3 +47,5 @@ benchmarking/*.rds
 benchmarking/*.png
 benchmarking/*.csv
 benchmarking/*.txt
+/doc/
+/Meta/

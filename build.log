@@ -4,25 +4,12 @@
 * cleaning src
 * installing the package to process help pages
 * saving partial Rd database
+* creating vignettes ... OK
 * cleaning src
 * checking for LF line-endings in source and make files and shell scripts
 * checking for empty or unneeded directories
 Removed empty directory ‘reindeer/.qodo’
-Removed empty directory ‘reindeer/.worktrees/comprehensive-fixes/inst/praat/praatdet’
-Removed empty directory ‘reindeer/.worktrees/comprehensive-fixes/tests/testthat/_snaps’
 Removed empty directory ‘reindeer/R/deprecated’
 Removed empty directory ‘reindeer/images’
-Removed empty directory ‘reindeer/inst/pymomelintsint/.idea/inspectionProfiles’
 Removed empty directory ‘reindeer/inst/pymomelintsint/testdata’
-  NB: this package now depends on R (>= 3.5.0)
-  WARNING: Added dependency on R >= 3.5.0 because serialized objects in
-  serialize/load version 3 cannot be read in older versions of R.
-  File(s) containing such objects:
-    ‘reindeer/.worktrees/comprehensive-fixes/benchmarking/benchmark_results.rds’
-    ‘reindeer/.worktrees/comprehensive-fixes/benchmarking/benchmark_summary.rds’
-    ‘reindeer/.worktrees/comprehensive-fixes/benchmarking/dspp_benchmark_results.rds’
-    ‘reindeer/.worktrees/comprehensive-fixes/benchmarking/performance_targets_results.rds’
-    ‘reindeer/.worktrees/comprehensive-fixes/benchmarking/test_results.rds’
-    ‘reindeer/.worktrees/comprehensive-fixes/data/DSPP.rda’
-    ‘reindeer/data/DSPP.rda’
-* building ‘reindeer_0.4.2.tar.gz’
+* building ‘reindeer_0.4.8.tar.gz’

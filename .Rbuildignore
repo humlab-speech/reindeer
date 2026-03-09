@@ -44,3 +44,5 @@
 ^\.claude$
 ^inst/praat/praatdet/\.git$
 ^inst/pymomelintsint/\.idea$
+^doc$
+^Meta$

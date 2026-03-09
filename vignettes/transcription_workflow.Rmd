@@ -35,11 +35,8 @@ library(protoscribe)
 corp <- corpus("path/to/database_emuDB")
 
 # Use protoscribe for annotation drafting
-suggestions <- protoscribe::draft_momel_intsint(
-  corpus = corp,
-  session = "session001",
-  bundle = "bundle001"
-)
+# See protoscribe documentation for available draft_*() functions
+suggestions <- protoscribe::draft_vad(corpus = corp)
 
 # Validate suggestions
 suggestions <- protoscribe::assess(suggestions)
