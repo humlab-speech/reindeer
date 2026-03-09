@@ -29,8 +29,8 @@ up without executing SQL until \code{collect()} is called or the data is needed.
 \examples{
 \dontrun{
 # Build query chain without execution
-lazy_segs <- ask_for(corpus, "Phonetic == t") \%>\%
-  scout(1) \%>\%
+lazy_segs <- ask_for(corpus, "Phonetic == t") |>
+  scout(1) |>
   ascend_to("Word")
 
 # Force execution
@@ -39,5 +39,6 @@ segs <- collect(lazy_segs)
 # Or implicitly via print/summary
 print(lazy_segs)  # Shows preview
 }
+
 }
 \keyword{internal}

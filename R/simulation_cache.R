@@ -72,14 +72,33 @@ reminisce <- function(segment_list,
     cli::cli_abort("No results found for parameter combination")
   }
   
-  # Deserialize and combine results using qs
-  result_list <- lapply(results$result_blob, qs::qdeserialize)
+  # Deserialize and combine results
+  result_list <- lapply(results$result_blob, function(blob) {
+    tryCatch({
+      if (requireNamespace("qs", quietly = TRUE)) {
+        qs::qdeserialize(blob)
+      } else {
+        unserialize(blob)
+      }
+    }, error = function(e) {
+      # Fallback: try alternate deserialization method
+      tryCatch(unserialize(blob), error = function(e2) {
+        if (requireNamespace("qs", quietly = TRUE)) qs::qdeserialize(blob)
+        else cli::cli_abort("Deserialization failed: {conditionMessage(e)}", parent = e)
+      })
+    })
+  })
   
   combined <- data.table::rbindlist(result_list, fill = TRUE)
   
-  # Convert to extended_segment_list
-  class(combined) <- c("extended_segment_list", "segment_list", class(combined))
-  attr(combined, "corpus") <- attr(segment_list, "corpus")
+  # Convert to extended_segment_list using S7 constructor when possible,
+  # falling back to manual class tagging for compatibility
+  tryCatch({
+    combined <- extended_segment_list(data = as.data.frame(combined))
+  }, error = function(e) {
+    # If S7 constructor fails (e.g., missing required columns), use namespaced names
+    class(combined) <<- c("reindeer::extended_segment_list", "reindeer::segment_list", class(combined))
+  })
   attr(combined, "parameters") <- parameters
   attr(combined, "cache_file") <- cache_path
   
@@ -394,8 +413,21 @@ reminisce_tracks <- function(corpus_obj,
     return(data.table::data.table())
   }
   
-  # Deserialize tracks using qs
-  results$track <- lapply(results$track_blob, qs::qdeserialize)
+  # Deserialize tracks
+  results$track <- lapply(results$track_blob, function(blob) {
+    tryCatch({
+      if (requireNamespace("qs", quietly = TRUE)) {
+        qs::qdeserialize(blob)
+      } else {
+        unserialize(blob)
+      }
+    }, error = function(e) {
+      tryCatch(unserialize(blob), error = function(e2) {
+        if (requireNamespace("qs", quietly = TRUE)) qs::qdeserialize(blob)
+        else cli::cli_abort("Deserialization failed: {conditionMessage(e)}", parent = e)
+      })
+    })
+  })
   results$track_blob <- NULL
   
   # Convert to data.table

@@ -130,11 +130,21 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     unique_bundles <- unique(as.data.frame(object)[, c("session", "bundle")])
 
     # Fetch only needed metadata
-    metadata_by_bundle <- DBI::dbGetQuery(con,
+    all_bundle_meta <- DBI::dbGetQuery(con,
       "SELECT session, bundle, key, value, value_type
-       FROM bundle_metadata") %>%
-      dplyr::semi_join(unique_bundles, by = c("session", "bundle")) %>%
-      tidyr::pivot_wider(names_from = key, values_from = value)
+       FROM bundle_metadata")
+    # Semi-join: keep only rows matching unique_bundles
+    meta_keys <- paste(all_bundle_meta$session, all_bundle_meta$bundle, sep = "\x01")
+    ub_keys <- paste(unique_bundles$session, unique_bundles$bundle, sep = "\x01")
+    all_bundle_meta <- all_bundle_meta[meta_keys %in% ub_keys, ]
+    # Pivot wider using data.table::dcast
+    if (nrow(all_bundle_meta) > 0) {
+      dt_meta <- data.table::as.data.table(all_bundle_meta)
+      metadata_by_bundle <- data.table::dcast(dt_meta, session + bundle ~ key, value.var = "value")
+      metadata_by_bundle <- tibble::as_tibble(metadata_by_bundle)
+    } else {
+      metadata_by_bundle <- tibble::tibble(session = character(), bundle = character())
+    }
   }
 
   # Convert to data frame for processing
@@ -142,8 +152,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   # Join with metadata if available
   if (!is.null(metadata_by_bundle)) {
-    seg_df <- seg_df %>%
-      dplyr::left_join(metadata_by_bundle, by = c("session", "bundle"))
+    seg_df <- merge(seg_df, metadata_by_bundle, by = c("session", "bundle"), all.x = TRUE)
 
     # Derive DSP parameters from metadata where applicable
     if (.use_metadata && nrow(metadata_by_bundle) > 0) {
@@ -212,7 +221,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   }
 
   # Remove NULL results
-  results <- purrr::compact(results_list)
+  results <- Filter(Negate(is.null), results_list)
 
   if (length(results) == 0) {
     if (.verbose) {
@@ -227,7 +236,8 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     data.table::rbindlist(results, fill = TRUE) |>
       tibble::as_tibble()
   } else {
-    dplyr::bind_rows(results)
+    data.table::rbindlist(results, fill = TRUE) |>
+      tibble::as_tibble()
   }
 
   if (.verbose) {

@@ -362,7 +362,7 @@ corp <- corpus("path/to/database_emuDB")
 serve(corp, bundleListName = "Annotator_A")
 
 # 3. Track progress
-bundles_A <- emuR::read_bundleList(as_emuDBhandle(corp), "Annotator_A")
+bundles_A <- emuR::read_bundleList(get_emuDBhandle(corp), "Annotator_A")
 
 # Check which have been annotated
 # (Look for .meta_json or specific annotation levels)

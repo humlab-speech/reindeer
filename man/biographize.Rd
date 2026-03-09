@@ -2,19 +2,30 @@
 % Please edit documentation in R/metadata_import_export.R
 \name{biographize}
 \alias{biographize}
-\title{Add biographical metadata to segment list (biographize)}
+\title{Enrich query results with metadata}
 \usage{
 biographize(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm = "sha1")
 }
 \arguments{
-\item{segs_tbl}{Tibble from query}
+\item{segs_tbl}{A segment_list or data.frame with session and bundle columns}
 
-\item{corpus_obj}{Corpus object}
+\item{corpus_obj}{A corpus object}
 
-\item{compute_digests}{Compute file checksums}
+\item{compute_digests}{Compute file checksums before joining (default: FALSE)}
 
-\item{algorithm}{Hash algorithm}
+\item{algorithm}{Hash algorithm for digests (default: "sha1")}
+}
+\value{
+An \code{extended_segment_list} with metadata columns appended
 }
 \description{
-Add biographical metadata to segment list (biographize)
+Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
+containing session and bundle columns.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/db_emuDB")
+segs <- ask_for(corp, "Phonetic == t")
+enriched <- biographize(segs, corp)
+\dontshow{\}) # examplesIf}
 }

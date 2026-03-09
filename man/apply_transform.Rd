@@ -2,21 +2,21 @@
 % Please edit documentation in R/reindeer_lazy_segment_list.R
 \name{apply_transform}
 \alias{apply_transform}
-\title{Apply a Transform to SQL Query}
+\title{Apply a Transform to Parameterized SQL Query}
 \usage{
-apply_transform(sql, transform, verbose = FALSE)
+apply_transform(query, transform, verbose = FALSE)
 }
 \arguments{
-\item{sql}{Current SQL query}
+\item{query}{list(sql, params) — current query}
 
 \item{transform}{List with type and parameters}
 
 \item{verbose}{Logical}
 }
 \value{
-Modified SQL query
+list(sql, params) — modified query
 }
 \description{
-Apply a Transform to SQL Query
+Apply a Transform to Parameterized SQL Query
 }
 \keyword{internal}

@@ -4,7 +4,15 @@
 \alias{apply_scout_transform}
 \title{Apply Scout (Forward Sequence) Transform}
 \usage{
-apply_scout_transform(sql, n = 1)
+apply_scout_transform(query, n = 1)
+}
+\arguments{
+\item{query}{list(sql, params) — current query}
+
+\item{n}{integer — number of steps forward}
+}
+\value{
+list(sql, params) — modified query
 }
 \description{
 Apply Scout (Forward Sequence) Transform

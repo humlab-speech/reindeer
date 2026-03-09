@@ -75,7 +75,7 @@ propagation through the simulation system.
 library(reindeer)
 
 corp <- corpus("path/to/db_emuDB")
-segments <- ask_for(corp, "Phonetic == t") \%>\% head(5)
+segments <- ask_for(corp, "Phonetic == t") |> head(5)
 
 # Simulate with prep parameters but no actual transformation
 results <- quantify_simulate(

@@ -14,9 +14,10 @@ build_base_sql(db_path, parsed, opts = list())
 \item{opts}{Additional options}
 }
 \value{
-SQL query string
+list(sql = "...", params = list(...))
 }
 \description{
 Extracts the SQL query that would be executed, for use in lazy evaluation.
+Returns a parameterized query as list(sql, params).
 }
 \keyword{internal}

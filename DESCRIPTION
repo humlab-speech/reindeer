@@ -1,13 +1,12 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.4.2
-Date: 2026-03-05
+Version: 0.4.3
+Date: 2026-03-09
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-3373-0934"))
   )
-Maintainer: Fredrik Nylén <fredrik.nylen@umu.se>
 Description: A systematic framework for speech corpora management that retains emuR compatibility, but provides
   expanded ability to store metadata associated with the recording, use the metadata to guide signal processing when appropriate, and support the user in future archiving and FAIR use
   by automating the creation, and continuous updating, of standard compliant metadata files for corpora.
@@ -17,24 +16,19 @@ LazyData: true
 Imports:
     S7 (>= 0.1.0),
     digest,
-    superassp,
     jsonlite,
-    openxlsx,
-    dplyr,
     data.table,
     stats,
     Rdpack,
-    purrr,
     utils,
     assertthat,
-    tidyr,
-    stringr,
-    tidyselect,
     future,
     furrr,
     future.apply,
     cli,
-    av,
+    xml2,
+    wrassp,
+    imputeTS,
     Rcpp,
     DBI,
     RSQLite,
@@ -44,7 +38,12 @@ Suggests:
     testthat (>= 3.0.0),
     emuR,
     qs (>= 0.25.0),
-    protoscribe
+    protoscribe,
+    superassp,
+    openxlsx,
+    av,
+    readr,
+    rstudioapi
 Remotes:
   github::humlab-speech/superassp
   github::humlab-speech/av
@@ -52,6 +51,6 @@ RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Depends: 
-    R (>= 2.10)
+    R (>= 4.1.0)
 Config/testthat/edition: 3
 LinkingTo: Rcpp

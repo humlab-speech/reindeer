@@ -216,11 +216,11 @@ test_that("quantify_simulate validates prep function requirements", {
 
 test_that("quantify_simulate works without preprocessing", {
   skip_if_not_installed("emuR")
-  skip("Integration test - requires full setup")
+  skip_on_cran()
 
   db_path <- reindeer:::create_ae_db(verbose = FALSE)
   corp <- corpus(db_path)
-  segments <- ask_for(corp, "[#Phonetic -> Phonetic]") %>% head(2)
+  segments <- head(ask_for(corp, "[#Phonetic -> Phonetic]"), 2)
 
   # Traditional simulation without preprocessing should still work
   result <- quantify_simulate(
@@ -273,15 +273,6 @@ test_that("simulation_results print shows prep function info", {
   expect_true(any(grepl("prep_passthrough", output)))
   expect_true(any(grepl("DSP Parameters", output)))
   expect_true(any(grepl("Prep Parameters", output)))
-})
-
-test_that("simulation cache stores prep function metadata", {
-  skip("Requires database setup")
-
-  # This would test that:
-  # 1. prep_function name is stored in simulation_metadata table
-  # 2. prep_parameter_names are stored as JSON
-  # 3. prep_params_json is stored in parameter_combinations table
 })
 
 test_that("parameter grid attributes are preserved through simulation", {

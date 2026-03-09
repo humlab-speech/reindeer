@@ -6,6 +6,12 @@
 \usage{
 is_segment_list(x)
 }
+\arguments{
+\item{x}{Object to test}
+}
+\value{
+Logical
+}
 \description{
 Check if object is a segment_list
 }

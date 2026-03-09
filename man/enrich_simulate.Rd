@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulation_core.R
 \name{enrich_simulate}
 \alias{enrich_simulate}
-\title{Retrieve simulation results from cache}
+\title{Run simulation-based track enrichment across a parameter grid}
 \usage{
 enrich_simulate(
   corpus_obj,
@@ -23,21 +23,43 @@ enrich_simulate(
 )
 }
 \arguments{
-\item{segment_list}{Original segment_list used in simulation}
+\item{corpus_obj}{A \code{corpus} object}
 
-\item{parameters}{Named list of parameter values to retrieve}
+\item{.using}{DSP function to apply (e.g. \code{superassp::forest})}
 
-\item{cache_path}{Path to simulation cache file, or}
+\item{...}{Additional fixed arguments passed to \code{.using}}
 
-\item{timestamp}{Timestamp string to identify cache file}
+\item{.simulate}{Named list of parameter vectors to vary (outer product)}
 
-\item{cache_dir}{Directory containing cache files (if using timestamp)}
+\item{.prep_function}{Optional preprocessing function (e.g.
+\code{superassp::prep_recode}) applied to media before DSP}
 
-\item{dsp_function}{DSP function name (if using timestamp)}
+\item{.prep_simulate}{Named list of parameter vectors for preprocessing}
+
+\item{.simulation_store}{Path to directory for storing simulation caches}
+
+\item{.simulation_timestamp}{Optional timestamp string for cache identification}
+
+\item{.simulation_overwrite}{Logical; overwrite existing cache entries}
+
+\item{.metadata_fields}{Character vector of metadata fields for
+age/gender-appropriate DSP parameters (default: \code{c("Gender", "Age")})}
+
+\item{.signal_extension}{File extension for signal files}
+
+\item{.force}{Logical; force recomputation even if cached}
+
+\item{.verbose}{Logical; print progress messages}
+
+\item{.parallel}{Logical; use parallel processing}
+
+\item{.workers}{Number of parallel workers (NULL for auto)}
 }
 \value{
-extended_segment_list with retrieved results
+An \code{extended_segment_list} with simulation results
 }
 \description{
-Retrieve simulation results from cache
+Generates SSFF track data for a corpus using a DSP function with systematic
+parameter variation. Results are cached in a simulation store for later
+retrieval with \code{\link{reminisce_tracks}}.
 }

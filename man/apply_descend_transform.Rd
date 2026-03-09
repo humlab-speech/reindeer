@@ -4,7 +4,15 @@
 \alias{apply_descend_transform}
 \title{Apply Descend (Dominance Downward) Transform}
 \usage{
-apply_descend_transform(sql, level)
+apply_descend_transform(query, level)
+}
+\arguments{
+\item{query}{list(sql, params) — current query}
+
+\item{level}{character — target level to descend to}
+}
+\value{
+list(sql, params) — modified query
 }
 \description{
 Apply Descend (Dominance Downward) Transform

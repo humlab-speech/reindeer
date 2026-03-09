@@ -17,10 +17,14 @@ update_signal_hashes(
 \item{bundles}{Optional data.table with session and bundle columns to update.
 If NULL, updates all bundles.}
 
-\item{verbose}{Show progress messages}
+\item{verbose}{Show progress messages (default: TRUE)}
 
 \item{parallel}{Use parallel processing (default: TRUE)}
 }
+\value{
+A data.table of signal hashes, invisibly
+}
 \description{
-Computes and stores SHA1 hashes for all signal files associated with bundles
+Computes and stores SHA1 hashes for all signal files associated with bundles.
+Used to track file integrity for simulation cache validation.
 }

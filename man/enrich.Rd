@@ -78,15 +78,15 @@ Set .parallel = FALSE to disable parallel processing (useful for debugging).
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Enrich corpus with formant tracks
-corp \%>\% enrich(.using = superassp::forest)
+corp |> enrich(.using = superassp::forest)
 
 # With explicit parameters
-corp \%>\% enrich(.using = superassp::ksvF0,
+corp |> enrich(.using = superassp::ksvF0,
                 minF = 75, maxF = 500,
                 .force = TRUE)
 
 # Disable parallel processing
-corp \%>\% enrich(.using = superassp::forest, .parallel = FALSE)
+corp |> enrich(.using = superassp::forest, .parallel = FALSE)
 \dontshow{\}) # examplesIf}
 }
 \seealso{

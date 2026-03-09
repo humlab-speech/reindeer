@@ -4,7 +4,15 @@
 \alias{apply_ascend_transform}
 \title{Apply Ascend (Dominance Upward) Transform}
 \usage{
-apply_ascend_transform(sql, level)
+apply_ascend_transform(query, level)
+}
+\arguments{
+\item{query}{list(sql, params) — current query}
+
+\item{level}{character — target level to ascend to}
+}
+\value{
+list(sql, params) — modified query
 }
 \description{
 Apply Ascend (Dominance Upward) Transform

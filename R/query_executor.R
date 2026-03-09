@@ -1,3 +1,24 @@
+#' Query an EMU database using EQL (EMU Query Language)
+#'
+#' Executes a query against the SQLite cache of an EMU database and returns
+#' matching annotation segments. Supports simple, sequence, dominance,
+#' and function queries.
+#'
+#' @param emuDB A \code{corpus} object, path to an emuDB directory, or emuDBhandle
+#' @param query Character string with an EQL query (e.g. \code{"Phonetic == t"})
+#' @param ... Additional arguments: \code{lazy = TRUE} returns a
+#'   \code{lazy_segment_list} for deferred execution
+#' @return A \code{\link{segment_list}} object (or \code{lazy_segment_list} if
+#'   \code{lazy = TRUE})
+#'
+#' @examples
+#' \dontrun{
+#' corp <- corpus("path/to/db_emuDB")
+#' segs <- ask_for(corp, "Phonetic == t")
+#' segs <- ask_for(corp, "[Phonetic == t -> Phonetic == s]")
+#' segs <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+#' }
+#' @export
 ask_for <- function(emuDB, query, ...) {
   # Handle corpus objects
   if (S7::S7_inherits(emuDB, reindeer::corpus)) {
@@ -70,9 +91,9 @@ ask_for <- function(emuDB, query, ...) {
   
   if (lazy) {
     # Return lazy segment list without executing query
-    # Build base SQL query but don't execute
+    # Build base SQL query but don't execute — returns list(sql, params)
     parsed <- parse_eql_query(query)
-    base_sql <- build_base_sql(db_path, parsed, dots)
+    base_query <- build_base_sql(db_path, parsed, dots)
     
     # Get db_uuid from database
     conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
@@ -86,7 +107,7 @@ ask_for <- function(emuDB, query, ...) {
     return(lazy_segment_list(
       corpus = corpus_obj,
       query_parts = list(
-        base = base_sql,
+        base = base_query,  # list(sql, params)
         transforms = list()
       ),
       db_path = db_path,
@@ -99,7 +120,7 @@ ask_for <- function(emuDB, query, ...) {
     result <- execute_query(db_path, query, ...)
     
     # Convert to segment_list if result is a data.frame
-    if (is.data.frame(result) && !inherits(result, "segment_list")) {
+    if (is.data.frame(result) && !S7::S7_inherits(result, segment_list)) {
       # Extract db_uuid and db_path for segment_list
       db_uuid <- if ("db_uuid" %in% names(result)) unique(result$db_uuid)[1] else ""
       result <- segment_list(result, db_uuid = db_uuid, db_path = database_dir)
@@ -114,17 +135,18 @@ ask_for <- function(emuDB, query, ...) {
 #' Build Base SQL Query Without Execution
 #'
 #' Extracts the SQL query that would be executed, for use in lazy evaluation.
+#' Returns a parameterized query as list(sql, params).
 #' 
 #' @param db_path Path to SQLite database
 #' @param parsed Parsed EQL query
 #' @param opts Additional options
-#' @return SQL query string
+#' @return list(sql = "...", params = list(...))
 #' @keywords internal
 build_base_sql <- function(db_path, parsed, opts = list()) {
   result_level <- opts$result_level %||% NULL
   
-  # Build SQL based on query type
-  sql <- switch(parsed$type,
+  # Build SQL based on query type — all builders return list(sql, params)
+  result <- switch(parsed$type,
     "simple" = build_simple_query_sql(db_path, parsed),
     "sequence" = build_sequence_query_sql(db_path, parsed, result_level),
     "dominance" = build_dominance_query_sql(db_path, parsed, result_level),
@@ -134,18 +156,19 @@ build_base_sql <- function(db_path, parsed, opts = list()) {
     cli::cli_abort("Unknown query type: {.val {parsed$type}}")
   )
   
-  return(sql)
+  return(result)
 }
 
 #' Build SQL for Simple Query
+#'
+#' Returns a parameterized query as list(sql, params) to prevent SQL injection.
 #' @keywords internal
 build_simple_query_sql <- function(db_path, parsed) {
   level <- parsed$level
   operator <- parsed$operator
-  pattern <- parsed$pattern
+  pattern <- parsed$pattern %||% parsed$value
   attribute <- parsed$attribute %||% level
-  
-  # Base SQL for simple query
+
   base_sql <- paste0(
     "SELECT i.*, l.label as labels ",
     "FROM items i ",
@@ -154,76 +177,85 @@ build_simple_query_sql <- function(db_path, parsed) {
     "  i.session = l.session AND ",
     "  i.bundle = l.bundle AND ",
     "  i.item_id = l.item_id ",
-    "WHERE i.level = '", level, "' ",
-    "  AND l.name = '", attribute, "' "
+    "WHERE i.level = ? ",
+    "  AND l.name = ? "
   )
-  
+  params <- list(level, attribute)
+
   # Add filter based on operator
   if (operator == "==") {
-    base_sql <- paste0(base_sql, "AND l.label = '", pattern, "'")
+    base_sql <- paste0(base_sql, "AND l.label = ?")
+    params <- c(params, list(pattern))
   } else if (operator == "!=") {
-    base_sql <- paste0(base_sql, "AND l.label != '", pattern, "'")
+    base_sql <- paste0(base_sql, "AND l.label != ?")
+    params <- c(params, list(pattern))
   } else if (operator == "=~") {
-    # SQLite LIKE pattern
     like_pattern <- gsub("\\.", "%", pattern)
     like_pattern <- gsub("\\*", "%", like_pattern)
-    base_sql <- paste0(base_sql, "AND l.label LIKE '", like_pattern, "'")
+    base_sql <- paste0(base_sql, "AND l.label LIKE ?")
+    params <- c(params, list(like_pattern))
   } else if (operator == "!~") {
     like_pattern <- gsub("\\.", "%", pattern)
     like_pattern <- gsub("\\*", "%", like_pattern)
-    base_sql <- paste0(base_sql, "AND l.label NOT LIKE '", like_pattern, "'")
+    base_sql <- paste0(base_sql, "AND l.label NOT LIKE ?")
+    params <- c(params, list(like_pattern))
   }
-  
-  return(base_sql)
+
+  return(list(sql = base_sql, params = params))
 }
 
-# Placeholder functions for other query types (to be implemented)
+# Placeholder functions for query types not yet supporting lazy SQL generation
 build_sequence_query_sql <- function(db_path, parsed, result_level = NULL) {
-  # For now, fall back to execution
   # TODO: Implement lazy SQL building for sequences
-  conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
-  on.exit(DBI::dbDisconnect(conn))
-  result <- execute_sequence_query_corrected(db_path, parsed, result_level)
-  # Extract the SQL that was used (if available)
-  return(NULL)  # Will cause execution
+  return(NULL)
 }
 
 build_dominance_query_sql <- function(db_path, parsed, result_level = NULL) {
-  # TODO: Implement
+  # TODO: Implement lazy SQL building for dominance
   return(NULL)
 }
 
 build_function_query_sql <- function(db_path, parsed) {
-  # TODO: Implement
+  # TODO: Implement lazy SQL building for function queries
   return(NULL)
 }
 
 build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
-  left_sql <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
-  right_sql <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
-  if (is.null(left_sql) || is.null(right_sql)) return(NULL)
-  paste0("(", left_sql, ") INTERSECT (", right_sql, ")")
+  left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
+  right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
+  if (is.null(left_result) || is.null(right_result)) return(NULL)
+  list(
+    sql = paste0("(", left_result$sql, ") INTERSECT (", right_result$sql, ")"),
+    params = c(left_result$params, right_result$params)
+  )
 }
 
 build_disjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
-  left_sql <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
-  right_sql <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
-  if (is.null(left_sql) || is.null(right_sql)) return(NULL)
-  paste0("(", left_sql, ") UNION (", right_sql, ")")
+  left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
+  right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
+  if (is.null(left_result) || is.null(right_result)) return(NULL)
+  list(
+    sql = paste0("(", left_result$sql, ") UNION (", right_result$sql, ")"),
+    params = c(left_result$params, right_result$params)
+  )
 }
 
 # Main execution dispatcher
 execute_query <- function(db_path, query_string, result_level = NULL) {
+  # Open a single connection and thread it through all sub-executors
+  con <- .open_query_connection(db_path)
+  on.exit(DBI::dbDisconnect(con))
+
   tryCatch({
     parsed <- parse_eql_query(query_string)
     
     result <- switch(parsed$type,
-      "simple" = execute_simple_query_corrected(db_path, parsed),
-      "sequence" = execute_sequence_query_corrected(db_path, parsed, result_level),
-      "dominance" = execute_dominance_query_corrected(db_path, parsed, result_level),
-      "function" = execute_function_query_corrected(db_path, parsed),
-      "conjunction" = execute_conjunction_query(db_path, parsed, result_level),
-      "disjunction" = execute_disjunction_query(db_path, parsed, result_level),
+      "simple" = execute_simple_query_corrected(db_path, parsed, con = con),
+      "sequence" = execute_sequence_query_corrected(db_path, parsed, result_level, con = con),
+      "dominance" = execute_dominance_query_corrected(db_path, parsed, result_level, con = con),
+      "function" = execute_function_query_corrected(db_path, parsed, con = con),
+      "conjunction" = execute_conjunction_query(db_path, parsed, result_level, con = con),
+      "disjunction" = execute_disjunction_query(db_path, parsed, result_level, con = con),
       cli::cli_abort("Unknown query type: {.val {parsed$type}}")
     )
     
@@ -232,8 +264,11 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
     return(format_as_emuRsegs(result))
     
   }, error = function(e) {
-    cli::cli_alert_danger("Query execution failed: {e$message}")
-    return(create_empty_emuRsegs())
+    cli::cli_abort(c(
+      "Query execution failed",
+      "x" = conditionMessage(e),
+      "i" = "Query: {.code {query_string}}"
+    ), parent = e)
   })
 }
 

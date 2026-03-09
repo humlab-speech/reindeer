@@ -20,7 +20,6 @@ NULL
     # Check if i looks like a session (contains "ses" or matches existing session)
     con <- get_corpus_connection(x)
     sessions <- list_sessions_from_cache(con, x@.uuid)
-    DBI::dbDisconnect(con)
     
     # If i matches any session name, treat as session pattern
     if (any(grepl(i, sessions$name, ignore.case = TRUE))) {
@@ -103,26 +102,24 @@ NULL
     
     # Count basic entities
     stats <- list(
-      sessions = DBI::dbGetQuery(con, sprintf(
-        "SELECT COUNT(*) as n FROM session WHERE db_uuid = '%s'", x@.uuid
-      ))$n,
-      bundles = DBI::dbGetQuery(con, sprintf(
-        "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = '%s'", x@.uuid
-      ))$n,
-      items = DBI::dbGetQuery(con, sprintf(
-        "SELECT COUNT(*) as n FROM items WHERE db_uuid = '%s'", x@.uuid
-      ))$n,
-      labels = DBI::dbGetQuery(con, sprintf(
-        "SELECT COUNT(*) as n FROM labels WHERE db_uuid = '%s'", x@.uuid
-      ))$n
+      sessions = DBI::dbGetQuery(con,
+        "SELECT COUNT(*) as n FROM session WHERE db_uuid = ?",
+        params = list(x@.uuid))$n,
+      bundles = DBI::dbGetQuery(con,
+        "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = ?",
+        params = list(x@.uuid))$n,
+      items = DBI::dbGetQuery(con,
+        "SELECT COUNT(*) as n FROM items WHERE db_uuid = ?",
+        params = list(x@.uuid))$n,
+      labels = DBI::dbGetQuery(con,
+        "SELECT COUNT(*) as n FROM labels WHERE db_uuid = ?",
+        params = list(x@.uuid))$n
     )
     
     # Levels available
-    levels_query <- sprintf(
-      "SELECT DISTINCT level FROM items WHERE db_uuid = '%s' ORDER BY level", 
-      x@.uuid
-    )
-    levels <- DBI::dbGetQuery(con, levels_query)$level
+    levels <- DBI::dbGetQuery(con,
+      "SELECT DISTINCT level FROM items WHERE db_uuid = ? ORDER BY level",
+      params = list(x@.uuid))$level
     
     # Metadata fields - check if table exists first
     n_metadata_fields <- tryCatch({
@@ -168,25 +165,25 @@ NULL
   cli::cli_text("")
   
   # Basic info
-  session_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM session WHERE db_uuid = '%s'", object@.uuid
-  ))$n
+  session_count <- DBI::dbGetQuery(con,
+    "SELECT COUNT(*) as n FROM session WHERE db_uuid = ?",
+    params = list(object@.uuid))$n
   
-  bundle_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = '%s'", object@.uuid
-  ))$n
+  bundle_count <- DBI::dbGetQuery(con,
+    "SELECT COUNT(*) as n FROM bundle WHERE db_uuid = ?",
+    params = list(object@.uuid))$n
   
-  item_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM items WHERE db_uuid = '%s'", object@.uuid
-  ))$n
+  item_count <- DBI::dbGetQuery(con,
+    "SELECT COUNT(*) as n FROM items WHERE db_uuid = ?",
+    params = list(object@.uuid))$n
   
-  label_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM labels WHERE db_uuid = '%s'", object@.uuid
-  ))$n
+  label_count <- DBI::dbGetQuery(con,
+    "SELECT COUNT(*) as n FROM labels WHERE db_uuid = ?",
+    params = list(object@.uuid))$n
   
-  link_count <- DBI::dbGetQuery(con, sprintf(
-    "SELECT COUNT(*) as n FROM links WHERE db_uuid = '%s'", object@.uuid
-  ))$n
+  link_count <- DBI::dbGetQuery(con,
+    "SELECT COUNT(*) as n FROM links WHERE db_uuid = ?",
+    params = list(object@.uuid))$n
   
   cli::cli_text("Name:            {.field {object@dbName}}")
   cli::cli_text("UUID:            {.val {object@.uuid}}")
@@ -208,14 +205,14 @@ NULL
     cli::cli_h3("SSFF track definitions")
     cli::cli_text("")
     
-    track_df <- purrr::map_dfr(object@config$ssffTrackDefinitions, function(track) {
+    track_df <- do.call(rbind, lapply(object@config$ssffTrackDefinitions, function(track) {
       tibble::tibble(
         name = track$name,
         columnName = track$columnName,
         fileExtension = track$fileExtension,
         fileFormat = track$format %||% "ssff"
       )
-    })
+    }))
     
     print(track_df)
     cli::cli_text("")
@@ -227,9 +224,9 @@ NULL
     cli::cli_h3("Level definitions")
     cli::cli_text("")
     
-    level_df <- purrr::map_dfr(object@config$levelDefinitions, function(level) {
+    level_df <- do.call(rbind, lapply(object@config$levelDefinitions, function(level) {
       attr_defs <- if (!is.null(level$attributeDefinitions)) {
-        paste(purrr::map_chr(level$attributeDefinitions, ~.x$name), collapse = "; ")
+        paste(vapply(level$attributeDefinitions, function(x) x$name, character(1)), collapse = "; ")
       } else {
         ""
       }
@@ -242,7 +239,7 @@ NULL
         nrOfAttrDefs = length(level$attributeDefinitions %||% list()),
         attrDefNames = attr_defs
       )
-    })
+    }))
     
     print(level_df)
     cli::cli_text("")
@@ -254,13 +251,13 @@ NULL
     cli::cli_h3("Link definitions")
     cli::cli_text("")
     
-    link_df <- purrr::map_dfr(object@config$linkDefinitions, function(link) {
+    link_df <- do.call(rbind, lapply(object@config$linkDefinitions, function(link) {
       tibble::tibble(
         type = link$type,
         superlevelName = link$superlevelName,
         sublevelName = link$sublevelName
       )
-    })
+    }))
     
     print(link_df)
     cli::cli_text("")
@@ -319,36 +316,30 @@ glimpse_corpus_impl <- function(x, ...) {
   con <- get_corpus_connection(x)
   
   # Get sample data for levels
-  levels_query <- sprintf(
-    "SELECT DISTINCT level FROM items WHERE db_uuid = '%s' LIMIT 10", 
-    x@.uuid
-  )
-  levels <- DBI::dbGetQuery(con, levels_query)$level
+  levels <- DBI::dbGetQuery(con,
+    "SELECT DISTINCT level FROM items WHERE db_uuid = ? LIMIT 10",
+    params = list(x@.uuid))$level
   
   # Show level structure
   cli::cli_text("{.strong Levels ({length(levels)}):} {.val {paste(levels, collapse = ', ')}}")
   
   # Sample labels per level
   for (lvl in head(levels, 3)) {
-    labels_query <- sprintf(
+    labels <- DBI::dbGetQuery(con,
       "SELECT DISTINCT l.label 
        FROM labels l 
        INNER JOIN items i ON l.db_uuid = i.db_uuid AND l.session = i.session 
          AND l.bundle = i.bundle AND l.item_id = i.item_id
-       WHERE i.db_uuid = '%s' AND i.level = '%s' 
+       WHERE i.db_uuid = ? AND i.level = ? 
        LIMIT 5",
-      x@.uuid, lvl
-    )
-    labels <- DBI::dbGetQuery(con, labels_query)$label
+      params = list(x@.uuid, lvl))$label
     cli::cli_text("  {.field {lvl}}: {.val {paste(head(labels, 5), collapse = ', ')}}")
   }
   
   # Sample sessions
-  sessions_query <- sprintf(
-    "SELECT name FROM session WHERE db_uuid = '%s' LIMIT 5", 
-    x@.uuid
-  )
-  sessions <- DBI::dbGetQuery(con, sessions_query)$name
+  sessions <- DBI::dbGetQuery(con,
+    "SELECT name FROM session WHERE db_uuid = ? LIMIT 5",
+    params = list(x@.uuid))$name
   cli::cli_text("")
   cli::cli_text("{.strong Sessions (sample):} {.val {paste(sessions, collapse = ', ')}}")
   
@@ -376,7 +367,7 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
   }
   
   # Quick stats
-  n_sessions <- dplyr::n_distinct(x@.data$session)
+  n_sessions <- length(unique(x@.data$session))
   metadata_cols <- setdiff(names(x@.data), c("session", "bundle"))
   
   cli::cli_text("")
@@ -399,10 +390,14 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
 }
 
 
-#' Get or restore database handle for corpus
+#' Get emuDBhandle from a corpus object
+#'
+#' Constructs an emuDBhandle for use with emuR functions that require one.
+#'
 #' @param corpus_obj A corpus object
-#' @param verbose Whether to show loading messages
+#' @param verbose Whether to show loading messages (default: FALSE)
 #' @return An emuDBhandle with valid connection
+#' @export
 get_handle <- function(corpus_obj, verbose = FALSE) {
   # Create native handle using cached connection
   handle <- list(
@@ -513,11 +508,11 @@ get_metadata_field_values <- function(con, db_uuid, field_name, sessions, bundle
     bundle <- bundles[i]
     
     # Try bundle level first
-    bundle_val <- DBI::dbGetQuery(con, sprintf(
+    bundle_val <- DBI::dbGetQuery(con,
       "SELECT field_value, field_type FROM metadata_bundle 
-       WHERE db_uuid = '%s' AND session = '%s' AND bundle = '%s' AND field_name = %s",
-      db_uuid, session, bundle, DBI::dbQuoteString(con, field_name)
-    ))
+       WHERE db_uuid = ? AND session = ? AND bundle = ? AND field_name = ?",
+      params = list(db_uuid, session, bundle, field_name)
+    )
     
     if (nrow(bundle_val) > 0) {
       values[i] <- bundle_val$field_value[1]
@@ -526,11 +521,11 @@ get_metadata_field_values <- function(con, db_uuid, field_name, sessions, bundle
     }
     
     # Try session level
-    session_val <- DBI::dbGetQuery(con, sprintf(
+    session_val <- DBI::dbGetQuery(con,
       "SELECT field_value, field_type FROM metadata_session 
-       WHERE db_uuid = '%s' AND session = '%s' AND field_name = %s",
-      db_uuid, session, DBI::dbQuoteString(con, field_name)
-    ))
+       WHERE db_uuid = ? AND session = ? AND field_name = ?",
+      params = list(db_uuid, session, field_name)
+    )
     
     if (nrow(session_val) > 0) {
       values[i] <- session_val$field_value[1]
@@ -539,11 +534,11 @@ get_metadata_field_values <- function(con, db_uuid, field_name, sessions, bundle
     }
     
     # Try database level
-    db_val <- DBI::dbGetQuery(con, sprintf(
+    db_val <- DBI::dbGetQuery(con,
       "SELECT field_value, field_type FROM metadata_database 
-       WHERE db_uuid = '%s' AND field_name = %s",
-      db_uuid, DBI::dbQuoteString(con, field_name)
-    ))
+       WHERE db_uuid = ? AND field_name = ?",
+      params = list(db_uuid, field_name)
+    )
     
     if (nrow(db_val) > 0) {
       values[i] <- db_val$field_value[1]

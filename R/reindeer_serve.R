@@ -111,7 +111,7 @@ S7::method(serve, corpus) <- function(corpus,
     allBundlesDf <- .list_bundles(emuDBhandle)
   } else {
     # Check if seglist is valid
-    if (!inherits(seglist, "segment_list") && !is.data.frame(seglist)) {
+    if (!S7::S7_inherits(seglist, segment_list) && !is.data.frame(seglist)) {
       cli::cli_abort("seglist must be a segment_list or data.frame with required columns")
     }
 
@@ -349,7 +349,7 @@ S7::method(serve, corpus) <- function(corpus,
 
       # Parse message
       D <- if (is.raw(DATA)) rawToChar(DATA) else DATA
-      D <- readr::parse_character(D)
+      D <- enc2utf8(D)
       jr <- jsonlite::fromJSON(D, simplifyVector = FALSE)
 
       if (debugLevel >= 2) {
@@ -475,7 +475,7 @@ S7::method(serve, corpus) <- function(corpus,
         }
 
         # Create media file URL
-        if (rstudioapi::isAvailable()) {
+        if (requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
           translateFunction <- rstudioapi::translateLocalUrl
         } else {
           translateFunction <- paste0
@@ -761,7 +761,7 @@ S7::method(serve, corpus) <- function(corpus,
   if (length(autoOpenURL) != 0 && autoOpenURL != "") {
     viewer <- getOption("viewer")
 
-    if (useViewer & rstudioapi::isAvailable()) {
+    if (useViewer & requireNamespace("rstudioapi", quietly = TRUE) & rstudioapi::isAvailable()) {
       webApp_path <- get_webapp_dir()
 
       if (!dir.exists(webApp_path)) {
@@ -773,7 +773,7 @@ S7::method(serve, corpus) <- function(corpus,
 
       # Prepare base path for RStudio
       base_path <- "/"
-      if (rstudioapi::isAvailable()) {
+      if (requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
         if (rstudioapi::translateLocalUrl(paste0("http://localhost:", port, "/")) !=
             paste0("http://localhost:", port, "/")) {
           base_path <- paste0("/", rstudioapi::translateLocalUrl(paste0("http://localhost:", port, "/")))
@@ -781,29 +781,32 @@ S7::method(serve, corpus) <- function(corpus,
       }
 
       # Modify index.html for local serving
-      index_html <- readr::read_file(file.path(webApp_path, "index.html"))
-      index_html_new <- stringr::str_replace(
+      index_html <- readLines(file.path(webApp_path, "index.html"), warn = FALSE)
+      index_html <- paste(index_html, collapse = "\n")
+      index_html_new <- sub(
+        "<base href=\"/EMU-webApp/\">",
+        paste0("<base href=\"", base_path, "\">"),
         index_html,
-        pattern = "<base href=\"/EMU-webApp/\">",
-        replacement = paste0("<base href=\"", base_path, "\">")
+        fixed = TRUE
       )
-      index_html_new <- stringr::str_replace(
+      index_html_new <- sub(
+        "manifest=\"manifest.appcache\"",
+        "",
         index_html_new,
-        pattern = "manifest=\"manifest.appcache\"",
-        replacement = ""
+        fixed = TRUE
       )
 
       # Write modified index.html to temp location
       temp_index <- tempfile(fileext = ".html")
-      readr::write_file(x = index_html_new, file = temp_index)
+      writeLines(index_html_new, temp_index)
 
       # Open in viewer or browser
       if (!is.null(viewer)) {
         viewer(paste0(
           "http://127.0.0.1:", port, "/?autoConnect=true",
-          "&serverUrl=", stringr::str_replace(
-            rstudioapi::translateLocalUrl(paste0("http://127.0.0.1:", port), absolute = TRUE),
-            "http", "ws"
+          "&serverUrl=", sub(
+            "http", "ws",
+            rstudioapi::translateLocalUrl(paste0("http://127.0.0.1:", port), absolute = TRUE)
           )
         ))
       } else {

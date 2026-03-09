@@ -23,7 +23,7 @@ build_emuDB_cache <- function(database_dir,
   }
 
   # Extract database name from directory
-  db_name <- stringr::str_replace(basename(database_dir), "_emuDB$", "")
+  db_name <- sub("_emuDB$", "", basename(database_dir))
 
   # Setup paths
   db_config_path <- file.path(database_dir, paste0(db_name, "_DBconfig.json"))
@@ -79,7 +79,7 @@ build_emuDB_cache <- function(database_dir,
   }
 
   if (verbose) {
-    cli::cli_alert_success("Found {.val {dplyr::n_distinct(sessions_bundles$session)}} sessions with {.val {nrow(sessions_bundles)}} bundles")
+    cli::cli_alert_success("Found {.val {length(unique(sessions_bundles$session))}} sessions with {.val {nrow(sessions_bundles)}} bundles")
   }
 
   # Setup parallel processing if requested
@@ -237,14 +237,14 @@ initialize_database_schema <- function(con, uuid, db_name) {
 
 discover_sessions_bundles <- function(database_dir) {
   session_dirs <- list.dirs(database_dir, recursive = FALSE, full.names = FALSE)
-  session_dirs <- session_dirs[stringr::str_detect(session_dirs, "_ses$")]
+  session_dirs <- session_dirs[grepl("_ses$", session_dirs)]
 
-  sessions_bundles <- purrr::map_dfr(session_dirs, function(ses_dir) {
-    session_name <- stringr::str_replace(ses_dir, "_ses$", "")
+  sessions_bundles <- do.call(rbind, lapply(session_dirs, function(ses_dir) {
+    session_name <- sub("_ses$", "", ses_dir)
     bundle_dirs <- list.dirs(file.path(database_dir, ses_dir),
                              recursive = FALSE, full.names = FALSE)
-    bundle_dirs <- bundle_dirs[stringr::str_detect(bundle_dirs, "_bndl$")]
-    bundle_names <- stringr::str_replace(bundle_dirs, "_bndl$", "")
+    bundle_dirs <- bundle_dirs[grepl("_bndl$", bundle_dirs)]
+    bundle_names <- sub("_bndl$", "", bundle_dirs)
 
     if (length(bundle_names) > 0) {
       tibble::tibble(
@@ -252,9 +252,13 @@ discover_sessions_bundles <- function(database_dir) {
         bundle = bundle_names
       )
     } else {
-      tibble::tibble()
+      NULL
     }
-  })
+  }))
+
+  if (is.null(sessions_bundles)) {
+    sessions_bundles <- tibble::tibble(session = character(), bundle = character())
+  }
 
   return(sessions_bundles)
 }
@@ -268,13 +272,13 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
 
   # Add sessions to database
   unique_sessions <- unique(sessions_bundles$session)
-  session_insert <- sprintf(
-    "INSERT OR IGNORE INTO session (db_uuid, name) VALUES ('%s', '%s')",
-    db_config$UUID, unique_sessions
-  )
 
   DBI::dbBegin(con)
-  purrr::walk(session_insert, ~ DBI::dbExecute(con, .x))
+  for (sess in unique_sessions) {
+    DBI::dbExecute(con,
+      "INSERT OR IGNORE INTO session (db_uuid, name) VALUES (?, ?)",
+      params = list(db_config$UUID, sess))
+  }
   DBI::dbCommit(con)
 
   # Split into batches
@@ -345,16 +349,15 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
         .options = furrr::furrr_options(seed = TRUE)
       )
     } else {
-      batch_results <- purrr::pmap(
-        list(batch$session, batch$bundle),
+      batch_results <- Map(
         process_bundle,
-        database_dir = database_dir,
-        db_config = db_config
+        batch$session, batch$bundle,
+        MoreArgs = list(database_dir = database_dir, db_config = db_config)
       )
     }
 
     # Insert successful results into database
-    successful_results <- purrr::keep(batch_results, ~ .x$success)
+    successful_results <- Filter(function(x) x$success, batch_results)
 
     if (length(successful_results) > 0) {
       insert_batch_results(con, successful_results, db_config$UUID)
@@ -364,7 +367,7 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
     
     # Update progress bar
     if (verbose) {
-      bundles_done <- sum(purrr::map_int(batches[1:i], nrow))
+      bundles_done <- sum(vapply(batches[1:i], nrow, integer(1)))
       cli::cli_progress_update(set = bundles_done)
     }
   }
@@ -375,8 +378,8 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
 
   # Convert results to data frame
   results_df <- tibble::tibble(
-    success = purrr::map_lgl(results, ~ .x$success),
-    error = purrr::map_chr(results, ~ .x$error)
+    success = vapply(results, function(x) x$success, logical(1)),
+    error = vapply(results, function(x) x$error, character(1))
   )
 
   return(results_df)
@@ -498,7 +501,7 @@ insert_batch_results <- function(con, results, db_uuid) {
 
   tryCatch({
     # Prepare bundle data
-    bundle_data <- purrr::map_dfr(results, function(r) {
+    bundle_data <- do.call(rbind, lapply(results, function(r) {
       tibble::tibble(
         db_uuid = db_uuid,
         session = r$data$items$session[1],
@@ -507,12 +510,12 @@ insert_batch_results <- function(con, results, db_uuid) {
         sample_rate = r$sample_rate,
         md5_annot_json = r$md5
       )
-    })
+    }))
 
     # Combine all items, labels, and links
-    all_items <- purrr::map_dfr(results, ~ .x$data$items)
-    all_labels <- purrr::map_dfr(results, ~ .x$data$labels)
-    all_links <- purrr::map_dfr(results, ~ .x$data$links)
+    all_items <- do.call(rbind, lapply(results, function(x) x$data$items))
+    all_labels <- do.call(rbind, lapply(results, function(x) x$data$labels))
+    all_links <- do.call(rbind, lapply(results, function(x) x$data$links))
 
     # Insert bundles
     if (nrow(bundle_data) > 0) {

@@ -84,14 +84,21 @@ initialize_metadata_schema <- function(con) {
 # METADATA GATHERING FROM .meta_json FILES
 # ==============================================================================
 
-#' Gather all metadata from .meta_json files and update SQLite cache - OPTIMIZED
+#' Gather metadata from JSON files into SQLite cache
 #'
-#' Efficiently scans database, session, and bundle .meta_json files
-#' and populates the metadata tables in the cache using bulk operations
-#' 
+#' Scans database, session, and bundle METADATA.json files and populates the
+#' metadata tables in the SQLite cache using bulk operations.
+#' Call this after manually editing .meta_json files to keep the cache in sync.
+#'
 #' @param corpus_obj A corpus object
-#' @param verbose Show progress messages
+#' @param verbose Show progress messages (default: TRUE)
 #' @param parallel Use parallel processing for bundle metadata (default: TRUE)
+#' @return The corpus object, invisibly
+#'
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/db_emuDB")
+#' gather_metadata(corp)
+#'
 #' @export
 gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
 
@@ -399,14 +406,23 @@ register_metadata_field <- function(con, field_name, field_type) {
 # EFFICIENT METADATA RETRIEVAL
 # ==============================================================================
 
-#' Get complete metadata for all bundles with inheritance - OPTIMIZED
+#' Get metadata for all bundles with inheritance
 #'
-#' Retrieves metadata with proper precedence: bundle > session > database
-#' Uses a single efficient SQL query instead of looping
+#' Retrieves metadata with proper precedence: bundle > session > database.
+#' Returns one row per bundle with all metadata fields as columns.
+#'
 #' @param corpus_obj A corpus object
 #' @param session_pattern Optional regex pattern to filter sessions
 #' @param bundle_pattern Optional regex pattern to filter bundles
-#' @return A data.table with one row per bundle and columns for all metadata fields
+#' @return A tibble with one row per bundle and columns for session, bundle,
+#'   and all metadata fields (with inheritance resolved)
+#'
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/db_emuDB")
+#' meta <- get_metadata(corp)
+#' # Filter by session
+#' meta_s1 <- get_metadata(corp, session_pattern = "Session1")
+#'
 #' @export
 get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".*") {
   
@@ -503,12 +519,21 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
 #' @keywords internal
 get_metadata_field <- function(con, db_uuid, field_name, sessions, bundles) {
   
+  if (length(sessions) == 0) return(character(0))
+  
   # Build single efficient query using COALESCE for precedence
-  # This replaces hundreds of individual queries with one query
+  # Generate exactly N rows in the CTE
+  quoted_field <- DBI::dbQuoteString(con, field_name)
+  quoted_uuid <- DBI::dbQuoteString(con, db_uuid)
+  
+  pairs_sql <- paste(
+    c("SELECT ? as session, ? as bundle",
+      rep("UNION ALL SELECT ?, ?", max(0, length(sessions) - 1))),
+    collapse = "\n      "
+  )
+  
   query <- sprintf("
     WITH bundle_session_pairs AS (
-      SELECT ? as session, ? as bundle
-      UNION ALL SELECT ?, ?
       %s
     )
     SELECT 
@@ -521,22 +546,21 @@ get_metadata_field <- function(con, db_uuid, field_name, sessions, bundles) {
       ) as field_value
     FROM bundle_session_pairs bsp
     LEFT JOIN metadata_bundle mb 
-      ON mb.db_uuid = '%s' 
+      ON mb.db_uuid = %s 
       AND mb.session = bsp.session 
       AND mb.bundle = bsp.bundle
       AND mb.field_name = %s
     LEFT JOIN metadata_session ms
-      ON ms.db_uuid = '%s'
+      ON ms.db_uuid = %s
       AND ms.session = bsp.session
       AND ms.field_name = %s  
     LEFT JOIN metadata_database md
-      ON md.db_uuid = '%s'
-      AND md.field_name = %s
-    ORDER BY bsp.rowid",
-    paste(rep("UNION ALL SELECT ?, ?", max(0, length(sessions) - 2)), collapse = "\n"),
-    db_uuid, DBI::dbQuoteString(con, field_name),
-    db_uuid, DBI::dbQuoteString(con, field_name),
-    db_uuid, DBI::dbQuoteString(con, field_name)
+      ON md.db_uuid = %s
+      AND md.field_name = %s",
+    pairs_sql,
+    quoted_uuid, quoted_field,
+    quoted_uuid, quoted_field,
+    quoted_uuid, quoted_field
   )
   
   # Prepare parameters - interleave sessions and bundles
@@ -667,11 +691,4 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
 # ==============================================================================
 # EXCEL IMPORT/EXPORT
 # ==============================================================================
-
-#' Export metadata to Excel for convenient editing - OPTIMIZED
-#'
-#' @param corpus_obj A corpus object
-#' @param Excelfile Path to Excel file to create
-#' @param overwrite Whether to overwrite existing file
-#' @param mandatory Vector of column names to ensure are present
-#' @export
+# Implementation is in metadata_import_export.R

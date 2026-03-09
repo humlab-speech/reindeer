@@ -13,6 +13,7 @@
 #' @param sync_eaf Logical; enable auto-sync of EAF files on annotation changes
 #' @param sync_cmdi Logical; enable auto-sync of CMDI metadata file on changes
 #' @param cache_dir Character; path to quantify cache dir (default: {basePath}/.quantify_cache)
+#' @param quick Logical; if TRUE, skip cache/metadata rebuild when existing cache is present
 #'
 #' @returns A corpus object with access to database contents
 #'
@@ -54,7 +55,7 @@ corpus <- S7::new_class(
   ),
   constructor = function(path, verbose = FALSE, create = FALSE,
                          sync_eaf = FALSE, sync_cmdi = FALSE,
-                         cache_dir = NULL) {
+                         cache_dir = NULL, quick = FALSE) {
     # Input validation with assertthat
     assertthat::assert_that(
       !is.null(path),
@@ -77,7 +78,7 @@ corpus <- S7::new_class(
       )
       
       # Auto-append _emuDB if not present
-      if (!stringr::str_ends(path, "_emuDB")) {
+      if (!endsWith(path, "_emuDB")) {
         path <- paste0(path, "_emuDB")
         if (verbose) {
           cli::cli_alert_info("Auto-appending suffix: {.path {path}}")
@@ -88,28 +89,33 @@ corpus <- S7::new_class(
       if (!dir.exists(path)) {
         if (create) {
           # Create new database
-          dbName <- stringr::str_remove(basename(path), "_emuDB$")
+          dbName <- sub("_emuDB$", "", basename(path))
           basePath <- create_new_emuDB(path, dbName, verbose)
         } else {
           # Provide helpful error message
           cli::cli_abort(c(
             "Database path {.path {path}} does not exist",
             "i" = "To create a new corpus, use: {.code corpus('{path}', create = TRUE)}",
-            "i" = "Or create with emuR first: {.code emuR::create_emuDB(name='{stringr::str_remove(basename(path), '_emuDB$')}', targetDir='{dirname(path)}')}"
+            "i" = "Or create with emuR first: {.code emuR::create_emuDB(name='{sub('_emuDB$', '', basename(path))}', targetDir='{dirname(path)}')}"
           ))
         }
       } else {
         # Path exists - validate it's a proper _emuDB
         assertthat::assert_that(
-          stringr::str_ends(basename(path), "_emuDB"),
+          endsWith(basename(path), "_emuDB"),
           msg = "Database directory should end with '_emuDB'"
         )
         basePath <- path
-        dbName <- stringr::str_remove(basename(basePath), "_emuDB$")
+        dbName <- sub("_emuDB$", "", basename(basePath))
       }
 
-      # Build/update cache with progress display
-      build_emuDB_cache(basePath, verbose = verbose)
+      # Build/update cache (skip if quick mode and cache already exists)
+      cache_file <- file.path(basePath, paste0(dbName, "_emuDBcache.sqlite"))
+      if (quick && file.exists(cache_file)) {
+        if (verbose) cli::cli_alert_info("Quick mode: reusing existing cache")
+      } else {
+        build_emuDB_cache(basePath, verbose = verbose)
+      }
 
       # Gather metadata into cache
       if (verbose) {
@@ -121,9 +127,11 @@ corpus <- S7::new_class(
       dbName <- handle$dbName
       basePath <- handle$basePath
 
-      # Ensure cache exists
+      # Ensure cache exists (in quick mode, skip rebuild if cache present)
       cache_file <- file.path(basePath, paste0(dbName, "_emuDBcache.sqlite"))
       if (!file.exists(cache_file)) {
+        build_emuDB_cache(basePath, verbose = verbose)
+      } else if (!quick) {
         build_emuDB_cache(basePath, verbose = verbose)
       }
     } else {
@@ -169,8 +177,20 @@ corpus <- S7::new_class(
     con <- get_or_create_connection(corpus_obj)
     initialize_metadata_schema(con)
 
-    # Gather from .meta_json files (ground truth)
-    gather_metadata_internal(corpus_obj, verbose = verbose)
+    # Gather from .meta_json files (ground truth) — skip in quick mode if metadata exists
+    if (quick) {
+      has_metadata <- tryCatch({
+        n <- DBI::dbGetQuery(con, "SELECT COUNT(*) as n FROM metadata_bundle")$n
+        n > 0
+      }, error = function(e) FALSE)
+      if (!has_metadata) {
+        gather_metadata_internal(corpus_obj, verbose = verbose)
+      } else if (verbose) {
+        cli::cli_alert_info("Quick mode: reusing cached metadata")
+      }
+    } else {
+      gather_metadata_internal(corpus_obj, verbose = verbose)
+    }
 
     corpus_obj
   },

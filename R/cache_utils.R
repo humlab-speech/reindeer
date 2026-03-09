@@ -120,16 +120,19 @@ clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
   conn <- DBI::dbConnect(RSQLite::SQLite(), cache_file)
   on.exit(DBI::dbDisconnect(conn), add = TRUE)
   
-  # Build query
+  # Build query with parameterized conditions
   where_clauses <- character()
+  params <- list()
   
   if (!is.null(older_than)) {
     cutoff_time <- as.integer(Sys.time()) - (older_than * 24 * 60 * 60)
-    where_clauses <- c(where_clauses, sprintf("accessed_at < %d", cutoff_time))
+    where_clauses <- c(where_clauses, "accessed_at < ?")
+    params <- c(params, list(cutoff_time))
   }
   
   if (!is.null(format)) {
-    where_clauses <- c(where_clauses, sprintf("format = '%s'", format))
+    where_clauses <- c(where_clauses, "format = ?")
+    params <- c(params, list(format))
   }
   
   where_sql <- if (length(where_clauses) > 0) {
@@ -138,9 +141,12 @@ clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
     ""
   }
   
+  # Only pass params when there are placeholders
+  params_arg <- if (length(params) == 0) NULL else params
+  
   # Count entries to be deleted
-  count_query <- sprintf("SELECT COUNT(*) as count FROM cache %s", where_sql)
-  to_delete <- DBI::dbGetQuery(conn, count_query)$count
+  count_query <- paste("SELECT COUNT(*) as count FROM cache", where_sql)
+  to_delete <- DBI::dbGetQuery(conn, count_query, params = params_arg)$count
   
   if (to_delete == 0) {
     cli::cli_alert_info("No entries match the criteria")
@@ -148,8 +154,8 @@ clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
   }
   
   # Delete entries
-  delete_query <- sprintf("DELETE FROM cache %s", where_sql)
-  DBI::dbExecute(conn, delete_query)
+  delete_query <- paste("DELETE FROM cache", where_sql)
+  DBI::dbExecute(conn, delete_query, params = params_arg)
   
   cli::cli_alert_success("Removed {to_delete} cache entr{?y/ies}")
   

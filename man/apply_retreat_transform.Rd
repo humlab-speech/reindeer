@@ -4,7 +4,15 @@
 \alias{apply_retreat_transform}
 \title{Apply Retreat (Backward Sequence) Transform}
 \usage{
-apply_retreat_transform(sql, n = 1)
+apply_retreat_transform(query, n = 1)
+}
+\arguments{
+\item{query}{list(sql, params) — current query}
+
+\item{n}{integer — number of steps backward}
+}
+\value{
+list(sql, params) — modified query
 }
 \description{
 Apply Retreat (Backward Sequence) Transform

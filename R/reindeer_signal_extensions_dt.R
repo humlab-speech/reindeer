@@ -26,6 +26,12 @@ dspp_metadataParameters_dt <- function(recompute=FALSE,
   }
 
   # Read data once
+  if (!requireNamespace("openxlsx", quietly = TRUE)) {
+    cli::cli_abort(c(
+      "Package {.pkg openxlsx} is required to recompute DSPP parameters",
+      "i" = "Install it with: {.code install.packages('openxlsx')}"
+    ))
+  }
   defaults <- openxlsx::read.xlsx(
     file.path(system.file(package = "reindeer", mustWork = TRUE),
               "default_parameters.xlsx"),
@@ -65,128 +71,75 @@ dspp_metadataParameters_dt <- function(recompute=FALSE,
 #' Process gender-specific data with data.table
 #' @keywords internal
 process_gender_data <- function(defaults, genders, impute, defaultsEstimatedSampleSize) {
-
-  # Filter and select relevant columns
+  # Filter to specified genders
   dt <- defaults[Gender %in% genders,
                  .(Gender, Age_lower, Age_upper, Parameter, Setting,
                    `Study participants`, `Study identifier`)]
-
-  # Expand age ranges efficiently - ensure consistent types
-  dt_expanded <- dt[, {
-    age_range <- seq(as.integer(Age_lower[1]), as.integer(Age_upper[1]), 1L)
-    list(Age = age_range)
-  }, by = .(Gender, Parameter, Setting, `Study participants`, `Study identifier`)]
-
-  # Calculate weights efficiently
-  dt_expanded[, weight := data.table::fcase(
-    grepl("^min", Parameter), `Study participants` / Setting,
-    grepl("^max", Parameter), `Study participants` * Setting,
-    default = `Study participants`
-  )]
-
-  # Remove Study identifier (not needed for modeling)
-  dt_expanded[, `Study identifier` := NULL]
-
-  # Floor Age
-  dt_expanded[, Age := floor(Age)]
-
-  # Apply loess smoothing by Gender and Parameter
-  dt_smoothed <- dt_expanded[, {
-    age_seq <- seq(min(Age), max(Age), 1)
-    loess_model <- loess(Setting ~ Age, weights = weight, data = .SD, span = 1)
-    predicted <- predict(loess_model,
-                        data.frame(Age = age_seq),
-                        surface = "direct",
-                        statistics = "approximate")
-    .(Age = age_seq, Setting = predicted)
-  }, by = .(Gender, Parameter)]
-
-  # Pivot wider efficiently
-  DSPP_wide <- data.table::dcast(dt_smoothed, Gender + Age ~ Parameter, value.var = "Setting")
-
-  # Compute derived columns
-  if ("windowSize" %in% names(DSPP_wide)) {
-    DSPP_wide[is.na(windowSize) & !is.na(minF),
-              windowSize := ceiling(2*1*1000/minF)]
-  }
-  if ("nominalF2" %in% names(DSPP_wide) && "nominalF1" %in% names(DSPP_wide)) {
-    DSPP_wide[is.na(nominalF2), nominalF2 := ceiling(nominalF1*3)]
-  }
-  if ("nominalF3" %in% names(DSPP_wide) && "nominalF1" %in% names(DSPP_wide)) {
-    DSPP_wide[is.na(nominalF3), nominalF3 := ceiling(nominalF1*5)]
-  }
-
-  # Round all numeric columns
-  num_cols <- names(DSPP_wide)[sapply(DSPP_wide, is.numeric)]
-  DSPP_wide[, (num_cols) := lapply(.SD, function(x) round(x, 0)), .SDcols = num_cols]
-
-  # Sort
-  data.table::setkey(DSPP_wide, Gender, Age)
-
-  # Impute if requested
-  if(impute) {
-    # Group by Gender and impute
-    DSPP_wide[, (num_cols) := lapply(.SD, function(x) {
-      if(any(is.na(x)) && sum(!is.na(x)) > 2) {  # Need at least 3 non-NA values
-        tryCatch({
-          # Suppress convergence warnings - fallback handles failures
-          suppressWarnings(
-            imputeTS::na_kalman(x, smooth=FALSE, model="StructTS")
-          )
-        }, error = function(e) {
-          # Fallback to simple imputation if Kalman fails
-          imputeTS::na_interpolation(x, option = "linear")
-        })
-      } else {
-        x
-      }
-    }), .SDcols = num_cols, by = Gender]
-  }
-
-  return(DSPP_wide)
+  .process_dspp_data(dt, impute, by_gender = TRUE)
 }
 
 
 #' Process unspecified gender data with data.table
 #' @keywords internal
 process_unspecified_data <- function(defaults, impute, defaultsEstimatedSampleSize) {
-
-  # Select relevant columns (no Gender)
+  # Select relevant columns (no Gender filter)
   dt <- defaults[, .(Age_lower, Age_upper, Parameter, Setting,
                      `Study participants`, `Study identifier`)]
+  result <- .process_dspp_data(dt, impute, by_gender = FALSE)
+  result[, Gender := "Unspecified"]
+  result
+}
 
-  # Expand age ranges efficiently - ensure consistent types
+
+#' Shared DSPP data processing pipeline
+#' @param dt data.table with columns Age_lower, Age_upper, Parameter, Setting,
+#'   `Study participants`, `Study identifier`, and optionally Gender
+#' @param impute logical; impute missing values?
+#' @param by_gender logical; include Gender in grouping?
+#' @keywords internal
+.process_dspp_data <- function(dt, impute, by_gender = TRUE) {
+  group_cols <- if (by_gender) {
+    c("Gender", "Parameter", "Setting", "Study participants", "Study identifier")
+  } else {
+    c("Parameter", "Setting", "Study participants", "Study identifier")
+  }
+  smooth_by <- if (by_gender) c("Gender", "Parameter") else "Parameter"
+  impute_by <- if (by_gender) "Gender" else NULL
+
+  # Expand age ranges efficiently
   dt_expanded <- dt[, {
     age_range <- seq(as.integer(Age_lower[1]), as.integer(Age_upper[1]), 1L)
     list(Age = age_range)
-  }, by = .(Parameter, Setting, `Study participants`, `Study identifier`)]
+  }, by = group_cols]
 
-  # Calculate weights efficiently
+  # Calculate weights
   dt_expanded[, weight := data.table::fcase(
     grepl("^min", Parameter), `Study participants` / Setting,
     grepl("^max", Parameter), `Study participants` * Setting,
     default = `Study participants`
   )]
 
-  # Remove Study identifier
   dt_expanded[, `Study identifier` := NULL]
-
-  # Floor Age
   dt_expanded[, Age := floor(Age)]
 
-  # Apply loess smoothing by Parameter
+  # Apply loess smoothing
   dt_smoothed <- dt_expanded[, {
     age_seq <- seq(min(Age), max(Age), 1)
-    loess_model <- loess(Setting ~ Age, weights = weight, data = .SD, span = 1)
-    predicted <- predict(loess_model,
+    loess_model <- stats::loess(Setting ~ Age, weights = weight, data = .SD, span = 1)
+    predicted <- stats::predict(loess_model,
                         data.frame(Age = age_seq),
                         surface = "direct",
                         statistics = "approximate")
     .(Age = age_seq, Setting = predicted)
-  }, by = .(Parameter)]
+  }, by = smooth_by]
 
-  # Pivot wider efficiently
-  DSPP_wide <- data.table::dcast(dt_smoothed, Age ~ Parameter, value.var = "Setting")
+  # Pivot wider
+  cast_formula <- if (by_gender) {
+    stats::as.formula("Gender + Age ~ Parameter")
+  } else {
+    stats::as.formula("Age ~ Parameter")
+  }
+  DSPP_wide <- data.table::dcast(dt_smoothed, cast_formula, value.var = "Setting")
 
   # Compute derived columns
   if ("windowSize" %in% names(DSPP_wide)) {
@@ -204,30 +157,34 @@ process_unspecified_data <- function(defaults, impute, defaultsEstimatedSampleSi
   num_cols <- names(DSPP_wide)[sapply(DSPP_wide, is.numeric)]
   DSPP_wide[, (num_cols) := lapply(.SD, function(x) round(x, 0)), .SDcols = num_cols]
 
-  # Add Gender column
-  DSPP_wide[, Gender := "Unspecified"]
-
   # Sort
-  data.table::setkey(DSPP_wide, Age)
+  if (by_gender) {
+    data.table::setkey(DSPP_wide, Gender, Age)
+  } else {
+    data.table::setkey(DSPP_wide, Age)
+  }
 
   # Impute if requested
-  if(impute) {
-    DSPP_wide[, (num_cols) := lapply(.SD, function(x) {
-      if(any(is.na(x)) && sum(!is.na(x)) > 2) {  # Need at least 3 non-NA values
+  if (impute) {
+    impute_expr <- quote(lapply(.SD, function(x) {
+      if (any(is.na(x)) && sum(!is.na(x)) > 2) {
         tryCatch({
-          # Suppress convergence warnings - fallback handles failures
           suppressWarnings(
-            imputeTS::na_kalman(x, smooth=FALSE, model="StructTS")
+            imputeTS::na_kalman(x, smooth = FALSE, model = "StructTS")
           )
         }, error = function(e) {
-          # Fallback to simple imputation if Kalman fails
           imputeTS::na_interpolation(x, option = "linear")
         })
       } else {
         x
       }
-    }), .SDcols = num_cols]
+    }))
+    if (!is.null(impute_by)) {
+      DSPP_wide[, (num_cols) := eval(impute_expr), .SDcols = num_cols, by = impute_by]
+    } else {
+      DSPP_wide[, (num_cols) := eval(impute_expr), .SDcols = num_cols]
+    }
   }
 
-  return(DSPP_wide)
+  DSPP_wide
 }

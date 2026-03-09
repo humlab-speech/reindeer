@@ -40,15 +40,15 @@
 #' 
 #' @examplesIf interactive()
 #' # Enrich corpus with formant tracks
-#' corp %>% enrich(.using = superassp::forest)
+#' corp |> enrich(.using = superassp::forest)
 #'
 #' # With explicit parameters
-#' corp %>% enrich(.using = superassp::ksvF0,
+#' corp |> enrich(.using = superassp::ksvF0,
 #'                 minF = 75, maxF = 500,
 #'                 .force = TRUE)
 #'
 #' # Disable parallel processing
-#' corp %>% enrich(.using = superassp::forest, .parallel = FALSE)
+#' corp |> enrich(.using = superassp::forest, .parallel = FALSE)
 #' 
 #' @seealso [quantify()]
 #' @export
@@ -93,8 +93,8 @@ enrich <- function(corpus_obj, .using, ...,
   }
   
   # Get all signal files
-  signal_files <- peek_signals(corpus_obj) %>%
-    dplyr::filter(extension == .signal_extension)
+  signal_files <- peek_signals(corpus_obj)
+  signal_files <- signal_files[signal_files$extension == .signal_extension, ]
   
   if (nrow(signal_files) == 0) {
     cli::cli_alert_warning("No signal files found with extension {.val {.signal_extension}}")
@@ -111,25 +111,26 @@ enrich <- function(corpus_obj, .using, ...,
   # Only fetch metadata for bundles we're actually processing
   needed_bundles <- unique(paste(signal_files$session, signal_files$bundle, sep = "||"))
   
-  # More efficient: query only the metadata we need
+  # More efficient: query only the metadata we need using parameterized IN clause
+  placeholders <- paste(rep("?", length(needed_bundles)), collapse = ", ")
   bundle_metadata_query <- sprintf(
-    "SELECT * FROM bundle_metadata WHERE CONCAT(session, '||', bundle) IN (%s)",
-    paste(sprintf("'%s'", needed_bundles), collapse = ", ")
+    "SELECT * FROM bundle_metadata WHERE (session || '||' || bundle) IN (%s)",
+    placeholders
   )
   
-  # Fallback to simpler approach if database doesn't support CONCAT
+  # Fallback to simpler approach if query fails
   bundle_metadata <- tryCatch({
-    DBI::dbGetQuery(con, bundle_metadata_query)
+    DBI::dbGetQuery(con, bundle_metadata_query, params = as.list(needed_bundles))
   }, error = function(e) {
     # Fallback: get all and filter in R
     all_meta <- DBI::dbReadTable(con, "bundle_metadata")
-    all_meta %>%
-      dplyr::semi_join(signal_files, by = c("session", "bundle"))
+    sf_keys <- paste(signal_files$session, signal_files$bundle, sep = "||")
+    meta_keys <- paste(all_meta$session, all_meta$bundle, sep = "||")
+    all_meta[meta_keys %in% sf_keys, ]
   })
 
   # Pre-join metadata with signal files for efficiency
-  signal_files_with_meta <- signal_files %>%
-    dplyr::left_join(bundle_metadata, by = c("session", "bundle"))
+  signal_files_with_meta <- merge(signal_files, bundle_metadata, by = c("session", "bundle"), all.x = TRUE)
   
   # Determine number of workers
   if (.parallel) {
@@ -240,7 +241,7 @@ enrich <- function(corpus_obj, .using, ...,
     cli::cli_progress_done()
     
     # Report any errors
-    errors <- purrr::keep(results, ~!.x$success)
+    errors <- Filter(function(x) !x$success, results)
     if (length(errors) > 0) {
       cli::cli_alert_warning("{length(errors)} bundle{?s} failed processing")
       for (err in errors) {

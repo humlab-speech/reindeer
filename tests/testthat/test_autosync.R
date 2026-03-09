@@ -108,11 +108,10 @@ test_that("EAF sync triggers on annotation changes", {
   skip_on_cran()
   skip_if_not(requireNamespace("jsonlite", quietly = TRUE))
   
-  # Use ae_emuDB if available, otherwise skip
-  ae_path <- "/Users/frkkan96/Downloads/ae_emuDB"
-  skip_if_not(dir.exists(ae_path), message = "ae_emuDB not available")
+  # Use isolated ae database (tests modify data)
+  ae_path <- create_isolated_ae_db()
   
-  # Load the original database (read-only)
+  # Load the database
   db_orig <- emuR::load_emuDB(ae_path, verbose = FALSE)
   
   # Get sessions/bundles from original
@@ -219,8 +218,7 @@ test_that("Metadata writing functions trigger syncs", {
   skip_if_not_installed("emuR")
   skip_on_cran()
   
-  ae_path <- "/Users/frkkan96/Downloads/ae_emuDB"
-  skip_if_not(dir.exists(ae_path), message = "ae_emuDB not available")
+  ae_path <- create_isolated_ae_db()
   
   db <- emuR::load_emuDB(ae_path, verbose = FALSE)
   
@@ -280,8 +278,7 @@ test_that("Session metadata writing triggers CMDI sync", {
   skip_if_not_installed("emuR")
   skip_on_cran()
   
-  ae_path <- "/Users/frkkan96/Downloads/ae_emuDB"
-  skip_if_not(dir.exists(ae_path), message = "ae_emuDB not available")
+  ae_path <- create_isolated_ae_db()
   
   db <- emuR::load_emuDB(ae_path, verbose = FALSE)
   
@@ -335,8 +332,7 @@ test_that("Batch metadata updates work efficiently", {
   skip_if_not_installed("emuR")
   skip_on_cran()
   
-  ae_path <- "/Users/frkkan96/Downloads/ae_emuDB"
-  skip_if_not(dir.exists(ae_path), message = "ae_emuDB not available")
+  ae_path <- create_isolated_ae_db()
   
   db <- emuR::load_emuDB(ae_path, verbose = FALSE)
   
@@ -396,8 +392,7 @@ test_that("Force sync regenerates all files", {
   skip_if_not_installed("emuR")
   skip_on_cran()
   
-  ae_path <- "/Users/frkkan96/Downloads/ae_emuDB"
-  skip_if_not(dir.exists(ae_path), message = "ae_emuDB not available")
+  ae_path <- create_isolated_ae_db()
   
   db <- emuR::load_emuDB(ae_path, verbose = FALSE)
   
@@ -532,8 +527,7 @@ test_that("EAF files are valid after sync", {
   skip_on_cran()
   skip_if_not(requireNamespace("xml2", quietly = TRUE))
   
-  ae_path <- "/Users/frkkan96/Downloads/ae_emuDB"
-  skip_if_not(dir.exists(ae_path), message = "ae_emuDB not available")
+  ae_path <- create_isolated_ae_db()
   
   db <- emuR::load_emuDB(ae_path, verbose = FALSE)
   
@@ -592,8 +586,7 @@ test_that("CMDI files contain expected metadata", {
   skip_on_cran()
   skip_if_not(requireNamespace("xml2", quietly = TRUE))
   
-  ae_path <- "/Users/frkkan96/Downloads/ae_emuDB"
-  skip_if_not(dir.exists(ae_path), message = "ae_emuDB not available")
+  ae_path <- create_isolated_ae_db()
   
   db <- emuR::load_emuDB(ae_path, verbose = FALSE)
   

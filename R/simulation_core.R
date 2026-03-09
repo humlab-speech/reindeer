@@ -251,37 +251,51 @@ quantify_simulate <- function(.what, .using, ...,
       ))
     }
     
-    # Store results in cache
-    for (seg_idx in seq_len(nrow(result))) {
-      
-      # Serialize result for this segment using qs for better performance
-      result_blob <- qs::qserialize(result[seg_idx], preset = "fast")
-      
-      # Get signal hash
-      sig_hash <- NA_character_
-      if ("hashes" %in% names(.what_with_hash)) {
-        hash_info <- .what_with_hash$hashes[[seg_idx]]
-        if (!is.null(hash_info)) {
-          sig_hash <- jsonlite::toJSON(hash_info)
+    # Store results in cache (batched within a transaction)
+    n_segs <- nrow(result)
+    if (n_segs > 0) {
+      use_qs <- requireNamespace("qs", quietly = TRUE)
+
+      # Pre-compute all blobs and hashes
+      blobs <- vector("list", n_segs)
+      sig_hashes <- rep(NA_character_, n_segs)
+      for (seg_idx in seq_len(n_segs)) {
+        blobs[[seg_idx]] <- if (use_qs) {
+          qs::qserialize(result[seg_idx], preset = "fast")
+        } else {
+          serialize(result[seg_idx], NULL)
+        }
+        if ("hashes" %in% names(.what_with_hash)) {
+          hash_info <- .what_with_hash$hashes[[seg_idx]]
+          if (!is.null(hash_info)) {
+            sig_hashes[seg_idx] <- jsonlite::toJSON(hash_info)
+          }
         }
       }
-      
-      DBI::dbExecute(con, "
-        INSERT OR REPLACE INTO simulation_results
-          (param_id, segment_row_idx, session, bundle, start_time, end_time,
-           signal_hash, result_blob)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        params = list(
-          param_id,
-          seg_idx,
-          result$session[seg_idx],
-          result$bundle[seg_idx],
-          result$start[seg_idx],
-          result$end[seg_idx],
-          sig_hash,
-          result_blob
-        )
-      )
+
+      # Batch INSERT within transaction
+      DBI::dbBegin(con)
+      tryCatch({
+        insert_sql <- "
+          INSERT OR REPLACE INTO simulation_results
+            (param_id, segment_row_idx, session, bundle, start_time, end_time,
+             signal_hash, result_blob)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        for (seg_idx in seq_len(n_segs)) {
+          DBI::dbExecute(con, insert_sql,
+            params = list(
+              param_id, seg_idx,
+              result$session[seg_idx], result$bundle[seg_idx],
+              result$start[seg_idx], result$end[seg_idx],
+              sig_hashes[seg_idx], blobs[[seg_idx]]
+            )
+          )
+        }
+        DBI::dbCommit(con)
+      }, error = function(e) {
+        DBI::dbRollback(con)
+        cli::cli_abort("Failed to store simulation results: {conditionMessage(e)}")
+      })
     }
     
     # Store result
@@ -330,15 +344,30 @@ quantify_simulate <- function(.what, .using, ...,
 # SIMULATION RESULT RETRIEVAL
 # ==============================================================================
 
-#' Retrieve simulation results from cache
+#' Run simulation-based track enrichment across a parameter grid
 #'
-#' @param segment_list Original segment_list used in simulation
-#' @param parameters Named list of parameter values to retrieve
-#' @param cache_path Path to simulation cache file, or
-#' @param timestamp Timestamp string to identify cache file
-#' @param cache_dir Directory containing cache files (if using timestamp)
-#' @param dsp_function DSP function name (if using timestamp)
-#' @return extended_segment_list with retrieved results
+#' Generates SSFF track data for a corpus using a DSP function with systematic
+#' parameter variation. Results are cached in a simulation store for later
+#' retrieval with \code{\link{reminisce_tracks}}.
+#'
+#' @param corpus_obj A \code{corpus} object
+#' @param .using DSP function to apply (e.g. \code{superassp::forest})
+#' @param ... Additional fixed arguments passed to \code{.using}
+#' @param .simulate Named list of parameter vectors to vary (outer product)
+#' @param .prep_function Optional preprocessing function (e.g.
+#'   \code{superassp::prep_recode}) applied to media before DSP
+#' @param .prep_simulate Named list of parameter vectors for preprocessing
+#' @param .simulation_store Path to directory for storing simulation caches
+#' @param .simulation_timestamp Optional timestamp string for cache identification
+#' @param .simulation_overwrite Logical; overwrite existing cache entries
+#' @param .metadata_fields Character vector of metadata fields for
+#'   age/gender-appropriate DSP parameters (default: \code{c("Gender", "Age")})
+#' @param .signal_extension File extension for signal files
+#' @param .force Logical; force recomputation even if cached
+#' @param .verbose Logical; print progress messages
+#' @param .parallel Logical; use parallel processing
+#' @param .workers Number of parallel workers (NULL for auto)
+#' @return An \code{extended_segment_list} with simulation results
 #' @export
 enrich_simulate <- function(corpus_obj, .using, ...,
                             .simulate = NULL,
@@ -433,8 +462,8 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   }
   
   # Get signal files
-  signal_files <- peek_signals(corpus_obj) %>%
-    dplyr::filter(extension == .signal_extension)
+  signal_files <- peek_signals(corpus_obj)
+  signal_files <- signal_files[signal_files$extension == .signal_extension, ]
   
   if (nrow(signal_files) == 0) {
     cli::cli_alert_warning("No signal files with extension {.val {.signal_extension}}")
@@ -496,8 +525,7 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   
   # Get metadata for bundles
   bundle_metadata <- get_all_bundle_metadata(corpus_obj)
-  signal_files_with_meta <- signal_files %>%
-    dplyr::left_join(bundle_metadata, by = c("session", "bundle"))
+  signal_files_with_meta <- merge(signal_files, bundle_metadata, by = c("session", "bundle"), all.x = TRUE)
   
   # Get base parameters
   base_params <- list(...)
@@ -598,8 +626,12 @@ enrich_simulate <- function(corpus_obj, .using, ...,
           list(toFile = FALSE, verbose = FALSE)
         ))
         
-        # Serialize track object using qs for better performance
-        track_blob <- qs::qserialize(track, preset = "fast")
+        # Serialize track object
+        track_blob <- if (requireNamespace("qs", quietly = TRUE)) {
+          qs::qserialize(track, preset = "fast")
+        } else {
+          serialize(track, NULL)
+        }
         
         # Get signal hash
         signal_hashes <- get_signal_hashes(corpus_obj, 

@@ -2,18 +2,18 @@
 % Please edit documentation in R/corpus_methods.R
 \name{get_handle}
 \alias{get_handle}
-\title{Get or restore database handle for corpus}
+\title{Get emuDBhandle from a corpus object}
 \usage{
 get_handle(corpus_obj, verbose = FALSE)
 }
 \arguments{
 \item{corpus_obj}{A corpus object}
 
-\item{verbose}{Whether to show loading messages}
+\item{verbose}{Whether to show loading messages (default: FALSE)}
 }
 \value{
 An emuDBhandle with valid connection
 }
 \description{
-Get or restore database handle for corpus
+Constructs an emuDBhandle for use with emuR functions that require one.
 }

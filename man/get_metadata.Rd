@@ -2,7 +2,7 @@
 % Please edit documentation in R/metadata_core.R
 \name{get_metadata}
 \alias{get_metadata}
-\title{Get complete metadata for all bundles with inheritance - OPTIMIZED}
+\title{Get metadata for all bundles with inheritance}
 \usage{
 get_metadata(corpus_obj, session_pattern = ".*", bundle_pattern = ".*")
 }
@@ -14,9 +14,18 @@ get_metadata(corpus_obj, session_pattern = ".*", bundle_pattern = ".*")
 \item{bundle_pattern}{Optional regex pattern to filter bundles}
 }
 \value{
-A data.table with one row per bundle and columns for all metadata fields
+A tibble with one row per bundle and columns for session, bundle,
+and all metadata fields (with inheritance resolved)
 }
 \description{
-Retrieves metadata with proper precedence: bundle > session > database
-Uses a single efficient SQL query instead of looping
+Retrieves metadata with proper precedence: bundle > session > database.
+Returns one row per bundle with all metadata fields as columns.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/db_emuDB")
+meta <- get_metadata(corp)
+# Filter by session
+meta_s1 <- get_metadata(corp, session_pattern = "Session1")
+\dontshow{\}) # examplesIf}
 }

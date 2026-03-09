@@ -22,7 +22,6 @@ The reindeer package provides an optimized metadata management system that combi
 
 ```{r setup, eval=FALSE}
 library(reindeer)
-library(dplyr)
 
 # Create or load a corpus
 ae <- corpus("path/to/ae_emuDB")
@@ -129,18 +128,16 @@ import_metadata(ae, "corpus_metadata.xlsx")
 
 ```{r biographize, eval=FALSE}
 # Query for segments
-vowels <- query_opt(ae, "Phonetic=~'[aeiou]'")
+vowels <- ask_for(ae, "Phonetic =~ '[aeiou]'")
 
 # Add metadata
 vowels_enriched <- biographize(vowels, ae)
 
 # Now you can analyze by metadata
-vowels_enriched %>%
-  group_by(Gender, label) %>%
-  summarise(
-    count = n(),
-    mean_duration = mean(end - start)
-  )
+vowels_by_group <- vowels_enriched[, .(
+  count = .N,
+  mean_duration = mean(end - start)
+), by = .(Gender, labels)]
 ```
 
 ### Filtering by Metadata
@@ -150,14 +147,11 @@ vowels_enriched %>%
 meta <- get_metadata(ae)
 
 # Filter to specific speakers
-young_speakers <- meta %>%
-  filter(Age < 30) %>%
-  select(session, bundle)
+meta <- get_metadata(ae)
+young_speakers <- meta[meta$Age < 30, c("session", "bundle")]
 
 # Query only those bundles
-results <- query_opt(ae, "Phonetic=s", 
-                    session = young_speakers$session,
-                    bundle = young_speakers$bundle)
+results <- ask_for(ae, "Phonetic == s")
 ```
 
 ## Corpus Summary
@@ -227,21 +221,23 @@ The optimized system is significantly faster than direct file reading:
 
 This makes interactive metadata exploration practical even for large corpora.
 
-## Advanced: Metadata Inheritance Visualization
+## Advanced: Metadata Inheritance Inspection
 
-To see where each metadata value comes from:
+To see the effective metadata for a specific bundle (with inheritance resolved):
 
 ```{r inheritance, eval=FALSE}
-# Compare different levels
-db_meta <- get_metadata_at_level(ae, "database")
-sess_meta <- get_metadata_at_level(ae, "session", session = "S1")
-bundle_meta <- get_metadata_at_level(ae, "bundle", session = "S1", bundle = "B1")
+# Get all metadata with inheritance resolved
+all_meta <- get_metadata(ae)
 
-# Effective metadata (with inheritance)
-effective <- get_metadata(ae) %>%
-  filter(session == "S1", bundle == "B1")
+# Filter to specific bundle
+effective <- all_meta[all_meta$session == "S1" & all_meta$bundle == "B1", ]
+print(effective)
 
-# Compare to see which values are inherited vs overridden
+# The returned values reflect the precedence: bundle > session > database
+# To inspect raw values at each level, read the .meta_json files directly:
+# - Database: <db_emuDB>/METADATA.json
+# - Session:  <db_emuDB>/<session>_ses/METADATA.json
+# - Bundle:   <db_emuDB>/<session>_ses/<bundle>_bndl/METADATA.json
 ```
 
 ## Conclusion

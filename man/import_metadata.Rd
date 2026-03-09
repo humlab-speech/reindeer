@@ -11,6 +11,17 @@ import_metadata(corpus_obj, Excelfile)
 
 \item{Excelfile}{Path to Excel file to import}
 }
+\value{
+The corpus object, invisibly
+}
 \description{
-Import metadata from Excel file
+Reads bundle, session, and database metadata from an Excel workbook
+(as created by \code{\link{export_metadata}}) and writes it back to
+the corpus JSON files and SQLite cache.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/db_emuDB")
+import_metadata(corp, "corpus_metadata.xlsx")
+\dontshow{\}) # examplesIf}
 }

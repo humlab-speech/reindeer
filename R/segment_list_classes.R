@@ -26,15 +26,12 @@
 #' @examples
 #' \dontrun{
 #' # Query returns a segment_list
-#' segs <- query(corpus, "Phonetic == t")
+#' segs <- ask_for(corpus("path/to/db_emuDB"), "Phonetic == t")
 #'
 #' # Apply DSP to segments
-#' result <- quantify(segs, dsp_function)
+#' result <- quantify(segs, corpus, tracks = "fm")
 #' }
-
-#' @noRd
-
-#' S7 class for segment lists
+#'
 #' @name segment_list
 #' @export
 segment_list <- S7::new_class(
@@ -118,16 +115,18 @@ segment_list <- S7::new_class(
 #' @return A segment_list object
 #' @export
 as_segment_list <- function(x, db_uuid = NULL, db_path = NULL) {
-  if (inherits(x, "segment_list")) {
+  if (S7::S7_inherits(x, segment_list)) {
     return(x)
   }
   segment_list(x, db_uuid = db_uuid, db_path = db_path)
 }
 
 #' Check if object is a segment_list
+#' @param x Object to test
+#' @return Logical
 #' @export
 is_segment_list <- function(x) {
-  inherits(x, "segment_list")
+  S7::S7_inherits(x, segment_list)
 }
 
 #' Extended Segment List S7 Class
@@ -200,7 +199,9 @@ extended_segment_list <- S7::new_class(
 )
 
 #' Check if object is an extended_segment_list
+#' @param x Object to test
+#' @return Logical
 #' @export
 is_extended_segment_list <- function(x) {
-  inherits(x, "extended_segment_list")
+  S7::S7_inherits(x, extended_segment_list)
 }

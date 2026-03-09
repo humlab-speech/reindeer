@@ -1,3 +1,20 @@
+#' Export metadata to Excel file
+#'
+#' Creates a multi-sheet Excel workbook with bundle, session, and database
+#' metadata. Requires the \pkg{openxlsx} package.
+#'
+#' @param corpus_obj A corpus object
+#' @param Excelfile Output path for the Excel file
+#' @param overwrite Overwrite existing file (default: FALSE)
+#' @param mandatory Character vector of metadata columns to always include,
+#'   even if empty (default: \code{c("Age", "Gender")})
+#' @return A data.frame of bundle metadata, invisibly
+#'
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/db_emuDB")
+#' export_metadata(corp, "corpus_metadata.xlsx")
+#'
+#' @export
 export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE, 
                            mandatory = c("Age", "Gender")) {
   
@@ -22,7 +39,7 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
   }
   
   # OPTIMIZATION: Get session metadata with a single query
-  query_session <- sprintf("
+  session_meta_long <- data.table::setDT(DBI::dbGetQuery(con, "
     SELECT 
       s.name as session,
       ms.field_name,
@@ -30,10 +47,8 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
     FROM session s
     LEFT JOIN metadata_session ms 
       ON ms.db_uuid = s.db_uuid AND ms.session = s.name
-    WHERE s.db_uuid = '%s'
-  ", db_uuid)
-  
-  session_meta_long <- data.table::setDT(DBI::dbGetQuery(con, query_session))
+    WHERE s.db_uuid = ?
+  ", params = list(db_uuid)))
   
   if (nrow(session_meta_long) > 0 && !all(is.na(session_meta_long$field_name))) {
     # Convert to wide format
@@ -58,10 +73,10 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
   }
   
   # Get database-level metadata
-  db_metadata <- DBI::dbGetQuery(con, sprintf(
-    "SELECT field_name, field_value FROM metadata_database WHERE db_uuid = '%s'",
-    db_uuid
-  ))
+  db_metadata <- DBI::dbGetQuery(con,
+    "SELECT field_name, field_value FROM metadata_database WHERE db_uuid = ?",
+    params = list(db_uuid)
+  )
   
   if (nrow(db_metadata) > 0) {
     db_df <- as.data.frame(t(db_metadata$field_value))
@@ -109,8 +124,18 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
 
 #' Import metadata from Excel file
 #'
+#' Reads bundle, session, and database metadata from an Excel workbook
+#' (as created by \code{\link{export_metadata}}) and writes it back to
+#' the corpus JSON files and SQLite cache.
+#'
 #' @param corpus_obj A corpus object
 #' @param Excelfile Path to Excel file to import
+#' @return The corpus object, invisibly
+#'
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/db_emuDB")
+#' import_metadata(corp, "corpus_metadata.xlsx")
+#'
 #' @export
 import_metadata <- function(corpus_obj, Excelfile) {
   
@@ -178,11 +203,22 @@ import_metadata <- function(corpus_obj, Excelfile) {
 
 #' Add metadata programmatically
 #'
+#' Sets metadata at the database, session, or bundle level. Writes to
+#' METADATA.json (ground truth) and updates the SQLite cache. Level is
+#' determined by which of \code{session}/\code{bundle} are provided.
+#'
 #' @param corpus_obj A corpus object
-#' @param metadataList Named list of metadata
-#' @param session Optional session name
-#' @param bundle Optional bundle name  
-#' @param reset.before.add Clear existing metadata first
+#' @param metadataList Named list of metadata key-value pairs
+#' @param session Optional session name (required for session/bundle level)
+#' @param bundle Optional bundle name (requires session)
+#' @param reset.before.add Clear existing metadata at this level first (default: FALSE)
+#' @return The corpus object, invisibly
+#'
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/db_emuDB")
+#' add_metadata(corp, list(Project = "MyStudy"))
+#' add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
+#'
 #' @export
 add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL, 
                         reset.before.add = FALSE) {
@@ -250,12 +286,22 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
   }
 }
 
-#' Add biographical metadata to segment list (biographize)
+#' Enrich query results with metadata
 #'
-#' @param segs_tbl Tibble from query
-#' @param corpus_obj Corpus object
-#' @param compute_digests Compute file checksums
-#' @param algorithm Hash algorithm
+#' Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
+#' containing session and bundle columns.
+#'
+#' @param segs_tbl A segment_list or data.frame with session and bundle columns
+#' @param corpus_obj A corpus object
+#' @param compute_digests Compute file checksums before joining (default: FALSE)
+#' @param algorithm Hash algorithm for digests (default: "sha1")
+#' @return An \code{extended_segment_list} with metadata columns appended
+#'
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/db_emuDB")
+#' segs <- ask_for(corp, "Phonetic == t")
+#' enriched <- biographize(segs, corp)
+#'
 #' @export
 biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm = "sha1") {
   
@@ -271,13 +317,12 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
   metadata <- get_metadata(corpus_obj)
   
   # Join with segment list
-  result <- segs_tbl %>%
-    dplyr::left_join(metadata, by = c("session", "bundle"))
+  result <- merge(segs_tbl, metadata, by = c("session", "bundle"), all.x = TRUE)
 
   # Preserve S7 class after join
-  if (inherits(segs_tbl, "extended_segment_list")) {
+  if (S7::S7_inherits(segs_tbl, extended_segment_list)) {
     result <- extended_segment_list(data = as.data.frame(result))
-  } else if (inherits(segs_tbl, "segment_list")) {
+  } else if (S7::S7_inherits(segs_tbl, segment_list)) {
     result <- extended_segment_list(data = as.data.frame(result))
   }
 
@@ -285,10 +330,14 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
 }
 
 #' Add file digests to metadata
-#' @param corpus_obj Corpus object
-#' @param sessionPattern Session pattern
-#' @param bundlePattern Bundle pattern
-#' @param algorithm Hash algorithm
+#'
+#' Computes checksums for signal files and stores them as metadata.
+#'
+#' @param corpus_obj A corpus object
+#' @param sessionPattern Regex pattern to filter sessions (default: ".*")
+#' @param bundlePattern Regex pattern to filter bundles (default: ".*")
+#' @param algorithm Hash algorithm (default: "sha1")
+#' @return The corpus object, invisibly
 #' @export
 add_digests <- function(corpus_obj, sessionPattern = ".*", bundlePattern = ".*", 
                        algorithm = "sha1") {
@@ -310,24 +359,26 @@ get_db_uuid <- function(corpus_obj) {
   config$UUID
 }
 
-#' Get connection from corpus object (delegates to cached connection)
+#' Get connection from corpus object (alias for get_corpus_connection)
 #' @keywords internal
 get_connection <- function(corpus_obj) {
-  get_or_create_connection(corpus_obj)
+  get_corpus_connection(corpus_obj)
 }
 
 #' List sessions from cache
 #' @keywords internal
 list_sessions_from_cache <- function(con, db_uuid) {
-  DBI::dbGetQuery(con, sprintf(
-    "SELECT name FROM session WHERE db_uuid = '%s'", db_uuid
-  ))
+  DBI::dbGetQuery(con,
+    "SELECT name FROM session WHERE db_uuid = ?",
+    params = list(db_uuid)
+  )
 }
 
 #' List bundles from cache
 #' @keywords internal
 list_bundles_from_cache <- function(con, db_uuid) {
-  DBI::dbGetQuery(con, sprintf(
-    "SELECT session, name FROM bundle WHERE db_uuid = '%s'", db_uuid
-  ))
+  DBI::dbGetQuery(con,
+    "SELECT session, name FROM bundle WHERE db_uuid = ?",
+    params = list(db_uuid)
+  )
 }

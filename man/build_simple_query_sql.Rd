@@ -7,6 +7,6 @@
 build_simple_query_sql(db_path, parsed)
 }
 \description{
-Build SQL for Simple Query
+Returns a parameterized query as list(sql, params) to prevent SQL injection.
 }
 \keyword{internal}

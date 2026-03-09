@@ -301,9 +301,12 @@ parse_function_query <- function(query_string) {
 }
 
 # Simple query execution
-execute_simple_query_corrected <- function(db_path, parsed_query) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+execute_simple_query_corrected <- function(db_path, parsed_query, con = NULL) {
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
 
   level <- extract_level_from_query(parsed_query)
   attribute <- if (!is.null(parsed_query$attribute)) parsed_query$attribute else level
@@ -337,9 +340,12 @@ execute_simple_query_corrected <- function(db_path, parsed_query) {
 }
 
 # Sequence query execution
-execute_sequence_query_corrected <- function(db_path, parsed_query, result_level = NULL) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+execute_sequence_query_corrected <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
   
   left_query <- parsed_query$left
   right_query <- parsed_query$right
@@ -384,6 +390,11 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
     }
   }
   
+  # Validate result_side to prevent column name injection
+  if (!result_side %in% c("left", "right", "both")) {
+    cli::cli_abort("Internal error: invalid result_side {.val {result_side}}")
+  }
+
   # Pre-execute non-simple sub-queries to get item IDs
   left_preexec <- NULL
   right_preexec <- NULL
@@ -391,14 +402,14 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   right_condition <- NULL
 
   if (left_query$type != "simple") {
-    left_preexec <- execute_subquery(db_path, left_query)
+    left_preexec <- execute_subquery(db_path, left_query, con = con)
     if (nrow(left_preexec) == 0) return(create_empty_result())
     left_cond <- NULL
   } else {
     left_cond <- extract_condition_from_query(left_query)
   }
   if (right_query$type != "simple") {
-    right_preexec <- execute_subquery(db_path, right_query)
+    right_preexec <- execute_subquery(db_path, right_query, con = con)
     if (nrow(right_preexec) == 0) return(create_empty_result())
     right_cond <- NULL
   } else {
@@ -409,11 +420,14 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   # Returns list(sql = "...", params = list(...))
   build_match_where <- function(level, cond, preexec) {
     if (!is.null(preexec)) {
-      # Pre-executed: use item_id IN (...) — these are internal IDs, not user input
+      # Pre-executed: use compound key match — these are internal IDs from prior queries
+      # Use dbQuoteLiteral for safe interpolation (too many rows for ? placeholders)
       id_col <- if ("item_id" %in% names(preexec)) "item_id" else names(preexec)[grep("item_id", names(preexec))[1]]
       keys <- paste0(
-        "(i.db_uuid='", preexec$db_uuid, "' AND i.session='", preexec$session,
-        "' AND i.bundle='", preexec$bundle, "' AND i.item_id=", preexec[[id_col]], ")"
+        "(i.db_uuid=", DBI::dbQuoteLiteral(con, preexec$db_uuid),
+        " AND i.session=", DBI::dbQuoteLiteral(con, preexec$session),
+        " AND i.bundle=", DBI::dbQuoteLiteral(con, preexec$bundle),
+        " AND i.item_id=", DBI::dbQuoteLiteral(con, preexec[[id_col]]), ")"
       )
       return(list(
         sql = paste0("i.level = ? AND (", paste(keys, collapse = " OR "), ")"),
@@ -593,9 +607,12 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
 }
 
 # Dominance query execution - the key fix
-execute_dominance_query_corrected <- function(db_path, parsed_query, result_level = NULL) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+execute_dominance_query_corrected <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
 
   left_query <- parsed_query$left
   right_query <- parsed_query$right
@@ -632,18 +649,18 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
   left_item_ids <- NULL
   right_item_ids <- NULL
   if (left_query$type != "simple") {
-    left_result <- execute_subquery(db_path, left_query)
+    left_result <- execute_subquery(db_path, left_query, con = con)
     if (nrow(left_result) == 0) return(create_empty_result())
     left_item_ids <- left_result
   }
   if (right_query$type != "simple") {
-    right_result <- execute_subquery(db_path, right_query)
+    right_result <- execute_subquery(db_path, right_query, con = con)
     if (nrow(right_result) == 0) return(create_empty_result())
     right_item_ids <- right_result
   }
 
   dom_sql <- build_corrected_dominance_sql(
-    left_query, right_query, left_level, right_level, result_level, hierarchy_info,
+    con, left_query, right_query, left_level, right_level, result_level, hierarchy_info,
     left_item_ids = left_item_ids, right_item_ids = right_item_ids
   )
 
@@ -652,9 +669,12 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
 }
 
 # Function query execution
-execute_function_query_corrected <- function(db_path, parsed_query) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+execute_function_query_corrected <- function(db_path, parsed_query, con = NULL) {
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
   
   func_name <- parsed_query$func_name
   level1 <- parsed_query$level1
@@ -677,11 +697,10 @@ execute_function_query_corrected <- function(db_path, parsed_query) {
 }
 
 # Conjunction query execution (AND)
-execute_conjunction_query <- function(db_path, parsed_query, result_level = NULL) {
-  # No connection needed here — sub-queries open their own
-  # Execute both sub-queries
-  left_result <- execute_subquery(db_path, parsed_query$left)
-  right_result <- execute_subquery(db_path, parsed_query$right)
+execute_conjunction_query <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
+  # Execute both sub-queries using shared connection
+  left_result <- execute_subquery(db_path, parsed_query$left, con = con)
+  right_result <- execute_subquery(db_path, parsed_query$right, con = con)
   
   # Find intersection based on item_id
   # Items must match in both result sets (same db_uuid, session, bundle, item_id)
@@ -702,10 +721,10 @@ execute_conjunction_query <- function(db_path, parsed_query, result_level = NULL
 }
 
 # Disjunction query execution (OR)
-execute_disjunction_query <- function(db_path, parsed_query, result_level = NULL) {
-  # Execute both sub-queries
-  left_result <- execute_subquery(db_path, parsed_query$left)
-  right_result <- execute_subquery(db_path, parsed_query$right)
+execute_disjunction_query <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
+  # Execute both sub-queries using shared connection
+  left_result <- execute_subquery(db_path, parsed_query$left, con = con)
+  right_result <- execute_subquery(db_path, parsed_query$right, con = con)
   
   # Union the results (remove duplicates)
   result <- unique(rbind(left_result, right_result))
@@ -719,14 +738,14 @@ execute_disjunction_query <- function(db_path, parsed_query, result_level = NULL
 }
 
 # Helper to execute a sub-query
-execute_subquery <- function(db_path, parsed_query) {
+execute_subquery <- function(db_path, parsed_query, con = NULL) {
   result <- switch(parsed_query$type,
-    "simple" = execute_simple_query_corrected(db_path, parsed_query),
-    "sequence" = execute_sequence_query_corrected(db_path, parsed_query, NULL),
-    "dominance" = execute_dominance_query_corrected(db_path, parsed_query, NULL),
-    "function" = execute_function_query_corrected(db_path, parsed_query),
-    "conjunction" = execute_conjunction_query(db_path, parsed_query, NULL),
-    "disjunction" = execute_disjunction_query(db_path, parsed_query, NULL),
+    "simple" = execute_simple_query_corrected(db_path, parsed_query, con = con),
+    "sequence" = execute_sequence_query_corrected(db_path, parsed_query, NULL, con = con),
+    "dominance" = execute_dominance_query_corrected(db_path, parsed_query, NULL, con = con),
+    "function" = execute_function_query_corrected(db_path, parsed_query, con = con),
+    "conjunction" = execute_conjunction_query(db_path, parsed_query, NULL, con = con),
+    "disjunction" = execute_disjunction_query(db_path, parsed_query, NULL, con = con),
     cli::cli_abort("Unknown query type in subquery: {.val {parsed_query$type}}")
   )
   return(result)
@@ -814,19 +833,21 @@ create_empty_result <- function() {
 }
 
 # Dominance SQL builder — returns list(sql, params) for parameterized execution
-build_corrected_dominance_sql <- function(left_query, right_query, left_level, right_level,
+build_corrected_dominance_sql <- function(con, left_query, right_query, left_level, right_level,
                                           result_level, hierarchy_info,
                                           left_item_ids = NULL, right_item_ids = NULL) {
   all_params <- list()
 
-  # Build conditions: parameterized for simple queries, item_id IN for pre-executed
+  # Build conditions: parameterized for simple queries, dbQuoteLiteral for pre-executed
   if (is.null(left_item_ids)) {
     left_cond <- extract_condition_from_query(left_query)
   } else {
-    # Pre-executed: internal IDs, not user input
+    # Pre-executed: internal IDs — use dbQuoteLiteral for safe interpolation
     ids <- unique(paste0(
-      "(i.db_uuid='", left_item_ids$db_uuid, "' AND i.session='", left_item_ids$session,
-      "' AND i.bundle='", left_item_ids$bundle, "' AND i.item_id=", left_item_ids$item_id, ")"
+      "(i.db_uuid=", DBI::dbQuoteLiteral(con, left_item_ids$db_uuid),
+      " AND i.session=", DBI::dbQuoteLiteral(con, left_item_ids$session),
+      " AND i.bundle=", DBI::dbQuoteLiteral(con, left_item_ids$bundle),
+      " AND i.item_id=", DBI::dbQuoteLiteral(con, left_item_ids$item_id), ")"
     ))
     left_cond <- list(sql = paste0("(", paste(ids, collapse = " OR "), ")"), params = list())
   }
@@ -834,8 +855,10 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
     right_cond <- extract_condition_from_query(right_query)
   } else {
     ids <- unique(paste0(
-      "(i.db_uuid='", right_item_ids$db_uuid, "' AND i.session='", right_item_ids$session,
-      "' AND i.bundle='", right_item_ids$bundle, "' AND i.item_id=", right_item_ids$item_id, ")"
+      "(i.db_uuid=", DBI::dbQuoteLiteral(con, right_item_ids$db_uuid),
+      " AND i.session=", DBI::dbQuoteLiteral(con, right_item_ids$session),
+      " AND i.bundle=", DBI::dbQuoteLiteral(con, right_item_ids$bundle),
+      " AND i.item_id=", DBI::dbQuoteLiteral(con, right_item_ids$item_id), ")"
     ))
     right_cond <- list(sql = paste0("(", paste(ids, collapse = " OR "), ")"), params = list())
   }
@@ -859,6 +882,11 @@ build_corrected_dominance_sql <- function(left_query, right_query, left_level, r
   all_params <- c(all_params, cte_result$params)
 
   result_side <- if(result_level == left_level) "left" else "right"
+
+  # Validate result_side to prevent column name injection
+  if (!result_side %in% c("left", "right")) {
+    cli::cli_abort("Internal error: invalid result_side {.val {result_side}}")
+  }
 
   main_sql <- paste0("
     SELECT DISTINCT
@@ -976,9 +1004,25 @@ build_recursive_dominance_chain <- function(path_info) {
     cli::cli_abort("build_recursive_dominance_chain called for direct dominance")
   }
 
+  # Validate level names — they're used as SQL identifiers and values.
+  # Level names come from DBconfig JSON (trusted) but we still validate
+  # to prevent any injection through malformed config files.
+  for (lvl in path) {
+    if (grepl("[^A-Za-z0-9_]", lvl)) {
+      cli::cli_abort("Invalid level name in hierarchy path: {.val {lvl}}")
+    }
+  }
+
+  # Validate direction values
+  for (d in directions) {
+    if (!d %in% c("down", "up")) {
+      cli::cli_abort("Invalid direction in hierarchy path: {.val {d}}")
+    }
+  }
+
   # Helper: for a given direction, determine which link columns to join
-  # "down" = parent→child: from_id is current, to_id is next
-  # "up" = child→parent: to_id is current, from_id is next
+  # "down" = parent->child: from_id is current, to_id is next
+  # "up" = child->parent: to_id is current, from_id is next
   link_cols <- function(dir) {
     if (dir == "down") list(match = "from_id", next_col = "to_id")
     else list(match = "to_id", next_col = "from_id")
@@ -1114,6 +1158,14 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
 
 # Count function
 execute_count_function <- function(con, parent_level, child_level, operator, value) {
+  # Whitelist SQL comparison operators to prevent injection
+  valid_operators <- c("=", "==", "!=", ">", "<", ">=", "<=")
+  if (!operator %in% valid_operators) {
+    cli::cli_abort("Invalid operator for count function: {.val {operator}}")
+  }
+  # Normalize == to = for SQL
+  sql_op <- if (operator == "==") "=" else operator
+
   sql <- sprintf("
     WITH child_counts AS (
       SELECT
@@ -1147,12 +1199,12 @@ execute_count_function <- function(con, parent_level, child_level, operator, val
       AND cc.bundle = l.bundle
       AND cc.item_id = l.item_id
       AND l.name = ?
-    WHERE cc.child_count %s %d
+    WHERE cc.child_count %s ?
     ORDER BY cc.session, cc.bundle, cc.seq_idx",
-    operator, value
+    sql_op
   )
 
-  return(DBI::dbGetQuery(con, sql, params = list(child_level, parent_level, parent_level)))
+  return(DBI::dbGetQuery(con, sql, params = list(child_level, parent_level, parent_level, as.integer(value))))
 }
 
 # Hierarchy functions
@@ -1405,7 +1457,7 @@ format_as_emuRsegs <- function(result_df) {
   )
   
   # Convert to tibble to match emuR output
-  emuRsegs_df <- dplyr::as_tibble(emuRsegs_df)
+  emuRsegs_df <- tibble::as_tibble(emuRsegs_df)
   class(emuRsegs_df) <- c("emuRsegs", class(emuRsegs_df))
   return(emuRsegs_df)
 }
@@ -1432,7 +1484,7 @@ create_empty_emuRsegs <- function() {
   )
   
   # Convert to tibble to match emuR output
-  empty_df <- dplyr::as_tibble(empty_df)
+  empty_df <- tibble::as_tibble(empty_df)
   class(empty_df) <- c("emuRsegs", class(empty_df))
   return(empty_df)
 }

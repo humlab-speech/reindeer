@@ -2,18 +2,28 @@
 % Please edit documentation in R/metadata_core.R
 \name{gather_metadata}
 \alias{gather_metadata}
-\title{Gather all metadata from .meta_json files and update SQLite cache - OPTIMIZED}
+\title{Gather metadata from JSON files into SQLite cache}
 \usage{
 gather_metadata(corpus_obj, verbose = TRUE, parallel = TRUE)
 }
 \arguments{
 \item{corpus_obj}{A corpus object}
 
-\item{verbose}{Show progress messages}
+\item{verbose}{Show progress messages (default: TRUE)}
 
 \item{parallel}{Use parallel processing for bundle metadata (default: TRUE)}
 }
+\value{
+The corpus object, invisibly
+}
 \description{
-Efficiently scans database, session, and bundle .meta_json files
-and populates the metadata tables in the cache using bulk operations
+Scans database, session, and bundle METADATA.json files and populates the
+metadata tables in the SQLite cache using bulk operations.
+Call this after manually editing .meta_json files to keep the cache in sync.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/db_emuDB")
+gather_metadata(corp)
+\dontshow{\}) # examplesIf}
 }

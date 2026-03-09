@@ -10,15 +10,17 @@ test_that("serve rejects invalid corpus types", {
 })
 
 test_that("serve validates port argument", {
-  # Create minimal fake corpus to get past type check
   skip_if_not_installed("httpuv")
-
-  # Port validation happens inside serve(), testing with invalid corpus
-  # just to verify the function exists and is callable
   expect_true(is.function(reindeer::serve))
 })
 
-test_that("get_emuDBhandle creates proper handle from corpus-like object", {
-  # Test the internal helper
-  skip("Requires live corpus object")
+test_that("get_handle creates proper emuDBhandle from corpus", {
+  skip_if_not_installed("emuR")
+
+  ae <- create_isolated_ae_corpus()
+  handle <- get_handle(ae)
+
+  expect_true(inherits(handle, "emuDBhandle"))
+  expect_true(!is.null(handle$basePath))
+  expect_true(!is.null(handle$dbName))
 })

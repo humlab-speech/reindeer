@@ -63,7 +63,7 @@ scout <- function(.segments,
   }
   
   # Handle lazy evaluation
-  if (inherits(.segments, "lazy_segment_list")) {
+  if (S7::S7_inherits(.segments, lazy_segment_list)) {
     # Add scout transform to query chain
     transform <- list(
       type = "scout",
@@ -322,7 +322,7 @@ ascend_to <- function(.segments, level, .from = NULL, .quiet = TRUE, collect = T
   }
   
   # Handle lazy evaluation
-  if (inherits(.segments, "lazy_segment_list")) {
+  if (S7::S7_inherits(.segments, lazy_segment_list)) {
     transform <- list(
       type = "ascend",
       level = level
@@ -491,7 +491,7 @@ descend_to <- function(.segments, level, .from = NULL, .quiet = TRUE, collect = 
   }
   
   # Handle lazy evaluation
-  if (inherits(.segments, "lazy_segment_list")) {
+  if (S7::S7_inherits(.segments, lazy_segment_list)) {
     transform <- list(
       type = "descend",
       level = level

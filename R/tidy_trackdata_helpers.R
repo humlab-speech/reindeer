@@ -128,7 +128,7 @@ clear_tidy_cache <- function() {
 #' @noRd
 .seglist_to_df <- function(.segments) {
   # Handle lazy evaluation first - explicitly check class
-  if ("lazy_segment_list" %in% class(.segments)) {
+  if (S7::S7_inherits(.segments, reindeer::lazy_segment_list)) {
     # Force collection
     .segments <- reindeer::collect(.segments)
   }
@@ -219,7 +219,7 @@ clear_tidy_cache <- function() {
         seg_replicated <- seg[rep(1, n_result_rows), , drop = FALSE]
         rownames(seg_replicated) <- NULL
         
-        dplyr::bind_cols(
+        cbind(
           tibble::as_tibble(seg_replicated),
           tibble::as_tibble(result_df)
         )
@@ -232,7 +232,7 @@ clear_tidy_cache <- function() {
     })
     
     # Combine results from this file
-    purrr::compact(segment_results)
+    Filter(Negate(is.null), segment_results)
   })
   
   # Flatten nested list
@@ -553,7 +553,7 @@ clear_tidy_cache <- function() {
         n_result_rows <- nrow(result_df)
         seg_info <- .SD[rep(1, n_result_rows)]
         
-        dplyr::bind_cols(
+        cbind(
           tibble::as_tibble(seg_info),
           tibble::as_tibble(result_df)
         )
@@ -665,7 +665,7 @@ clear_tidy_cache <- function() {
         seg_replicated <- seg[rep(1, n_result_rows), , drop = FALSE]
         rownames(seg_replicated) <- NULL
         
-        dplyr::bind_cols(
+        cbind(
           tibble::as_tibble(seg_replicated),
           tibble::as_tibble(result_df)
         )

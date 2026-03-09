@@ -37,9 +37,10 @@ A segment_list must contain the following columns:
 \examples{
 \dontrun{
 # Query returns a segment_list
-segs <- query(corpus, "Phonetic == t")
+segs <- ask_for(corpus("path/to/db_emuDB"), "Phonetic == t")
 
 # Apply DSP to segments
-result <- quantify(segs, dsp_function)
+result <- quantify(segs, corpus, tracks = "fm")
 }
+
 }

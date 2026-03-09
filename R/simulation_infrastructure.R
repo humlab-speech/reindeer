@@ -121,13 +121,15 @@ compute_signal_hash <- function(file_path) {
 
 #' Update signal file hashes in bundle metadata
 #'
-#' Computes and stores SHA1 hashes for all signal files associated with bundles
-#' 
+#' Computes and stores SHA1 hashes for all signal files associated with bundles.
+#' Used to track file integrity for simulation cache validation.
+#'
 #' @param corpus_obj A corpus object
 #' @param bundles Optional data.table with session and bundle columns to update.
 #'   If NULL, updates all bundles.
-#' @param verbose Show progress messages
+#' @param verbose Show progress messages (default: TRUE)
 #' @param parallel Use parallel processing (default: TRUE)
+#' @return A data.table of signal hashes, invisibly
 #' @export
 update_signal_hashes <- function(corpus_obj, bundles = NULL, 
                                   verbose = TRUE, parallel = TRUE) {
@@ -186,7 +188,7 @@ update_signal_hashes <- function(corpus_obj, bundles = NULL,
   })
   
   # Update metadata for each bundle
-  con <- DBI::dbConnect(RSQLite::SQLite(), file.path(corpus_obj@basePath, "_cache.sqlite"))
+  con <- DBI::dbConnect(RSQLite::SQLite(), file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, "_emuDBcache.sqlite")))
   on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   db_uuid <- corpus_obj@config$UUID
@@ -223,7 +225,7 @@ update_signal_hashes <- function(corpus_obj, bundles = NULL,
 #' @export
 get_signal_hashes <- function(corpus_obj, session = NULL, bundle = NULL) {
   
-  con <- DBI::dbConnect(RSQLite::SQLite(), file.path(corpus_obj@basePath, "_cache.sqlite"))
+  con <- DBI::dbConnect(RSQLite::SQLite(), file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, "_emuDBcache.sqlite")))
   on.exit(DBI::dbDisconnect(con), add = TRUE)
   
   db_uuid <- corpus_obj@config$UUID
@@ -389,9 +391,10 @@ create_parameter_grid <- function(simulate_spec, prep_simulate_spec = NULL) {
   # Combine grids (full outer product)
   combined_grid <- merge(dsp_grid, prep_grid, by = NULL)
 
-  # Remove dummy columns
+  # Remove dummy columns (from placeholder data.frames)
   combined_grid$dummy.x <- NULL
   combined_grid$dummy.y <- NULL
+  combined_grid$dummy <- NULL
 
   grid <- data.table::as.data.table(combined_grid)
 

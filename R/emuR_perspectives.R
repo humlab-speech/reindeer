@@ -57,7 +57,7 @@ set_specOverlay <- function(emuDBhandle,perspective,trackname){
 
 #'
 #' @rdname set_overlays
-#'
+#' @export
 
 set_osciOverlay <- function(emuDBhandle,perspective,trackname){
   perspectiveNames <- .list_perspectives(emuDBhandle)$name

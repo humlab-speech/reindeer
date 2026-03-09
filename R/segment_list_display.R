@@ -26,8 +26,8 @@ S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
   }
 
   # Quick stats
-  n_sessions <- dplyr::n_distinct(x$session)
-  n_bundles <- dplyr::n_distinct(x$bundle)
+  n_sessions <- length(unique(x$session))
+  n_bundles <- length(unique(x$bundle))
   levels <- unique(x$level)
   types <- unique(x$type)
 
@@ -92,8 +92,8 @@ S7::method(summary, segment_list) <- function(object, ...) {
     "Levels" = paste(unique(object$level), collapse = ", "),
     "Types" = paste(unique(object$type), collapse = ", "),
     "Attributes" = paste(unique(object$attribute), collapse = ", "),
-    "Sessions" = as.character(dplyr::n_distinct(object$session)),
-    "Bundles" = as.character(dplyr::n_distinct(object$bundle))
+    "Sessions" = as.character(length(unique(object$session))),
+    "Bundles" = as.character(length(unique(object$bundle)))
   ))
 
   # Temporal characteristics
@@ -157,9 +157,9 @@ glimpse_segment_list_impl <- function(x, width = NULL, ...) {
 
   # Quick summary
   cli::cli_text(
-    "{dplyr::n_distinct(x$session)} session{?s}, ",
-    "{dplyr::n_distinct(x$bundle)} bundle{?s}, ",
-    "{dplyr::n_distinct(x$level)} level{?s}"
+    "{length(unique(x$session))} session{?s}, ",
+    "{length(unique(x$bundle))} bundle{?s}, ",
+    "{length(unique(x$level))} level{?s}"
   )
 
   # Show column structure
@@ -215,7 +215,7 @@ S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = N
   }
 
   # Segment counts
-  n_unique_segs <- dplyr::n_distinct(x$start_item_id)
+  n_unique_segs <- length(unique(x$start_item_id))
   rows_per_seg <- nrow(x) / n_unique_segs
 
   cli::cli_text("")
@@ -285,7 +285,7 @@ S7::method(summary, extended_segment_list) <- function(object, ...) {
   }
 
   # Segment structure
-  n_unique_segs <- dplyr::n_distinct(object$start_item_id)
+  n_unique_segs <- length(unique(object$start_item_id))
   rows_per_seg <- nrow(object) / n_unique_segs
 
   cli::cli_h2("Structure")
@@ -293,8 +293,8 @@ S7::method(summary, extended_segment_list) <- function(object, ...) {
     "Unique segments" = as.character(n_unique_segs),
     "Rows per segment" = sprintf("%.2f", rows_per_seg),
     "Levels" = paste(unique(object$level), collapse = ", "),
-    "Sessions" = as.character(dplyr::n_distinct(object$session)),
-    "Bundles" = as.character(dplyr::n_distinct(object$bundle))
+    "Sessions" = as.character(length(unique(object$session))),
+    "Bundles" = as.character(length(unique(object$bundle)))
   ))
 
   # DSP information
@@ -361,7 +361,7 @@ glimpse_extended_segment_list_impl <- function(x, width = NULL, ...) {
   }
 
   # Quick summary
-  n_unique_segs <- dplyr::n_distinct(x$start_item_id)
+  n_unique_segs <- length(unique(x$start_item_id))
   cli::cli_text(
     "{n_unique_segs} segment{?s}, ",
     "{length(x@dsp_columns)} DSP column{?s}"

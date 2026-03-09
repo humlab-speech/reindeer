@@ -15,14 +15,26 @@ add_metadata(
 \arguments{
 \item{corpus_obj}{A corpus object}
 
-\item{metadataList}{Named list of metadata}
+\item{metadataList}{Named list of metadata key-value pairs}
 
-\item{session}{Optional session name}
+\item{session}{Optional session name (required for session/bundle level)}
 
-\item{bundle}{Optional bundle name}
+\item{bundle}{Optional bundle name (requires session)}
 
-\item{reset.before.add}{Clear existing metadata first}
+\item{reset.before.add}{Clear existing metadata at this level first (default: FALSE)}
+}
+\value{
+The corpus object, invisibly
 }
 \description{
-Add metadata programmatically
+Sets metadata at the database, session, or bundle level. Writes to
+METADATA.json (ground truth) and updates the SQLite cache. Level is
+determined by which of \code{session}/\code{bundle} are provided.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/db_emuDB")
+add_metadata(corp, list(Project = "MyStudy"))
+add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
+\dontshow{\}) # examplesIf}
 }

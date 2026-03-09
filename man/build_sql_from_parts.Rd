@@ -2,19 +2,19 @@
 % Please edit documentation in R/reindeer_lazy_segment_list.R
 \name{build_sql_from_parts}
 \alias{build_sql_from_parts}
-\title{Build SQL Query from Query Parts}
+\title{Build Parameterized SQL Query from Query Parts}
 \usage{
 build_sql_from_parts(query_parts, verbose = FALSE)
 }
 \arguments{
-\item{query_parts}{List of query components}
+\item{query_parts}{List of query components (base is list(sql, params))}
 
 \item{verbose}{Logical}
 }
 \value{
-SQL query string
+list(sql = "...", params = list(...))
 }
 \description{
-Build SQL Query from Query Parts
+Build Parameterized SQL Query from Query Parts
 }
 \keyword{internal}

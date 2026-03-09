@@ -19,7 +19,7 @@ test_that("segment_list class validation works", {
                                db_path = ae_path)
   
   # Test class
-  expect_true(inherits(seg_list, "segment_list"))
+  expect_true(is_segment_list(seg_list))
   expect_true(is_segment_list(seg_list))
   
   # Test properties

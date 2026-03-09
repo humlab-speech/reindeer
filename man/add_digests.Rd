@@ -12,14 +12,17 @@ add_digests(
 )
 }
 \arguments{
-\item{corpus_obj}{Corpus object}
+\item{corpus_obj}{A corpus object}
 
-\item{sessionPattern}{Session pattern}
+\item{sessionPattern}{Regex pattern to filter sessions (default: ".*")}
 
-\item{bundlePattern}{Bundle pattern}
+\item{bundlePattern}{Regex pattern to filter bundles (default: ".*")}
 
-\item{algorithm}{Hash algorithm}
+\item{algorithm}{Hash algorithm (default: "sha1")}
+}
+\value{
+The corpus object, invisibly
 }
 \description{
-Add file digests to metadata
+Computes checksums for signal files and stores them as metadata.
 }

@@ -1,3 +1,19 @@
+---
+title: "Simulation Infrastructure for DSP Parameter Exploration"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Simulation Infrastructure for DSP Parameter Exploration}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
 # Simulation Infrastructure for DSP Parameter Exploration
 
 ## Overview
@@ -333,5 +349,5 @@ results <- quantify_simulate(..., .simulation_overwrite = TRUE)
 
 - `quantify()`: Standard quantification without simulation
 - `enrich()`: Add track data to corpus
-- `update_metadata()`: Manage bundle metadata
+- `add_metadata()`: Manage bundle metadata
 - `ask_for()`: Query segments

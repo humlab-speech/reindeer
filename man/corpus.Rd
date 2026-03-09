@@ -10,7 +10,8 @@ corpus(
   create = FALSE,
   sync_eaf = FALSE,
   sync_cmdi = FALSE,
-  cache_dir = NULL
+  cache_dir = NULL,
+  quick = FALSE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ corpus(
 \item{sync_cmdi}{Logical; enable auto-sync of CMDI metadata file on changes}
 
 \item{cache_dir}{Character; path to quantify cache dir (default: {basePath}/.quantify_cache)}
+
+\item{quick}{Logical; if TRUE, skip cache/metadata rebuild when existing cache is present}
 }
 \value{
 A corpus object with access to database contents
