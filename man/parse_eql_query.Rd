@@ -2,7 +2,7 @@
 % Please edit documentation in R/query_parser.R
 \name{parse_eql_query}
 \alias{parse_eql_query}
-\title{Optimized EMU Query Language (EQL) Implementation}
+\title{Query EMU database using optimized SQLite backend}
 \usage{
 parse_eql_query(query_string)
 }
@@ -13,53 +13,6 @@ parse_eql_query(query_string)
 A list describing the parsed query structure
 }
 \description{
-This module provides a complete implementation of the EMU Query Language (EQL)
-that directly queries the SQLite cache database, bypassing the standard emuR
-query system for improved performance.
-}
-\section{Supported Features}{
-
-\itemize{
-\item Simple queries: ==, !=, =~, !~
-\item Sequence queries: [A -> B]
-\item Dominance queries: [A ^ B]
-\item Conjunction: [A & B]
-\item Disjunction: [A | B]
-\item Projection: #Level
-\item Position functions: Start(), End(), Medial()
-\item Count function: Num()
-\item Multi-attribute levels: Level:Attribute
-}
-}
-
-\section{Performance}{
-
-This implementation provides significant performance benefits for large databases
-by using optimized SQL queries and avoiding R object overhead.
-}
-
-\examples{
-\dontrun{
-# Simple query
-ask_for(corpus, "Phonetic == t")
-query(corpus, "Phonetic == t")  # alias
-
-# Sequence with projection
-ask_for(corpus, "[#Phoneme == n -> Phoneme == t]")
-
-# Dominance query
-ask_for(corpus, "[Word == the ^ Phoneme == D]")
-
-# Count function
-ask_for(corpus, "Num(Syllable, Phoneme) >= 3")
-}
 Query EMU database using optimized SQLite backend
-
-}
-\references{
-EQL Specification: https://ips-lmu.github.io/The-EMU-SDMS-Manual/app-chap-EQL-EBNF.html
-}
-\author{
-reindeer package
 }
 \keyword{internal}

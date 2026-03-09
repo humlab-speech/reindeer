@@ -6,6 +6,16 @@
 \usage{
 segment_list(data, db_uuid = NULL, db_path = NULL)
 }
+\arguments{
+\item{db_uuid}{Character; the database UUID}
+
+\item{db_path}{Character; path to the database directory}
+
+\item{.data}{A data.frame with the required columns (see Structure below)}
+}
+\value{
+A \code{segment_list} object (inherits from data.frame)
+}
 \description{
 An S7 class representing a segment list returned by EMU queries.
 This class extends tibble with validation to ensure compatibility

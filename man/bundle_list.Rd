@@ -9,6 +9,13 @@ bundle_list(
     FALSE)
 )
 }
+\arguments{
+\item{.data}{A data.frame with at least \code{session} and \code{bundle}
+character columns. Additional columns represent metadata fields.}
+}
+\value{
+A \code{bundle_list} object (inherits from data.frame)
+}
 \description{
 An S7 class that extends tibble to represent a list of bundles with
 their associated metadata following inheritance rules.

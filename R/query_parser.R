@@ -39,6 +39,9 @@
 #' # Count function
 #' ask_for(corpus, "Num(Syllable, Phoneme) >= 3")
 #' }
+#' @name reindeer-query-parser
+#' @keywords internal
+NULL
 
 #' Query EMU database using optimized SQLite backend
 #' 

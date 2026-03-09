@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.4.5
+Version: 0.4.6
 Date: 2026-03-09
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -32,6 +32,7 @@ Imports:
     Rcpp,
     DBI,
     RSQLite,
+    RcppSimdJson,
     tibble,
     httpuv
 Suggests:

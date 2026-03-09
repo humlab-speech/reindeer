@@ -14,6 +14,8 @@ Returns information about which JSON parser to use for different operations.
 This is useful for debugging and understanding performance characteristics.
 }
 \examples{
+\dontrun{
 get_json_strategy()
+}
 }
 \keyword{internal}

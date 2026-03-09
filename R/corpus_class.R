@@ -12,7 +12,7 @@
 #' @param create Logical; if TRUE and path doesn't exist, create a new database
 #' @param sync_eaf Logical; enable auto-sync of EAF files on annotation changes
 #' @param sync_cmdi Logical; enable auto-sync of CMDI metadata file on changes
-#' @param cache_dir Character; path to quantify cache dir (default: {basePath}/.quantify_cache)
+#' @param cache_dir Character; path to quantify cache dir (default: \code{basePath/.quantify_cache})
 #' @param quick Logical; if TRUE, skip cache/metadata rebuild when existing cache is present
 #'
 #' @returns A corpus object with access to database contents
@@ -213,6 +213,10 @@ corpus <- S7::new_class(
 #'
 #' An S7 class that extends tibble to represent a list of bundles with
 #' their associated metadata following inheritance rules.
+#'
+#' @param .data A data.frame with at least \code{session} and \code{bundle}
+#'   character columns. Additional columns represent metadata fields.
+#' @return A \code{bundle_list} object (inherits from data.frame)
 #'
 #' @export
 bundle_list <- S7::new_class(

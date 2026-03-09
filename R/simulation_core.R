@@ -1,3 +1,35 @@
+#' Run simulation-based quantification across a parameter grid
+#'
+#' Extracts signal measurements from segments using a DSP function with
+#' systematic parameter variation. Results are cached in a simulation store
+#' for later retrieval with \code{\link{reminisce}}.
+#'
+#' When \code{.simulate} is \code{NULL} and \code{.prep_simulate} is
+#' \code{NULL}, falls through to \code{\link{quantify}}.
+#'
+#' @param .what A \code{segment_list} object
+#' @param .using DSP function to apply (e.g. \code{superassp::forest})
+#' @param ... Additional fixed arguments passed to \code{.using}
+#' @param .simulate Named list of parameter vectors to vary (outer product
+#'   creates the full grid)
+#' @param .prep_function Optional preprocessing function (e.g.
+#'   \code{superassp::prep_recode}) applied to media before DSP
+#' @param .prep_simulate Named list of parameter vectors for preprocessing
+#' @param .simulation_store Path to directory for storing simulation caches.
+#'   Defaults to \code{".simulations"}.
+#' @param .simulation_timestamp Optional timestamp string for cache naming
+#' @param .simulation_overwrite Logical; overwrite existing cache entries
+#' @param .verbose Logical; print progress messages
+#' @return A list with class \code{simulation_results} containing:
+#'   \describe{
+#'     \item{results}{data.table of measurements per parameter combination}
+#'     \item{parameters}{the parameter grid used}
+#'     \item{dsp_function}{name of the DSP function}
+#'   }
+#' @seealso \code{\link{enrich_simulate}} for track-based simulation,
+#'   \code{\link{reminisce}} for retrieving cached results,
+#'   \code{\link{quantify}} for single-parameter quantification
+#' @export
 quantify_simulate <- function(.what, .using, ...,
                                .simulate = NULL,
                                .prep_function = NULL,
@@ -763,7 +795,10 @@ enrich_simulate <- function(corpus_obj, .using, ...,
   )
 }
 
-#' Initialize track simulation cache database
+#' Assess simulation results against reference tracks
+#'
+#' Compare simulation results from \code{\link{enrich_simulate}} against
+#' existing track data using a metric function. Not yet fully implemented.
 #'
 #' @keywords internal
 assess <- function(segment_list,

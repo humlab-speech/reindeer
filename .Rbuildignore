@@ -30,3 +30,13 @@
 ^CACHE_.*\.md$
 ^IMPLEMENTATION_.*\.md$
 ^PYTHON_.*\.md$
+^CLAUDE\.md$
+^SERVE_.*\.md$
+^VIGNETTES_.*\.md$
+^CI_CD_.*\.md$
+^Rplots\.pdf$
+^bench\.log$
+^build\.log$
+^dev$
+^render_vignette\.R$
+^verify_implementation\.R$

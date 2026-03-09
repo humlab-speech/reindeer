@@ -17,7 +17,7 @@
 #' @param .parallel Logical; use parallel processing (default TRUE)
 #' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
 #' @param .use_cache Logical; enable persistent caching of processed bundles (default FALSE)
-#' @param .cache_dir Character; cache directory path (default: corpus@.cache_dir, i.e. {basePath}/.quantify_cache)
+#' @param .cache_dir Character; cache directory path (default: \code{corpus@.cache_dir}, i.e. \code{basePath/.quantify_cache})
 #' @param .cache_format Character; serialization format - "auto", "qs", or "rds"
 #' 
 #' @return The corpus object (invisibly), with new SSFF track files created

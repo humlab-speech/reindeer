@@ -12,6 +12,20 @@ extended_segment_list(
   dsp_columns = character(0)
 )
 }
+\arguments{
+\item{data}{A data.frame with segment_list columns plus DSP measurement columns}
+
+\item{db_uuid}{Character; the database UUID}
+
+\item{db_path}{Character; path to the database directory}
+
+\item{dsp_function}{Character; name of the DSP function used}
+
+\item{dsp_columns}{Character vector of column names added by DSP processing}
+}
+\value{
+An \code{extended_segment_list} object (inherits from segment_list)
+}
 \description{
 An S7 class representing a segment list with DSP-derived measurements.
 This extends segment_list with additional columns from DSP processing

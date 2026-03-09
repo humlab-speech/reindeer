@@ -4,6 +4,11 @@
 #' This class extends tibble with validation to ensure compatibility
 #' with emuR::query() results.
 #'
+#' @param .data A data.frame with the required columns (see Structure below)
+#' @param db_uuid Character; the database UUID
+#' @param db_path Character; path to the database directory
+#' @return A \code{segment_list} object (inherits from data.frame)
+#'
 #' @section Structure:
 #' A segment_list must contain the following columns:
 #' - labels: Character vector of segment labels
@@ -134,6 +139,13 @@ is_segment_list <- function(x) {
 #' An S7 class representing a segment list with DSP-derived measurements.
 #' This extends segment_list with additional columns from DSP processing
 #' (e.g., formants, pitch, intensity).
+#'
+#' @param data A data.frame with segment_list columns plus DSP measurement columns
+#' @param db_uuid Character; the database UUID
+#' @param db_path Character; path to the database directory
+#' @param dsp_function Character; name of the DSP function used
+#' @param dsp_columns Character vector of column names added by DSP processing
+#' @return An \code{extended_segment_list} object (inherits from segment_list)
 #'
 #' @section Structure:
 #' An extended_segment_list contains all segment_list columns plus

@@ -25,7 +25,7 @@ corpus(
 
 \item{sync_cmdi}{Logical; enable auto-sync of CMDI metadata file on changes}
 
-\item{cache_dir}{Character; path to quantify cache dir (default: {basePath}/.quantify_cache)}
+\item{cache_dir}{Character; path to quantify cache dir (default: \code{basePath/.quantify_cache})}
 
 \item{quick}{Logical; if TRUE, skip cache/metadata rebuild when existing cache is present}
 }

@@ -4,15 +4,18 @@
 \alias{hash_parameters}
 \title{Hash parameter combination for lookup}
 \usage{
-hash_parameters(params)
+hash_parameters(params, prep_params = list())
 }
 \arguments{
-\item{params}{Named list of parameter values}
+\item{params}{Named list of DSP parameter values}
+
+\item{prep_params}{Named list of preprocessing parameter values (default: empty list)}
 }
 \value{
 MD5 hash string
 }
 \description{
-Hash parameter combination for lookup
+Hashes using the same structure as create_parameter_grid: list(dsp = ..., prep = ...)
+so that storage and retrieval produce identical hashes.
 }
 \keyword{internal}

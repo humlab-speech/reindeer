@@ -189,7 +189,9 @@ to_json_compat <- function(x, auto_unbox = TRUE, ...) {
 #' @keywords internal
 #'
 #' @examples
+#' \dontrun{
 #' get_json_strategy()
+#' }
 get_json_strategy <- function() {
   list(
     read_files = "RcppSimdJson::fload() [2-10x faster than jsonlite]",

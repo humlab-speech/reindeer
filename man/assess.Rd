@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulation_core.R
 \name{assess}
 \alias{assess}
-\title{Initialize track simulation cache database}
+\title{Assess simulation results against reference tracks}
 \usage{
 assess(
   segment_list,
@@ -14,6 +14,7 @@ assess(
 )
 }
 \description{
-Initialize track simulation cache database
+Compare simulation results from \code{\link{enrich_simulate}} against
+existing track data using a metric function. Not yet fully implemented.
 }
 \keyword{internal}

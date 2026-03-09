@@ -38,4 +38,12 @@ vignettes/*.pdf
 
 # Build logs
 build.log
+bench.log
+Rplots.pdf
 .worktrees/
+
+# Benchmark artifacts
+benchmarking/*.rds
+benchmarking/*.png
+benchmarking/*.csv
+benchmarking/*.txt
