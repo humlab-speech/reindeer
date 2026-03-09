@@ -7,12 +7,12 @@
 apply_descend_transform(query, level)
 }
 \arguments{
-\item{query}{list(sql, params) — current query}
+\item{query}{list(sql, params) -- current query}
 
-\item{level}{character — target level to descend to}
+\item{level}{character -- target level to descend to}
 }
 \value{
-list(sql, params) — modified query
+list(sql, params) -- modified query
 }
 \description{
 Apply Descend (Dominance Downward) Transform

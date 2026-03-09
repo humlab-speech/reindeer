@@ -7,46 +7,23 @@
 initialize_track_simulation_cache(cache_dir, timestamp, dsp_function_name)
 }
 \arguments{
-\item{corpus_obj}{A corpus object}
+\item{cache_dir}{Directory for simulation caches}
 
-\item{.using}{A DSP function from superassp package}
+\item{timestamp}{Timestamp string for cache file naming}
 
-\item{...}{Additional arguments passed to DSP function}
-
-\item{.simulate}{Named list specifying DSP parameter grid (e.g.,
-list(nominalF1 = seq(300, 600, 50), windowSize = c(20, 25, 30)))}
-
-\item{.prep_function}{Optional preprocessing function to apply to media before DSP.
-Should accept listOfFiles parameter and return audio data compatible with DSP function.
-See superassp::prep_recode() for example.}
-
-\item{.prep_simulate}{Named list specifying prep parameter grid (e.g.,
-list(sample_rate = c(16000, 22050, 44100), format = "wav"))}
-
-\item{.simulation_store}{Directory for simulation cache (required if .simulate is used)}
-
-\item{.simulation_timestamp}{Optional timestamp (auto-generated if NULL)}
-
-\item{.simulation_overwrite}{Overwrite existing simulation cache}
-
-\item{.metadata_fields}{Character vector of metadata fields for parameter derivation}
-
-\item{.signal_extension}{File extension of signal files to process}
-
-\item{.force}{Recompute even if track files exist}
-
-\item{.verbose}{Show progress messages}
-
-\item{.parallel}{Use parallel processing}
-
-\item{.workers}{Number of parallel workers}
+\item{dsp_function_name}{Name of the DSP function}
 }
 \value{
-The corpus object (invisibly), or simulation_tracks object if simulating
+Path to the created cache file
 }
 \description{
 Extends enrich() to support systematic parameter space exploration for track
 generation with optional preprocessing of media files. Results are cached in
 SQLite database for efficient retrieval.
+}
+\details{
+Initialize a track simulation cache
+
+Creates a new SQLite cache file for track-based simulation results.
 }
 \keyword{internal}

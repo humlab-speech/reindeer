@@ -99,7 +99,7 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
     return(lazy_sl@.state$cache)
   }
   
-  # Build parameterized query from query_parts — returns list(sql, params)
+  # Build parameterized query from query_parts -- returns list(sql, params)
   query <- build_sql_from_parts(lazy_sl@query_parts, verbose = verbose)
   
   if (verbose) {
@@ -132,7 +132,7 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
     db_path = lazy_sl@db_path
   )
   
-  # Cache result (uses environment reference semantics — mutates in place)
+  # Cache result (uses environment reference semantics -- mutates in place)
   lazy_sl@.state$cache <- seg_list
   lazy_sl@.state$materialized <- TRUE
   
@@ -146,7 +146,7 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
 #' @return list(sql = "...", params = list(...))
 #' @keywords internal
 build_sql_from_parts <- function(query_parts, verbose = FALSE) {
-  # Start with base query — list(sql, params)
+  # Start with base query -- list(sql, params)
   if (is.null(query_parts$base)) {
     cli::cli_abort("No base query found in query_parts")
   }
@@ -158,7 +158,7 @@ build_sql_from_parts <- function(query_parts, verbose = FALSE) {
     return(current)
   }
   
-  # Apply transforms sequentially — each returns list(sql, params)
+  # Apply transforms sequentially -- each returns list(sql, params)
   for (transform in query_parts$transforms) {
     current <- apply_transform(current, transform, verbose = verbose)
   }
@@ -168,10 +168,10 @@ build_sql_from_parts <- function(query_parts, verbose = FALSE) {
 
 #' Apply a Transform to Parameterized SQL Query
 #'
-#' @param query list(sql, params) — current query
+#' @param query list(sql, params) -- current query
 #' @param transform List with type and parameters
 #' @param verbose Logical
-#' @return list(sql, params) — modified query
+#' @return list(sql, params) -- modified query
 #' @keywords internal
 apply_transform <- function(query, transform, verbose = FALSE) {
   type <- transform$type
@@ -191,9 +191,9 @@ apply_transform <- function(query, transform, verbose = FALSE) {
 
 #' Apply Scout (Forward Sequence) Transform
 #'
-#' @param query list(sql, params) — current query
-#' @param n integer — number of steps forward
-#' @return list(sql, params) — modified query
+#' @param query list(sql, params) -- current query
+#' @param n integer -- number of steps forward
+#' @return list(sql, params) -- modified query
 #' @keywords internal
 apply_scout_transform <- function(query, n = 1) {
   n <- as.integer(n)
@@ -211,9 +211,9 @@ apply_scout_transform <- function(query, n = 1) {
 
 #' Apply Retreat (Backward Sequence) Transform
 #'
-#' @param query list(sql, params) — current query
-#' @param n integer — number of steps backward
-#' @return list(sql, params) — modified query
+#' @param query list(sql, params) -- current query
+#' @param n integer -- number of steps backward
+#' @return list(sql, params) -- modified query
 #' @keywords internal
 apply_retreat_transform <- function(query, n = 1) {
   n <- as.integer(n)
@@ -231,9 +231,9 @@ apply_retreat_transform <- function(query, n = 1) {
 
 #' Apply Ascend (Dominance Upward) Transform
 #'
-#' @param query list(sql, params) — current query
-#' @param level character — target level to ascend to
-#' @return list(sql, params) — modified query
+#' @param query list(sql, params) -- current query
+#' @param level character -- target level to ascend to
+#' @return list(sql, params) -- modified query
 #' @keywords internal
 apply_ascend_transform <- function(query, level) {
   sql <- paste0(
@@ -255,9 +255,9 @@ apply_ascend_transform <- function(query, level) {
 
 #' Apply Descend (Dominance Downward) Transform
 #'
-#' @param query list(sql, params) — current query
-#' @param level character — target level to descend to
-#' @return list(sql, params) — modified query
+#' @param query list(sql, params) -- current query
+#' @param level character -- target level to descend to
+#' @return list(sql, params) -- modified query
 #' @keywords internal
 apply_descend_transform <- function(query, level) {
   sql <- paste0(
@@ -288,7 +288,7 @@ apply_descend_transform <- function(query, level) {
 S7::method(print, lazy_segment_list) <- function(x, ...) {
   cli::cli_rule(
     left = cli::style_bold("lazy_segment_list"),
-    right = if (x@.state$materialized) "{cli::col_green('✓ materialized')}" else "{cli::col_silver('⧗ lazy')}"
+    right = if (x@.state$materialized) "{cli::col_green('\u2713 materialized')}" else "{cli::col_silver('\u29d7 lazy')}"
   )
   
   cli::cli_text("")

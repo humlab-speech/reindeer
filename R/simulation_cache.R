@@ -1,3 +1,16 @@
+#' Retrieve cached simulation results
+#'
+#' Reads back quantification results stored by
+#' \code{\link{quantify_simulate}} from a simulation cache.
+#'
+#' @param segment_list A segment_list to look up in the cache
+#' @param parameters Named list of DSP parameters identifying the combination
+#' @param cache_path Direct path to the simulation SQLite file
+#' @param timestamp Timestamp used when creating the simulation
+#' @param cache_dir Directory containing simulation caches
+#' @param dsp_function Name of the DSP function
+#' @return A data.table of cached measurements
+#' @export
 reminisce <- function(segment_list,
                       parameters,
                       cache_path = NULL,
@@ -222,7 +235,7 @@ summary.simulation_results <- function(object, ...) {
   print(object)
   
   cat("\n")
-  cat("══ Result Summary ══\n")
+  cat("\u2550\u2550 Result Summary \u2550\u2550\n")
   
   # Show summary of first result as example
   if (length(object) > 0) {
@@ -244,26 +257,14 @@ summary.simulation_results <- function(object, ...) {
 #' generation with optional preprocessing of media files. Results are cached in
 #' SQLite database for efficient retrieval.
 #'
-#' @param corpus_obj A corpus object
-#' @param .using A DSP function from superassp package
-#' @param ... Additional arguments passed to DSP function
-#' @param .simulate Named list specifying DSP parameter grid (e.g.,
-#'   list(nominalF1 = seq(300, 600, 50), windowSize = c(20, 25, 30)))
-#' @param .prep_function Optional preprocessing function to apply to media before DSP.
-#'   Should accept listOfFiles parameter and return audio data compatible with DSP function.
-#'   See superassp::prep_recode() for example.
-#' @param .prep_simulate Named list specifying prep parameter grid (e.g.,
-#'   list(sample_rate = c(16000, 22050, 44100), format = "wav"))
-#' @param .simulation_store Directory for simulation cache (required if .simulate is used)
-#' @param .simulation_timestamp Optional timestamp (auto-generated if NULL)
-#' @param .simulation_overwrite Overwrite existing simulation cache
-#' @param .metadata_fields Character vector of metadata fields for parameter derivation
-#' @param .signal_extension File extension of signal files to process
-#' @param .force Recompute even if track files exist
-#' @param .verbose Show progress messages
-#' @param .parallel Use parallel processing
-#' @param .workers Number of parallel workers
-#' @return The corpus object (invisibly), or simulation_tracks object if simulating
+#' Initialize a track simulation cache
+#'
+#' Creates a new SQLite cache file for track-based simulation results.
+#'
+#' @param cache_dir Directory for simulation caches
+#' @param timestamp Timestamp string for cache file naming
+#' @param dsp_function_name Name of the DSP function
+#' @return Path to the created cache file
 #' @keywords internal
 initialize_track_simulation_cache <- function(cache_dir, timestamp, dsp_function_name) {
   

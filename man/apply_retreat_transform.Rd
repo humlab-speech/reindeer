@@ -7,12 +7,12 @@
 apply_retreat_transform(query, n = 1)
 }
 \arguments{
-\item{query}{list(sql, params) — current query}
+\item{query}{list(sql, params) -- current query}
 
-\item{n}{integer — number of steps backward}
+\item{n}{integer -- number of steps backward}
 }
 \value{
-list(sql, params) — modified query
+list(sql, params) -- modified query
 }
 \description{
 Apply Retreat (Backward Sequence) Transform

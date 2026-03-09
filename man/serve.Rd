@@ -9,28 +9,18 @@ serve(corpus, ...)
 \arguments{
 \item{corpus}{A reindeer corpus object created with \code{corpus()}}
 
-\item{sessionPattern}{Regular expression pattern to filter sessions (default: ".*" for all)}
-
-\item{bundlePattern}{Regular expression pattern to filter bundles (default: ".*" for all)}
-
-\item{seglist}{Optional segment_list to restrict which bundles are served}
-
-\item{bundleListName}{Optional name of a bundle list to serve}
-
-\item{host}{Host address to bind the server to (default: "127.0.0.1")}
-
-\item{port}{Port number for the server (default: 17890)}
-
-\item{autoOpenURL}{URL to open automatically. Set to "" to disable auto-open.
-Default opens the revised EMU-webApp with autoConnect=true}
-
-\item{browser}{Browser to use (uses \code{getOption("browser")} by default)}
-
-\item{useViewer}{Use RStudio viewer pane if available (default: TRUE)}
-
-\item{debug}{Enable debug output (default: FALSE)}
-
-\item{debugLevel}{Debug verbosity level 0-8 (default: 0, or 2 if debug=TRUE)}
+\item{...}{Additional arguments passed to the method, including
+\code{sessionPattern} (regex for sessions, default \code{".*"}),
+\code{bundlePattern} (regex for bundles, default \code{".*"}),
+\code{seglist} (optional segment_list to restrict bundles),
+\code{bundleListName} (optional bundle list name),
+\code{host} (server address, default \code{"127.0.0.1"}),
+\code{port} (server port, default \code{17890}),
+\code{autoOpenURL} (URL to open, set \code{""} to disable),
+\code{browser} (browser to use),
+\code{useViewer} (use RStudio viewer, default \code{TRUE}),
+\code{debug} (enable debug output, default \code{FALSE}),
+\code{debugLevel} (verbosity 0-8, default \code{0}).}
 }
 \value{
 Invisible TRUE

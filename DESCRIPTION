@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.4.7
+Version: 0.4.8
 Date: 2026-03-09
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -39,6 +39,10 @@ Suggests:
     testthat (>= 3.0.0),
     emuR,
     qs (>= 0.25.0),
+    knitr,
+    rmarkdown,
+    yardstick,
+    bigstatsr,
     protoscribe,
     superassp,
     openxlsx,
@@ -53,5 +57,6 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Depends: 
     R (>= 4.1.0)
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 LinkingTo: Rcpp

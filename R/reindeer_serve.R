@@ -9,18 +9,18 @@
 #' serves a revised version of the annotation application from `../EMU-webApp/dist/`.
 #'
 #' @param corpus A reindeer corpus object created with `corpus()`
-#' @param sessionPattern Regular expression pattern to filter sessions (default: ".*" for all)
-#' @param bundlePattern Regular expression pattern to filter bundles (default: ".*" for all)
-#' @param seglist Optional segment_list to restrict which bundles are served
-#' @param bundleListName Optional name of a bundle list to serve
-#' @param host Host address to bind the server to (default: "127.0.0.1")
-#' @param port Port number for the server (default: 17890)
-#' @param autoOpenURL URL to open automatically. Set to "" to disable auto-open.
-#'   Default opens the revised EMU-webApp with autoConnect=true
-#' @param browser Browser to use (uses `getOption("browser")` by default)
-#' @param useViewer Use RStudio viewer pane if available (default: TRUE)
-#' @param debug Enable debug output (default: FALSE)
-#' @param debugLevel Debug verbosity level 0-8 (default: 0, or 2 if debug=TRUE)
+#' @param ... Additional arguments passed to the method, including
+#'   `sessionPattern` (regex for sessions, default `".*"`),
+#'   `bundlePattern` (regex for bundles, default `".*"`),
+#'   `seglist` (optional segment_list to restrict bundles),
+#'   `bundleListName` (optional bundle list name),
+#'   `host` (server address, default `"127.0.0.1"`),
+#'   `port` (server port, default `17890`),
+#'   `autoOpenURL` (URL to open, set `""` to disable),
+#'   `browser` (browser to use),
+#'   `useViewer` (use RStudio viewer, default `TRUE`),
+#'   `debug` (enable debug output, default `FALSE`),
+#'   `debugLevel` (verbosity 0-8, default `0`).
 #'
 #' @details
 #' This function creates an HTTP server with WebSocket support to enable
@@ -78,6 +78,7 @@
 #' # Stop the server
 #' httpuv::stopAllServers()
 #'
+#' @importFrom httpuv startServer stopAllServers
 #' @export
 serve <- S7::new_generic("serve", "corpus")
 

@@ -41,7 +41,7 @@ S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
   # Duration range
   durations <- x$end - x$start
   cli::cli_text(
-    "Duration: {round(min(durations), 1)}–{round(max(durations), 1)} ms ",
+    "Duration: {round(min(durations), 1)}\u2013{round(max(durations), 1)} ms ",
     "(total: {round(sum(durations)/1000, 2)} s)"
   )
 
@@ -101,7 +101,7 @@ S7::method(summary, segment_list) <- function(object, ...) {
   durations <- object$end - object$start
 
   cli::cli_dl(c(
-    "Duration range" = sprintf("%.2f – %.2f ms", min(durations), max(durations)),
+    "Duration range" = sprintf("%.2f \u2013 %.2f ms", min(durations), max(durations)),
     "Mean duration" = sprintf("%.2f ms", mean(durations)),
     "Median duration" = sprintf("%.2f ms", median(durations)),
     "Total duration" = sprintf("%.2f s", sum(durations) / 1000)
@@ -111,7 +111,7 @@ S7::method(summary, segment_list) <- function(object, ...) {
     cli::cli_text("Sample rate: {.val {sprintf('%.0f Hz', unique(object$sample_rate))}}")
   } else {
     cli::cli_text(
-      "Sample rate: {.val {sprintf('%.0f – %.0f Hz', min(object$sample_rate), max(object$sample_rate))}}"
+      "Sample rate: {.val {sprintf('%.0f \u2013 %.0f Hz', min(object$sample_rate), max(object$sample_rate))}}"
     )
   }
 
@@ -140,7 +140,7 @@ S7::method(summary, segment_list) <- function(object, ...) {
   session_counts <- table(object$session)
   cli::cli_text(
     "Segments per session: mean={round(mean(session_counts), 1)}, ",
-    "range={min(session_counts)}–{max(session_counts)}"
+    "range={min(session_counts)}\u2013{max(session_counts)}"
   )
 
   invisible(object)
@@ -148,7 +148,7 @@ S7::method(summary, segment_list) <- function(object, ...) {
 
 # Implementation function for segment_list
 glimpse_segment_list_impl <- function(x, width = NULL, ...) {
-  cli::cli_h2("segment_list [{nrow(x)} × {ncol(x)}]")
+  cli::cli_h2("segment_list [{nrow(x)} \u00d7 {ncol(x)}]")
 
   if (nrow(x) == 0) {
     cli::cli_alert_warning("Empty")
@@ -220,7 +220,7 @@ S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = N
 
   cli::cli_text("")
   cli::cli_text(
-    "{cli::col_blue(n_unique_segs)} segment{?s} × ",
+    "{cli::col_blue(n_unique_segs)} segment{?s} \u00d7 ",
     "{cli::col_blue(round(rows_per_seg, 1))} point{?s}/seg = ",
     "{cli::col_blue(nrow(x))} row{?s}"
   )
@@ -248,7 +248,7 @@ S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = N
     if (length(numeric_cols) > 0) {
       ranges_str <- sapply(head(numeric_cols, 3), function(col) {
         vals <- x[[col]]
-        sprintf("%s: %.1f–%.1f", col, min(vals, na.rm = TRUE), max(vals, na.rm = TRUE))
+        sprintf("%s: %.1f\u2013%.1f", col, min(vals, na.rm = TRUE), max(vals, na.rm = TRUE))
       })
       cli::cli_text("Ranges: {.val {paste(ranges_str, collapse = ', ')}}")
     }
@@ -317,7 +317,7 @@ S7::method(summary, extended_segment_list) <- function(object, ...) {
   durations <- unique_segs$end - unique_segs$start
 
   cli::cli_dl(c(
-    "Duration range" = sprintf("%.2f – %.2f ms", min(durations), max(durations)),
+    "Duration range" = sprintf("%.2f \u2013 %.2f ms", min(durations), max(durations)),
     "Mean duration" = sprintf("%.2f ms", mean(durations)),
     "Total duration" = sprintf("%.2f s", sum(durations) / 1000)
   ))
@@ -334,7 +334,7 @@ S7::method(summary, extended_segment_list) <- function(object, ...) {
         if (length(vals_clean) > 0) {
           cli::cli_text(
             "{.field {col}}: ",
-            "range={sprintf('%.2f–%.2f', min(vals_clean), max(vals_clean))}, ",
+            "range={sprintf('%.2f\u2013%.2f', min(vals_clean), max(vals_clean))}, ",
             "mean={sprintf('%.2f', mean(vals_clean))}, ",
             "sd={sprintf('%.2f', sd(vals_clean))}, ",
             "NA={sum(is.na(vals))}"
@@ -353,7 +353,7 @@ S7::method(summary, extended_segment_list) <- function(object, ...) {
 
 # Implementation function for extended_segment_list
 glimpse_extended_segment_list_impl <- function(x, width = NULL, ...) {
-  cli::cli_h2("extended_segment_list [{nrow(x)} × {ncol(x)}]")
+  cli::cli_h2("extended_segment_list [{nrow(x)} \u00d7 {ncol(x)}]")
 
   if (nrow(x) == 0) {
     cli::cli_alert_warning("Empty")
@@ -382,7 +382,7 @@ glimpse_extended_segment_list_impl <- function(x, width = NULL, ...) {
 
     # Mark DSP columns
     is_dsp <- col_name %in% x@dsp_columns
-    prefix <- if (is_dsp) cli::col_green("★") else " "
+    prefix <- if (is_dsp) cli::col_green("\u2605") else " "
 
     # Format sample values
     if (is.numeric(col_data)) {
@@ -397,7 +397,7 @@ glimpse_extended_segment_list_impl <- function(x, width = NULL, ...) {
   }
 
   cli::cli_text("")
-  cli::cli_text("{cli::col_green('★')} = DSP measurement column")
+  cli::cli_text("{cli::col_green('\u2605')} = DSP measurement column")
 
   invisible(x)
 }

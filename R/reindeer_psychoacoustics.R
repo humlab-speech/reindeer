@@ -49,7 +49,7 @@ st <- function(x,ref=16.35160){
 #' \insertCite{Moore:1982ha}{reindeer} is used
 #' in the calculations.
 #'
-#' @param x A vector of frequency values (in Hz)
+#' @param f A vector of frequency values (in Hz)
 #'
 #' @return A vector of ERB values
 #' @export

@@ -62,12 +62,12 @@ quantify_simulate <- function(.what, .using, ...,
     cli::cli_abort(".prep_function must be a function")
   }
   
-  # Simulation mode — default store location
+  # Simulation mode -- default store location
   if (is.null(.simulation_store)) {
     .simulation_store <- ".simulations"
   }
   
-  # Get corpus object — try attribute first, fall back to db_path resolution
+  # Get corpus object -- try attribute first, fall back to db_path resolution
   corpus_obj <- attr(.what, "corpus") %||% .get_corpus_cached(.what, NULL)
   if (is.null(corpus_obj)) {
     cli::cli_abort("segment_list must have corpus attribute or valid db_path")
@@ -78,7 +78,7 @@ quantify_simulate <- function(.what, .using, ...,
     .simulation_timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
   }
   
-  # Get DSP function name — collapse to single string and sanitize for filenames
+  # Get DSP function name -- collapse to single string and sanitize for filenames
   dsp_name <- paste(deparse(substitute(.using)), collapse = " ")
   if (is.character(.using)) {
     dsp_name <- .using
@@ -460,7 +460,7 @@ enrich_simulate <- function(corpus_obj, .using, ...,
     .simulation_timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
   }
   
-  # Get DSP function name — collapse to single string and sanitize for filenames
+  # Get DSP function name -- collapse to single string and sanitize for filenames
   dsp_name <- paste(deparse(substitute(.using)), collapse = " ")
   if (is.character(.using)) {
     dsp_name <- .using
@@ -803,10 +803,18 @@ enrich_simulate <- function(corpus_obj, .using, ...,
 #' @keywords internal
 assess <- function(segment_list,
                    simulation_results,
-                   .metric = yardstick::rmse,
+                   .metric = NULL,
                    .track_name = NULL,
                    .detailed = FALSE,
                    .verbose = TRUE) {
+  
+  # Default metric requires yardstick
+  if (is.null(.metric)) {
+    if (!requireNamespace("yardstick", quietly = TRUE)) {
+      cli::cli_abort("Package {.pkg yardstick} is required for the default metric. Install it or provide a custom .metric function.")
+    }
+    .metric <- yardstick::rmse
+  }
   
   # Validate inputs
   if (!S7::S7_inherits(segment_list, reindeer::segment_list)) {
@@ -920,7 +928,7 @@ print.simulation_tracks <- function(x, ...) {
   prep_function <- attr(x, "prep_function")
 
   cat("\n")
-  cat("══ Track Simulation Results ══\n")
+  cat("\u2550\u2550 Track Simulation Results \u2550\u2550\n")
   cat("\n")
   cat(sprintf("DSP function: %s\n", attr(x, 'dsp_function')))
 

@@ -4,7 +4,7 @@
 #' This class extends tibble with validation to ensure compatibility
 #' with emuR::query() results.
 #'
-#' @param .data A data.frame with the required columns (see Structure below)
+#' @param data A data.frame with the required columns (see Structure below)
 #' @param db_uuid Character; the database UUID
 #' @param db_path Character; path to the database directory
 #' @return A \code{segment_list} object (inherits from data.frame)

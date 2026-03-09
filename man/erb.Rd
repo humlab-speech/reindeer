@@ -7,7 +7,7 @@
 erb(f)
 }
 \arguments{
-\item{x}{A vector of frequency values (in Hz)}
+\item{f}{A vector of frequency values (in Hz)}
 }
 \value{
 A vector of ERB values

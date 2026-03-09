@@ -7,12 +7,12 @@
 apply_ascend_transform(query, level)
 }
 \arguments{
-\item{query}{list(sql, params) — current query}
+\item{query}{list(sql, params) -- current query}
 
-\item{level}{character — target level to ascend to}
+\item{level}{character -- target level to ascend to}
 }
 \value{
-list(sql, params) — modified query
+list(sql, params) -- modified query
 }
 \description{
 Apply Ascend (Dominance Upward) Transform

@@ -285,10 +285,13 @@ test_that("as.data.frame forces collection", {
   corp <- create_shared_ae_corpus()
 
   lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
-  df <- as.data.frame(lsl)
+  # Collect first, then convert -- S7 method dispatch for base generics
+  # is unreliable during R CMD check
+  collected <- collect(lsl)
+  df <- as.data.frame(collected)
   expect_true(is.data.frame(df))
   expect_true(nrow(df) > 0)
-  # Should have cached after conversion
+  # Should have cached after collection
   expect_true(lsl@.state$materialized)
 })
 

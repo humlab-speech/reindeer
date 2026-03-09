@@ -21,8 +21,8 @@ dspp_metadataParameters_dt <- function(recompute=FALSE,
                                         defaultsEstimatedSampleSize=10){
 
   if(!recompute){
-    data(DSPP, package="reindeer")
-    return(reindeer::DSPP)
+    data(DSPP, package = "reindeer", envir = environment())
+    return(DSPP)
   }
 
   # Read data once

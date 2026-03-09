@@ -128,9 +128,9 @@ clear_tidy_cache <- function() {
 #' @noRd
 .seglist_to_df <- function(.segments) {
   # Handle lazy evaluation first - explicitly check class
-  if (S7::S7_inherits(.segments, reindeer::lazy_segment_list)) {
+  if (S7::S7_inherits(.segments, lazy_segment_list)) {
     # Force collection
-    .segments <- reindeer::collect(.segments)
+    .segments <- collect(.segments)
   }
   
   if (S7::S7_inherits(.segments, reindeer::segment_list)) {
@@ -196,7 +196,7 @@ clear_tidy_cache <- function() {
         
         # Handle different result types
         result_df <- if (inherits(result, "AsspDataObj")) {
-          track_data <- wrassp::as.data.frame.AsspDataObj(result)
+          track_data <- as.data.frame(result)
           
           if (!is.null(.at)) {
             n_frames <- nrow(track_data)
@@ -531,7 +531,7 @@ clear_tidy_cache <- function() {
     result_list <- dt_all[, {
       if (!is.null(result[[1]])) {
         result_df <- if (inherits(result[[1]], "AsspDataObj")) {
-          track_data <- wrassp::as.data.frame.AsspDataObj(result[[1]])
+          track_data <- as.data.frame(result[[1]])
           
           if (!is.null(.at)) {
             n_frames <- nrow(track_data)
@@ -642,7 +642,7 @@ clear_tidy_cache <- function() {
         
         # Handle result formatting
         result_df <- if (inherits(result, "AsspDataObj")) {
-          track_data <- wrassp::as.data.frame.AsspDataObj(result)
+          track_data <- as.data.frame(result)
           
           if (!is.null(.at)) {
             n_frames <- nrow(track_data)

@@ -40,3 +40,7 @@
 ^dev$
 ^render_vignette\.R$
 ^verify_implementation\.R$
+^\.worktrees$
+^\.claude$
+^inst/praat/praatdet/\.git$
+^inst/pymomelintsint/\.idea$

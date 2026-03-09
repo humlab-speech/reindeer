@@ -7,14 +7,14 @@
 apply_transform(query, transform, verbose = FALSE)
 }
 \arguments{
-\item{query}{list(sql, params) — current query}
+\item{query}{list(sql, params) -- current query}
 
 \item{transform}{List with type and parameters}
 
 \item{verbose}{Logical}
 }
 \value{
-list(sql, params) — modified query
+list(sql, params) -- modified query
 }
 \description{
 Apply a Transform to Parameterized SQL Query

@@ -7,7 +7,7 @@
 assess(
   segment_list,
   simulation_results,
-  .metric = yardstick::rmse,
+  .metric = NULL,
   .track_name = NULL,
   .detailed = FALSE,
   .verbose = TRUE
