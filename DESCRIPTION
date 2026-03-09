@@ -50,7 +50,7 @@ Suggests:
     readr,
     rstudioapi
 Remotes:
-  github::humlab-speech/superassp
+  github::humlab-speech/superassp,
   github::humlab-speech/av
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
