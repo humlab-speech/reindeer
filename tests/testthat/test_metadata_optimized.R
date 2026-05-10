@@ -285,6 +285,70 @@ test_that("Empty/missing metadata handled gracefully", {
   expect_equal(ncol(metadata), 2)  # Just session and bundle columns
 })
 
+# ==============================================================================
+# Auto-stub METADATA.json on bundle/session creation (Item 4)
+# ==============================================================================
+
+test_that("create_session_and_bundle writes METADATA.json at session level", {
+  ae <- create_isolated_ae_corpus()
+
+  reindeer:::create_session_and_bundle(ae, "newsess", "newbndl", verbose = FALSE)
+
+  ses_meta <- file.path(ae@basePath, "newsess_ses", "METADATA.json")
+  expect_true(file.exists(ses_meta))
+
+  content <- jsonlite::read_json(ses_meta)
+  expect_type(content, "list")
+  expect_length(content, 0L)
+})
+
+test_that("create_session_and_bundle writes METADATA.json at bundle level", {
+  ae <- create_isolated_ae_corpus()
+
+  reindeer:::create_session_and_bundle(ae, "newsess2", "newbndl2", verbose = FALSE)
+
+  bndl_meta <- file.path(
+    ae@basePath, "newsess2_ses", "newbndl2_bndl", "METADATA.json"
+  )
+  expect_true(file.exists(bndl_meta))
+
+  content <- jsonlite::read_json(bndl_meta)
+  expect_type(content, "list")
+  expect_length(content, 0L)
+})
+
+test_that("auto-stub never overwrites existing METADATA.json", {
+  ae <- create_isolated_ae_corpus()
+
+  reindeer:::create_session_and_bundle(ae, "presess", "prebndl", verbose = FALSE)
+  bndl_meta <- file.path(
+    ae@basePath, "presess_ses", "prebndl_bndl", "METADATA.json"
+  )
+
+  # Populate with real metadata
+  jsonlite::write_json(
+    list(participant = list(id = "P999")),
+    bndl_meta,
+    auto_unbox = TRUE,
+    pretty = TRUE
+  )
+
+  # Re-invoke skeleton write — must NOT overwrite
+  result <- reindeer:::.write_metadata_skeleton(bndl_meta, level = "bundle")
+  expect_false(result)
+
+  content <- jsonlite::read_json(bndl_meta)
+  expect_equal(content$participant$id, "P999")
+})
+
+test_that("gather_metadata accepts auto-stubbed bundles without error", {
+  ae <- create_isolated_ae_corpus()
+
+  reindeer:::create_session_and_bundle(ae, "stubsess", "stubbndl", verbose = FALSE)
+
+  expect_no_error(gather_metadata(ae, verbose = FALSE))
+})
+
 test_that("Bulk operations maintain data integrity", {
   skip_on_cran()
 

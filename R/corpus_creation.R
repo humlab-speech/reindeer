@@ -182,7 +182,12 @@ create_session_and_bundle <- function(corpus_obj, session_name, bundle_name, ver
       cli::cli_alert_info("Creating session: {.field {session_name}}")
     }
     dir.create(session_dir, recursive = TRUE)
-    
+
+    .write_metadata_skeleton(
+      file.path(session_dir, metadata.filename),
+      level = "session"
+    )
+
     # Add session to cache
     con <- get_corpus_connection(corpus_obj)
     tryCatch({
@@ -207,7 +212,12 @@ create_session_and_bundle <- function(corpus_obj, session_name, bundle_name, ver
     cli::cli_alert_info("Creating bundle: {.field {bundle_name}}")
   }
   dir.create(bundle_dir, recursive = TRUE)
-  
+
+  .write_metadata_skeleton(
+    file.path(bundle_dir, metadata.filename),
+    level = "bundle"
+  )
+
   # Create minimal annotation JSON
   annot <- list(
     name = bundle_name,

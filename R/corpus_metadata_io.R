@@ -1,3 +1,31 @@
+#' Write an empty METADATA.json skeleton at session or bundle level
+#'
+#' Creates an empty `{}` JSON file at the given path so downstream metadata
+#' gathering does not silently skip the bundle/session. Never overwrites
+#' existing files.
+#'
+#' @param meta_path Absolute path where `METADATA.json` should be written
+#' @param level One of "session" or "bundle" (currently informational only)
+#' @return TRUE if a file was written, FALSE if a file already existed
+#' @keywords internal
+.write_metadata_skeleton <- function(meta_path, level = c("session", "bundle")) {
+  level <- match.arg(level)
+  if (file.exists(meta_path)) {
+    return(invisible(FALSE))
+  }
+  parent_dir <- dirname(meta_path)
+  if (!dir.exists(parent_dir)) {
+    dir.create(parent_dir, recursive = TRUE)
+  }
+  jsonlite::write_json(
+    structure(list(), names = character(0)),
+    meta_path,
+    auto_unbox = TRUE,
+    pretty = TRUE
+  )
+  invisible(TRUE)
+}
+
 corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, metadata_list) {
   if (!is.list(metadata_list) || is.null(names(metadata_list))) {
     cli::cli_abort("Metadata must be a named list")
