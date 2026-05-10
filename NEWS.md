@@ -1,3 +1,34 @@
+# reindeer 0.5.1 (2026-05-10)
+
+## JSON-Schema validation for `_DBconfig.json` and `METADATA.json`
+
+Two schemas ship under `inst/schemas/`. `load_DBconfig()` validates on
+read; `store_DBconfig()` and the metadata write paths
+(`set_metadata_*`, `write_metadata_to_json`) validate before writing.
+Read-side validation is soft-warn by default to keep existing
+non-conformant corpora loading; opt in to hard errors with
+`options(reindeer.schema_strict = TRUE)`. Write-side validation is
+always strict.
+
+A new exported `validate_corpus(corp)` walks all corpus JSON files
+and returns a tibble of validation results.
+
+`jsonvalidate` is now in `Imports`.
+
+## `describe_corpus()` exports README + CMDI + DataCite
+
+A single call writes a README.md, the existing CMDI XML, and a
+DataCite 4.5 JSON document for a corpus. Outputs derive from a shared
+`collect_corpus_summary()` snapshot. Existing files are preserved
+unless `force = TRUE` (otherwise the new file gets a `-generated`
+suffix). Project / funding / team metadata at the database level
+flow into both README and DataCite output.
+
+(The function is named `describe_corpus()` rather than `describe()`
+to avoid colliding with `testthat::describe()`.)
+
+---
+
 # reindeer 0.5.0 (2026-05-10)
 
 ## Tidyverse-friendly segment_list
