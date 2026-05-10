@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://humlab-speech.github.io/reindeer/schemas/metadata.schema.json",
+  "title": "reindeer METADATA.json",
+  "description": "Schema for METADATA.json files at database, session, or bundle level. The schema enforces structure of canonical keys when present but accepts arbitrary user-defined fields (additionalProperties: true).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "participant": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": ["string", "number", "null"] },
+        "age": { "type": ["number", "integer", "null"] },
+        "gender": { "type": ["string", "null"] },
+        "language": { "type": ["string", "null"] },
+        "dialect": { "type": ["string", "null"] },
+        "education": { "type": ["string", "null"] },
+        "occupation": { "type": ["string", "null"] }
+      }
+    },
+    "recording": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "date": { "type": ["string", "null"] },
+        "time": { "type": ["string", "null"] },
+        "location": { "type": ["string", "null"] },
+        "equipment": { "type": ["string", "null"] },
+        "stimulus": { "type": ["string", "null"] },
+        "repetition": { "type": ["integer", "number", "null"] },
+        "sampleRate": { "type": ["integer", "number", "null"] },
+        "channels": { "type": ["integer", "number", "null"] }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "annotator": { "type": ["string", "null"] },
+        "annotation_date": { "type": ["string", "null"] },
+        "quality": { "type": ["string", "null"] }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "task": { "type": ["string", "null"] },
+        "duration_minutes": { "type": ["number", "integer", "null"] }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "acronym": { "type": ["string", "null"] },
+        "startDate": { "type": ["string", "null"] },
+        "endDate": { "type": ["string", "null"] },
+        "website": { "type": ["string", "null"] }
+      }
+    },
+    "funding": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "funder": { "type": ["string", "null"] },
+        "grantNumber": { "type": ["string", "null"] },
+        "amount": { "type": ["number", "integer", "null"] },
+        "currency": { "type": ["string", "null"] }
+      }
+    },
+    "team": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string" },
+          "role": { "type": ["string", "null"] },
+          "affiliation": { "type": ["string", "null"] },
+          "email": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

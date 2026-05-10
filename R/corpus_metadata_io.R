@@ -73,15 +73,19 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
   
   # Merge
   updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
-  
+
+  # Validate before writing
+  .validate_against_schema(updated, "metadata.schema.json",
+                           file_path = db_meta_file, write = TRUE)
+
   # Write
   jsonlite::write_json(updated, db_meta_file, auto_unbox = TRUE, pretty = TRUE)
-  
+
   # Update cache
   con <- get_corpus_connection(corpus_obj)
-  
+
   process_metadata_list(con, corpus_obj@.uuid, NULL, NULL, metadata_list, "database")
-  
+
   cli::cli_alert_success("Database metadata updated")
 }
 
@@ -121,20 +125,24 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
     
     # Merge
     updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
-    
+
     # Ensure directory exists
     session_dir <- dirname(session_meta_file)
     if (!dir.exists(session_dir)) {
       dir.create(session_dir, recursive = TRUE)
     }
-    
+
+    # Validate before writing
+    .validate_against_schema(updated, "metadata.schema.json",
+                             file_path = session_meta_file, write = TRUE)
+
     # Write
     jsonlite::write_json(updated, session_meta_file, auto_unbox = TRUE, pretty = TRUE)
-    
+
     # Update cache
     process_metadata_list(con, corpus_obj@.uuid, session_name, NULL, metadata_list, "session")
   }
-  
+
   cli::cli_alert_success("Metadata updated for {length(matching_sessions)} session{?s}")
 }
 
@@ -175,20 +183,24 @@ set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, met
     
     # Merge
     updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
-    
+
     # Ensure directory exists
     bundle_dir <- dirname(bundle_meta_file)
     if (!dir.exists(bundle_dir)) {
       dir.create(bundle_dir, recursive = TRUE)
     }
-    
+
+    # Validate before writing
+    .validate_against_schema(updated, "metadata.schema.json",
+                             file_path = bundle_meta_file, write = TRUE)
+
     # Write
     jsonlite::write_json(updated, bundle_meta_file, auto_unbox = TRUE, pretty = TRUE)
-    
+
     # Update cache
     process_metadata_list(con, corpus_obj@.uuid, session_name, bundle_name, metadata_list, "bundle")
   }
-  
+
   cli::cli_alert_success("Metadata updated for {nrow(matching_bundles)} bundle{?s}")
 }
 

@@ -34,7 +34,8 @@ Imports:
     RSQLite,
     RcppSimdJson,
     tibble,
-    httpuv
+    httpuv,
+    jsonvalidate
 Suggests:
     testthat (>= 3.0.0),
     emuR,

@@ -682,6 +682,8 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     }
     
     updated <- utils::modifyList(existing, meta_list, keep.null = FALSE)
+    .validate_against_schema(updated, "metadata.schema.json",
+                             file_path = meta_file, write = TRUE)
     jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
     
   } else if (level == "session") {
@@ -696,6 +698,8 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     }
     
     updated <- utils::modifyList(existing, meta_list, keep.null = FALSE)
+    .validate_against_schema(updated, "metadata.schema.json",
+                             file_path = meta_file, write = TRUE)
     jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
     
   } else if (level == "bundle") {
@@ -718,6 +722,8 @@ write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level
     }
     
     updated <- utils::modifyList(existing, meta_list, keep.null = FALSE)
+    .validate_against_schema(updated, "metadata.schema.json",
+                             file_path = meta_file, write = TRUE)
     jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
   }
 }

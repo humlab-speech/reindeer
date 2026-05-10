@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://humlab-speech.github.io/reindeer/schemas/dbconfig.schema.json",
+  "title": "EMU-SDMS database configuration",
+  "description": "Schema for _DBconfig.json files written by reindeer / emuR.",
+  "type": "object",
+  "required": ["name", "UUID", "levelDefinitions", "linkDefinitions"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "UUID": { "type": "string", "minLength": 1 },
+    "mediafileExtension": { "type": "string" },
+    "ssffTrackDefinitions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ssffTrack" }
+    },
+    "levelDefinitions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/level" }
+    },
+    "linkDefinitions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/link" }
+    },
+    "EMUwebAppConfig": {
+      "type": "object",
+      "properties": {
+        "perspectives": { "type": "array" },
+        "restrictions": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "ssffTrack": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "columnName": { "type": "string" },
+        "fileExtension": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "level": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["ITEM", "EVENT", "SEGMENT"] },
+        "attributeDefinitions": { "type": "array" }
+      },
+      "additionalProperties": true
+    },
+    "link": {
+      "type": "object",
+      "required": ["type", "superlevelName", "sublevelName"],
+      "properties": {
+        "type": { "type": "string", "enum": ["ONE_TO_MANY", "MANY_TO_MANY", "ONE_TO_ONE"] },
+        "superlevelName": { "type": "string" },
+        "sublevelName": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

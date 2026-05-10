@@ -62,6 +62,9 @@ load_DBconfig <- function(obj) {
   # Use optimized JSON reading with RcppSimdJson
   DBconfig <- read_json_fast(dbCfgPath, simplifyVector = FALSE)
 
+  # Validate against schema (soft-warn unless reindeer.schema_strict is TRUE)
+  .validate_against_schema(DBconfig, "dbconfig.schema.json", file_path = dbCfgPath)
+
   # Cache the config
   attr(DBconfig, "mtime") <- file.mtime(dbCfgPath)
   .dbConfigCache[[cache_key]] <- DBconfig
@@ -276,6 +279,10 @@ store_DBconfig <- function(obj, dbConfig, basePath = NULL) {
   # Use more efficient JSON writing
   json <- jsonlite::toJSON(dbConfig, auto_unbox = TRUE,
                            force = TRUE, pretty = TRUE)
+
+  # Validate before writing — write paths are always strict
+  .validate_against_schema(as.character(json), "dbconfig.schema.json",
+                           file_path = dbCfgPath, write = TRUE)
 
   writeLines(json, dbCfgPath, useBytes = TRUE)
 
