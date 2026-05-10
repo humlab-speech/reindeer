@@ -48,7 +48,9 @@ Suggests:
     openxlsx,
     av,
     readr,
-    rstudioapi
+    rstudioapi,
+    dplyr (>= 1.0.0),
+    vctrs
 Remotes:
   github::humlab-speech/superassp,
   github::humlab-speech/av

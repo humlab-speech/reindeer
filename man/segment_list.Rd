@@ -7,19 +7,23 @@
 segment_list(data, db_uuid = NULL, db_path = NULL)
 }
 \arguments{
-\item{data}{A data.frame with the required columns (see Structure below)}
+\item{data}{A data.frame, tibble, or compatible object with the required
+columns (see Structure below)}
 
 \item{db_uuid}{Character; the database UUID}
 
 \item{db_path}{Character; path to the database directory}
 }
 \value{
-A \code{segment_list} object (inherits from data.frame)
+A \code{segment_list} object that inherits from
+\code{tbl_df}, \code{tbl}, and \code{data.frame}.
 }
 \description{
 An S7 class representing a segment list returned by EMU queries.
-This class extends tibble with validation to ensure compatibility
-with emuR::query() results.
+This class wraps a tibble (\code{tbl_df}) and carries \code{db_uuid} / \code{db_path}
+as S7 properties. Tidyverse verbs (\code{dplyr::filter}, \code{mutate}, \code{select},
+\code{arrange}, base bracket subsetting) preserve the class and its
+properties when columns required by the validator remain present.
 }
 \section{Structure}{
 
@@ -48,6 +52,9 @@ A segment_list must contain the following columns:
 \dontrun{
 # Query returns a segment_list
 segs <- ask_for(corpus("path/to/db_emuDB"), "Phonetic == t")
+
+# Tidyverse pipe preserves segment_list and its properties
+long_segs <- segs |> dplyr::filter(end - start > 50)
 
 # Apply DSP to segments
 result <- quantify(segs, corpus, tracks = "fm")

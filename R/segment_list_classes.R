@@ -1,13 +1,21 @@
+# S3 parent describing tibble's class chain so S7 preserves tbl_df/tbl
+# classes on the underlying data.
+.tbl_df_S3_class <- S7::new_S3_class(c("tbl_df", "tbl", "data.frame"))
+
 #' Segment List S7 Class
 #'
 #' An S7 class representing a segment list returned by EMU queries.
-#' This class extends tibble with validation to ensure compatibility
-#' with emuR::query() results.
+#' This class wraps a tibble (`tbl_df`) and carries `db_uuid` / `db_path`
+#' as S7 properties. Tidyverse verbs (`dplyr::filter`, `mutate`, `select`,
+#' `arrange`, base bracket subsetting) preserve the class and its
+#' properties when columns required by the validator remain present.
 #'
-#' @param data A data.frame with the required columns (see Structure below)
+#' @param data A data.frame, tibble, or compatible object with the required
+#'   columns (see Structure below)
 #' @param db_uuid Character; the database UUID
 #' @param db_path Character; path to the database directory
-#' @return A \code{segment_list} object (inherits from data.frame)
+#' @return A \code{segment_list} object that inherits from
+#'   \code{tbl_df}, \code{tbl}, and \code{data.frame}.
 #'
 #' @section Structure:
 #' A segment_list must contain the following columns:
@@ -33,6 +41,9 @@
 #' # Query returns a segment_list
 #' segs <- ask_for(corpus("path/to/db_emuDB"), "Phonetic == t")
 #'
+#' # Tidyverse pipe preserves segment_list and its properties
+#' long_segs <- segs |> dplyr::filter(end - start > 50)
+#'
 #' # Apply DSP to segments
 #' result <- quantify(segs, corpus, tracks = "fm")
 #' }
@@ -41,7 +52,7 @@
 #' @export
 segment_list <- S7::new_class(
   "segment_list",
-  parent = S7::class_data.frame,
+  parent = .tbl_df_S3_class,
   properties = list(
     db_uuid = S7::class_character,
     db_path = S7::class_character
@@ -78,11 +89,9 @@ segment_list <- S7::new_class(
     NULL
   },
   constructor = function(data, db_uuid = NULL, db_path = NULL) {
-    # Convert to data.frame if needed
-    if (inherits(data, "tbl_df") || inherits(data, "tbl")) {
-      data <- as.data.frame(data)
-    } else if (!is.data.frame(data)) {
-      data <- as.data.frame(data)
+    # Always wrap in tibble so S7 sees the tbl_df/tbl/data.frame class chain
+    if (!inherits(data, "tbl_df")) {
+      data <- tibble::as_tibble(data)
     }
 
     # Extract db_uuid from data if not provided
@@ -174,11 +183,9 @@ extended_segment_list <- S7::new_class(
   },
   constructor = function(data, db_uuid = NULL, db_path = NULL,
                         dsp_function = "", dsp_columns = character(0)) {
-    # Convert to data.frame if needed
-    if (inherits(data, "tbl_df") || inherits(data, "tbl")) {
-      data <- as.data.frame(data)
-    } else if (!is.data.frame(data)) {
-      data <- as.data.frame(data)
+    # Always wrap in tibble so S7 sees the tbl_df/tbl/data.frame class chain
+    if (!inherits(data, "tbl_df")) {
+      data <- tibble::as_tibble(data)
     }
 
     # Extract db_uuid from data if not provided
