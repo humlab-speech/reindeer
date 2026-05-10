@@ -106,17 +106,22 @@ extended_segment_list with tracks/metadata
 Three-level hierarchy with proper inheritance (R/reindeeR_metadata_optimized.R):
 
 1. **Database level**: Defaults for all bundles (stored in `<dbname>_DBconfig.json`)
-2. **Session level**: Overrides for session (stored in `<session>.meta_json`)
-3. **Bundle level**: Bundle-specific values (stored in `<bundle>.meta_json`)
+2. **Session level**: Overrides for session (stored in `<session>_ses/METADATA.json`)
+3. **Bundle level**: Bundle-specific values (stored in `<bundle>_bndl/METADATA.json`)
+
+**Filename note (as of v0.5.0):** all three levels use the same filename
+`METADATA.json`. The `metadata.filename` constant in `R/metadata_core.R:12`
+is the single source of truth. Older docs / comments referring to
+`.meta_json` are stale.
 
 Key functions:
-- `gather_metadata(corpus)`: Scan .meta_json files and populate SQLite cache
+- `gather_metadata(corpus)`: Scan METADATA.json files and populate SQLite cache
 - `get_metadata(corpus)`: Retrieve with inheritance resolved
 - `add_metadata(corpus, list(...), session, bundle)`: Set metadata programmatically
 - `export_metadata(corpus, "file.xlsx")` / `import_metadata(corpus, "file.xlsx")`: Batch editing
 - `biographize(segments, corpus)`: Enrich query results with metadata
 
-**Ground truth**: Always the `.meta_json` files. SQLite cache is for performance only.
+**Ground truth**: Always the `METADATA.json` files. SQLite cache is for performance only.
 
 ### Query System
 
@@ -192,7 +197,7 @@ See `SERVE_FUNCTION_SUMMARY.md` for detailed documentation.
 
 ### 1. Ground Truth vs Cache
 
-- **Ground truth**: JSON files (`.meta_json`, `_DBconfig.json`, `_annot.json`)
+- **Ground truth**: JSON files (`METADATA.json`, `_DBconfig.json`, `_annot.json`)
 - **Cache**: SQLite database (`_emuDBcache.sqlite`)
 - Always trust JSON files; rebuild cache when in doubt: `gather_metadata(corpus)`
 
@@ -376,7 +381,7 @@ add_metadata(corp, list(Speaker = "P01"), session = "Session1")
 # Set bundle-level
 add_metadata(corp, list(Quality = "Good"), session = "Session1", bundle = "Bundle1")
 
-# Always call gather_metadata() after manual .meta_json edits
+# Always call gather_metadata() after manual METADATA.json edits
 gather_metadata(corp)
 ```
 
@@ -476,7 +481,7 @@ simulations/                     # Simulation caches (user-specified location)
 **Note:** Draft annotation caches (`.draft_cache/`) are managed by the protoscribe package.
 
 **Cache priority**:
-1. Ground truth: JSON files (`.meta_json`, `_annot.json`)
+1. Ground truth: JSON files (`METADATA.json`, `_annot.json`)
 2. Cache: SQLite databases (for performance)
 3. Always rebuild cache if JSON files change
 

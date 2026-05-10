@@ -1,3 +1,42 @@
+# reindeer 0.5.0 (2026-05-10)
+
+## Tidyverse-friendly segment_list
+
+`segment_list` and `extended_segment_list` now inherit from `tbl_df`, `tbl`,
+and `data.frame`. Tidyverse verbs (`dplyr::filter`, `mutate`, `arrange`,
+`select`) and base bracket subsetting preserve the class and `db_uuid` /
+`db_path` properties. When a column required by the validator is dropped,
+the result downcasts to a plain tibble.
+
+The change is implemented through registered `vctrs::vec_proxy` /
+`vec_restore` and `dplyr::dplyr_reconstruct` methods plus a class-aware `[`
+method. `dplyr` and `vctrs` are now in `Suggests` so dplyr operations only
+require dplyr if you actually use them.
+
+## Pipe-loss provenance accounting (`provenance()`, `dropped()`)
+
+Every verb that touches a `segment_list` now appends a structured row to
+its `reindeer_provenance` attribute, recording verb name, deparsed call,
+input/output row counts, and timestamp. Two new exported accessors:
+
+* `provenance(seg)` returns the full log as a tibble.
+* `dropped(seg)` returns cumulative loss; `dropped(seg, step)` returns
+  per-step loss.
+
+Navigation verbs (`scout`, `ascend_to`, `descend_to`) emit a `cli` warning
+when more than 25% of input rows are dropped (configurable via
+`options(reindeer.loss_warn = N)`). User-explicit ops (`dplyr` verbs,
+bracket subsetting) record the step but stay silent. The provenance log
+is capped at the last 1000 entries (`options(reindeer.provenance_max)`).
+
+## METADATA.json auto-stub on bundle/session creation
+
+`create_session_and_bundle()` now writes an empty `METADATA.json` skeleton
+at session and bundle level so downstream `gather_metadata()` no longer
+silently skips fresh bundles. Existing files are never overwritten.
+
+---
+
 # reindeer 0.3.2 (2026-02-05)
 
 ## Minor Update
