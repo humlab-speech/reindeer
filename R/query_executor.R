@@ -125,7 +125,10 @@ ask_for <- function(emuDB, query, ...) {
       db_uuid <- if ("db_uuid" %in% names(result)) unique(result$db_uuid)[1] else ""
       result <- segment_list(result, db_uuid = db_uuid, db_path = database_dir)
     }
-    
+
+    if (S7::S7_inherits(result, segment_list)) {
+      result <- .seed_provenance(result, "ask_for", sys.call())
+    }
     return(result)
   }
 }

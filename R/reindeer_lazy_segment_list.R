@@ -131,11 +131,13 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
     db_uuid = lazy_sl@db_uuid,
     db_path = lazy_sl@db_path
   )
-  
+
+  seg_list <- .seed_provenance(seg_list, "collect", sys.call(-1L))
+
   # Cache result (uses environment reference semantics -- mutates in place)
   lazy_sl@.state$cache <- seg_list
   lazy_sl@.state$materialized <- TRUE
-  
+
   return(seg_list)
 }
 

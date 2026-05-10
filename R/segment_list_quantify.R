@@ -290,5 +290,5 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     dsp_columns = dsp_cols
   )
 
-  result
+  .record_step(result, object, "quantify", sys.call(-1L))
 }

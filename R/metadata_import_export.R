@@ -326,6 +326,10 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
     result <- extended_segment_list(data = as.data.frame(result))
   }
 
+  if (S7::S7_inherits(segs_tbl, segment_list)) {
+    result <- .record_step(result, segs_tbl, "biographize", sys.call(-1L))
+  }
+
   result
 }
 

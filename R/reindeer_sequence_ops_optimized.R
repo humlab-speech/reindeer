@@ -274,7 +274,9 @@ scout_dt <- function(.segments,
     db_uuid = db_uuid,
     db_path = db_path
   )
-  
+
+  result <- .record_step(result, .segments, "scout", sys.call(-1L))
+
   return(result)
 }
 
@@ -466,6 +468,8 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     db_path = db_path
   )
 
+  result <- .record_step(result, .segments, "ascend_to", sys.call(-1L))
+
   return(result)
 }
 
@@ -616,13 +620,15 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   )
   
   result_dt <- result_dt[, ..result_cols]
-  
+
   # Convert to segment_list
   result <- segment_list(
     data = as.data.frame(result_dt),
     db_uuid = db_uuid,
     db_path = db_path
   )
-  
+
+  result <- .record_step(result, .segments, "descend_to", sys.call(-1L))
+
   return(result)
 }
