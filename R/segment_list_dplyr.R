@@ -109,6 +109,52 @@
   .dplyr_reconstruct_extended_segment_list(out, x)
 }
 
+# ---------------------------------------------------------------------------
+# *_join hooks: dplyr's reconstruct pipeline records "dplyr_op" for every
+# verb. Joins deserve a named provenance step so users can see which kind
+# of join dropped rows. These wrappers run the join on the tibble proxy,
+# rebuild the segment_list, and log the join verb + row loss. warn=TRUE so
+# loss above reindeer.loss_warn threshold fires a cli warning.
+# ---------------------------------------------------------------------------
+
+#' @keywords internal
+.segment_list_join <- function(x, y, by = NULL, copy = FALSE,
+                               suffix = c(".x", ".y"), ..., keep = NULL,
+                               .verb = "inner_join", .fn = dplyr::inner_join) {
+  proxy <- .vec_proxy_segment_list(x)
+  out <- .fn(proxy, y, by = by, copy = copy, suffix = suffix, ..., keep = keep)
+  if (!is.data.frame(out)) return(out)
+  required_cols <- c(
+    "labels", "start", "end", "db_uuid", "session", "bundle",
+    "start_item_id", "end_item_id", "level", "attribute",
+    "start_item_seq_idx", "end_item_seq_idx", "type",
+    "sample_start", "sample_end", "sample_rate"
+  )
+  if (!all(required_cols %in% names(out))) {
+    return(tibble::as_tibble(out))
+  }
+  rebuilt <- segment_list(out, db_uuid = x@db_uuid, db_path = x@db_path)
+  .record_step(rebuilt, x, .verb, warn = TRUE)
+}
+
+#' @keywords internal
+.segment_list_filter_join <- function(x, y, by = NULL, copy = FALSE, ...,
+                                      .verb = "anti_join",
+                                      .fn = dplyr::anti_join) {
+  proxy <- .vec_proxy_segment_list(x)
+  out <- .fn(proxy, y, by = by, copy = copy, ...)
+  if (!is.data.frame(out)) return(out)
+  rebuilt <- segment_list(out, db_uuid = x@db_uuid, db_path = x@db_path)
+  .record_step(rebuilt, x, .verb, warn = TRUE)
+}
+
+.left_join_segment_list  <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) .segment_list_join(x, y, by, copy, suffix, ..., keep = keep, .verb = "left_join",  .fn = dplyr::left_join)
+.right_join_segment_list <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) .segment_list_join(x, y, by, copy, suffix, ..., keep = keep, .verb = "right_join", .fn = dplyr::right_join)
+.inner_join_segment_list <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) .segment_list_join(x, y, by, copy, suffix, ..., keep = keep, .verb = "inner_join", .fn = dplyr::inner_join)
+.full_join_segment_list  <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) .segment_list_join(x, y, by, copy, suffix, ..., keep = keep, .verb = "full_join",  .fn = dplyr::full_join)
+.anti_join_segment_list  <- function(x, y, by = NULL, copy = FALSE, ...)        .segment_list_filter_join(x, y, by, copy, ..., .verb = "anti_join", .fn = dplyr::anti_join)
+.semi_join_segment_list  <- function(x, y, by = NULL, copy = FALSE, ...)        .segment_list_filter_join(x, y, by, copy, ..., .verb = "semi_join", .fn = dplyr::semi_join)
+
 #' @keywords internal
 .dplyr_reconstruct_extended_segment_list <- function(data, template) {
   required_cols <- c(

@@ -84,6 +84,18 @@
                      .dplyr_reconstruct_segment_list, envir = asNamespace("dplyr"))
     registerS3method("dplyr_reconstruct", "reindeer::extended_segment_list",
                      .dplyr_reconstruct_extended_segment_list, envir = asNamespace("dplyr"))
+
+    # *_join methods that record a join-specific provenance step (verb name
+    # in {left,right,inner,full,anti,semi}_join) and fire the loss warning
+    # so silent row-drops during joins become visible.
+    dn <- asNamespace("dplyr")
+    cls <- "reindeer::segment_list"
+    registerS3method("left_join",  cls, .left_join_segment_list,  envir = dn)
+    registerS3method("right_join", cls, .right_join_segment_list, envir = dn)
+    registerS3method("inner_join", cls, .inner_join_segment_list, envir = dn)
+    registerS3method("full_join",  cls, .full_join_segment_list,  envir = dn)
+    registerS3method("anti_join",  cls, .anti_join_segment_list,  envir = dn)
+    registerS3method("semi_join",  cls, .semi_join_segment_list,  envir = dn)
   }
 
   invisible()
