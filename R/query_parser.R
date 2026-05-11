@@ -112,7 +112,7 @@ parse_simple_query <- function(query_string) {
   matches <- regmatches(query_string, match)[[1]]
 
   if (length(matches) < 4) {
-    cli::cli_abort("Cannot parse simple query: {.val {query_string}}")
+    .query_abort("Cannot parse simple query: {.val {query_string}}")
   }
 
   level <- matches[2]
@@ -151,7 +151,7 @@ parse_dominance_query <- function(query_string) {
   parts <- split_on_operator(inner, "^")
 
   if (is.null(parts) || length(parts) != 2) {
-    cli::cli_abort("Invalid dominance query: {.val {query_string}}")
+    .query_abort("Invalid dominance query: {.val {query_string}}")
   }
 
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -169,7 +169,7 @@ parse_sequence_query <- function(query_string) {
   parts <- split_on_operator(inner, "->")
 
   if (is.null(parts) || length(parts) != 2) {
-    cli::cli_abort("Invalid sequence query: {.val {query_string}}")
+    .query_abort("Invalid sequence query: {.val {query_string}}")
   }
 
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -189,7 +189,7 @@ parse_conjunction_query <- function(query_string) {
   parts <- split_on_operator(inner, "&")
   
   if (length(parts) != 2) {
-    cli::cli_abort("Invalid conjunction query: {.val {query_string}}")
+    .query_abort("Invalid conjunction query: {.val {query_string}}")
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -209,7 +209,7 @@ parse_disjunction_query <- function(query_string) {
   parts <- split_on_operator(inner, "|")
   
   if (length(parts) != 2) {
-    cli::cli_abort("Invalid disjunction query: {.val {query_string}}")
+    .query_abort("Invalid disjunction query: {.val {query_string}}")
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -299,7 +299,7 @@ parse_function_query <- function(query_string) {
     ))
   }
 
-  cli::cli_abort("Cannot parse function query: {.val {query_string}}")
+  .query_abort("Cannot parse function query: {.val {query_string}}")
 }
 
 # Open a query connection with REGEXP support
@@ -451,7 +451,7 @@ build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = 
   }
 
   if (left_level != right_level) {
-    cli::cli_abort("Sequence queries require both sides to be from the same level")
+    .query_abort("Sequence queries require both sides to be from the same level")
   }
 
   # Determine result level and side based on projection
@@ -480,7 +480,7 @@ build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = 
   
   # Validate result_side to prevent column name injection
   if (!result_side %in% c("left", "right", "both")) {
-    cli::cli_abort("Internal error: invalid result_side {.val {result_side}}")
+    .query_abort("Internal error: invalid result_side {.val {result_side}}")
   }
 
   # Build CTE WHERE clauses with parameterized conditions
@@ -769,7 +769,7 @@ execute_function_query_corrected <- function(db_path, parsed_query, con = NULL) 
   } else if (func_name == "Num") {
     return(execute_count_function(con, level1, level2, operator, value))
   } else {
-    cli::cli_abort("Unknown function: {.val {func_name}}")
+    .query_abort("Unknown function: {.val {func_name}}")
   }
 }
 
@@ -823,7 +823,7 @@ execute_subquery <- function(db_path, parsed_query, con = NULL) {
     "function" = execute_function_query_corrected(db_path, parsed_query, con = con),
     "conjunction" = execute_conjunction_query(db_path, parsed_query, NULL, con = con),
     "disjunction" = execute_disjunction_query(db_path, parsed_query, NULL, con = con),
-    cli::cli_abort("Unknown query type in subquery: {.val {parsed_query$type}}")
+    .query_abort("Unknown query type in subquery: {.val {parsed_query$type}}")
   )
   return(result)
 }
@@ -864,7 +864,7 @@ extract_condition_from_query <- function(query) {
     }
   }
 
-  cli::cli_abort("Cannot extract condition from query")
+  .query_abort("Cannot extract condition from query")
 }
 
 extract_level_from_query <- function(query) {
@@ -887,7 +887,7 @@ extract_level_from_query <- function(query) {
       return(extract_level_from_query(query$left))
     }
   }
-  cli::cli_abort("Cannot extract level from query")
+  .query_abort("Cannot extract level from query")
 }
 
 # Extract the display attribute name from any query type.
@@ -976,7 +976,7 @@ build_corrected_dominance_sql <- function(con, left_query, right_query, left_lev
   path_info <- find_dominance_path(hierarchy_info, left_level, right_level)
 
   if (length(path_info$path) == 0) {
-    cli::cli_abort("No dominance path found")
+    .query_abort("No dominance path found")
   }
 
   cte_result <- build_dominance_chain_cte(path_info, left_cond, right_cond,
@@ -988,7 +988,7 @@ build_corrected_dominance_sql <- function(con, left_query, right_query, left_lev
 
   # Validate result_side to prevent column name injection
   if (!result_side %in% c("left", "right")) {
-    cli::cli_abort("Internal error: invalid result_side {.val {result_side}}")
+    .query_abort("Internal error: invalid result_side {.val {result_side}}")
   }
 
   main_sql <- paste0("
@@ -1104,7 +1104,7 @@ build_recursive_dominance_chain <- function(path_info) {
   directions <- path_info$directions
 
   if (length(path) <= 2) {
-    cli::cli_abort("build_recursive_dominance_chain called for direct dominance")
+    .query_abort("build_recursive_dominance_chain called for direct dominance")
   }
 
   # Validate level names — they're used as SQL identifiers and values.
@@ -1112,14 +1112,14 @@ build_recursive_dominance_chain <- function(path_info) {
   # to prevent any injection through malformed config files.
   for (lvl in path) {
     if (grepl("[^A-Za-z0-9_]", lvl)) {
-      cli::cli_abort("Invalid level name in hierarchy path: {.val {lvl}}")
+      .query_abort("Invalid level name in hierarchy path: {.val {lvl}}")
     }
   }
 
   # Validate direction values
   for (d in directions) {
     if (!d %in% c("down", "up")) {
-      cli::cli_abort("Invalid direction in hierarchy path: {.val {d}}")
+      .query_abort("Invalid direction in hierarchy path: {.val {d}}")
     }
   }
 
@@ -1209,7 +1209,7 @@ build_position_function_sql <- function(func_name, parent_level, child_level,
     "==" = value == 1,
     "=" = value == 1,
     "!=" = value != 1,
-    cli::cli_abort("Invalid operator for position function: {.val {operator}}")
+    .query_abort("Invalid operator for position function: {.val {operator}}")
   )
   if (!include_position) {
     position_condition <- sprintf("NOT (%s)", position_condition)
@@ -1260,7 +1260,7 @@ build_position_function_sql <- function(func_name, parent_level, child_level,
 build_count_function_sql <- function(parent_level, child_level, operator, value) {
   valid_operators <- c("=", "==", "!=", ">", "<", ">=", "<=")
   if (!operator %in% valid_operators) {
-    cli::cli_abort("Invalid operator for count function: {.val {operator}}")
+    .query_abort("Invalid operator for count function: {.val {operator}}")
   }
   sql_op <- if (operator == "==") "=" else operator
 
@@ -1325,7 +1325,7 @@ get_hierarchy_info <- function(db_dir) {
   dbconfig <- load_DBconfig(db_dir)
   link_defs <- dbconfig$linkDefinitions
   if (is.null(link_defs) || length(link_defs) == 0) {
-    cli::cli_abort("No linkDefinitions found in DBconfig for {.path {db_dir}}")
+    .query_abort("No linkDefinitions found in DBconfig for {.path {db_dir}}")
   }
   links <- lapply(link_defs, function(ld) {
     list(type = ld$type, super = ld$superlevelName, sub = ld$sublevelName)

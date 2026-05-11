@@ -55,7 +55,7 @@ parse_size_string <- function(size_string) {
     # No space - split number from unit
     match <- regexpr("[A-Z]+$", size_string)
     if (match == -1) {
-      cli::cli_abort("Invalid size format. Use format like {.val 500 MB} or {.val 2 GB}")
+      .cache_abort("Invalid size format. Use format like {.val 500 MB} or {.val 2 GB}")
     }
     number_part <- substr(size_string, 1, match - 1)
     unit_part <- substr(size_string, match, nchar(size_string))
@@ -63,7 +63,7 @@ parse_size_string <- function(size_string) {
   }
 
   if (length(parts) != 2) {
-    cli::cli_abort("Invalid size format. Use format like {.val 500 MB} or {.val 2 GB}")
+    .cache_abort("Invalid size format. Use format like {.val 500 MB} or {.val 2 GB}")
   }
 
   number <- as.numeric(parts[1])
@@ -78,7 +78,7 @@ parse_size_string <- function(size_string) {
   )
 
   if (!unit %in% names(multipliers)) {
-    cli::cli_abort("Unknown unit: {.val {unit}}. Use B, KB, MB, GB, or TB")
+    .cache_abort("Unknown unit: {.val {unit}}. Use B, KB, MB, GB, or TB")
   }
 
   unname(number * multipliers[unit])

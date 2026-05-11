@@ -36,7 +36,7 @@ query <- function(emuDB, eql, ...) {
     } else if (file.exists(db_path2)) {
       db_path <- db_path2
     } else {
-      cli::cli_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
+      .query_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
     }
     
     database_dir <- base_path
@@ -56,7 +56,7 @@ query <- function(emuDB, eql, ...) {
     } else if (file.exists(db_path2)) {
       db_path <- db_path2
     } else {
-      cli::cli_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
+      .query_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
     }
     
     database_dir <- emuDB
@@ -66,7 +66,7 @@ query <- function(emuDB, eql, ...) {
     db_name <- attr(emuDB, "dbName")
     
     if (is.null(base_path) || is.null(db_name)) {
-      cli::cli_abort("Invalid emuDB object: missing basePath or dbName attributes")
+      .query_abort("Invalid emuDB object: missing basePath or dbName attributes")
     }
     
     db_path1 <- file.path(base_path, paste0(db_name, "_emuDB.sqlite"))
@@ -77,14 +77,14 @@ query <- function(emuDB, eql, ...) {
     } else if (file.exists(db_path2)) {
       db_path <- db_path2
     } else {
-      cli::cli_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
+      .query_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
     }
     
     database_dir <- base_path
   }
   
   if (!file.exists(db_path)) {
-    cli::cli_abort("SQLite database not found at: {.path {db_path}}")
+    .query_abort("SQLite database not found at: {.path {db_path}}")
   }
   
   # Lazy is the default as of v0.7.0; auto-collect S3 methods preserve
@@ -159,7 +159,7 @@ build_base_sql <- function(db_path, parsed, opts = list()) {
     "function" = build_function_query_sql(db_path, parsed),
     "conjunction" = build_conjunction_query_sql(db_path, parsed, result_level),
     "disjunction" = build_disjunction_query_sql(db_path, parsed, result_level),
-    cli::cli_abort("Unknown query type: {.val {parsed$type}}")
+    .query_abort("Unknown query type: {.val {parsed$type}}")
   )
   
   return(result)
@@ -277,7 +277,7 @@ build_function_query_sql <- function(db_path, parsed) {
   } else if (func_name == "Num") {
     build_count_function_sql(level1, level2, operator, value)
   } else {
-    cli::cli_abort("Unknown function: {.val {func_name}}")
+    .query_abort("Unknown function: {.val {func_name}}")
   }
 }
 
@@ -319,7 +319,7 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
       "function" = execute_function_query_corrected(db_path, parsed, con = con),
       "conjunction" = execute_conjunction_query(db_path, parsed, result_level, con = con),
       "disjunction" = execute_disjunction_query(db_path, parsed, result_level, con = con),
-      cli::cli_abort("Unknown query type: {.val {parsed$type}}")
+      .query_abort("Unknown query type: {.val {parsed$type}}")
     )
     
     # Deduce times for ITEM-type levels before formatting
@@ -327,7 +327,7 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
     return(format_as_emuRsegs(result))
     
   }, error = function(e) {
-    cli::cli_abort(c(
+    .query_abort(c(
       "Query execution failed",
       "x" = conditionMessage(e),
       "i" = "Query: {.code {query_string}}"

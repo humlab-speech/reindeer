@@ -67,7 +67,7 @@
   ctx <- if (is.null(file_path)) "<inline>" else file_path
   strict <- isTRUE(getOption("reindeer.schema_strict", FALSE)) || isTRUE(write)
   if (strict) {
-    cli::cli_abort(c(
+    .schema_abort(c(
       "Schema validation failed for {.path {ctx}} ({schema_name})",
       bullets
     ))
@@ -122,7 +122,7 @@
 #' @export
 validate_corpus <- function(corpus_obj) {
   if (!S7::S7_inherits(corpus_obj, corpus)) {
-    cli::cli_abort("Input must be a {.cls corpus} object")
+    .schema_abort("Input must be a {.cls corpus} object")
   }
   base_path <- corpus_obj@basePath
   db_name <- corpus_obj@dbName
