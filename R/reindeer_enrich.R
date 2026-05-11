@@ -61,9 +61,30 @@ enrich <- function(corpus_obj, .using, ...,
                    .workers = NULL,
                    .use_cache = FALSE,
                    .cache_dir = NULL,
-                   .cache_format = c("auto", "qs", "rds")) {
+                   .cache_format = c("auto", "qs", "rds"),
+                   with = NULL) {
+  # Segment-level enrichment: enrich(segs, corp, with = "metadata") joins
+  # metadata columns onto a segment_list. Folded in from the former
+  # biographize() entry point.
+  if (S7::S7_inherits(corpus_obj, reindeer::segment_list) ||
+      S7::S7_inherits(corpus_obj, reindeer::lazy_segment_list) ||
+      S7::S7_inherits(corpus_obj, reindeer::extended_segment_list)) {
+    segs <- corpus_obj
+    if (S7::S7_inherits(segs, reindeer::lazy_segment_list)) {
+      segs <- collect(segs)
+    }
+    if (!identical(with, "metadata")) {
+      cli::cli_abort(c(
+        "Cannot enrich a segment_list without {.arg with = \"metadata\"}",
+        "i" = "For DSP enrichment use {.code enrich(corpus, .using = ...)}."
+      ))
+    }
+    # Second positional argument is the corpus when first is a segment_list.
+    return(biographize(segs, .using))
+  }
+
   .cache_format <- match.arg(.cache_format)
-  
+
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
   }

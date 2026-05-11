@@ -130,8 +130,8 @@ compute_signal_hash <- function(file_path) {
 #' @param verbose Show progress messages (default: TRUE)
 #' @param parallel Use parallel processing (default: TRUE)
 #' @return A data.table of signal hashes, invisibly
-#' @export
-update_signal_hashes <- function(corpus_obj, bundles = NULL, 
+#' @keywords internal
+update_signal_hashes <- function(corpus_obj, bundles = NULL,
                                   verbose = TRUE, parallel = TRUE) {
   
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
@@ -222,7 +222,7 @@ update_signal_hashes <- function(corpus_obj, bundles = NULL,
 #' @param session Session name (optional)
 #' @param bundle Bundle name (optional)
 #' @return tibble with signal hash information
-#' @export
+#' @keywords internal
 get_signal_hashes <- function(corpus_obj, session = NULL, bundle = NULL) {
   
   con <- DBI::dbConnect(RSQLite::SQLite(), file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, "_emuDBcache.sqlite")))

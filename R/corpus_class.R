@@ -218,7 +218,7 @@ corpus <- S7::new_class(
 #'   character columns. Additional columns represent metadata fields.
 #' @return A \code{bundle_list} object (inherits from data.frame)
 #'
-#' @export
+#' @keywords internal
 bundle_list <- S7::new_class(
   "bundle_list",
   parent = S7::class_data.frame,

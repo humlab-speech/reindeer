@@ -17,3 +17,4 @@ An emuDBhandle with valid connection
 \description{
 Constructs an emuDBhandle for use with emuR functions that require one.
 }
+\keyword{internal}

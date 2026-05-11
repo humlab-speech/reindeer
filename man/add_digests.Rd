@@ -26,3 +26,4 @@ The corpus object, invisibly
 \description{
 Computes checksums for signal files and stores them as metadata.
 }
+\keyword{internal}

@@ -126,7 +126,7 @@ provenance <- function(seg) {
 #' segs <- query(corp, "Phonetic == t") |> scout(1) |> ascend_to("Word")
 #' dropped(segs)        # cumulative
 #' dropped(segs, 2L)    # how many segs scout() dropped
-#' @export
+#' @keywords internal
 dropped <- function(seg, step = NULL) {
   prov <- provenance(seg)
   if (nrow(prov) == 0L) return(0L)

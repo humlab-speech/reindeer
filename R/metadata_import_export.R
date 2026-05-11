@@ -303,9 +303,9 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' segs <- query(corp, "Phonetic == t")
-#' enriched <- biographize(segs, corp)
+#' enriched <- enrich(segs, corp, with = "metadata")
 #'
-#' @export
+#' @keywords internal
 biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm = "sha1") {
   
   if (!is.data.frame(segs_tbl) || !all(c("session", "bundle") %in% names(segs_tbl))) {
@@ -345,8 +345,8 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
 #' @param bundlePattern Regex pattern to filter bundles (default: ".*")
 #' @param algorithm Hash algorithm (default: "sha1")
 #' @return The corpus object, invisibly
-#' @export
-add_digests <- function(corpus_obj, sessionPattern = ".*", bundlePattern = ".*", 
+#' @keywords internal
+add_digests <- function(corpus_obj, sessionPattern = ".*", bundlePattern = ".*",
                        algorithm = "sha1") {
   
   # This would require emuR functions to list files

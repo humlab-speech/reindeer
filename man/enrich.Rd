@@ -16,7 +16,8 @@ enrich(
   .workers = NULL,
   .use_cache = FALSE,
   .cache_dir = NULL,
-  .cache_format = c("auto", "qs", "rds")
+  .cache_format = c("auto", "qs", "rds"),
+  with = NULL
 )
 }
 \arguments{

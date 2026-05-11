@@ -398,7 +398,7 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
 #' @param corpus_obj A corpus object
 #' @param verbose Whether to show loading messages (default: FALSE)
 #' @return An emuDBhandle with valid connection
-#' @export
+#' @keywords internal
 get_handle <- function(corpus_obj, verbose = FALSE) {
   # Create native handle using cached connection
   handle <- list(

@@ -15,3 +15,4 @@ Logical
 \description{
 Check if object is an extended_segment_list
 }
+\keyword{internal}

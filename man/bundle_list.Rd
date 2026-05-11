@@ -20,3 +20,4 @@ A \code{bundle_list} object (inherits from data.frame)
 An S7 class that extends tibble to represent a list of bundles with
 their associated metadata following inheritance rules.
 }
+\keyword{internal}

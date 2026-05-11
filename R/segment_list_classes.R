@@ -220,7 +220,7 @@ extended_segment_list <- S7::new_class(
 #' Check if object is an extended_segment_list
 #' @param x Object to test
 #' @return Logical
-#' @export
+#' @keywords internal
 is_extended_segment_list <- function(x) {
   S7::S7_inherits(x, extended_segment_list)
 }

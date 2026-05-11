@@ -8,7 +8,7 @@
 #' @param perspective The name of the perspective in which the overlay should be shown. The perspective should already be defined in the database.
 #' @param trackname The name of the SSFF track to be set as an overlay on either the oscillogram [set_osciOverlay] or spectrogram [set_specOverlay]
 #'
-#' @export
+#' @keywords internal
 #' @rdname set_overlays
 #'
 #' @examplesIf interactive()
@@ -57,7 +57,7 @@ set_specOverlay <- function(emuDBhandle,perspective,trackname){
 
 #'
 #' @rdname set_overlays
-#' @export
+#' @keywords internal
 
 set_osciOverlay <- function(emuDBhandle,perspective,trackname){
   perspectiveNames <- .list_perspectives(emuDBhandle)$name

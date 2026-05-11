@@ -19,3 +19,4 @@ tibble with signal hash information
 \description{
 Get signal file hashes for bundles
 }
+\keyword{internal}

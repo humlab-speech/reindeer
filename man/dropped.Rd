@@ -26,3 +26,4 @@ dropped(segs)        # cumulative
 dropped(segs, 2L)    # how many segs scout() dropped
 \dontshow{\}) # examplesIf}
 }
+\keyword{internal}

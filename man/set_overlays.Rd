@@ -34,3 +34,4 @@ set_osciOverlay(ae,"default","rms")
 serve(ae)
 \dontshow{\}) # examplesIf}
 }
+\keyword{internal}

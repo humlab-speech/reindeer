@@ -28,3 +28,4 @@ A data.table of signal hashes, invisibly
 Computes and stores SHA1 hashes for all signal files associated with bundles.
 Used to track file integrity for simulation cache validation.
 }
+\keyword{internal}

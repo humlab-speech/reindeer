@@ -26,6 +26,7 @@ containing session and bundle columns.
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")
 segs <- query(corp, "Phonetic == t")
-enriched <- biographize(segs, corp)
+enriched <- enrich(segs, corp, with = "metadata")
 \dontshow{\}) # examplesIf}
 }
+\keyword{internal}
