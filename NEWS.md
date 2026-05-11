@@ -1,3 +1,29 @@
+# reindeer 0.6.0 (2026-05-11)
+
+## Deferred quantify on lazy_segment_list
+
+`quantify()` now has a method on `lazy_segment_list`. When called on a
+lazy chain it does NOT execute DSP — it appends a `"quantify"` entry to
+`query_parts$post_transforms` and returns the same lazy object. The
+DSP runs at `collect()` time on the materialized segment_list.
+
+This lets a single pipeline carry through to DSP without paying the
+cost unless the result is actually needed:
+
+```r
+ask_for(corp, "Phonetic == t", lazy = TRUE) |>
+  scout(1) |>
+  quantify(superassp::forest) |>
+  collect()
+```
+
+`enrich()` is still eager (it operates on the corpus rather than on a
+segment list, so the lazy semantics differ); deferring it is left for
+a future release. Lazy SQL building for sequence / dominance / function
+queries (the open TODOs in `R/query_executor.R`) is also deferred.
+
+---
+
 # reindeer 0.5.2 (2026-05-11)
 
 ## Single canonical metadata write path
