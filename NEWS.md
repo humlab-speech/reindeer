@@ -1,3 +1,33 @@
+# reindeer 0.5.2 (2026-05-11)
+
+## Single canonical metadata write path
+
+`add_metadata()` and the `[<-` bracket-assignment operator on
+`corpus` objects now share one writer (`corpus_assign_metadata` ->
+`set_metadata_database`/`set_metadata_session`/`set_metadata_bundle`).
+Internal helper `write_metadata_to_json()` has been removed.
+
+`process_metadata_list()` now uses `INSERT OR REPLACE` so re-applying
+the same field at the same level is idempotent. The "Type validation"
+test was previously relying on an incidental UNIQUE-constraint
+failure; it has been updated to reflect the new (correct) behavior,
+with a comment that opt-in type validation may return in a future
+release.
+
+`set_metadata_bundle()` now errors instead of silently creating dirs
+when a literal bundle does not exist. Use `create_session_and_bundle()`
+to create a new bundle before attaching metadata.
+
+## CLI migration complete
+
+The remaining seven plain `stop()` / `warning()` calls in
+`R/test_utilities.R` have been migrated to `cli::cli_abort` /
+`cli::cli_warn`. A new `tests/testthat/test_error_messages.R` lint
+guard prevents regressions: any future plain `stop()` / `warning()`
+under `R/` (excluding `R/deprecated/`) will fail the test suite.
+
+---
+
 # reindeer 0.5.1 (2026-05-10)
 
 ## JSON-Schema validation for `_DBconfig.json` and `METADATA.json`
