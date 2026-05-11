@@ -64,7 +64,22 @@ scout <- function(.segments,
   
   # Handle lazy evaluation
   if (S7::S7_inherits(.segments, lazy_segment_list)) {
-    # Add scout transform to query chain
+    if (collect) {
+      # Materialise then run the eager data.table path. Avoids the lazy SQL
+      # transform chain (which has narrower schema guarantees than the
+      # data.table implementation).
+      return(scout(collect(.segments),
+                   steps_forward = steps_forward,
+                   count_from = count_from,
+                   capture = capture,
+                   ignore_bundle_boundaries = ignore_bundle_boundaries,
+                   calculate_times = calculate_times,
+                   times_from = times_from,
+                   .from = .from,
+                   .quiet = .quiet,
+                   collect = TRUE))
+    }
+    # collect = FALSE: keep deferring via the SQL transform chain.
     transform <- list(
       type = "scout",
       n = steps_forward,
@@ -72,17 +87,11 @@ scout <- function(.segments,
       capture = capture,
       ignore_bundle_boundaries = ignore_bundle_boundaries
     )
-    
     .segments@query_parts$transforms <- c(
       .segments@query_parts$transforms,
       list(transform)
     )
-    
-    if (collect) {
-      return(collect(.segments))
-    } else {
-      return(.segments)
-    }
+    return(.segments)
   }
   
   # Materialized version using data.table
@@ -325,23 +334,18 @@ ascend_to <- function(.segments, level, .from = NULL, .quiet = TRUE, collect = T
   
   # Handle lazy evaluation
   if (S7::S7_inherits(.segments, lazy_segment_list)) {
-    transform <- list(
-      type = "ascend",
-      level = level
-    )
-    
+    if (collect) {
+      return(ascend_to(collect(.segments), level = level,
+                       .from = .from, .quiet = .quiet, collect = TRUE))
+    }
+    transform <- list(type = "ascend", level = level)
     .segments@query_parts$transforms <- c(
       .segments@query_parts$transforms,
       list(transform)
     )
-    
-    if (collect) {
-      return(collect(.segments))
-    } else {
-      return(.segments)
-    }
+    return(.segments)
   }
-  
+
   # Materialized version
   ascend_dt(.segments, level = level, .from = .from, .quiet = .quiet)
 }
@@ -496,23 +500,19 @@ descend_to <- function(.segments, level, .from = NULL, .quiet = TRUE, collect = 
   
   # Handle lazy evaluation
   if (S7::S7_inherits(.segments, lazy_segment_list)) {
-    transform <- list(
-      type = "descend",
-      level = level
-    )
-    
+    if (collect) {
+      return(descend_to(collect(.segments), level = level,
+                        .from = .from, .quiet = .quiet, collect = TRUE))
+    }
+    transform <- list(type = "descend", level = level)
     .segments@query_parts$transforms <- c(
       .segments@query_parts$transforms,
       list(transform)
     )
-    
-    if (collect) {
-      return(collect(.segments))
-    } else {
-      return(.segments)
-    }
+    return(.segments)
   }
-  
+
+
   # Materialized version
   descend_dt(.segments, level = level, .from = .from, .quiet = .quiet)
 }

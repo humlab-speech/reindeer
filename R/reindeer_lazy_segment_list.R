@@ -23,7 +23,7 @@
 #' }
 #'
 #' @name lazy_segment_list
-#' @keywords internal
+#' @export
 lazy_segment_list <- S7::new_class(
   "lazy_segment_list",
   properties = list(
@@ -129,17 +129,26 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
     if ("labels" %in% names(raw_df) && !"label" %in% names(raw_df)) {
       names(raw_df)[names(raw_df) == "labels"] <- "label"
     }
+    # Fill in start/end for ITEM-type levels (those without explicit times)
+    # by recursively walking their dominance children. Mirrors the eager
+    # execute_query() path at R/query_executor.R.
+    raw_df <- deduce_item_times(raw_df, lazy_sl@db_path)
     result_df <- format_as_emuRsegs(raw_df)
   }
   
-  # Convert to segment_list
+  # Convert to segment_list. lazy_sl@db_path is the .sqlite file; the
+  # segment_list constructor expects the corpus directory, so use its
+  # parent dir.
   seg_list <- segment_list(
     data = as.data.frame(result_df),
     db_uuid = lazy_sl@db_uuid,
-    db_path = lazy_sl@db_path
+    db_path = dirname(lazy_sl@db_path)
   )
 
-  seg_list <- .seed_provenance(seg_list, "collect", sys.call(-1L))
+  # Seed provenance as if the user had run the eager path: the verb is
+  # "query" so downstream tests and inspectors see a consistent first step
+  # regardless of whether the segment_list arrived eager or via collect().
+  seg_list <- .seed_provenance(seg_list, "query", sys.call(-1L))
 
   # Apply any deferred post-materialization transforms (quantify, biographize).
   # These run on the materialized segment_list, in declaration order.
@@ -466,3 +475,45 @@ is_lazy <- function(x) {
 needs_collect <- function(x) {
   is_lazy(x)
 }
+
+# ---------------------------------------------------------------------------
+# Auto-collect S3 methods (registered in .onLoad for the namespaced class
+# "reindeer::lazy_segment_list"). Any path that asks for actual data
+# (subset, $, [[, dim/nrow, head/tail, as_tibble) materialises the lazy
+# pipeline once and delegates to the resulting segment_list. The cache
+# lives on @.state, so repeat accesses are cheap.
+# ---------------------------------------------------------------------------
+
+.lazy_dim <- function(x) dim(collect(x))
+.lazy_length <- function(x) length(collect(x))
+.lazy_names <- function(x) names(collect(x))
+.lazy_bracket <- function(x, ...) collect(x)[...]
+.lazy_double_bracket <- function(x, ...) collect(x)[[...]]
+.lazy_dollar <- function(x, name) collect(x)[[name]]
+.lazy_head <- function(x, n = 6L, ...) utils::head(collect(x), n = n, ...)
+.lazy_tail <- function(x, n = 6L, ...) utils::tail(collect(x), n = n, ...)
+.lazy_as_tibble <- function(x, ...) tibble::as_tibble(collect(x), ...)
+.lazy_as_data_frame <- function(x, ...) as.data.frame(collect(x), ...)
+
+# dplyr verbs on lazy_segment_list: collect, then delegate. The collected
+# segment_list inherits tbl_df so dplyr's default methods apply; the
+# dplyr_reconstruct hook in segment_list_dplyr.R preserves class + props.
+.lazy_dplyr_filter    <- function(.data, ...)        dplyr::filter(collect(.data), ...)
+.lazy_dplyr_mutate    <- function(.data, ...)        dplyr::mutate(collect(.data), ...)
+.lazy_dplyr_select    <- function(.data, ...)        dplyr::select(collect(.data), ...)
+.lazy_dplyr_arrange   <- function(.data, ...)        dplyr::arrange(collect(.data), ...)
+.lazy_dplyr_slice     <- function(.data, ...)        dplyr::slice(collect(.data), ...)
+.lazy_dplyr_rename    <- function(.data, ...)        dplyr::rename(collect(.data), ...)
+.lazy_dplyr_distinct  <- function(.data, ..., .keep_all = FALSE) dplyr::distinct(collect(.data), ..., .keep_all = .keep_all)
+.lazy_dplyr_transmute <- function(.data, ...)        dplyr::transmute(collect(.data), ...)
+.lazy_dplyr_group_by  <- function(.data, ..., .add = FALSE, .drop = dplyr::group_by_drop_default(.data)) dplyr::group_by(collect(.data), ..., .add = .add, .drop = .drop)
+.lazy_dplyr_ungroup   <- function(x, ...)            dplyr::ungroup(collect(x), ...)
+.lazy_dplyr_summarise <- function(.data, ..., .groups = NULL) dplyr::summarise(collect(.data), ..., .groups = .groups)
+.lazy_dplyr_count     <- function(x, ..., wt = NULL, sort = FALSE, name = NULL) dplyr::count(collect(x), ..., wt = !!rlang::enquo(wt), sort = sort, name = name)
+.lazy_dplyr_tally     <- function(x, wt = NULL, sort = FALSE, name = NULL) dplyr::tally(collect(x), wt = !!rlang::enquo(wt), sort = sort, name = name)
+.lazy_dplyr_left_join  <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) dplyr::left_join(collect(x), y, by = by, copy = copy, suffix = suffix, ..., keep = keep)
+.lazy_dplyr_right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) dplyr::right_join(collect(x), y, by = by, copy = copy, suffix = suffix, ..., keep = keep)
+.lazy_dplyr_inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) dplyr::inner_join(collect(x), y, by = by, copy = copy, suffix = suffix, ..., keep = keep)
+.lazy_dplyr_full_join  <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ..., keep = NULL) dplyr::full_join(collect(x), y, by = by, copy = copy, suffix = suffix, ..., keep = keep)
+.lazy_dplyr_anti_join  <- function(x, y, by = NULL, copy = FALSE, ...) dplyr::anti_join(collect(x), y, by = by, copy = copy, ...)
+.lazy_dplyr_semi_join  <- function(x, y, by = NULL, copy = FALSE, ...) dplyr::semi_join(collect(x), y, by = by, copy = copy, ...)

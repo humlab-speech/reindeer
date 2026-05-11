@@ -6,10 +6,12 @@
 #'
 #' @param emuDB A \code{corpus} object, path to an emuDB directory, or emuDBhandle
 #' @param eql Character string with an EQL query (e.g. \code{"Phonetic == t"})
-#' @param ... Additional arguments: \code{lazy = TRUE} returns a
-#'   \code{lazy_segment_list} for deferred execution
-#' @return A \code{\link{segment_list}} object (or \code{lazy_segment_list} if
-#'   \code{lazy = TRUE})
+#' @param ... Additional arguments: \code{lazy = FALSE} forces eager
+#'   materialisation. Defaults to \code{lazy = TRUE} as of v0.7.0, returning
+#'   a \code{lazy_segment_list} that auto-collects on data access.
+#' @return A \code{lazy_segment_list} (default) or a \code{\link{segment_list}}
+#'   when \code{lazy = FALSE}. Both behave identically for data access via
+#'   \code{$}, \code{[}, \code{nrow()}, \code{head()}, etc.
 #'
 #' @examples
 #' \dontrun{
@@ -85,9 +87,10 @@ query <- function(emuDB, eql, ...) {
     cli::cli_abort("SQLite database not found at: {.path {db_path}}")
   }
   
-  # Check for lazy parameter (default FALSE until lazy evaluation is fully implemented)
+  # Lazy is the default as of v0.7.0; auto-collect S3 methods preserve
+  # data-access behaviour for callers that expect a materialised segment_list.
   dots <- list(...)
-  lazy <- if ("lazy" %in% names(dots)) dots$lazy else FALSE
+  lazy <- if ("lazy" %in% names(dots)) dots$lazy else TRUE
   
   if (lazy) {
     # Return lazy segment list without executing query
@@ -116,8 +119,10 @@ query <- function(emuDB, eql, ...) {
       cache = NULL
     ))
   } else {
-    # Execute immediately (old behavior)
-    result <- execute_query(db_path, eql, ...)
+    # Execute immediately (old behavior). Strip `lazy` from dots since
+    # execute_query() doesn't accept it.
+    eager_dots <- dots[setdiff(names(dots), "lazy")]
+    result <- do.call(execute_query, c(list(db_path, eql), eager_dots))
 
     # Convert to segment_list if result is a data.frame
     if (is.data.frame(result) && !S7::S7_inherits(result, segment_list)) {
@@ -170,8 +175,23 @@ build_simple_query_sql <- function(db_path, parsed) {
   pattern <- parsed$pattern %||% parsed$value
   attribute <- parsed$attribute %||% level
 
+  # Attribute -> level resolution: queries like `Text == "always"` reference
+  # the *attribute* "Text" which lives on level "Word" (or wherever defined).
+  # The eager execute_simple_query_corrected path resolves this via
+  # .resolve_level_attribute; mirror it here so lazy parity holds.
+  con <- .open_query_connection(db_path)
+  on.exit(DBI::dbDisconnect(con))
+  resolved <- .resolve_level_attribute(con, level, attribute)
+  level <- resolved$level
+  attribute <- resolved$attribute
+
+  # Emit columns that downstream lazy transforms (scout/retreat/ascend/
+  # descend) expect: start/end_item_id and start/end_item_seq_idx aliases.
+  # For simple queries each row's start and end refer to the same item.
   base_sql <- paste0(
-    "SELECT i.*, l.label as labels ",
+    "SELECT i.*, l.label as labels, ",
+    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
+    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
     "FROM items i ",
     "INNER JOIN labels l ON ",
     "  i.db_uuid = l.db_uuid AND ",
@@ -183,23 +203,29 @@ build_simple_query_sql <- function(db_path, parsed) {
   )
   params <- list(level, attribute)
 
-  # Add filter based on operator
-  if (operator == "==") {
-    base_sql <- paste0(base_sql, "AND l.label = ?")
-    params <- c(params, list(pattern))
-  } else if (operator == "!=") {
-    base_sql <- paste0(base_sql, "AND l.label != ?")
-    params <- c(params, list(pattern))
+  # Add filter based on operator. =~ / !~ use SQLite REGEXP so behaviour
+  # matches the eager execute_simple_query_corrected path. Label alternatives
+  # ("m|n|p") map to IN (?, ?, ?) -- same as the eager path. The parser puts
+  # the alt list in parsed$alternatives (first element duplicated in
+  # parsed$value), so check that first.
+  alts <- parsed$alternatives
+  if (operator %in% c("==", "!=")) {
+    if (!is.null(alts) && length(alts) > 1) {
+      placeholders <- paste(rep("?", length(alts)), collapse = ",")
+      op_sql <- if (operator == "==") "IN" else "NOT IN"
+      base_sql <- paste0(base_sql, "AND l.label ", op_sql, " (", placeholders, ")")
+      params <- c(params, as.list(alts))
+    } else {
+      op_sql <- if (operator == "==") "=" else "!="
+      base_sql <- paste0(base_sql, "AND l.label ", op_sql, " ?")
+      params <- c(params, list(pattern))
+    }
   } else if (operator == "=~") {
-    like_pattern <- gsub("\\.", "%", pattern)
-    like_pattern <- gsub("\\*", "%", like_pattern)
-    base_sql <- paste0(base_sql, "AND l.label LIKE ?")
-    params <- c(params, list(like_pattern))
+    base_sql <- paste0(base_sql, "AND l.label REGEXP ?")
+    params <- c(params, list(pattern))
   } else if (operator == "!~") {
-    like_pattern <- gsub("\\.", "%", pattern)
-    like_pattern <- gsub("\\*", "%", like_pattern)
-    base_sql <- paste0(base_sql, "AND l.label NOT LIKE ?")
-    params <- c(params, list(like_pattern))
+    base_sql <- paste0(base_sql, "AND NOT (l.label REGEXP ?)")
+    params <- c(params, list(pattern))
   }
 
   return(list(sql = base_sql, params = params))
@@ -259,8 +285,10 @@ build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
   left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
   right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
   if (is.null(left_result) || is.null(right_result)) return(NULL)
+  # SQLite does not accept parenthesised SELECTs around a compound operator;
+  # use the bare form.
   list(
-    sql = paste0("(", left_result$sql, ") INTERSECT (", right_result$sql, ")"),
+    sql = paste0(left_result$sql, " INTERSECT ", right_result$sql),
     params = c(left_result$params, right_result$params)
   )
 }
@@ -270,7 +298,7 @@ build_disjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
   right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
   if (is.null(left_result) || is.null(right_result)) return(NULL)
   list(
-    sql = paste0("(", left_result$sql, ") UNION (", right_result$sql, ")"),
+    sql = paste0(left_result$sql, " UNION ", right_result$sql),
     params = c(left_result$params, right_result$params)
   )
 }

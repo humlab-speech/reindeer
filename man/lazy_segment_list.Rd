@@ -41,4 +41,3 @@ print(lazy_segs)  # Shows preview
 }
 
 }
-\keyword{internal}

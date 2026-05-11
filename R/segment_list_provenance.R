@@ -107,6 +107,9 @@
 #' provenance(segs)
 #' @export
 provenance <- function(seg) {
+  if (S7::S7_inherits(seg, lazy_segment_list)) {
+    seg <- collect(seg)
+  }
   prov <- attr(seg, "reindeer_provenance")
   if (is.null(prov)) return(.empty_provenance())
   prov

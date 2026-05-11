@@ -11,12 +11,14 @@ query(emuDB, eql, ...)
 
 \item{eql}{Character string with an EQL query (e.g. \code{"Phonetic == t"})}
 
-\item{...}{Additional arguments: \code{lazy = TRUE} returns a
-\code{lazy_segment_list} for deferred execution}
+\item{...}{Additional arguments: \code{lazy = FALSE} forces eager
+materialisation. Defaults to \code{lazy = TRUE} as of v0.7.0, returning
+a \code{lazy_segment_list} that auto-collects on data access.}
 }
 \value{
-A \code{\link{segment_list}} object (or \code{lazy_segment_list} if
-\code{lazy = TRUE})
+A \code{lazy_segment_list} (default) or a \code{\link{segment_list}}
+when \code{lazy = FALSE}. Both behave identically for data access via
+\code{$}, \code{[}, \code{nrow()}, \code{head()}, etc.
 }
 \description{
 Executes a query against the SQLite cache of an EMU database and returns
