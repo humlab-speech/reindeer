@@ -302,7 +302,7 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #'
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
-#' segs <- ask_for(corp, "Phonetic == t")
+#' segs <- query(corp, "Phonetic == t")
 #' enriched <- biographize(segs, corp)
 #'
 #' @export

@@ -69,7 +69,7 @@ cli::cli_alert_info("emuR::get_trackdata (all): {.val {sprintf('%.2f ms', as.num
 # 3. Query + get_trackdata combined (end-to-end)
 #===============================================================================
 
-cli::cli_h2("End-to-end: query + get_trackdata vs ask_for (query only)")
+cli::cli_h2("End-to-end: query + get_trackdata vs query (query only)")
 cli::cli_text("Measures emuR query+trackdata pipeline overhead")
 
 bench_e2e <- bench::mark(
@@ -78,7 +78,7 @@ bench_e2e <- bench::mark(
     emuR::get_trackdata(ae_db, s, ssffTrackName = track_name)
   },
   reindeer_query_only = {
-    ask_for(corp, "Phonetic == V")
+    query(corp, "Phonetic == V")
   },
   check = FALSE,
   iterations = 10,

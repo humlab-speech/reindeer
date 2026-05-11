@@ -21,7 +21,7 @@ navigation verbs (\code{scout}, \code{ascend_to}, \code{descend_to}) or dplyr fi
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-segs <- ask_for(corp, "Phonetic == t")
+segs <- query(corp, "Phonetic == t")
 segs <- scout(segs, 1)
 provenance(segs)
 \dontshow{\}) # examplesIf}

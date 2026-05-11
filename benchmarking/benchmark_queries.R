@@ -1,5 +1,5 @@
 # Comprehensive Benchmarking Suite for Optimized EQL Implementation
-# Compare performance of ask_for() vs emuR::query()
+# Compare performance of query() vs emuR::query()
 
 suppressPackageStartupMessages({
   devtools::load_all(".", quiet = TRUE)
@@ -35,7 +35,7 @@ benchmark_query <- function(query_str, ae_corpus, ae_db, iterations = 50) {
   tryCatch({
     bm <- bench::mark(
       emuR = suppressWarnings(emuR::query(ae_db, query_str)),
-      optimized = ask_for(ae_corpus, query_str),
+      optimized = query(ae_corpus, query_str),
       iterations = iterations,
       check = FALSE,
       memory = TRUE

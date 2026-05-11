@@ -50,4 +50,4 @@ protoscribe::transcribe(suggestions)
 - [protoscribe on GitHub](https://github.com/humlab-speech/protoscribe)
 - `vignette("getting_started")` -- reindeer basics
 - `?corpus` -- Corpus object documentation
-- `?ask_for` -- Query segments from a corpus
+- `?query` -- Query segments from a corpus

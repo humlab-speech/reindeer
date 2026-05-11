@@ -4,7 +4,7 @@
 \alias{quantify.segment_list}
 \title{Quantify method for segment_list - Apply DSP to query results}
 \arguments{
-\item{object}{A segment_list object (from ask_for/query)}
+\item{object}{A segment_list object (from query/query)}
 
 \item{dsp_function}{A DSP function from superassp or similar}
 
@@ -40,7 +40,7 @@ but allows for custom DSP functions with metadata-driven parameters.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-segs <- ask_for(corpus, "Phonetic == t")
+segs <- query(corpus, "Phonetic == t")
 formants <- quantify(segs, superassp::forest)
 
 # Extract at specific time points

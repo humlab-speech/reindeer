@@ -29,7 +29,7 @@ up without executing SQL until \code{collect()} is called or the data is needed.
 \examples{
 \dontrun{
 # Build query chain without execution
-lazy_segs <- ask_for(corpus, "Phonetic == t") |>
+lazy_segs <- query(corpus, "Phonetic == t") |>
   scout(1) |>
   ascend_to("Word")
 

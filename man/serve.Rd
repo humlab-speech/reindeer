@@ -84,7 +84,7 @@ serve(corp, sessionPattern = "Session.*")
 serve(corp, bundlePattern = "msajc.*")
 
 # Serve only bundles from a query result
-segments <- ask_for(corp, "Phonetic == t")
+segments <- query(corp, "Phonetic == t")
 serve(corp, seglist = segments)
 
 # Serve on a different port

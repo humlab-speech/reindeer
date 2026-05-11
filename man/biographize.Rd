@@ -25,7 +25,7 @@ containing session and bundle columns.
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")
-segs <- ask_for(corp, "Phonetic == t")
+segs <- query(corp, "Phonetic == t")
 enriched <- biographize(segs, corp)
 \dontshow{\}) # examplesIf}
 }

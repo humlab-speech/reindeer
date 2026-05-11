@@ -26,7 +26,7 @@
 #
 # # Load corpus and query segments
 # corp <- corpus("path/to/db_emuDB")
-# segments <- ask_for(corp, "Phonetic == a")
+# segments <- query(corp, "Phonetic == a")
 #
 # # Simulate with sample rate preprocessing
 # results <- quantify_simulate(

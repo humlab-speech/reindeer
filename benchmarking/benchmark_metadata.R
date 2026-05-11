@@ -139,7 +139,7 @@ cli::cli_h2("biographize (reindeer-only)")
 # .meta_json files persist through cache rebuild, just re-gather
 gather_metadata(corp, verbose = FALSE)
 
-segs <- ask_for(corp, "Phonetic == t")
+segs <- query(corp, "Phonetic == t")
 
 bench_bio <- bench::mark(
   biographize = biographize(segs, corp),

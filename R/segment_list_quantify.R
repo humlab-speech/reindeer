@@ -11,7 +11,7 @@ quantify <- S7::new_generic("quantify", "object")
 #' acoustic measurements for each segment. This is equivalent to emuR::get_trackdata()
 #' but allows for custom DSP functions with metadata-driven parameters.
 #'
-#' @param object A segment_list object (from ask_for/query)
+#' @param object A segment_list object (from query/query)
 #' @param dsp_function A DSP function from superassp or similar
 #' @param ... Additional arguments passed to the DSP function
 #' @param .at Optional vector of relative time points (0-1) to extract from track
@@ -29,7 +29,7 @@ quantify <- S7::new_generic("quantify", "object")
 #' @return An extended_segment_list with segment information and DSP-derived measurements
 #'
 #' @examplesIf interactive()
-#' segs <- ask_for(corpus, "Phonetic == t")
+#' segs <- query(corpus, "Phonetic == t")
 #' formants <- quantify(segs, superassp::forest)
 #'
 #' # Extract at specific time points
@@ -299,10 +299,10 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 #' Instead it appends a "quantify" entry to the lazy chain's
 #' `post_transforms`; the DSP is run at `collect()` time on the
 #' materialized `segment_list`. This lets users write a single pipeline
-#' (`ask_for(corp, ..., lazy = TRUE) |> scout() |> quantify(...) |>
+#' (`query(corp, ..., lazy = TRUE) |> scout() |> quantify(...) |>
 #' collect()`) without paying for DSP unless / until the result is needed.
 #'
-#' @param object A `lazy_segment_list` (from `ask_for(corp, query, lazy = TRUE)`).
+#' @param object A `lazy_segment_list` (from `query(corp, query, lazy = TRUE)`).
 #' @param dsp_function A DSP function from `superassp` or similar.
 #' @param ... Additional arguments passed to the DSP function at `collect()` time.
 #' @return The same `lazy_segment_list` with a deferred quantify step.

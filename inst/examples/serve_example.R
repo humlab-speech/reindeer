@@ -61,7 +61,7 @@ serve(corp)
 # ------------------------------------------------------------------------------
 
 # Find all /t/ phonemes and serve only those bundles
-# segments <- ask_for(corp, "Phonetic == t")
+# segments <- query(corp, "Phonetic == t")
 # serve(corp, seglist = segments)
 # # The webApp will automatically navigate to the /t/ segments
 

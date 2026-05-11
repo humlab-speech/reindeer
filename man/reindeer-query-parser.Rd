@@ -32,17 +32,17 @@ by using optimized SQL queries and avoiding R object overhead.
 \examples{
 \dontrun{
 # Simple query
-ask_for(corpus, "Phonetic == t")
+query(corpus, "Phonetic == t")
 query(corpus, "Phonetic == t")  # alias
 
 # Sequence with projection
-ask_for(corpus, "[#Phoneme == n -> Phoneme == t]")
+query(corpus, "[#Phoneme == n -> Phoneme == t]")
 
 # Dominance query
-ask_for(corpus, "[Word == the ^ Phoneme == D]")
+query(corpus, "[Word == the ^ Phoneme == D]")
 
 # Count function
-ask_for(corpus, "Num(Syllable, Phoneme) >= 3")
+query(corpus, "Num(Syllable, Phoneme) >= 3")
 }
 }
 \references{

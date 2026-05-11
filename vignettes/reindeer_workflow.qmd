@@ -88,22 +88,22 @@ The `corpus` object automatically:
 
 ## 2. Querying Annotations
 
-The `ask_for()` function (alias: `query()`) implements the EMU Query Language (EQL) with SQL-based optimization:
+The `query()` function (alias: `query()`) implements the EMU Query Language (EQL) with SQL-based optimization:
 
 ```{r basic-queries}
 # Simple label matching
 vowels <- visp_corpus %>% 
-  ask_for("Phonetic =~ [aeiou]")
+  query("Phonetic =~ [aeiou]")
 
 print(vowels)
 
 # Sequence queries
 nasal_stop_sequences <- visp_corpus %>% 
-  ask_for("[Phoneme =~ [mn] -> Phoneme =~ [ptk]]")
+  query("[Phoneme =~ [mn] -> Phoneme =~ [ptk]]")
 
 # Dominance queries (hierarchical relationships)
 word_initial_stops <- visp_corpus %>% 
-  ask_for("Start(Word, Phoneme) =~ [ptk]")
+  query("Start(Word, Phoneme) =~ [ptk]")
 
 print(word_initial_stops)
 ```
@@ -125,15 +125,15 @@ Reindeer provides functions for refining query results through hierarchical navi
 ```{r query-refinement, eval=FALSE}
 # Navigate hierarchical structure using dominance queries
 utterances_with_vowels <- visp_corpus %>%
-  ask_for("[Utterance ^ #Phonetic =~ [aeiou]]")
+  query("[Utterance ^ #Phonetic =~ [aeiou]]")
 
 # Get words containing specific phonemes
 words_with_stops <- visp_corpus %>%
-  ask_for("[Word ^ #Phoneme =~ [ptk]]")
+  query("[Word ^ #Phoneme =~ [ptk]]")
 
 # Sequence queries for context
 stop_vowel_sequences <- visp_corpus %>%
-  ask_for("[Phoneme =~ [ptk] -> #Phoneme =~ [aeiou]]")
+  query("[Phoneme =~ [ptk] -> #Phoneme =~ [aeiou]]")
 ```
 
 Query results are returned as `segment_list` objects that integrate seamlessly with dplyr operations:
@@ -301,8 +301,8 @@ Use `quantify2()` for analyses requiring two annotation levels:
 
 ```{r quantify2, eval=FALSE}
 # Get both vowels and their containing syllables
-vowels <- visp_corpus %>% ask_for("Phonetic =~ [aeiou]")
-syllables <- visp_corpus %>% ask_for("Syllable =~ .*")
+vowels <- visp_corpus %>% query("Phonetic =~ [aeiou]")
+syllables <- visp_corpus %>% query("Syllable =~ .*")
 
 # Analyze vowels with syllable-level DSP
 vowel_syllable_data <- quantify2(
@@ -418,7 +418,7 @@ my_corpus <- my_corpus %>%
 
 # 4. Query for vowels
 vowels <- my_corpus %>% 
-  ask_for("Phonetic =~ [aeiou]")
+  query("Phonetic =~ [aeiou]")
 
 # 5. Extract formant values (assuming tracks exist)
 vowel_data <- vowels %>% 
@@ -465,7 +465,7 @@ Reindeer's SQL-optimized query system provides substantial speedups:
 # Complex chains:    20-100× faster
 ```
 
-| Query Type | emuR::query | reindeer::ask_for | Speedup |
+| Query Type | emuR::query | reindeer::query | Speedup |
 |------------|-------------|-------------------|---------|
 | Simple     | 45 ms       | 6 ms              | 7.5×    |
 | Sequence   | 230 ms      | 15 ms             | 15.3×   |

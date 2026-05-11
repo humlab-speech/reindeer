@@ -21,7 +21,7 @@ ae_db <- load_emuDB(ae_path, verbose = FALSE)
 
 # Pre-compute segments
 segs_emur <- emuR::query(ae_db, "[Phonetic == t]")
-segs_rein <- ask_for(corp, "Phonetic == t")
+segs_rein <- query(corp, "Phonetic == t")
 
 #===============================================================================
 # 1. scout(1) vs requery_seq(offset = 1) — next segment

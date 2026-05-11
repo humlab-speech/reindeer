@@ -102,7 +102,7 @@
 #' @return A tibble with columns `step`, `verb`, `call`, `rows_in`,
 #'   `rows_out`, `rows_lost`, `ts`. Empty if no provenance has been recorded.
 #' @examplesIf interactive()
-#' segs <- ask_for(corp, "Phonetic == t")
+#' segs <- query(corp, "Phonetic == t")
 #' segs <- scout(segs, 1)
 #' provenance(segs)
 #' @export
@@ -120,7 +120,7 @@ provenance <- function(seg) {
 #'   returns the rows lost at the given step.
 #' @return An integer count.
 #' @examplesIf interactive()
-#' segs <- ask_for(corp, "Phonetic == t") |> scout(1) |> ascend_to("Word")
+#' segs <- query(corp, "Phonetic == t") |> scout(1) |> ascend_to("Word")
 #' dropped(segs)        # cumulative
 #' dropped(segs, 2L)    # how many segs scout() dropped
 #' @export

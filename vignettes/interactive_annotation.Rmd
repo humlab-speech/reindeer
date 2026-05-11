@@ -114,7 +114,7 @@ This is particularly powerful - navigate directly to segments of interest:
 
 ```{r annotate-query}
 # Find all /t/ phonemes
-t_segments <- ask_for(corp, "Phonetic == t")
+t_segments <- query(corp, "Phonetic == t")
 
 # Open webApp at those specific segments
 serve(corp, seglist = t_segments)
@@ -129,7 +129,7 @@ serve(corp, seglist = t_segments)
 
 ```{r vowel-workflow}
 # 1. Query for vowels
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 
 # 2. Check how many bundles
 length(unique(paste(vowels$session, vowels$bundle)))
@@ -274,7 +274,7 @@ corp <- corpus("path/to/database_emuDB")
 
 # 2. Find segments that might need review
 #    (e.g., very short segments)
-all_segments <- ask_for(corp, "Phonetic =~ .*")
+all_segments <- query(corp, "Phonetic =~ .*")
 
 short_segments <- all_segments %>%
   mutate(duration = end - start) %>%
@@ -291,7 +291,7 @@ serve(corp, seglist = short_segments)
 #    - Merge segments
 
 # 5. Re-query to verify fixes
-all_segments_updated <- ask_for(corp, "Phonetic =~ .*")
+all_segments_updated <- query(corp, "Phonetic =~ .*")
 
 short_segments_updated <- all_segments_updated %>%
   mutate(duration = end - start) %>%
@@ -309,7 +309,7 @@ The `serve()` function integrates seamlessly with analysis:
 
 # 1. Initial analysis
 corp <- corpus("path/to/database_emuDB")
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 formants <- quantify(vowels, superassp::forest)
 
 # 2. Find outliers
@@ -335,7 +335,7 @@ serve(corp, seglist = outliers)
 # - Should this token be excluded?
 
 # 4. Re-run analysis after corrections
-vowels_corrected <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels_corrected <- query(corp, "Phonetic =~ [aeiou]")
 formants_corrected <- quantify(vowels_corrected, superassp::forest)
 
 # 5. Compare results
@@ -441,7 +441,7 @@ serve(corp, sessionPattern = "pilot_session")
 
 ```{r tip-query}
 # Much more efficient than browsing all bundles
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 serve(corp, seglist = vowels)
 ```
 
@@ -499,14 +499,14 @@ corp <- corpus("path/to/corpus_emuDB")
 
 # === FIND WORK TO DO ===
 # Find all words, check for missing phonetic annotations
-words <- ask_for(corp, "Word =~ .*")
+words <- query(corp, "Word =~ .*")
 
 # Check which bundles have words but no phonetic tier
 bundles_with_words <- words %>%
   select(session, bundle) %>%
   distinct()
 
-phonemes <- ask_for(corp, "Phonetic =~ .*")
+phonemes <- query(corp, "Phonetic =~ .*")
 bundles_with_phonemes <- phonemes %>%
   select(session, bundle) %>%
   distinct()
@@ -535,7 +535,7 @@ serve(corp, seglist = work_segments)
 
 # === VERIFY ===
 # Check progress after annotation session
-phonemes_updated <- ask_for(corp, "Phonetic =~ .*")
+phonemes_updated <- query(corp, "Phonetic =~ .*")
 bundles_with_phonemes_updated <- phonemes_updated %>%
   select(session, bundle) %>%
   distinct()
@@ -552,7 +552,7 @@ cat(sprintf("Completed %d/%d bundles\n",
 
 # === ANALYZE ===
 # Now ready for acoustic analysis
-phonemes_final <- ask_for(corp, "Phonetic =~ [aeiou]")
+phonemes_final <- query(corp, "Phonetic =~ [aeiou]")
 formants <- quantify(phonemes_final, superassp::forest)
 
 # Proceed with analysis...

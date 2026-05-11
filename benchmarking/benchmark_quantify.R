@@ -56,7 +56,7 @@ simple_dsp <- function(listOfFiles, beginTime, endTime,
 # Get segments for benchmarking
 query_str <- "[Phonetic =~ p|t|k]"
 segs_emur <- query(ae_db, query_str, resultType = "tibble")
-segs_reindeer <- ask_for(corp, "Phonetic =~ p|t|k")
+segs_reindeer <- query(corp, "Phonetic =~ p|t|k")
 segs_reindeer@db_path <- ae_path
 
 cat(sprintf("Testing with %d segments\n", nrow(segs_emur)))

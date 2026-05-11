@@ -128,7 +128,7 @@ import_metadata(ae, "corpus_metadata.xlsx")
 
 ```{r biographize, eval=FALSE}
 # Query for segments
-vowels <- ask_for(ae, "Phonetic =~ '[aeiou]'")
+vowels <- query(ae, "Phonetic =~ '[aeiou]'")
 
 # Add metadata
 vowels_enriched <- biographize(vowels, ae)
@@ -151,7 +151,7 @@ meta <- get_metadata(ae)
 young_speakers <- meta[meta$Age < 30, c("session", "bundle")]
 
 # Query only those bundles
-results <- ask_for(ae, "Phonetic == s")
+results <- query(ae, "Phonetic == s")
 ```
 
 ## Corpus Summary

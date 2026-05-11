@@ -40,7 +40,7 @@ cli::cli_text("Target: 50%+ faster than emuR::query()")
 
 bench_simple <- bench::mark(
   emuR = emuR::query(ae_db, "[Phonetic == a]", resultType = "tibble"),
-  reindeer = ask_for(corp, "Phonetic == a"),
+  reindeer = query(corp, "Phonetic == a"),
   check = FALSE,
   iterations = 50,
   time_unit = "ms"
@@ -72,7 +72,7 @@ seq_query <- "[Phonetic == a -> Phonetic == t]"
 
 bench_seq <- bench::mark(
   emuR = emuR::query(ae_db, seq_query, resultType = "tibble"),
-  reindeer = ask_for(corp, seq_query),
+  reindeer = query(corp, seq_query),
   check = FALSE,
   iterations = 30,
   time_unit = "ms"
@@ -104,7 +104,7 @@ regex_query <- "Phonetic =~ .*"
 
 bench_large <- bench::mark(
   emuR = suppressWarnings(emuR::query(ae_db, sprintf("[%s]", regex_query), resultType = "tibble")),
-  reindeer = ask_for(corp, regex_query),
+  reindeer = query(corp, regex_query),
   check = FALSE,
   iterations = 30,
   time_unit = "ms"
@@ -114,7 +114,7 @@ times <- as.numeric(bench_large$median)
 speedup_large <- times[1] / times[2]
 pct_large <- (speedup_large - 1) * 100
 
-n_results <- nrow(ask_for(corp, regex_query))
+n_results <- nrow(query(corp, regex_query))
 cli::cli_alert_info("Result set size: {.val {n_results}} segments")
 cli::cli_alert_info("emuR: {.val {sprintf('%.2f ms', times[1])}}")
 cli::cli_alert_info("reindeer: {.val {sprintf('%.2f ms', times[2])}}")

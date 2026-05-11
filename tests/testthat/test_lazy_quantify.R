@@ -7,7 +7,7 @@ library(reindeer)
 
 test_that("quantify on a lazy_segment_list defers DSP and returns lazy", {
   ae <- create_isolated_ae_corpus()
-  lazy <- ask_for(ae, "Phonetic == n", lazy = TRUE)
+  lazy <- query(ae, "Phonetic == n", lazy = TRUE)
 
   call_count <- 0L
   fake_dsp <- function(file, ...) {
@@ -27,7 +27,7 @@ test_that("quantify on a lazy_segment_list defers DSP and returns lazy", {
 
 test_that("quantify on lazy validates dsp_function input", {
   ae <- create_isolated_ae_corpus()
-  lazy <- ask_for(ae, "Phonetic == n", lazy = TRUE)
+  lazy <- query(ae, "Phonetic == n", lazy = TRUE)
 
   expect_error(quantify(lazy, dsp_function = 42),
                regexp = "dsp_function")
@@ -35,7 +35,7 @@ test_that("quantify on lazy validates dsp_function input", {
 
 test_that("multiple deferred quantify calls accumulate post_transforms", {
   ae <- create_isolated_ae_corpus()
-  lazy <- ask_for(ae, "Phonetic == n", lazy = TRUE)
+  lazy <- query(ae, "Phonetic == n", lazy = TRUE)
   fake1 <- function(file, ...) list(a = 1)
   fake2 <- function(file, ...) list(b = 2)
 

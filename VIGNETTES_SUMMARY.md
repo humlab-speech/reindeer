@@ -33,7 +33,7 @@ The reindeer package provides comprehensive documentation through 7 active vigne
 **Key Examples**:
 ```r
 corp <- corpus("path/to/db_emuDB")
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 formants <- quantify(vowels, superassp::forest)
 data <- biographize(formants, corp)
 serve(corp, seglist = vowels)  # NEW in v0.1.4
@@ -78,7 +78,7 @@ outliers <- formants %>% filter(abs(F1_z) > 3)
 serve(corp, seglist = outliers)
 
 # Targeted annotation
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 serve(corp, seglist = vowels)
 
 # Collaborative work
@@ -216,7 +216,7 @@ log <- transcribe(suggestions)
 **Audience**: Advanced users, Performance analysis
 
 **Contents**:
-- Optimized query system (`ask_for()`) vs emuR
+- Optimized query system (`query()`) vs emuR
 - Performance comparisons
 - Query complexity analysis
 - SQLite optimization
@@ -225,7 +225,7 @@ log <- transcribe(suggestions)
 **Use Cases**:
 - Understanding query performance
 - Optimizing analysis pipelines
-- Choosing between `ask_for()` and `emuR::query()`
+- Choosing between `query()` and `emuR::query()`
 
 ---
 

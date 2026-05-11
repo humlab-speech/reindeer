@@ -41,9 +41,9 @@ corp <- corpus("path/to/db_emuDB")
 corp <- corpus("path/to/db_emuDB", quick = TRUE)  # skip cache rebuild
 
 # Query annotations (EQL -- EMU Query Language)
-segs <- ask_for(corp, "Phonetic == t")
-segs <- ask_for(corp, "[Phonetic == t -> Phonetic == s]")      # sequence
-segs <- ask_for(corp, "[Phonetic == t ^ Syllable == stressed]") # dominance
+segs <- query(corp, "Phonetic == t")
+segs <- query(corp, "[Phonetic == t -> Phonetic == s]")      # sequence
+segs <- query(corp, "[Phonetic == t ^ Syllable == stressed]") # dominance
 
 # Apply DSP to segments (returns extended_segment_list)
 formants <- quantify(segs, dsp_function = superassp::forest)
@@ -235,7 +235,7 @@ Once your function follows the `listOfFiles` calling convention:
 
 ```r
 # Use with quantify (per-segment) -- note: dsp_function is the second argument
-segs <- ask_for(corp, "Phonetic == t")
+segs <- query(corp, "Phonetic == t")
 results <- quantify(segs, dsp_function = my_dsp_function, .use_cache = TRUE)
 
 # Use with enrich (whole corpus)

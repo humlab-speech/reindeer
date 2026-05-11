@@ -5,7 +5,7 @@
 #' and function queries.
 #'
 #' @param emuDB A \code{corpus} object, path to an emuDB directory, or emuDBhandle
-#' @param query Character string with an EQL query (e.g. \code{"Phonetic == t"})
+#' @param eql Character string with an EQL query (e.g. \code{"Phonetic == t"})
 #' @param ... Additional arguments: \code{lazy = TRUE} returns a
 #'   \code{lazy_segment_list} for deferred execution
 #' @return A \code{\link{segment_list}} object (or \code{lazy_segment_list} if
@@ -14,12 +14,12 @@
 #' @examples
 #' \dontrun{
 #' corp <- corpus("path/to/db_emuDB")
-#' segs <- ask_for(corp, "Phonetic == t")
-#' segs <- ask_for(corp, "[Phonetic == t -> Phonetic == s]")
-#' segs <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+#' segs <- query(corp, "Phonetic == t")
+#' segs <- query(corp, "[Phonetic == t -> Phonetic == s]")
+#' segs <- query(corp, "Phonetic == t", lazy = TRUE)
 #' }
 #' @export
-ask_for <- function(emuDB, query, ...) {
+query <- function(emuDB, eql, ...) {
   # Handle corpus objects
   if (S7::S7_inherits(emuDB, reindeer::corpus)) {
     base_path <- emuDB@basePath
@@ -92,7 +92,7 @@ ask_for <- function(emuDB, query, ...) {
   if (lazy) {
     # Return lazy segment list without executing query
     # Build base SQL query but don't execute — returns list(sql, params)
-    parsed <- parse_eql_query(query)
+    parsed <- parse_eql_query(eql)
     base_query <- build_base_sql(db_path, parsed, dots)
     
     # Get db_uuid from database
@@ -117,8 +117,8 @@ ask_for <- function(emuDB, query, ...) {
     ))
   } else {
     # Execute immediately (old behavior)
-    result <- execute_query(db_path, query, ...)
-    
+    result <- execute_query(db_path, eql, ...)
+
     # Convert to segment_list if result is a data.frame
     if (is.data.frame(result) && !S7::S7_inherits(result, segment_list)) {
       # Extract db_uuid and db_path for segment_list
@@ -127,13 +127,11 @@ ask_for <- function(emuDB, query, ...) {
     }
 
     if (S7::S7_inherits(result, segment_list)) {
-      result <- .seed_provenance(result, "ask_for", sys.call())
+      result <- .seed_provenance(result, "query", sys.call())
     }
     return(result)
   }
 }
-
-# Note: query() is an alias for ask_for() defined in reindeeR_emuR_re-export.R
 
 #' Build Base SQL Query Without Execution
 #'

@@ -127,7 +127,7 @@ print(cache_init_benchmarks[, c("expression", "min", "median", "mem_alloc")])
 cat("\nBenchmarking simulation execution...\n")
 
 # Get test segment list
-segs <- ask_for(corp, "Phonetic == V")
+segs <- query(corp, "Phonetic == V")
 attr(segs, "corpus") <- corp
 
 # quantify_simulate/enrich_simulate depend on peek_signals() which may not be available

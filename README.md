@@ -37,7 +37,7 @@ library(reindeer)
 corp <- corpus("path/to/database_emuDB")
 
 # Query segments with optimized SQLite backend
-segments <- ask_for(corp, "Phonetic == t")
+segments <- query(corp, "Phonetic == t")
 
 # Quantify with metadata-driven DSP parameters
 results <- quantify(segments, superassp::forest)
@@ -132,7 +132,7 @@ Compared to standard emuR workflows:
 
 ### Optimized Functions
 
-- `ask_for()` / `query()`: Direct SQLite EQL queries
+- `query()` / `query()`: Direct SQLite EQL queries
 - `quantify()`: DSP analysis with metadata-driven parameters
 - `enrich()`: Corpus-wide track generation
 - `gather_metadata()`: Efficient metadata caching

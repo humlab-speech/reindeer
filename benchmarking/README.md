@@ -38,7 +38,7 @@ Creates `vignettes/query_benchmarks.html` with visualizations and analysis.
 | Script | Description |
 |--------|-------------|
 | `run_benchmarks.R` | Main runner (all benchmarks) |
-| `benchmark_queries.R` | EQL query optimization (`ask_for()` vs `emuR::query()`) |
+| `benchmark_queries.R` | EQL query optimization (`query()` vs `emuR::query()`) |
 | `benchmark_hierarchy.R` | Hierarchical/dominance query performance |
 | `benchmark_requery_seq.R` | Sequence requery benchmarks |
 | `benchmark_trackdata.R` | Track data extraction benchmarks |

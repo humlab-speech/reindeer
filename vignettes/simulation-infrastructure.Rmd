@@ -49,7 +49,7 @@ The `quantify_simulate()` function extends `quantify()` to support systematic pa
 ```r
 # Define parameter grid
 corp <- corpus("/path/to/database_emuDB")
-segments <- ask_for(corp, "Phonetic=a")
+segments <- query(corp, "Phonetic=a")
 
 # Simulate across parameter combinations
 results <- quantify_simulate(
@@ -113,7 +113,7 @@ library(superassp)
 corp <- corpus("/path/to/ae_emuDB")
 
 # 2. Query segments of interest
-vowels <- ask_for(corp, "Phonetic=~[aeiou]")
+vowels <- query(corp, "Phonetic=~[aeiou]")
 
 # 3. Ensure signal hashes are current
 update_signal_hashes(corp)
@@ -280,7 +280,7 @@ Simulation parameters can be informed by bundle metadata:
 corp["Session1", "Bundle1"] <- list(Age = 25, Gender = "Female")
 
 # Use metadata to set base parameters
-segments <- ask_for(corp, "Phonetic=a")
+segments <- query(corp, "Phonetic=a")
 
 # quantify_simulate will use metadata defaults for non-simulated parameters
 results <- quantify_simulate(
@@ -350,4 +350,4 @@ results <- quantify_simulate(..., .simulation_overwrite = TRUE)
 - `quantify()`: Standard quantification without simulation
 - `enrich()`: Add track data to corpus
 - `add_metadata()`: Manage bundle metadata
-- `ask_for()`: Query segments
+- `query()`: Query segments

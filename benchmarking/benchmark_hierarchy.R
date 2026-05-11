@@ -20,10 +20,10 @@ corp <- corpus(ae_path, verbose = FALSE)
 
 # Pre-compute segments for both systems
 segs_emur <- emuR::query(ae_db, "[Phonetic == t]")
-segs_rein <- ask_for(corp, "Phonetic == t")
+segs_rein <- query(corp, "Phonetic == t")
 
 word_segs_emur <- suppressWarnings(emuR::query(ae_db, "Word =~ .*"))
-word_segs_rein <- ask_for(corp, "Word =~ .*")
+word_segs_rein <- query(corp, "Word =~ .*")
 
 #===============================================================================
 # 1. Ascend: Phonetic -> Syllable (one level up)

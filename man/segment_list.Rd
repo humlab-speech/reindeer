@@ -51,7 +51,7 @@ A segment_list must contain the following columns:
 \examples{
 \dontrun{
 # Query returns a segment_list
-segs <- ask_for(corpus("path/to/db_emuDB"), "Phonetic == t")
+segs <- query(corpus("path/to/db_emuDB"), "Phonetic == t")
 
 # Tidyverse pipe preserves segment_list and its properties
 long_segs <- segs |> dplyr::filter(end - start > 50)

@@ -11,7 +11,7 @@
 #' @examples
 #' \dontrun{
 #' # Build query chain without execution
-#' lazy_segs <- ask_for(corpus, "Phonetic == t") |>
+#' lazy_segs <- query(corpus, "Phonetic == t") |>
 #'   scout(1) |>
 #'   ascend_to("Word")
 #' 

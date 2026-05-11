@@ -353,7 +353,7 @@ test_that("quantify simulation end-to-end workflow", {
   corp <- corpus(ae_path)
   
   # Get segment list — use label that exists in ae (V, m, n, s, t, etc.)
-  segs <- ask_for(corp, "Phonetic == V")
+  segs <- query(corp, "Phonetic == V")
   expect_true(is_segment_list(segs))
   
   # Create simple test DSP function
@@ -495,7 +495,7 @@ test_that("simulation respects default cache location", {
   emuR::create_emuRdemoData(dir = tempdir())
   ae_path <- file.path(tempdir(), "emuR_demoData", "ae_emuDB")
   corp <- corpus(ae_path)
-  segs <- ask_for(corp, "Phonetic == V")
+  segs <- query(corp, "Phonetic == V")
   
   test_dsp <- function(signal, sample_rate, p = 1) {
     list(val = rep(p, length(signal)))

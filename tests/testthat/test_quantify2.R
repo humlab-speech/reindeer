@@ -7,8 +7,8 @@ test_that("quantify2 works with segment lists", {
   corp <- corpus(ae)
   
   # Create two segment lists
-  vowels <- ask_for(corp, "Phonetic =~ V")
-  consonants <- ask_for(corp, "Phonetic =~ [ptkbdgmnlrszfvwj]")
+  vowels <- query(corp, "Phonetic =~ V")
+  consonants <- query(corp, "Phonetic =~ [ptkbdgmnlrszfvwj]")
   
   # Define a simple comparison function
   compare_segments <- function(seg1, seg2) {
@@ -61,8 +61,8 @@ test_that("quantify2 by_bundle processing works", {
   ae <- create_ae_db(verbose = FALSE)
   corp <- corpus(ae)
   
-  vowels <- ask_for(corp, "Phonetic =~ V")
-  consonants <- ask_for(corp, "Phonetic =~ [ptk]")
+  vowels <- query(corp, "Phonetic =~ V")
+  consonants <- query(corp, "Phonetic =~ [ptk]")
   
   compare_func <- function(seg1, seg2) {
     list(n1 = nrow(seg1), n2 = nrow(seg2))
@@ -92,8 +92,8 @@ test_that("quantify2 handles non-matching groups", {
   corp <- corpus(ae)
   
   # Get segments that might not overlap completely
-  vowels <- ask_for(corp, "Phonetic == V")
-  some_consonants <- ask_for(corp, "Phonetic == t")
+  vowels <- query(corp, "Phonetic == V")
+  some_consonants <- query(corp, "Phonetic == t")
   
   compare_func <- function(seg1, seg2) {
     list(count1 = nrow(seg1), count2 = nrow(seg2))
@@ -115,7 +115,7 @@ test_that("quantify2 validates inputs correctly", {
   ae <- create_ae_db(verbose = FALSE)
   corp <- corpus(ae)
   
-  vowels <- ask_for(corp, "Phonetic =~ V")
+  vowels <- query(corp, "Phonetic =~ V")
   
   # Missing .using argument
   expect_error(
@@ -145,8 +145,8 @@ test_that("quantify2 passes additional arguments correctly", {
   ae <- create_ae_db(verbose = FALSE)
   corp <- corpus(ae)
   
-  vowels <- ask_for(corp, "Phonetic =~ V")
-  consonants <- ask_for(corp, "Phonetic =~ [ptk]")
+  vowels <- query(corp, "Phonetic =~ V")
+  consonants <- query(corp, "Phonetic =~ [ptk]")
   
   # Function with extra parameters
   compare_with_param <- function(seg1, seg2, multiplier = 1) {
@@ -175,8 +175,8 @@ test_that("quantify2 works with fake DSP functions from examples", {
   ae <- create_ae_db(verbose = FALSE)
   corp <- corpus(ae)
   
-  vowels <- ask_for(corp, "Phonetic =~ V") |> head(3)
-  consonants <- ask_for(corp, "Phonetic =~ [ptk]") |> head(3)
+  vowels <- query(corp, "Phonetic =~ V") |> head(3)
+  consonants <- query(corp, "Phonetic =~ [ptk]") |> head(3)
   
   # Should work with fake_two_df_fun from tidy_trackdata.R
   if (exists("fake_two_df_fun", where = asNamespace("reindeer"))) {

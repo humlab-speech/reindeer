@@ -187,7 +187,7 @@ test_that("quantify_simulate validates prep function requirements", {
 
   db_path <- reindeer:::create_ae_db(verbose = FALSE)
   corp <- corpus(db_path)
-  segments <- ask_for(corp, "[#Phonetic -> Phonetic]") %>% head(2)
+  segments <- query(corp, "[#Phonetic -> Phonetic]") %>% head(2)
 
   # Error if .prep_simulate without .prep_function
   expect_error(
@@ -221,7 +221,7 @@ test_that("quantify_simulate works without preprocessing", {
 
   db_path <- reindeer:::create_ae_db(verbose = FALSE)
   corp <- corpus(db_path)
-  segments <- head(ask_for(corp, "[#Phonetic -> Phonetic]"), 2)
+  segments <- head(query(corp, "[#Phonetic -> Phonetic]"), 2)
 
   # Traditional simulation without preprocessing should still work
   result <- quantify_simulate(

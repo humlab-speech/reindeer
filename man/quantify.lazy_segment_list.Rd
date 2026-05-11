@@ -4,7 +4,7 @@
 \alias{quantify.lazy_segment_list}
 \title{Quantify method for lazy_segment_list — defer DSP until collect()}
 \arguments{
-\item{object}{A \code{lazy_segment_list} (from \code{ask_for(corp, query, lazy = TRUE)}).}
+\item{object}{A \code{lazy_segment_list} (from \code{query(corp, query, lazy = TRUE)}).}
 
 \item{dsp_function}{A DSP function from \code{superassp} or similar.}
 
@@ -18,5 +18,5 @@ When called on a lazy segment list, \code{quantify()} does not execute DSP.
 Instead it appends a "quantify" entry to the lazy chain's
 \code{post_transforms}; the DSP is run at \code{collect()} time on the
 materialized \code{segment_list}. This lets users write a single pipeline
-(\code{ask_for(corp, ..., lazy = TRUE) |> scout() |> quantify(...) |> collect()}) without paying for DSP unless / until the result is needed.
+(\code{query(corp, ..., lazy = TRUE) |> scout() |> quantify(...) |> collect()}) without paying for DSP unless / until the result is needed.
 }

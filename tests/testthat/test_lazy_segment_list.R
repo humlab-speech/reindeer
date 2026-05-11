@@ -2,7 +2,7 @@
 #
 # Covers: constructor, validator, build_sql_from_parts, apply_*_transform,
 #   collect(), mutable caching, is_lazy/needs_collect, as.data.frame,
-#   print/summary methods, and ask_for(..., lazy = TRUE) integration.
+#   print/summary methods, and query(..., lazy = TRUE) integration.
 
 # ==============================================================================
 # Helpers
@@ -224,11 +224,11 @@ test_that("collect.default errors on non-segment objects", {
 # Integration tests (require ae database)
 # ==============================================================================
 
-test_that("ask_for with lazy = TRUE returns lazy_segment_list", {
+test_that("query with lazy = TRUE returns lazy_segment_list", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
   expect_true(S7::S7_inherits(lsl, lazy_segment_list))
   expect_false(lsl@.state$materialized)
   expect_null(lsl@.state$cache)
@@ -240,7 +240,7 @@ test_that("collect() materializes lazy query and returns segment_list", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
   result <- collect(lsl)
 
   expect_true(S7::S7_inherits(result, segment_list))
@@ -253,7 +253,7 @@ test_that("collect() caches result via environment reference semantics", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
   expect_false(lsl@.state$materialized)
 
   result1 <- collect(lsl)
@@ -271,8 +271,8 @@ test_that("lazy results match eager results", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  eager <- ask_for(corp, "Phonetic == t")
-  lazy_result <- collect(ask_for(corp, "Phonetic == t", lazy = TRUE))
+  eager <- query(corp, "Phonetic == t")
+  lazy_result <- collect(query(corp, "Phonetic == t", lazy = TRUE))
 
   # Same labels
   expect_equal(sort(eager$labels), sort(lazy_result$labels))
@@ -284,7 +284,7 @@ test_that("as.data.frame forces collection", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
   # Collect first, then convert -- S7 method dispatch for base generics
   # is unreliable during R CMD check
   collected <- collect(lsl)
@@ -299,7 +299,7 @@ test_that("print method does not error for unmaterialized lazy_segment_list", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
   # S7 print dispatches via cli which writes to connection, not stdout;
   # just verify no error and returns invisible
   expect_no_error(capture.output(print(lsl), type = "message"))
@@ -310,7 +310,7 @@ test_that("print method does not error for materialized lazy_segment_list", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
   collect(lsl)
   expect_no_error(capture.output(print(lsl), type = "message"))
 })
@@ -319,7 +319,7 @@ test_that("summary method does not error for lazy_segment_list", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic == t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
   expect_no_error(capture.output(summary(lsl), type = "message"))
 })
 
@@ -327,7 +327,7 @@ test_that("lazy query with regex operator =~ works", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic =~ s.*", lazy = TRUE)
+  lsl <- query(corp, "Phonetic =~ s.*", lazy = TRUE)
   result <- collect(lsl)
   expect_true(S7::S7_inherits(result, segment_list))
   expect_true(all(grepl("^s", result$labels, ignore.case = TRUE)))
@@ -337,7 +337,7 @@ test_that("lazy query with != operator works", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- ask_for(corp, "Phonetic != t", lazy = TRUE)
+  lsl <- query(corp, "Phonetic != t", lazy = TRUE)
   result <- collect(lsl)
   expect_true(S7::S7_inherits(result, segment_list))
   expect_true(all(result$labels != "t"))
@@ -348,10 +348,10 @@ test_that("lazy query with != operator works", {
 # ==============================================================================
 
 # Reuse the eager parity contract: for each query type, lazy collect()
-# must produce the same row count and labels as the eager ask_for().
+# must produce the same row count and labels as the eager query().
 .lazy_parity_check <- function(corp, q) {
-  eager <- ask_for(corp, q)
-  lazy  <- collect(ask_for(corp, q, lazy = TRUE))
+  eager <- query(corp, q)
+  lazy  <- collect(query(corp, q, lazy = TRUE))
   expect_equal(nrow(lazy), nrow(eager),
                info = paste("nrow mismatch for", q))
   if (nrow(eager) > 0) {
@@ -398,7 +398,7 @@ test_that("lazy parity: sequence with non-simple sub-query", {
 test_that("lazy collect of sequence/dominance/function is materialised once", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
-  lsl <- ask_for(corp, "[Word ^ Phonetic == m]", lazy = TRUE)
+  lsl <- query(corp, "[Word ^ Phonetic == m]", lazy = TRUE)
   expect_false(lsl@.state$materialized)
   r1 <- collect(lsl)
   expect_true(lsl@.state$materialized)

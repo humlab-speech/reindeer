@@ -47,7 +47,7 @@ Here's a complete analysis workflow in just a few lines:
 corp <- corpus("path/to/your_database_emuDB")
 
 # 2. Query for segments
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 
 # 3. Extract formant measurements
 formants <- quantify(vowels, superassp::forest)
@@ -111,36 +111,36 @@ corp <- corpus(handle)
 
 ## Step 2: Querying Your Data
 
-reindeer provides optimized querying through `ask_for()` (alias: `query()`).
+reindeer provides optimized querying through `query()` (alias: `query()`).
 
 ### Simple Queries
 
 ```{r}
 # Exact match
-segments <- ask_for(corp, "Phonetic == t")
+segments <- query(corp, "Phonetic == t")
 
 # Not equal
-segments <- ask_for(corp, "Phonetic != t")
+segments <- query(corp, "Phonetic != t")
 
 # Regex pattern matching
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
-consonants <- ask_for(corp, "Phonetic !~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
+consonants <- query(corp, "Phonetic !~ [aeiou]")
 ```
 
 ### Advanced Queries
 
 ```{r}
 # Sequence: find /t/ followed by vowel
-seq <- ask_for(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")
+seq <- query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")
 
 # Dominance: find vowels dominated by stressed syllables
-stressed_vowels <- ask_for(corp, "[Syllable == S ^ Phonetic =~ [aeiou]]")
+stressed_vowels <- query(corp, "[Syllable == S ^ Phonetic =~ [aeiou]]")
 
 # Conjunction (AND)
-long_vowels <- ask_for(corp, "[Phonetic =~ [aeiou] & Duration > 100]")
+long_vowels <- query(corp, "[Phonetic =~ [aeiou] & Duration > 100]")
 
 # Disjunction (OR)
-stops <- ask_for(corp, "[Phonetic == p | Phonetic == t | Phonetic == k]")
+stops <- query(corp, "[Phonetic == p | Phonetic == t | Phonetic == k]")
 ```
 
 ### Projection
@@ -149,7 +149,7 @@ Use `#` to specify which level to return:
 
 ```{r}
 # Return the syllable, not the vowel
-syllables <- ask_for(corp, "[Syllable #== S ^ Phonetic =~ [aeiou]]")
+syllables <- query(corp, "[Syllable #== S ^ Phonetic =~ [aeiou]]")
 ```
 
 ### Query Results
@@ -157,7 +157,7 @@ syllables <- ask_for(corp, "[Syllable #== S ^ Phonetic =~ [aeiou]]")
 The result is a `segment_list` object:
 
 ```{r}
-segments <- ask_for(corp, "Phonetic == t")
+segments <- query(corp, "Phonetic == t")
 
 # View results
 print(segments)      # Pretty printed summary
@@ -390,7 +390,7 @@ ggplot(formants_with_meta, aes(x = F1, fill = Gender)) +
 corp <- corpus("path/to/db_emuDB")
 
 # Query vowels
-vowels <- ask_for(corp, "Phonetic =~ [aeiouæɑɔ]")
+vowels <- query(corp, "Phonetic =~ [aeiouæɑɔ]")
 
 # Extract formants at midpoint
 formants <- quantify(vowels, superassp::forest, .at = 0.5)
@@ -422,7 +422,7 @@ ggplot(vowels_data, aes(x = F2_norm, y = F1_norm, color = label)) +
 corp <- corpus("path/to/db_emuDB")
 
 # Query intonation phrases
-phrases <- ask_for(corp, "Intonation == IP")
+phrases <- query(corp, "Intonation == IP")
 
 # Extract pitch at multiple points
 pitch_contour <- quantify(
@@ -454,7 +454,7 @@ ggplot(pitch_data, aes(x = time_rel, y = F0, group = bundle)) +
 corp <- corpus("path/to/db_emuDB")
 
 # Query stops at word onsets
-stops <- ask_for(corp, "[Word #^ Phonetic =~ [ptk]]")
+stops <- query(corp, "[Word #^ Phonetic =~ [ptk]]")
 
 # Get zero crossing rate (for burst detection)
 zcr <- quantify(
@@ -541,8 +541,8 @@ hist(formants$F1)
 
 ```{r}
 # Be specific in queries to reduce processing time
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")  # Good
-all_segs <- ask_for(corp, "Phonetic =~ .*")     # Slower
+vowels <- query(corp, "Phonetic =~ [aeiou]")  # Good
+all_segs <- query(corp, "Phonetic =~ .*")     # Slower
 ```
 
 ## Troubleshooting
@@ -559,13 +559,13 @@ dir.exists("path/to/database_emuDB")
 corp <- corpus("path/to/database_emuDB")
 ```
 
-**Problem:** `ask_for()` returns empty segment_list
+**Problem:** `query()` returns empty segment_list
 
 ```{r}
 # Check your query syntax
 # Common issues:
-ask_for(corp, "Phonetic = t")    # Wrong: use ==
-ask_for(corp, "Phonetic == t")   # Correct
+query(corp, "Phonetic = t")    # Wrong: use ==
+query(corp, "Phonetic == t")   # Correct
 
 # Check what levels exist
 corp@config$levelDefinitions
@@ -606,7 +606,7 @@ For manual annotation and quality control, launch the EMU-webApp interface:
 serve(corp)
 
 # Or serve only specific segments (e.g., from a query)
-vowels <- ask_for(corp, "Phonetic =~ [aeiou]")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 serve(corp, seglist = vowels)
 
 # The webApp opens in your browser/RStudio Viewer
@@ -637,7 +637,7 @@ serve(corp)
 
 ```{r}
 # Review query results
-outliers <- ask_for(corp, "Duration > 500")
+outliers <- query(corp, "Duration > 500")
 serve(corp, seglist = outliers)
 
 # Annotate specific sessions
@@ -664,7 +664,7 @@ Now that you know the basics, explore:
 ```{r}
 # Function documentation
 ?corpus
-?ask_for
+?query
 ?quantify
 ?biographize
 
@@ -680,7 +680,7 @@ browseVignettes("reindeer")
 The reindeer workflow in 5 steps:
 
 1. **Load:** `corp <- corpus("path/to/db_emuDB")`
-2. **Query:** `segments <- ask_for(corp, "Phonetic == t")`
+2. **Query:** `segments <- query(corp, "Phonetic == t")`
 3. **Analyze:** `formants <- quantify(segments, superassp::forest)`
 4. **Enrich:** `data <- biographize(formants, corp)`
 5. **Annotate** (optional): `serve(corp, seglist = segments)`

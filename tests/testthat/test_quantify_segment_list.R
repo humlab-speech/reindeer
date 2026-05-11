@@ -58,14 +58,14 @@ test_that("segment_list can be created from emuR::query result", {
   expect_equal(seg_list$end, query_result$end)
 })
 
-test_that("ask_for returns segment_list", {
+test_that("query returns segment_list", {
   skip_if_not_installed("emuR")
   
   ae_path <- system.file("extdata/emu/DBs/ae_emuDB", package = "emuR")
   skip_if(ae_path == "", "ae demo data not available")
   
-  # Query using ask_for
-  seg_list <- ask_for(ae_path, "Phonetic == t")
+  # Query using query
+  seg_list <- query(ae_path, "Phonetic == t")
   
   # Test class
   expect_true(is_segment_list(seg_list))
@@ -88,7 +88,7 @@ test_that("quantify works with fake DSP function", {
   corp <- corpus(ae_path, verbose = FALSE)
   
   # Get segments
-  seg_list <- ask_for(corp, "Phonetic == n")
+  seg_list <- query(corp, "Phonetic == n")
   seg_list@db_path <- ae_path
   
   # Create a fake DSP function that returns a data.frame
@@ -128,7 +128,7 @@ test_that("quantify works with .at parameter for time points", {
   skip_if(ae_path == "", "ae demo data not available")
   
   corp <- corpus(ae_path, verbose = FALSE)
-  seg_list <- ask_for(corp, "Phonetic == n")
+  seg_list <- query(corp, "Phonetic == n")
   seg_list@db_path <- ae_path
   
   # Create a fake DSP that returns multiple frames (simulating SSFF track)
@@ -170,7 +170,7 @@ test_that("quantify handles empty segment list", {
   corp <- corpus(ae_path, verbose = FALSE)
   
   # Get empty segment list
-  seg_list <- ask_for(corp, "Phonetic == zzz")
+  seg_list <- query(corp, "Phonetic == zzz")
   seg_list@db_path <- ae_path
   
   fake_dsp <- function(listOfFiles, beginTime, endTime, toFile = FALSE, verbose = FALSE, ...) {
@@ -191,7 +191,7 @@ test_that("quantify error handling works", {
   skip_if(ae_path == "", "ae demo data not available")
   
   corp <- corpus(ae_path, verbose = FALSE)
-  seg_list <- ask_for(corp, "Phonetic == n")
+  seg_list <- query(corp, "Phonetic == n")
   seg_list@db_path <- ae_path
   
   # Test with invalid .at parameter
@@ -221,7 +221,7 @@ test_that("quantify with metadata derivation works", {
   # Add some metadata
   corp["0000", "msajc003"] <- list(Gender = "Male", Age = 25)
   
-  seg_list <- ask_for(corp, "Phonetic == n")
+  seg_list <- query(corp, "Phonetic == n")
   seg_list@db_path <- ae_path
   
   # Fake DSP that accepts Gender and Age parameters
@@ -263,7 +263,7 @@ test_that("quantify parallel processing works", {
   skip_if(ae_path == "", "ae demo data not available")
   
   corp <- corpus(ae_path, verbose = FALSE)
-  seg_list <- ask_for(corp, "Phonetic == n")
+  seg_list <- query(corp, "Phonetic == n")
   seg_list@db_path <- ae_path
   
   fake_dsp <- function(listOfFiles, beginTime, endTime, toFile = FALSE, verbose = FALSE, ...) {
@@ -301,7 +301,7 @@ test_that("segment_list print and summary methods work", {
   ae_path <- system.file("extdata/emu/DBs/ae_emuDB", package = "emuR")
   skip_if(ae_path == "", "ae demo data not available")
   
-  seg_list <- ask_for(ae_path, "Phonetic == t")
+  seg_list <- query(ae_path, "Phonetic == t")
   
   # Test print
   expect_output(print(seg_list), "Segment List")
@@ -321,7 +321,7 @@ test_that("quantify preserves segment ordering", {
   skip_if(ae_path == "", "ae demo data not available")
   
   corp <- corpus(ae_path, verbose = FALSE)
-  seg_list <- ask_for(corp, "Phonetic =~ .*")
+  seg_list <- query(corp, "Phonetic =~ .*")
   seg_list@db_path <- ae_path
   
   # Take first few segments
@@ -350,7 +350,7 @@ test_that("quantify handles list output from DSP", {
   skip_if(ae_path == "", "ae demo data not available")
   
   corp <- corpus(ae_path, verbose = FALSE)
-  seg_list <- ask_for(corp, "Phonetic == n")
+  seg_list <- query(corp, "Phonetic == n")
   seg_list@db_path <- ae_path
   
   # DSP that returns a list
