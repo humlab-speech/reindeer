@@ -375,10 +375,36 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
     con <- .open_query_connection(db_path)
     on.exit(DBI::dbDisconnect(con))
   }
-  
+  q <- build_sequence_query_sql_impl(db_path, parsed_query, result_level, con = con)
+  if (is.null(q)) return(create_empty_result())
+  DBI::dbGetQuery(con, q$sql, params = q$params)
+}
+
+# Sentinel SQL that returns zero rows with the standard column shape.
+# Used when an in-build sub-query materialises empty.
+.empty_query_sql <- function() {
+  list(
+    sql = "SELECT NULL AS db_uuid, NULL AS session, NULL AS bundle, NULL AS item_id,
+           NULL AS level, NULL AS type, NULL AS seq_idx, NULL AS sample_rate,
+           NULL AS sample_point, NULL AS sample_start, NULL AS sample_dur,
+           NULL AS label, NULL AS attribute WHERE 0",
+    params = list()
+  )
+}
+
+# Build SQL for a sequence query. Returns list(sql, params) ready for
+# DBI::dbGetQuery, or NULL if a non-simple sub-query was pre-executed and
+# returned no rows (caller should treat as empty result).
+#
+# Sub-query handling: any non-simple branch is materialised here via
+# execute_subquery() (Option B from the implementation plan); the resulting
+# item IDs are embedded as quoted literals. The OUTER sequence query
+# remains a single SQL statement that the lazy path can defer to collect().
+# @keywords internal
+build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = NULL, con) {
   left_query <- parsed_query$left
   right_query <- parsed_query$right
-  
+
   left_level_raw <- extract_level_from_query(left_query)
   right_level_raw <- extract_level_from_query(right_query)
 
@@ -400,7 +426,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
 
   if (left_query$type != "simple") {
     left_preexec <- execute_subquery(db_path, left_query, con = con)
-    if (nrow(left_preexec) == 0) return(create_empty_result())
+    if (nrow(left_preexec) == 0) return(NULL)
     # Derive actual level from pre-executed results
     if ("level" %in% names(left_preexec)) {
       left_level <- left_preexec$level[1]
@@ -413,7 +439,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   }
   if (right_query$type != "simple") {
     right_preexec <- execute_subquery(db_path, right_query, con = con)
-    if (nrow(right_preexec) == 0) return(create_empty_result())
+    if (nrow(right_preexec) == 0) return(NULL)
     if ("level" %in% names(right_preexec)) {
       right_level <- right_preexec$level[1]
       right_resolved <- .resolve_level_attribute(con, right_level, right_level)
@@ -646,7 +672,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
     all_params <- c(all_params, list(result_attr))
   }
 
-  return(DBI::dbGetQuery(con, sql, params = all_params))
+  list(sql = sql, params = all_params)
 }
 
 # Dominance query execution - the key fix
@@ -656,7 +682,18 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
     con <- .open_query_connection(db_path)
     on.exit(DBI::dbDisconnect(con))
   }
+  q <- build_dominance_query_sql_impl(db_path, parsed_query, result_level, con = con)
+  if (is.null(q)) return(create_empty_result())
+  DBI::dbGetQuery(con, q$sql, params = q$params)
+}
 
+# Build SQL for a dominance query. Returns list(sql, params) or NULL if a
+# non-simple sub-query was pre-executed and returned no rows. Sub-query
+# handling: same Option B as sequence — non-simple branches are
+# materialised here; the outer dominance CTE chain is a single SQL
+# statement that the lazy path can defer to collect().
+# @keywords internal
+build_dominance_query_sql_impl <- function(db_path, parsed_query, result_level = NULL, con) {
   left_query <- parsed_query$left
   right_query <- parsed_query$right
 
@@ -685,7 +722,7 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
 
   if (!can_dominate(hierarchy_info, left_level, right_level)) {
     cli::cli_warn("No dominance relationship possible between {.val {left_level}} and {.val {right_level}}")
-    return(create_empty_result())
+    return(NULL)
   }
 
   # For non-simple sub-queries, pre-execute to get item IDs
@@ -693,22 +730,19 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
   right_item_ids <- NULL
   if (left_query$type != "simple") {
     left_result <- execute_subquery(db_path, left_query, con = con)
-    if (nrow(left_result) == 0) return(create_empty_result())
+    if (nrow(left_result) == 0) return(NULL)
     left_item_ids <- left_result
   }
   if (right_query$type != "simple") {
     right_result <- execute_subquery(db_path, right_query, con = con)
-    if (nrow(right_result) == 0) return(create_empty_result())
+    if (nrow(right_result) == 0) return(NULL)
     right_item_ids <- right_result
   }
 
-  dom_sql <- build_corrected_dominance_sql(
+  build_corrected_dominance_sql(
     con, left_query, right_query, left_level, right_level, result_level, hierarchy_info,
     left_item_ids = left_item_ids, right_item_ids = right_item_ids
   )
-
-  result <- DBI::dbGetQuery(con, dom_sql$sql, params = dom_sql$params)
-  return(result)
 }
 
 # Function query execution
@@ -1155,11 +1189,12 @@ build_recursive_dominance_chain <- function(path_info) {
 }
 
 # Position function
-execute_position_function <- function(con, func_name, parent_level, child_level, operator, value, position = NULL) {
-  # Position functions: Start(parent, child), End(parent, child), Medial(parent, child, [n])
-  # Returns children in specific positions within their parent
-  
-  # Handle Medial with specific position
+# Build SQL for a position function (Start / End / Medial). Returns
+# list(sql, params) so the same builder is shared by the eager and lazy
+# execution paths.
+# @keywords internal
+build_position_function_sql <- function(func_name, parent_level, child_level,
+                                        operator, value, position = NULL) {
   if (func_name == "Medial" && !is.null(position)) {
     position_condition <- sprintf("child_rank = %d", position)
   } else {
@@ -1169,21 +1204,17 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
       "Medial" = "child_rank > 1 AND child_rank < max_rank"
     )
   }
-  
-  # For position functions, the value should always be 1 (true/false concept)
-  # The operator determines if we want or don't want items in that position
+
   include_position <- switch(operator,
     "==" = value == 1,
     "=" = value == 1,
     "!=" = value != 1,
     cli::cli_abort("Invalid operator for position function: {.val {operator}}")
   )
-  
-  # If we're looking for items NOT in position (value != 1), negate the condition
   if (!include_position) {
     position_condition <- sprintf("NOT (%s)", position_condition)
   }
-  
+
   sql <- sprintf("
     WITH child_positions AS (
       SELECT
@@ -1221,18 +1252,16 @@ execute_position_function <- function(con, func_name, parent_level, child_level,
     ORDER BY cp.session, cp.bundle, cp.seq_idx",
     position_condition
   )
-
-  return(DBI::dbGetQuery(con, sql, params = list(parent_level, child_level, child_level)))
+  list(sql = sql, params = list(parent_level, child_level, child_level))
 }
 
-# Count function
-execute_count_function <- function(con, parent_level, child_level, operator, value) {
-  # Whitelist SQL comparison operators to prevent injection
+# Build SQL for a count function (Num). Returns list(sql, params).
+# @keywords internal
+build_count_function_sql <- function(parent_level, child_level, operator, value) {
   valid_operators <- c("=", "==", "!=", ">", "<", ">=", "<=")
   if (!operator %in% valid_operators) {
     cli::cli_abort("Invalid operator for count function: {.val {operator}}")
   }
-  # Normalize == to = for SQL
   sql_op <- if (operator == "==") "=" else operator
 
   sql <- sprintf("
@@ -1272,8 +1301,22 @@ execute_count_function <- function(con, parent_level, child_level, operator, val
     ORDER BY cc.session, cc.bundle, cc.seq_idx",
     sql_op
   )
+  list(
+    sql = sql,
+    params = list(child_level, parent_level, parent_level, as.integer(value))
+  )
+}
 
-  return(DBI::dbGetQuery(con, sql, params = list(child_level, parent_level, parent_level, as.integer(value))))
+execute_position_function <- function(con, func_name, parent_level, child_level, operator, value, position = NULL) {
+  q <- build_position_function_sql(func_name, parent_level, child_level,
+                                   operator, value, position)
+  DBI::dbGetQuery(con, q$sql, params = q$params)
+}
+
+# Count function
+execute_count_function <- function(con, parent_level, child_level, operator, value) {
+  q <- build_count_function_sql(parent_level, child_level, operator, value)
+  DBI::dbGetQuery(con, q$sql, params = q$params)
 }
 
 # Hierarchy functions

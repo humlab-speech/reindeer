@@ -207,20 +207,54 @@ build_simple_query_sql <- function(db_path, parsed) {
   return(list(sql = base_sql, params = params))
 }
 
-# Placeholder functions for query types not yet supporting lazy SQL generation
+# Lazy SQL builders for sequence / dominance / function queries.
+# Each delegates to the build_*_query_sql_impl helper in R/query_parser.R
+# (which is also called by the eager execute_*_query_corrected wrapper),
+# giving lazy and eager exactly one source of truth for the SQL.
+#
+# The build helpers need a DB connection at build time for attribute
+# resolution and (for sequence/dominance) for materialising any non-simple
+# sub-queries. We open and close one here; the SQL string + params are
+# returned, and the lazy collect() opens a fresh connection to execute.
+#
+# Returning NULL means the query is statically empty (e.g. a sub-query
+# resolved to zero rows). The lazy path turns that into an empty-shape
+# SELECT so collect() yields a zero-row segment_list rather than aborting.
+
 build_sequence_query_sql <- function(db_path, parsed, result_level = NULL) {
-  # TODO: Implement lazy SQL building for sequences
-  return(NULL)
+  con <- .open_query_connection(db_path)
+  on.exit(DBI::dbDisconnect(con))
+  q <- build_sequence_query_sql_impl(db_path, parsed, result_level, con = con)
+  if (is.null(q)) return(.empty_query_sql())
+  q
 }
 
 build_dominance_query_sql <- function(db_path, parsed, result_level = NULL) {
-  # TODO: Implement lazy SQL building for dominance
-  return(NULL)
+  con <- .open_query_connection(db_path)
+  on.exit(DBI::dbDisconnect(con))
+  q <- build_dominance_query_sql_impl(db_path, parsed, result_level, con = con)
+  if (is.null(q)) return(.empty_query_sql())
+  q
 }
 
 build_function_query_sql <- function(db_path, parsed) {
-  # TODO: Implement lazy SQL building for function queries
-  return(NULL)
+  con <- .open_query_connection(db_path)
+  on.exit(DBI::dbDisconnect(con))
+
+  func_name <- parsed$func_name
+  level1 <- .resolve_level_attribute(con, parsed$level1, parsed$level1)$level
+  level2 <- .resolve_level_attribute(con, parsed$level2, parsed$level2)$level
+  operator <- parsed$operator
+  value <- as.numeric(parsed$value)
+  position <- parsed$position
+
+  if (func_name %in% c("Start", "End", "Medial")) {
+    build_position_function_sql(func_name, level1, level2, operator, value, position)
+  } else if (func_name == "Num") {
+    build_count_function_sql(level1, level2, operator, value)
+  } else {
+    cli::cli_abort("Unknown function: {.val {func_name}}")
+  }
 }
 
 build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {

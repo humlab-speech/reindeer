@@ -107,11 +107,18 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
     cli::cli_code(query$sql)
   }
   
-  # Execute query with parameters
-  conn <- DBI::dbConnect(RSQLite::SQLite(), lazy_sl@db_path)
+  # Execute query with parameters. Use .open_query_connection so REGEXP is
+  # registered (=~ / !~ in dominance / sequence sub-queries depends on it).
+  conn <- .open_query_connection(lazy_sl@db_path)
   on.exit(DBI::dbDisconnect(conn))
   
-  raw_df <- DBI::dbGetQuery(conn, query$sql, params = query$params)
+  # DBI rejects params = list() when the SQL has no ? placeholders, so pass
+  # NULL (= no params) when the builder produced an empty params list.
+  raw_df <- if (length(query$params) == 0) {
+    DBI::dbGetQuery(conn, query$sql)
+  } else {
+    DBI::dbGetQuery(conn, query$sql, params = query$params)
+  }
   
   if (nrow(raw_df) == 0) {
     result_df <- format_as_emuRsegs(raw_df)

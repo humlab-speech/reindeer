@@ -344,6 +344,69 @@ test_that("lazy query with != operator works", {
 })
 
 # ==============================================================================
+# Lazy parity with eager for sequence / dominance / function queries (Item 10)
+# ==============================================================================
+
+# Reuse the eager parity contract: for each query type, lazy collect()
+# must produce the same row count and labels as the eager ask_for().
+.lazy_parity_check <- function(corp, q) {
+  eager <- ask_for(corp, q)
+  lazy  <- collect(ask_for(corp, q, lazy = TRUE))
+  expect_equal(nrow(lazy), nrow(eager),
+               info = paste("nrow mismatch for", q))
+  if (nrow(eager) > 0) {
+    expect_equal(sort(lazy$labels), sort(eager$labels),
+                 info = paste("labels mismatch for", q))
+  }
+}
+
+test_that("lazy parity: simple equality (regression)", {
+  skip_if_no_emuR()
+  .lazy_parity_check(create_shared_ae_corpus(), "Phonetic == n")
+})
+
+test_that("lazy parity: sequence of two simple queries", {
+  skip_if_no_emuR()
+  .lazy_parity_check(create_shared_ae_corpus(),
+                     "[Phonetic == n -> Phonetic == s]")
+})
+
+test_that("lazy parity: dominance with simple sub-query", {
+  skip_if_no_emuR()
+  .lazy_parity_check(create_shared_ae_corpus(),
+                     "[Word ^ Phonetic == n]")
+})
+
+test_that("lazy parity: position function (Start)", {
+  skip_if_no_emuR()
+  .lazy_parity_check(create_shared_ae_corpus(),
+                     "Start(Word, Phonetic) == TRUE")
+})
+
+test_that("lazy parity: count function (Num)", {
+  skip_if_no_emuR()
+  .lazy_parity_check(create_shared_ae_corpus(),
+                     "Num(Word, Phonetic) == 3")
+})
+
+test_that("lazy parity: sequence with non-simple sub-query", {
+  skip_if_no_emuR()
+  .lazy_parity_check(create_shared_ae_corpus(),
+                     "[Start(Word, Phonetic) == TRUE -> Phonetic == n]")
+})
+
+test_that("lazy collect of sequence/dominance/function is materialised once", {
+  skip_if_no_emuR()
+  corp <- create_shared_ae_corpus()
+  lsl <- ask_for(corp, "[Word ^ Phonetic == m]", lazy = TRUE)
+  expect_false(lsl@.state$materialized)
+  r1 <- collect(lsl)
+  expect_true(lsl@.state$materialized)
+  r2 <- collect(lsl)
+  expect_identical(r1, r2)
+})
+
+# ==============================================================================
 # Environment reference semantics (crucial correctness test)
 # ==============================================================================
 
