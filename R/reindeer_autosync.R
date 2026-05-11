@@ -656,7 +656,7 @@ load_sync_config_from_path <- function(basePath) {
 #' @param corpus_obj A corpus object
 #' @return The corpus object (invisibly)
 #'
-#' @export
+#' @keywords internal
 disable_sync <- function(corpus_obj) {
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")

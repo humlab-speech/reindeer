@@ -298,13 +298,10 @@ scout_dt <- function(.segments,
 #' @param ... Additional arguments passed to scout()
 #'
 #' @return segment_list (or lazy_segment_list if collect=FALSE)
-#' @export
+#' @keywords internal
 #'
 #' @examplesIf interactive()
-#' # Get previous phoneme
-#' prev_phone <- retreat(segments, steps_backward = 1)
-#'
-#' # Equivalent to:
+#' # Use scout() with a negative step instead:
 #' prev_phone <- scout(segments, steps_forward = -1)
 retreat <- function(.segments, steps_backward, ...) {
   scout(.segments, steps_forward = -abs(steps_backward), ...)

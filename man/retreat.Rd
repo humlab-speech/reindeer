@@ -21,10 +21,8 @@ Convenience function for moving backward. Simply calls scout with negative offse
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-# Get previous phoneme
-prev_phone <- retreat(segments, steps_backward = 1)
-
-# Equivalent to:
+# Use scout() with a negative step instead:
 prev_phone <- scout(segments, steps_forward = -1)
 \dontshow{\}) # examplesIf}
 }
+\keyword{internal}

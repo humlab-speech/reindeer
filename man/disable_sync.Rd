@@ -16,3 +16,4 @@ The corpus object (invisibly)
 Writes \code{enabled: false} to the corpus \code{.sync_config.json}. Re-enable by
 passing \code{sync_eaf = TRUE} or \code{sync_cmdi = TRUE} to \code{corpus()}.
 }
+\keyword{internal}

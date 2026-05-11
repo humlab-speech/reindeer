@@ -11,14 +11,8 @@
   S7::method(summary, corpus) <- .summary_corpus
   S7::method(`[`, corpus) <- .subset_corpus
 
-  # Register S3 print/summary methods for simulation classes
-
-  # devtools::load_all() doesn't always register S3 methods in the correct
-
-  # method table for base generics — explicit registration ensures dispatch
-  registerS3method("print", "simulation_results", print.simulation_results, envir = asNamespace(pkgname))
-  registerS3method("print", "simulation_tracks", print.simulation_tracks, envir = asNamespace(pkgname))
-  registerS3method("summary", "simulation_results", summary.simulation_results, envir = asNamespace(pkgname))
+  # Simulation S3 methods moved to the reindeer.simulation companion
+  # package in v0.7.0; no registration here.
 
   # vctrs hooks — needed so vec_slice/dplyr operations don't reject S7 objects
   # as "scalars". tibble (Imports) brings vctrs as a transitive dep.
