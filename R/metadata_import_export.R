@@ -251,7 +251,39 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
     metadata_list = metadataList
   )
 
+  # Flag corpus as dirty so describe_corpus() can auto-regenerate the
+  # FAIR artifacts (CMDI XML, DataCite). Cheap: zero-byte sentinel file.
+  .mark_metadata_dirty(corpus_obj)
+
   invisible(corpus_obj)
+}
+
+#' Flag corpus metadata as dirty (internal helper for auto-regeneration)
+#' @keywords internal
+.mark_metadata_dirty <- function(corpus_obj) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(invisible(NULL))
+  tryCatch(
+    file.create(file.path(corpus_obj@basePath, ".cmdi_dirty"),
+                showWarnings = FALSE),
+    error = function(e) NULL
+  )
+  invisible(NULL)
+}
+
+#' Test whether a corpus has pending metadata changes
+#' @keywords internal
+.is_metadata_dirty <- function(corpus_obj) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(FALSE)
+  file.exists(file.path(corpus_obj@basePath, ".cmdi_dirty"))
+}
+
+#' Clear the metadata-dirty flag (after FAIR artifacts are regenerated)
+#' @keywords internal
+.clear_metadata_dirty <- function(corpus_obj) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(invisible(NULL))
+  flag <- file.path(corpus_obj@basePath, ".cmdi_dirty")
+  if (file.exists(flag)) unlink(flag)
+  invisible(NULL)
 }
 
 #' Clear metadata at a specific level

@@ -256,6 +256,18 @@ describe_corpus <- function(corpus_obj,
   if (is.null(output_dir)) output_dir <- corpus_obj@basePath
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
+  # Auto-regenerate: if add_metadata() / create_session_and_bundle() flipped
+  # the dirty bit, force a rewrite of the FAIR artifacts to keep them in
+  # sync with the underlying METADATA.json files.
+  if (.is_metadata_dirty(corpus_obj)) {
+    if (verbose) {
+      cli::cli_alert_info(
+        "Metadata changed since last {.fn describe_corpus} - regenerating artifacts."
+      )
+    }
+    force <- TRUE
+  }
+
   summary <- collect_corpus_summary(corpus_obj, verbose = verbose)
 
   written <- character()
@@ -286,6 +298,9 @@ describe_corpus <- function(corpus_obj,
     written <- c(written, datacite = target)
     if (verbose) cli::cli_alert_success("Wrote {.path {target}}")
   }
+
+  # Artifacts are back in sync — clear the dirty bit.
+  .clear_metadata_dirty(corpus_obj)
 
   invisible(written)
 }
