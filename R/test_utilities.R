@@ -79,20 +79,25 @@ prep_passthrough <- function(listOfFiles,
 
   # Check av package
   if (!requireNamespace("av", quietly = TRUE)) {
-    stop("Package 'av' is required for prep_passthrough.\n",
-         "Install with: install.packages('av')",
-         call. = FALSE)
+    cli::cli_abort(c(
+      "Package {.pkg av} is required for {.fn prep_passthrough}.",
+      "i" = "Install with {.code install.packages('av')}."
+    ))
   }
 
   # Validate input
   if (missing(listOfFiles) || is.null(listOfFiles) || length(listOfFiles) == 0) {
-    stop("listOfFiles cannot be NULL or empty", call. = FALSE)
+    cli::cli_abort("{.arg listOfFiles} cannot be NULL or empty")
   }
 
   # Check files exist
   missing_files <- listOfFiles[!file.exists(listOfFiles)]
-  if (length(missing_files) > 0) {
-    stop("File(s) not found: ", paste(missing_files, collapse = ", "), call. = FALSE)
+  n_missing <- length(missing_files)
+  if (n_missing > 0) {
+    cli::cli_abort(c(
+      "{n_missing} file{?s} not found",
+      "x" = "{.path {missing_files}}"
+    ))
   }
 
   # Store parameters that were passed (for testing verification)
@@ -132,7 +137,10 @@ prep_passthrough <- function(listOfFiles,
 
       audio_data
     }, error = function(e) {
-      stop("Failed to read audio from ", file_path, ": ", e$message, call. = FALSE)
+      cli::cli_abort(c(
+        "Failed to read audio from {.path {file_path}}",
+        "x" = "{e$message}"
+      ))
     })
   }
 
@@ -166,7 +174,7 @@ verify_prep_params <- function(result, expected_params) {
   if (is.list(result) && "prep_params" %in% names(attributes(result))) {
     actual_params <- attr(result, "prep_params")
   } else {
-    warning("No prep_params attribute found in result")
+    cli::cli_warn("No {.field prep_params} attribute found in result")
     return(FALSE)
   }
 
@@ -177,11 +185,10 @@ verify_prep_params <- function(result, expected_params) {
     actual_val <- actual_params[[param_name]]
 
     if (!isTRUE(all.equal(expected_val, actual_val))) {
-      warning(sprintf(
-        "Parameter mismatch: %s\n  Expected: %s\n  Actual: %s",
-        param_name,
-        paste(expected_val, collapse = ", "),
-        paste(actual_val, collapse = ", ")
+      cli::cli_warn(c(
+        "Parameter mismatch: {.field {param_name}}",
+        "i" = "Expected: {.val {paste(expected_val, collapse = ', ')}}",
+        "i" = "Actual: {.val {paste(actual_val, collapse = ', ')}}"
       ))
       all_match <- FALSE
     }
@@ -212,7 +219,7 @@ create_test_corpus_for_simulation <- function(n_bundles = 3, temp_dir = tempdir(
 
   # Use emuR to create minimal database
   if (!requireNamespace("emuR", quietly = TRUE)) {
-    stop("emuR package required for creating test corpus", call. = FALSE)
+    cli::cli_abort("Package {.pkg emuR} required for creating test corpus")
   }
 
   # Create database

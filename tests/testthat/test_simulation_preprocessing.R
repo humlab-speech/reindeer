@@ -147,12 +147,13 @@ test_that("prep_passthrough handles multiple files", {
 test_that("prep_passthrough validates inputs", {
   expect_error(
     prep_passthrough(character(0)),
-    "listOfFiles cannot be NULL or empty"
+    "`listOfFiles` cannot be NULL or empty"
   )
 
   expect_error(
     prep_passthrough("/nonexistent/file.wav"),
-    "File.*not found"
+    "file.*not found",
+    ignore.case = TRUE
   )
 })
 
