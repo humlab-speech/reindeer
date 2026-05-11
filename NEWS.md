@@ -1,3 +1,30 @@
+# reindeer 0.6.1 (2026-05-11)
+
+## Lazy SQL for sequence / dominance / function queries
+
+`ask_for(corp, q, lazy = TRUE) |> collect()` now works for every EQL
+query type that the eager path supports (simple, sequence, dominance,
+the position functions Start/End/Medial, and the count function Num),
+not just simple equality / regex. Conjunction and disjunction
+recurse through `build_base_sql` and benefit transparently when
+their children are shippable.
+
+Internally the four eager executors in `R/query_parser.R` were
+refactored to "build SQL" + "execute SQL" so the lazy stubs in
+`R/query_executor.R` reuse exactly the same SQL builders — there is
+now one source of truth per query type. Non-simple sub-queries of a
+sequence or dominance are materialised at lazy-build time (Option B
+in the implementation plan) and embedded as item-id literals; the
+outer query stays a single deferred SQL statement.
+
+Two small `collect()`-side fixes shipped alongside: `collect()` now
+uses `.open_query_connection` so REGEXP is available for dominance
+sub-queries, and it skips the `params =` argument to `dbGetQuery`
+when the params list is empty (DBI rejects empty params lists when
+the SQL has no `?` placeholders).
+
+---
+
 # reindeer 0.6.0 (2026-05-11)
 
 ## Deferred quantify on lazy_segment_list
