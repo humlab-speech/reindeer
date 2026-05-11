@@ -292,3 +292,33 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   .record_step(result, object, "quantify", sys.call(-1L))
 }
+
+#' Quantify method for lazy_segment_list — defer DSP until collect()
+#'
+#' When called on a lazy segment list, `quantify()` does not execute DSP.
+#' Instead it appends a "quantify" entry to the lazy chain's
+#' `post_transforms`; the DSP is run at `collect()` time on the
+#' materialized `segment_list`. This lets users write a single pipeline
+#' (`ask_for(corp, ..., lazy = TRUE) |> scout() |> quantify(...) |>
+#' collect()`) without paying for DSP unless / until the result is needed.
+#'
+#' @param object A `lazy_segment_list` (from `ask_for(corp, query, lazy = TRUE)`).
+#' @param dsp_function A DSP function from `superassp` or similar.
+#' @param ... Additional arguments passed to the DSP function at `collect()` time.
+#' @return The same `lazy_segment_list` with a deferred quantify step.
+#' @name quantify.lazy_segment_list
+S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
+  if (!is.function(dsp_function) && !is.character(dsp_function)) {
+    cli::cli_abort("{.arg dsp_function} must be a function or character string")
+  }
+  spec <- list(
+    type = "quantify",
+    dsp_function = dsp_function,
+    args = list(...)
+  )
+  object@query_parts$post_transforms <- c(
+    object@query_parts$post_transforms,
+    list(spec)
+  )
+  invisible(object)
+}

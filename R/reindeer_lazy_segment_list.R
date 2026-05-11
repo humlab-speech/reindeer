@@ -134,6 +134,19 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
 
   seg_list <- .seed_provenance(seg_list, "collect", sys.call(-1L))
 
+  # Apply any deferred post-materialization transforms (quantify, biographize).
+  # These run on the materialized segment_list, in declaration order.
+  post <- lazy_sl@query_parts$post_transforms
+  if (length(post) > 0) {
+    for (tr in post) {
+      seg_list <- switch(tr$type,
+        "quantify"    = do.call(quantify, c(list(seg_list, tr$dsp_function), tr$args)),
+        "biographize" = do.call(biographize, c(list(seg_list, tr$corpus_obj), tr$args)),
+        cli::cli_abort("Unknown post-materialization transform type: {.val {tr$type}}")
+      )
+    }
+  }
+
   # Cache result (uses environment reference semantics -- mutates in place)
   lazy_sl@.state$cache <- seg_list
   lazy_sl@.state$materialized <- TRUE
