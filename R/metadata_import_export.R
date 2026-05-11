@@ -161,34 +161,34 @@ import_metadata <- function(corpus_obj, Excelfile) {
   for (i in seq_len(nrow(bundle_meta))) {
     session <- bundle_meta$session[i]
     bundle <- bundle_meta$bundle[i]
-    
+
     meta_list <- as.list(bundle_meta[i, !names(bundle_meta) %in% c("session", "bundle")])
     meta_list <- meta_list[!is.na(meta_list)]
-    
+
     if (length(meta_list) > 0) {
-      write_metadata_to_json(corpus_obj, meta_list, session, bundle, "bundle")
+      add_metadata(corpus_obj, meta_list, session = session, bundle = bundle)
     }
   }
-  
+
   # Process session metadata
   for (i in seq_len(nrow(session_meta))) {
     session <- session_meta$session[i]
-    
+
     meta_list <- as.list(session_meta[i, !names(session_meta) %in% c("session")])
     meta_list <- meta_list[!is.na(meta_list)]
-    
+
     if (length(meta_list) > 0) {
-      write_metadata_to_json(corpus_obj, meta_list, session, NULL, "session")
+      add_metadata(corpus_obj, meta_list, session = session)
     }
   }
-  
+
   # Process database metadata
   if (nrow(db_meta) > 0) {
     meta_list <- as.list(db_meta[1, ])
     meta_list <- meta_list[!is.na(meta_list)]
-    
+
     if (length(meta_list) > 0) {
-      write_metadata_to_json(corpus_obj, meta_list, NULL, NULL, "database")
+      add_metadata(corpus_obj, meta_list)
     }
   }
   
@@ -220,34 +220,37 @@ import_metadata <- function(corpus_obj, Excelfile) {
 #' add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
 #'
 #' @export
-add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL, 
+add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL,
                         reset.before.add = FALSE) {
-  
-  # Determine level
-  if (is.null(session) && is.null(bundle)) {
-    level <- "database"
-  } else if (!is.null(session) && is.null(bundle)) {
-    level <- "session"
-  } else if (!is.null(session) && !is.null(bundle)) {
-    level <- "bundle"
-  } else {
+
+  if (!is.null(bundle) && is.null(session)) {
     cli::cli_abort("Bundle requires session")
   }
-  
+
+  level <- if (is.null(session)) "database"
+           else if (is.null(bundle)) "session"
+           else "bundle"
+
   if (reset.before.add) {
-    # Clear existing metadata at this level
     clear_metadata(corpus_obj, session, bundle, level)
   }
-  
-  # Write to JSON files (ground truth)
-  write_metadata_to_json(corpus_obj, metadataList, session, bundle, level)
-  
-  # Update cache
-  con <- get_connection(corpus_obj)
-  db_uuid <- get_db_uuid(corpus_obj)
-  process_metadata_list(con, db_uuid, session, bundle, metadataList, level)
-  DBI::dbDisconnect(con)
-  
+
+  # Route through the bracket-assignment dispatcher so there is exactly one
+  # write path for metadata. Literal names are anchored as regex so they
+  # do not accidentally match other sessions/bundles.
+  to_pattern <- function(s) {
+    if (is.null(s)) return(NULL)
+    paste0("^", gsub("([\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\])",
+                     "\\\\\\1", s, perl = TRUE), "$")
+  }
+
+  corpus_assign_metadata(
+    corpus_obj,
+    session_pattern = to_pattern(session),
+    bundle_pattern = to_pattern(bundle),
+    metadata_list = metadataList
+  )
+
   invisible(corpus_obj)
 }
 

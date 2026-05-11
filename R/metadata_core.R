@@ -295,41 +295,36 @@ process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, leve
       register_metadata_field(con, field_names[i], field_types[i])
     }
     
-    # Build data frame for bulk insert
+    # INSERT OR REPLACE so re-applying the same field at the same level
+    # is idempotent (matches the user-facing semantics of add_metadata).
     if (level == "database") {
-      insert_df <- data.frame(
-        db_uuid = rep(db_uuid, n_fields),
-        field_name = field_names,
-        field_value = field_values,
-        field_type = field_types,
-        stringsAsFactors = FALSE
+      sql <- "INSERT OR REPLACE INTO metadata_database
+              (db_uuid, field_name, field_value, field_type)
+              VALUES (?, ?, ?, ?)"
+      params <- list(
+        rep(db_uuid, n_fields), field_names, field_values, field_types
       )
-      DBI::dbWriteTable(con, "metadata_database", insert_df, 
-                       append = TRUE, overwrite = FALSE)
     } else if (level == "session") {
-      insert_df <- data.frame(
-        db_uuid = rep(db_uuid, n_fields),
-        session = rep(session, n_fields),
-        field_name = field_names,
-        field_value = field_values,
-        field_type = field_types,
-        stringsAsFactors = FALSE
+      sql <- "INSERT OR REPLACE INTO metadata_session
+              (db_uuid, session, field_name, field_value, field_type)
+              VALUES (?, ?, ?, ?, ?)"
+      params <- list(
+        rep(db_uuid, n_fields), rep(session, n_fields),
+        field_names, field_values, field_types
       )
-      DBI::dbWriteTable(con, "metadata_session", insert_df,
-                       append = TRUE, overwrite = FALSE)
     } else if (level == "bundle") {
-      insert_df <- data.frame(
-        db_uuid = rep(db_uuid, n_fields),
-        session = rep(session, n_fields),
-        bundle = rep(bundle, n_fields),
-        field_name = field_names,
-        field_value = field_values,
-        field_type = field_types,
-        stringsAsFactors = FALSE
+      sql <- "INSERT OR REPLACE INTO metadata_bundle
+              (db_uuid, session, bundle, field_name, field_value, field_type)
+              VALUES (?, ?, ?, ?, ?, ?)"
+      params <- list(
+        rep(db_uuid, n_fields), rep(session, n_fields),
+        rep(bundle, n_fields),
+        field_names, field_values, field_types
       )
-      DBI::dbWriteTable(con, "metadata_bundle", insert_df,
-                       append = TRUE, overwrite = FALSE)
+    } else {
+      cli::cli_abort("Unknown metadata level: {.val {level}}")
     }
+    DBI::dbExecute(con, sql, params = params)
   })
 }
 
@@ -662,71 +657,9 @@ set_metadata_validated <- function(corpus_obj, meta_list, session, bundle, level
   }
 }
 
-#' Write metadata to .meta_json file (ground truth)
-#' @keywords internal
-write_metadata_to_json <- function(corpus_obj, meta_list, session, bundle, level) {
-  
-  basePath <- corpus_obj@basePath
-  
-  if (level == "database") {
-    # Update METADATA.json in database root
-    db_name <- basename(basePath)
-    db_name <- sub("_emuDB$", "", db_name)
-    meta_file <- file.path(basePath, metadata.filename)
-    
-    # Read existing or create new
-    if (file.exists(meta_file)) {
-      existing <- read_json_fast(meta_file, simplifyVector = TRUE)
-    } else {
-      existing <- list()
-    }
-    
-    updated <- utils::modifyList(existing, meta_list, keep.null = FALSE)
-    .validate_against_schema(updated, "metadata.schema.json",
-                             file_path = meta_file, write = TRUE)
-    jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
-    
-  } else if (level == "session") {
-    # Update METADATA.json in session directory
-    meta_file <- file.path(basePath, paste0(session, "_ses"), metadata.filename)
-    
-    # Read existing or create new
-    if (file.exists(meta_file)) {
-      existing <- read_json_fast(meta_file, simplifyVector = TRUE)
-    } else {
-      existing <- list()
-    }
-    
-    updated <- utils::modifyList(existing, meta_list, keep.null = FALSE)
-    .validate_against_schema(updated, "metadata.schema.json",
-                             file_path = meta_file, write = TRUE)
-    jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
-    
-  } else if (level == "bundle") {
-    # Update METADATA.json in bundle directory
-    meta_file <- file.path(
-      basePath,
-      paste0(session, "_ses"),
-      paste0(bundle, "_bndl"),
-      metadata.filename
-    )
-    
-    # Ensure bundle directory exists
-    dir.create(dirname(meta_file), recursive = TRUE, showWarnings = FALSE)
-    
-    # Read existing or create new
-    if (file.exists(meta_file)) {
-      existing <- read_json_fast(meta_file, simplifyVector = TRUE)
-    } else {
-      existing <- list()
-    }
-    
-    updated <- utils::modifyList(existing, meta_list, keep.null = FALSE)
-    .validate_against_schema(updated, "metadata.schema.json",
-                             file_path = meta_file, write = TRUE)
-    jsonlite::write_json(updated, meta_file, auto_unbox = TRUE, pretty = TRUE)
-  }
-}
+# write_metadata_to_json was removed in v0.5.2 — add_metadata now routes
+# through corpus_assign_metadata -> set_metadata_database/session/bundle,
+# giving exactly one canonical write path for metadata.
 
 # ==============================================================================
 # EXCEL IMPORT/EXPORT
