@@ -75,7 +75,7 @@ The package uses S7 object system for type safety and performance:
 
 - **`segment_list`** (`R/reindeer_segment_list.R`): Query results containing time-aligned segments
   - Subclass of tibble with required columns: session, bundle, start, end, label
-  - Created by `ask_for()` and `query()` functions
+  - Created by `query()` and `query()` functions
 
 - **`extended_segment_list`**: segment_list enriched with metadata and/or signal tracks
 
@@ -88,7 +88,7 @@ The package uses S7 object system for type safety and performance:
 ```
 User Query (EQL)
     ↓
-ask_for() / query() [R/reindeer_query_optimized.r]
+query() [R/R/query_executor.R]
     ↓
 SQLite Cache (_emuDBcache.sqlite) ← built by build_emuDB_cache()
     ↓
@@ -127,7 +127,7 @@ Key functions:
 
 Two implementations:
 1. **Standard emuR**: Via `emuR::query()` (slower, more compatible)
-2. **Optimized**: Via `ask_for()` / `query()` - direct SQLite queries (`R/reindeer_query_optimized.r`)
+2. **Optimized**: Via `query()` - direct SQLite queries (`R/R/query_executor.R`)
 
 The optimized system:
 - Parses EQL (EMU Query Language) directly
@@ -138,7 +138,7 @@ The optimized system:
 Example:
 ```r
 corpus("path/to/db_emuDB") -> corp
-ask_for(corp, "Phonetic == t") -> segments
+query(corp, "Phonetic == t") -> segments
 ```
 
 ### Signal Processing & Caching
@@ -187,7 +187,7 @@ serve(corp)  # Opens EMU-webApp in browser
 
 **Key features**:
 - Filter bundles: `serve(corp, sessionPattern = "Session.*", bundlePattern = "msajc.*")`
-- Serve query results: `serve(corp, seglist = ask_for(corp, "Phonetic == t"))`
+- Serve query results: `serve(corp, seglist = query(corp, "Phonetic == t"))`
 - Custom port: `serve(corp, port = 8080)`
 - Debug mode: `serve(corp, debug = TRUE, debugLevel = 2)`
 
@@ -205,7 +205,7 @@ See `SERVE_FUNCTION_SUMMARY.md` for detailed documentation.
 
 Many functions have optimized versions:
 - `reindeeR_metadata_optimized.R` vs `reindeeR_metadata.R` (deprecated)
-- `reindeer_query_optimized.r` (`ask_for`) vs `emuR::query()`
+- `R/query_executor.R` (`query`) vs `emuR::query()`
 - `reindeeR_signalextensions_dt.R` (data.table) vs `reindeeR_signalextensions.R` (dplyr, deprecated)
 - `reindeer_transcription_system_optimized.R` vs `reindeer_transcription_system.R` (deprecated)
 
@@ -215,33 +215,27 @@ See DEPRECATED_FUNCTIONS.md for complete list of files marked for deletion.
 
 `R/reindeer_lazy_segment_list.R` implements lazy evaluation for query chains but is not yet integrated into main workflow. This is a planned optimization.
 
-### 4. Simulation System
+### 4. Simulation System (MOVED TO reindeer.simulation)
 
-`R/reindeer_simulation.R` provides infrastructure for systematic parameter space exploration:
-- **`quantify_simulate()`**: Run DSP analysis with parameter grids on segments
-- **`enrich_simulate()`**: Generate tracks with parameter grids across corpus
-- **Preprocessing support**: Apply transformations to media before DSP
-  - `.prep_function`: Function to transform media (e.g., `superassp::prep_recode`)
-  - `.prep_simulate`: Parameter grid for preprocessing (e.g., sample rates, codecs)
-  - Full outer product of DSP × prep parameters
-- **Caching**: Results stored in SQLite (`<timestamp>_<function>.sqlite`) for retrieval
-- **Cache size monitoring**: Automatic warnings when simulation caches grow large
-- `list_simulations()`: Show available simulation caches
-- `reminisce()` / `reminisce_tracks()`: Retrieve cached simulation results
+**As of v0.7.0**, all parameter-grid simulation functionality moved to
+the companion **[reindeer.simulation](../reindeer.simulation/)** package.
+The reindeer core no longer ships `quantify_simulate`, `enrich_simulate`,
+`reminisce`, `reminisce_tracks`, or `list_simulations`.
 
-**Example with preprocessing**:
 ```r
-# Simulate formant analysis with different sample rates
-quantify_simulate(
-  segments,
-  .using = superassp::forest,
-  .simulate = list(nominalF1 = seq(500, 900, 100)),  # DSP params
-  .prep_function = superassp::prep_recode,
-  .prep_simulate = list(sample_rate = c(16000, 22050, 44100)),  # Prep params
+library(reindeer.simulation)
+library(reindeer)
+
+corp <- corpus("path/to/db")
+segments <- query(corp, "Phonetic == t")
+reindeer.simulation::quantify_simulate(
+  segments, .using = superassp::forest,
+  .simulate = list(nominalF1 = seq(500, 900, 100)),
   .simulation_store = "simulations/formants"
 )
-# Creates 3 sample rates × 5 nominalF1 = 15 combinations per segment
 ```
+
+See the reindeer.simulation README for usage details.
 
 ### 5. Draft Annotation System (MOVED TO PROTOSCRIBE)
 
@@ -311,24 +305,27 @@ See `CACHE_SIZE_MANAGEMENT_SUMMARY.md` for complete documentation.
 ## Testing
 
 Test files in `tests/testthat/`:
-- `test_query_optimized.R`: Query system tests
+- `test_query_optimized.R`: Query system tests (EQL parity vs emuR)
+- `test_lazy_segment_list.R`: Lazy evaluation + auto-collect
+- `test_lazy_quantify.R`: Lazy quantify pipeline
 - `test_metadata_optimized.R`: Metadata system tests
 - `test_quantify_segment_list.R`: Signal quantification tests
-- `test_simulation_preprocessing.R`: Simulation preprocessing tests (16 tests)
-- `test_cache_size_management.R`: Cache size monitoring tests (40 tests)
+- `test_cache_size_management.R`: Cache size monitoring tests
+- `test_provenance.R`: Pipe-loss provenance accounting
+- `test_provenance_joins.R`: Named provenance for dplyr joins (v0.7)
+- `test_provenance_serialization.R`: saveRDS / qs round-trip (v0.7)
+- `test_classed_conditions.R`: reindeer_*_error class hierarchy (v0.7)
+- `test_auto_cmdi.R`: Auto-regeneration of FAIR artifacts (v0.7)
 - `test_reindeeR-metadata.R`: Legacy metadata tests
 
 Tests use the `ae` demo database from emuR package.
 Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_cache_size_management.R')"
-
-# Simulation preprocessing tests
-Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_simulation_preprocessing.R')"
 ```
 
 ## Important Conventions
 
 ### Function Naming
-- `ask_for()` / `query()`: Query the database (returns segment_list)
+- `query()`: Query the database (returns segment_list)
 - `quantify()`: Extract measurements from signal tracks
 - `enrich()`: Add signal data to segments
 - `biographize()`: Add metadata to segments
@@ -357,7 +354,7 @@ Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_simul
 
 ### Known Optimization Opportunities
 1. **Cache serialization**: Switch from `serialize()` to `qs` package (3-4x faster, see SERIALIZATION_QUICK_REF.md)
-2. **Lazy segment_list**: Integrate `lazy_segment_list` into `ask_for()` workflow
+2. **Lazy segment_list**: Integrate `lazy_segment_list` into `query()` workflow
 3. **Parallel processing**: `transcribe_parallel()` exists but not widely used
 
 ## Common Development Tasks
@@ -445,7 +442,7 @@ Key dependencies:
 
 ## Working with Git
 
-Current branch: `S7speedy` (feature branch for S7 optimization)
+Current branch: `v0.7-breaking` (feature branch for v0.7 API minimization)
 Main branch: `main`
 
 Recent focus areas (based on commit history):

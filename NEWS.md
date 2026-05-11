@@ -1,3 +1,109 @@
+# reindeer 0.7.0 (2026-05-11)
+
+## Breaking changes — API minimization
+
+`reindeer` 0.7.0 trims the public surface from 44 exports in 0.6.1 to
+28. Audit the changes against your scripts before upgrading.
+
+### Renamed
+
+- `ask_for()` is **removed**. Use `query()` everywhere. The parameter
+  formerly called `query` is now `eql`. There is no soft-deprecation
+  alias — calls to `ask_for()` will fail with "could not find function".
+
+### New default: lazy queries
+
+- `query(corp, "...")` now returns a `lazy_segment_list` by default.
+  Auto-collect S3 methods on `dim` / `length` / `$` / `[` / `[[` /
+  `head` / `tail` / `as.data.frame` / `as_tibble`, plus the entire
+  dplyr verb family (`filter`, `mutate`, `select`, `arrange`, `slice`,
+  `rename`, `distinct`, `transmute`, `group_by`, `ungroup`,
+  `summarise`, `count`, `tally`, all `*_join`) materialise on first
+  data access and delegate. Existing pipelines keep working.
+- Pass `lazy = FALSE` to `query()` for the old eager behaviour.
+- `lazy_segment_list` is now exported (was internal).
+
+### Unexported
+
+The following are still available as `reindeer:::name` but no longer
+part of the public surface:
+
+- `add_digests`, `update_signal_hashes`, `get_signal_hashes` — niche
+  signal-digest provenance helpers.
+- `get_handle` — legacy emuR-handle compatibility shim.
+- `set_specOverlay`, `set_osciOverlay` — emuR-style perspective config.
+- `dropped` — single-column accessor on `provenance(seg)`.
+- `is_extended_segment_list` — use `inherits()` /
+  `S7::S7_inherits()` directly.
+- `bundle_list` — internal S7 class.
+- `retreat` — equivalent to `scout(steps_forward = -n)`.
+- `disable_sync` — auto-sync configuration should live on the corpus.
+- `biographize(seg, corp)` — fold into `enrich(seg, corp, with = "metadata")`.
+
+### Companion package: `reindeer.simulation`
+
+The parameter-grid simulation subsystem
+(`quantify_simulate` / `enrich_simulate` / `reminisce` /
+`reminisce_tracks` / `list_simulations`) and the
+`update_signal_hashes` / `get_signal_hashes` helpers that validate
+its caches moved to a sibling package `reindeer.simulation`. ~1900
+LOC of `R/simulation_*.R` no longer ship with the reindeer core.
+Use `library(reindeer.simulation)` to access them; the package
+depends on `reindeer >= 0.7.0`.
+
+## New features
+
+### Auto-regenerated FAIR metadata
+
+`add_metadata()` flips a `.cmdi_dirty` sentinel at the corpus root.
+`describe_corpus()` consumes it and rewrites README / CMDI / DataCite
+automatically, then clears the flag. No more `force = TRUE` after every
+metadata edit.
+
+### Classed conditions
+
+`reindeer_query_error`, `reindeer_schema_error`, `reindeer_cache_error`
+(all inheriting from `reindeer_error`) are attached to every abort
+inside the query parser, query executor, schema validator, and cache
+size manager. Downstream code can catch reindeer-originated errors
+without string-matching the message:
+
+```r
+tryCatch(query(corp, "bad EQL"),
+         reindeer_query_error = function(e) handle_parse_failure(e),
+         reindeer_error       = function(e) handle_other(e))
+```
+
+### Named provenance for dplyr joins
+
+Joins on a `segment_list` now log their specific verb in `provenance()`
+(`left_join`, `right_join`, `inner_join`, `full_join`, `anti_join`,
+`semi_join`) instead of the generic `"dplyr_op"`. Row-loss above
+`getOption("reindeer.loss_warn")` fires a `cli::cli_warn`, closing the
+silent-loss gap from the v0.7 evaluation.
+
+### Provenance survives serialisation
+
+New tests assert that `attr(seg, "reindeer_provenance")` round-trips
+through `saveRDS` / `readRDS` and `qs::qsave` / `qs::qread`.
+
+## Known follow-up work (v0.7.x)
+
+Three EQL parser extensions and one positional-error feature remain on
+the v0.7 roadmap and ship in 0.7.x:
+
+- Bundle / Session filter predicates in EQL.
+- Position-of-element `[n]` syntax.
+- Label groups `{group}` and aliases `@alias`.
+- Caret pointer (`^^^`) in EQL parse-error messages.
+
+A small number of lazy-SQL parity gaps (INTERSECT across distinct
+hierarchy levels, ORDER BY before compound operators in some function
+queries, WITH wrappers inside sub-queries) also remain — exposed by
+the `lazy = TRUE` default flip and tracked alongside the parser work.
+
+---
+
 # reindeer 0.6.1 (2026-05-11)
 
 ## Lazy SQL for sequence / dominance / function queries
