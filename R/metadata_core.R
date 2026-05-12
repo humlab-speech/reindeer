@@ -85,21 +85,22 @@ initialize_metadata_schema <- function(con) {
 # METADATA GATHERING FROM .meta_json FILES
 # ==============================================================================
 
-#' Gather metadata from JSON files into SQLite cache
+#' Rescan METADATA.json files into the metadata cache
 #'
-#' Scans database, session, and bundle METADATA.json files and populates the
-#' metadata tables in the SQLite cache using bulk operations.
-#' Call this after manually editing .meta_json files to keep the cache in sync.
+#' Deprecated alias for `load_metadata(corp, source = "files")`. Use the
+#' new entry point in new code — both behave identically. Call this
+#' (or `load_metadata()`) whenever you have edited `METADATA.json`
+#' files outside of R and want the corpus to pick the changes up.
 #'
-#' @param corpus_obj A corpus object
-#' @param verbose Show progress messages (default: TRUE)
-#' @param parallel Use parallel processing for bundle metadata (default: TRUE)
-#' @return The corpus object, invisibly
-#'
+#' @param corpus_obj A `corpus`.
+#' @param verbose Print progress. Default `TRUE`.
+#' @param parallel Scan bundles in parallel. Default `TRUE`.
+#' @return The corpus, invisibly.
 #' @examplesIf interactive()
-#' corp <- corpus("path/to/db_emuDB")
-#' gather_metadata(corp)
-#'
+#' corp <- corpus("path/to/ae_emuDB")
+#' load_metadata(corp)              # preferred
+#' gather_metadata(corp)            # equivalent
+#' @seealso [load_metadata()], [set_metadata()], [get_metadata()]
 #' @export
 gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
 
@@ -406,23 +407,23 @@ register_metadata_field <- function(con, field_name, field_type) {
 # EFFICIENT METADATA RETRIEVAL
 # ==============================================================================
 
-#' Get metadata for all bundles with inheritance
+#' Read metadata with inheritance resolved
 #'
-#' Retrieves metadata with proper precedence: bundle > session > database.
-#' Returns one row per bundle with all metadata fields as columns.
+#' Returns a tidy one-row-per-bundle tibble with the effective metadata
+#' value at every level, picking bundle over session over database
+#' defaults. This is what most analyses want — feed it to
+#' [`dplyr::left_join`] against a `segment_list`, or use
+#' [enrich(segs, corp)][enrich()] to do the join for you.
 #'
-#' @param corpus_obj A corpus object
-#' @param session_pattern Optional regex pattern to filter sessions
-#' @param bundle_pattern Optional regex pattern to filter bundles
-#' @return A tibble with one row per bundle and columns for session, bundle,
-#'   and all metadata fields (with inheritance resolved)
-#'
+#' @param corpus_obj A `corpus`.
+#' @param session_pattern,bundle_pattern Optional regex filters.
+#' @return A tibble: columns `session`, `bundle`, plus one column per
+#'   metadata field.
 #' @examplesIf interactive()
-#' corp <- corpus("path/to/db_emuDB")
-#' meta <- get_metadata(corp)
-#' # Filter by session
-#' meta_s1 <- get_metadata(corp, session_pattern = "Session1")
-#'
+#' corp <- corpus("path/to/ae_emuDB")
+#' get_metadata(corp)
+#' get_metadata(corp, session_pattern = "Session1")
+#' @seealso [set_metadata()], [load_metadata()], [enrich()]
 #' @export
 get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".*") {
   

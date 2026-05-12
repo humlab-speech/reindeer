@@ -2,28 +2,33 @@
 % Please edit documentation in R/metadata_core.R
 \name{gather_metadata}
 \alias{gather_metadata}
-\title{Gather metadata from JSON files into SQLite cache}
+\title{Rescan METADATA.json files into the metadata cache}
 \usage{
 gather_metadata(corpus_obj, verbose = TRUE, parallel = TRUE)
 }
 \arguments{
-\item{corpus_obj}{A corpus object}
+\item{corpus_obj}{A \code{corpus}.}
 
-\item{verbose}{Show progress messages (default: TRUE)}
+\item{verbose}{Print progress. Default \code{TRUE}.}
 
-\item{parallel}{Use parallel processing for bundle metadata (default: TRUE)}
+\item{parallel}{Scan bundles in parallel. Default \code{TRUE}.}
 }
 \value{
-The corpus object, invisibly
+The corpus, invisibly.
 }
 \description{
-Scans database, session, and bundle METADATA.json files and populates the
-metadata tables in the SQLite cache using bulk operations.
-Call this after manually editing .meta_json files to keep the cache in sync.
+Deprecated alias for \code{load_metadata(corp, source = "files")}. Use the
+new entry point in new code — both behave identically. Call this
+(or \code{load_metadata()}) whenever you have edited \code{METADATA.json}
+files outside of R and want the corpus to pick the changes up.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/db_emuDB")
-gather_metadata(corp)
+corp <- corpus("path/to/ae_emuDB")
+load_metadata(corp)              # preferred
+gather_metadata(corp)            # equivalent
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=load_metadata]{load_metadata()}}, \code{\link[=set_metadata]{set_metadata()}}, \code{\link[=get_metadata]{get_metadata()}}
 }

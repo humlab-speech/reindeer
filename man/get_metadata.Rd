@@ -2,30 +2,33 @@
 % Please edit documentation in R/metadata_core.R
 \name{get_metadata}
 \alias{get_metadata}
-\title{Get metadata for all bundles with inheritance}
+\title{Read metadata with inheritance resolved}
 \usage{
 get_metadata(corpus_obj, session_pattern = ".*", bundle_pattern = ".*")
 }
 \arguments{
-\item{corpus_obj}{A corpus object}
+\item{corpus_obj}{A \code{corpus}.}
 
-\item{session_pattern}{Optional regex pattern to filter sessions}
-
-\item{bundle_pattern}{Optional regex pattern to filter bundles}
+\item{session_pattern, bundle_pattern}{Optional regex filters.}
 }
 \value{
-A tibble with one row per bundle and columns for session, bundle,
-and all metadata fields (with inheritance resolved)
+A tibble: columns \code{session}, \code{bundle}, plus one column per
+metadata field.
 }
 \description{
-Retrieves metadata with proper precedence: bundle > session > database.
-Returns one row per bundle with all metadata fields as columns.
+Returns a tidy one-row-per-bundle tibble with the effective metadata
+value at every level, picking bundle over session over database
+defaults. This is what most analyses want — feed it to
+\code{\link[dplyr:mutate-joins]{dplyr::left_join}} against a \code{segment_list}, or use
+\link[=enrich]{enrich(segs, corp)} to do the join for you.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/db_emuDB")
-meta <- get_metadata(corp)
-# Filter by session
-meta_s1 <- get_metadata(corp, session_pattern = "Session1")
+corp <- corpus("path/to/ae_emuDB")
+get_metadata(corp)
+get_metadata(corp, session_pattern = "Session1")
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=set_metadata]{set_metadata()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=enrich]{enrich()}}
 }

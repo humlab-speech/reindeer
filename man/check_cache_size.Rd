@@ -2,7 +2,7 @@
 % Please edit documentation in R/cache_size_management.R
 \name{check_cache_size}
 \alias{check_cache_size}
-\title{Check cache size and warn if large}
+\title{Check a cache directory's size and warn if it's getting large}
 \usage{
 check_cache_size(
   cache_path,
@@ -13,21 +13,31 @@ check_cache_size(
 )
 }
 \arguments{
-\item{cache_path}{Path to cache file or directory.}
+\item{cache_path}{Path to a cache file or directory.}
 
-\item{cache_type}{Type of cache (\code{"quantify"}, \code{"simulation"},
-\code{"draft"}, \code{"general"}).}
+\item{cache_type}{Label used in the warning message
+(\code{"quantify"}, \code{"simulation"}, etc.).}
 
-\item{warn_threshold}{Warning threshold (bytes or size string like \code{"500 MB"}).}
+\item{warn_threshold, max_threshold}{Size strings (e.g. \code{"500 MB"},
+\code{"2 GB"}) or byte counts. \code{warn_threshold} emits a soft warning;
+\code{max_threshold} emits a stronger one.}
 
-\item{max_threshold}{Maximum threshold (bytes or size string).}
-
-\item{verbose}{Show informational messages.}
+\item{verbose}{Print the size summary. Default \code{TRUE}.}
 }
 \value{
-Invisible list with \code{size_bytes}, \code{warn_exceeded},
-\code{max_exceeded} fields.
+Invisibly, a list with \code{size_bytes}, \code{size_formatted},
+\code{warn_exceeded}, \code{max_exceeded}.
 }
 \description{
-Check cache size and warn if large
+Low-level companion to \code{\link[=inspect_cache]{inspect_cache()}}; useful when you want to
+run a threshold check inside a script. Prefer \code{inspect_cache()} for
+interactive use — it summarises every reindeer-managed cache at once.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+check_cache_size(corp@.cache_dir, warn_threshold = "1 GB")
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=inspect_cache]{inspect_cache()}}, \code{\link[=manage_cache]{manage_cache()}}
 }

@@ -117,16 +117,24 @@ get_file_size <- function(path, recursive = FALSE) {
 # CACHE SIZE CHECKING
 # ==============================================================================
 
-#' Check cache size and warn if large
+#' Check a cache directory's size and warn if it's getting large
 #'
-#' @param cache_path Path to cache file or directory.
-#' @param cache_type Type of cache (\code{"quantify"}, \code{"simulation"},
-#'   \code{"draft"}, \code{"general"}).
-#' @param warn_threshold Warning threshold (bytes or size string like \code{"500 MB"}).
-#' @param max_threshold Maximum threshold (bytes or size string).
-#' @param verbose Show informational messages.
-#' @return Invisible list with \code{size_bytes}, \code{warn_exceeded},
-#'   \code{max_exceeded} fields.
+#' Low-level companion to [inspect_cache()]; useful when you want to
+#' run a threshold check inside a script. Prefer `inspect_cache()` for
+#' interactive use — it summarises every reindeer-managed cache at once.
+#'
+#' @param cache_path Path to a cache file or directory.
+#' @param cache_type Label used in the warning message
+#'   (`"quantify"`, `"simulation"`, etc.).
+#' @param warn_threshold,max_threshold Size strings (e.g. `"500 MB"`,
+#'   `"2 GB"`) or byte counts. `warn_threshold` emits a soft warning;
+#'   `max_threshold` emits a stronger one.
+#' @param verbose Print the size summary. Default `TRUE`.
+#' @return Invisibly, a list with `size_bytes`, `size_formatted`,
+#'   `warn_exceeded`, `max_exceeded`.
+#' @examplesIf interactive()
+#' check_cache_size(corp@.cache_dir, warn_threshold = "1 GB")
+#' @seealso [inspect_cache()], [manage_cache()]
 #' @export
 check_cache_size <- function(cache_path,
                               cache_type = "general",
