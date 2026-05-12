@@ -494,6 +494,40 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 }
 
 # ==============================================================================
+# INSPECTION ENTRY POINT
+# ==============================================================================
+
+#' Inspect the quantify/enrich cache
+#'
+#' Single user-facing entry point that combines [check_cache_size()]
+#' (size + threshold warnings) and [list_cache_files()] (per-file
+#' inventory) into one tidy report. Prefer this over the older
+#' `check_cache_size()` / `manage_cache()` pair when you just want to
+#' see "what's in the cache and how big is it".
+#'
+#' @param corpus_obj A corpus object.
+#' @param verbose Logical; print a one-line size summary. Default `TRUE`.
+#' @return A tibble of cache files (sorted by size, largest first),
+#'   invisibly when `verbose = TRUE`.
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/db_emuDB")
+#' inspect_cache(corp)
+#' @export
+inspect_cache <- function(corpus_obj, verbose = TRUE) {
+  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
+    cli::cli_abort("{.arg corpus_obj} must be a corpus object")
+  }
+  files <- list_cache_files(corpus_obj, cache_type = "all")
+  if (verbose) {
+    total_bytes <- sum(files$size_bytes %||% 0)
+    cli::cli_alert_info(
+      "Quantify cache: {nrow(files)} file{?s}, {format_bytes(total_bytes)}"
+    )
+  }
+  invisible(files)
+}
+
+# ==============================================================================
 # USER-FRIENDLY CACHE MANAGEMENT WRAPPER
 # ==============================================================================
 

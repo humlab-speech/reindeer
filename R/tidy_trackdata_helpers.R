@@ -485,12 +485,19 @@ clear_tidy_cache <- function() {
       # Separate cached and uncached
       dt_cached <- dt_valid[!vapply(cached_result, is.null, logical(1))]
       dt_uncached <- dt_valid[vapply(cached_result, is.null, logical(1))]
-      
+      if (nrow(dt_cached) > 0) {
+        dt_cached[, .cache_status := "hit"]
+      }
+      if (nrow(dt_uncached) > 0) {
+        dt_uncached[, .cache_status := "miss"]
+      }
+
       if (.verbose && nrow(dt_cached) > 0) {
         cli::cli_alert_success("Found {nrow(dt_cached)} cached result{?s}")
       }
     } else {
       dt_uncached <- dt_valid
+      dt_uncached[, .cache_status := NA_character_]
       dt_cached <- data.table::data.table()
     }
     
