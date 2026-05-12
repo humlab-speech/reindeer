@@ -126,6 +126,7 @@ S7::method(scout, lazy_segment_list) <- function(.segments,
 #' Internal optimized implementation using data.table operations.
 #'
 #' @keywords internal
+#' @noRd
 scout_dt <- function(.segments, 
                      steps_forward,
                      count_from = "START",
@@ -318,6 +319,7 @@ scout_dt <- function(.segments,
 #' @examplesIf interactive()
 #' # Use scout() with a negative step instead:
 #' prev_phone <- scout(segments, steps_forward = -1)
+#' @noRd
 retreat <- function(.segments, steps_backward, ...) {
   scout(.segments, steps_forward = -abs(steps_backward), ...)
 }
@@ -375,6 +377,7 @@ S7::method(ascend_to, lazy_segment_list) <- function(.segments, level,
 #' Ascend Implementation Using data.table
 #'
 #' @keywords internal
+#' @noRd
 ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   
   # Convert to data.table
@@ -551,6 +554,7 @@ S7::method(descend_to, lazy_segment_list) <- function(.segments, level,
 #' Descend Implementation Using data.table
 #'
 #' @keywords internal
+#' @noRd
 descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   
   # Convert to data.table

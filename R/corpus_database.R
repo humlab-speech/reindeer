@@ -11,6 +11,7 @@
 #' @param verbose Whether to show progress messages
 #' @return Invisible NULL, called for side effects
 #' @keywords internal
+#' @noRd
 build_emuDB_cache <- function(database_dir,
                               parallel = TRUE,
                               workers = future::availableCores() - 1,
@@ -544,6 +545,7 @@ insert_batch_results <- function(con, results, db_uuid) {
   })
 }#' Gather all metadata from .meta_json files (internal, called during construction)
 #' @keywords internal
+#' @noRd
 gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   if (verbose) {
     cli::cli_alert_info("Scanning .meta_json files...")

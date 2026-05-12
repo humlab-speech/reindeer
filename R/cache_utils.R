@@ -19,6 +19,7 @@ NULL
 #' print(stats)
 #'
 #' @keywords internal
+#' @noRd
 cache_summary <- function(cache_dir = NULL) {
   if (is.null(cache_dir)) {
     cache_dir <- file.path(tempdir(), "reindeer_cache")
@@ -105,6 +106,7 @@ cache_summary <- function(cache_dir = NULL) {
 #' clear_cache(format = "rds")
 #'
 #' @keywords internal
+#' @noRd
 clear_cache <- function(cache_dir = NULL, older_than = NULL, format = NULL) {
   if (is.null(cache_dir)) {
     cache_dir <- file.path(tempdir(), "reindeer_cache")

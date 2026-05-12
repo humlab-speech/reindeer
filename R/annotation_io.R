@@ -16,6 +16,7 @@
 #' @param name Bundle list name (e.g., "default")
 #' @return tibble with columns: session, name, comment, finishedEditing
 #' @keywords internal
+#' @noRd
 .read_bundle_list <- function(basePath, name) {
   bl_path <- file.path(basePath, paste0(name, "_bundleList.json"))
 
@@ -48,6 +49,7 @@
 #' @param data tibble/data.frame with bundle list data
 #' @return Invisible path to written file
 #' @keywords internal
+#' @noRd
 .write_bundle_list <- function(basePath, name, data) {
   bl_path <- file.path(basePath, paste0(name, "_bundleList.json"))
   jsonlite::write_json(data, bl_path, auto_unbox = TRUE, pretty = TRUE)
@@ -64,6 +66,7 @@
 #' @param bundle Bundle name
 #' @return List with items, labels, links data frames
 #' @keywords internal
+#' @noRd
 .load_bundle_annot <- function(con, session, bundle) {
   items <- DBI::dbGetQuery(con,
     "SELECT * FROM items WHERE session = ? AND bundle = ?",
@@ -91,6 +94,7 @@
 #' @param session Session name
 #' @param bundle Bundle name
 #' @keywords internal
+#' @noRd
 .store_bundle_annot <- function(con, annotDFs, session, bundle) {
   if (nrow(annotDFs$items) > 0) {
     DBI::dbWriteTable(con, "items", annotDFs$items, append = TRUE)
@@ -117,6 +121,7 @@
 #' @param json_string Character JSON string from _annot.json
 #' @return List with: annotates, sampleRate, items (df), labels (df), links (df)
 #' @keywords internal
+#' @noRd
 .parse_annot_json <- function(json_string) {
   annot <- jsonlite::fromJSON(json_string, simplifyVector = FALSE)
 
@@ -234,6 +239,7 @@
 #' @param session Session name
 #' @param bundle Bundle name
 #' @keywords internal
+#' @noRd
 .remove_bundle_from_db <- function(con, session, bundle) {
   DBI::dbExecute(con,
     "DELETE FROM items WHERE session = ? AND bundle = ?",
@@ -261,6 +267,7 @@
 #' @param sample_rate Sample rate
 #' @param md5 MD5 hash of annotation JSON
 #' @keywords internal
+#' @noRd
 .add_bundle_to_db <- function(con, db_uuid, session, name, annotates, sample_rate, md5) {
   DBI::dbExecute(con,
     "INSERT INTO bundle (db_uuid, session, name, annotates, sample_rate, md5_annot_json)
@@ -277,6 +284,7 @@
 #' @param db_uuid Database UUID
 #' @param name Session name
 #' @keywords internal
+#' @noRd
 .add_session_to_db <- function(con, db_uuid, name) {
   DBI::dbExecute(con,
     "INSERT OR IGNORE INTO session (db_uuid, name) VALUES (?, ?)",

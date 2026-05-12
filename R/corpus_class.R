@@ -236,6 +236,7 @@ corpus <- S7::new_class(
 #' @return A \code{bundle_list} object (inherits from data.frame)
 #'
 #' @keywords internal
+#' @noRd
 bundle_list <- S7::new_class(
   "bundle_list",
   parent = S7::class_data.frame,

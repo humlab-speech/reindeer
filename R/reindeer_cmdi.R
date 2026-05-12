@@ -150,6 +150,7 @@ create_cmdi_metadata <- function(corpus,
 
 #' Collect metadata from database structure
 #' @keywords internal
+#' @noRd
 collect_database_metadata <- function(db_handle, db_config, verbose = TRUE) {
   
   if (verbose) cat("Collecting database metadata...\n")
@@ -225,6 +226,7 @@ collect_database_metadata <- function(db_handle, db_config, verbose = TRUE) {
 
 #' Collect participant metadata from .meta_json files
 #' @keywords internal
+#' @noRd
 collect_participant_metadata <- function(db_handle, verbose = TRUE) {
   
   if (verbose) cat("Collecting participant metadata...\n")
@@ -287,6 +289,7 @@ collect_participant_metadata <- function(db_handle, verbose = TRUE) {
 
 #' Generate CMDI XML document
 #' @keywords internal
+#' @noRd
 generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
                               corpus_description, author, institution,
                               contact_email, license, availability,
@@ -376,6 +379,7 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
 
 #' Add speech corpus components to CMDI
 #' @keywords internal
+#' @noRd
 add_speech_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
                                         corpus_description, author, institution,
                                         contact_email, license, availability,
@@ -526,6 +530,7 @@ add_speech_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
 
 #' Add media corpus components to CMDI
 #' @keywords internal
+#' @noRd
 add_media_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
                                        corpus_description, author, institution,
                                        contact_email, license, availability,
@@ -544,6 +549,7 @@ add_media_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
 
 #' Format duration in HH:MM:SS
 #' @keywords internal
+#' @noRd
 format_duration <- function(seconds) {
   hours <- floor(seconds / 3600)
   minutes <- floor((seconds %% 3600) / 60)

@@ -16,6 +16,7 @@
 #' @param allow_regex Logical; if TRUE, regex patterns are allowed (for queries)
 #' @return TRUE if valid, otherwise aborts with error
 #' @keywords internal
+#' @noRd
 validate_name <- function(name, type = "name", allow_regex = FALSE) {
   assertthat::assert_that(
     assertthat::is.string(name),
@@ -73,6 +74,7 @@ validate_name <- function(name, type = "name", allow_regex = FALSE) {
 #' @param verbose Show progress messages
 #' @return Path to created database
 #' @keywords internal
+#' @noRd
 create_new_emuDB <- function(path, db_name, verbose = FALSE) {
   # Ensure parent directory exists
   parent_dir <- dirname(path)
@@ -169,6 +171,7 @@ create_new_emuDB <- function(path, db_name, verbose = FALSE) {
 #' @param verbose Show progress messages
 #' @return Invisibly returns TRUE on success
 #' @keywords internal
+#' @noRd
 create_session_and_bundle <- function(corpus_obj, session_name, bundle_name, verbose = TRUE) {
   # Validate names
   validate_name(session_name, "Session name", allow_regex = FALSE)
@@ -262,6 +265,7 @@ create_session_and_bundle <- function(corpus_obj, session_name, bundle_name, ver
 #' @param session_name Session name to check
 #' @return Logical; TRUE if session exists
 #' @keywords internal
+#' @noRd
 session_exists <- function(corpus_obj, session_name) {
   session_dir <- file.path(corpus_obj@basePath, paste0(session_name, "_ses"))
   dir.exists(session_dir)
@@ -274,6 +278,7 @@ session_exists <- function(corpus_obj, session_name) {
 #' @param bundle_name Bundle name to check
 #' @return Logical; TRUE if bundle exists
 #' @keywords internal
+#' @noRd
 bundle_exists <- function(corpus_obj, session_name, bundle_name) {
   bundle_dir <- file.path(
     corpus_obj@basePath, 

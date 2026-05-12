@@ -22,6 +22,7 @@ if(! exists("database.schema.suffix")){
 #' @param obj Either a character (basePath) or corpus object
 #' @return List with database configuration
 #' @keywords internal
+#' @noRd
 load_DBconfig <- function(obj) {
   # Determine basePath based on input type
   if (is.character(obj)) {
@@ -257,6 +258,7 @@ get_levelDefinition <- function(corpusObj, name) {
 #' @param dbConfig configuration list
 #' @param basePath optional basePath override
 #' @keywords internal
+#' @noRd
 store_DBconfig <- function(obj, dbConfig, basePath = NULL) {
   # Extract basePath and dbName
   if (is.null(basePath)) {
@@ -770,6 +772,7 @@ if(FALSE){
 #' @param verbose Logical; show progress
 #' @return Character path to the ae_emuDB directory
 #' @keywords internal
+#' @noRd
 create_ae_db <- function(verbose = FALSE) {
   tmp_dir <- tempfile("reindeer_ae_")
   dir.create(tmp_dir, recursive = TRUE)

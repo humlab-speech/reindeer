@@ -22,6 +22,7 @@
 #' @param verbose Logical; show sync messages
 #'
 #' @keywords internal
+#' @noRd
 enable_auto_sync <- function(db_handle, 
                               enable = TRUE,
                               sync_eaf = TRUE,
@@ -68,6 +69,7 @@ enable_auto_sync <- function(db_handle,
 #'
 #' @param db_handle An emuDBhandle object
 #' @keywords internal
+#' @noRd
 init_sync_state <- function(db_handle) {
   sync_state_path <- file.path(db_handle$basePath, ".sync_state.json")
   
@@ -92,6 +94,7 @@ init_sync_state <- function(db_handle) {
 #' @param db_handle An emuDBhandle object
 #' @return List with sync configuration, or NULL if not configured
 #' @keywords internal
+#' @noRd
 load_sync_config <- function(db_handle) {
   sync_config_path <- file.path(db_handle$basePath, ".sync_config.json")
   
@@ -107,6 +110,7 @@ load_sync_config <- function(db_handle) {
 #' @param db_handle An emuDBhandle object
 #' @return List with sync state
 #' @keywords internal
+#' @noRd
 load_sync_state <- function(db_handle) {
   sync_state_path <- file.path(db_handle$basePath, ".sync_state.json")
   
@@ -122,6 +126,7 @@ load_sync_state <- function(db_handle) {
 #' @param db_handle An emuDBhandle object
 #' @param state List with sync state
 #' @keywords internal
+#' @noRd
 save_sync_state <- function(db_handle, state) {
   sync_state_path <- file.path(db_handle$basePath, ".sync_state.json")
   jsonlite::write_json(state, sync_state_path, pretty = TRUE, auto_unbox = TRUE)
@@ -137,6 +142,7 @@ save_sync_state <- function(db_handle, state) {
 #' @param db_handle An emuDBhandle object
 #' @return Data frame with changed bundles (session, bundle, annot_path)
 #' @keywords internal
+#' @noRd
 detect_annot_changes <- function(db_handle) {
   state <- load_sync_state(db_handle)
   
@@ -204,6 +210,7 @@ detect_annot_changes <- function(db_handle) {
 #' @param db_handle An emuDBhandle object
 #' @return Data frame with changed metadata files
 #' @keywords internal
+#' @noRd
 detect_metadata_changes <- function(db_handle) {
   state <- load_sync_state(db_handle)
   
@@ -241,6 +248,7 @@ detect_metadata_changes <- function(db_handle) {
 #' @param db_handle An emuDBhandle object
 #' @return Logical; TRUE if configuration changed
 #' @keywords internal
+#' @noRd
 detect_config_changes <- function(db_handle) {
   state <- load_sync_state(db_handle)
   
@@ -273,6 +281,7 @@ detect_config_changes <- function(db_handle) {
 #' @param align_items Logical; whether to align ITEMs with time info
 #' @param verbose Logical; show progress
 #' @keywords internal
+#' @noRd
 sync_annot_to_eaf <- function(db_handle, changed_bundles = NULL, align_items = TRUE, verbose = TRUE) {
   
   if (is.null(changed_bundles)) {
@@ -340,6 +349,7 @@ sync_annot_to_eaf <- function(db_handle, changed_bundles = NULL, align_items = T
 #' @param profile Character; CMDI profile to use
 #' @param verbose Logical; show progress
 #' @keywords internal
+#' @noRd
 sync_to_cmdi <- function(db_handle, force = FALSE, profile = "speech-corpus", verbose = TRUE) {
   
   # Check for changes
@@ -432,6 +442,7 @@ sync_to_cmdi <- function(db_handle, force = FALSE, profile = "speech-corpus", ve
 #' @param cmdi_path Path to CMDI XML file
 #' @return List with extracted metadata
 #' @keywords internal
+#' @noRd
 extract_cmdi_metadata <- function(cmdi_path) {
   if (!file.exists(cmdi_path)) {
     return(list())
@@ -465,6 +476,7 @@ extract_cmdi_metadata <- function(cmdi_path) {
 #' @param verbose Logical; show progress
 #'
 #' @keywords internal
+#' @noRd
 sync_database <- function(db_handle, 
                           sync_eaf = TRUE, 
                           sync_cmdi = TRUE,
@@ -562,6 +574,7 @@ sync_database <- function(db_handle,
 #'
 #' @param db_handle An emuDBhandle or corpus S7 object
 #' @keywords internal
+#' @noRd
 auto_sync_check <- function(db_handle) {
   # If corpus S7 object, read config from .sync property (avoid disk I/O)
   if (S7::S7_inherits(db_handle, reindeer::corpus)) {
@@ -597,6 +610,7 @@ auto_sync_check <- function(db_handle) {
 #' @param fun Function to wrap (e.g., emuR::set_levelCanvasesOrder)
 #' @param ... Arguments to pass to the function
 #' @keywords internal
+#' @noRd
 with_auto_sync <- function(db_handle, fun, ...) {
   result <- fun(db_handle, ...)
   auto_sync_check(db_handle)
@@ -609,6 +623,7 @@ with_auto_sync <- function(db_handle, fun, ...) {
 
 #' Load sync config from database path (non-handle version)
 #' @keywords internal
+#' @noRd
 load_sync_config_from_path <- function(basePath) {
   sync_config_path <- file.path(basePath, ".sync_config.json")
 
@@ -629,6 +644,7 @@ load_sync_config_from_path <- function(basePath) {
 #' @param existing Existing sync config list to inherit optional fields from
 #' @return The written config list (invisibly)
 #' @keywords internal
+#' @noRd
 .init_sync_config <- function(basePath, sync_eaf, sync_cmdi,
                                align_items = TRUE,
                                cmdi_profile = "speech-corpus",
@@ -657,6 +673,7 @@ load_sync_config_from_path <- function(basePath) {
 #' @return The corpus object (invisibly)
 #'
 #' @keywords internal
+#' @noRd
 disable_sync <- function(corpus_obj) {
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")

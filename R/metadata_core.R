@@ -20,6 +20,7 @@ metadata.filename <- "METADATA.json"
 #' Adds metadata-specific tables to the cache database
 #' @param con SQLite connection
 #' @keywords internal
+#' @noRd
 initialize_metadata_schema <- function(con) {
   
   # metadata_fields table - tracks all known metadata fields and their types
@@ -270,6 +271,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
 
 #' Process and insert metadata list into appropriate table - OPTIMIZED BULK INSERT
 #' @keywords internal
+#' @noRd
 process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, level) {
   
   if (length(meta_list) == 0) return(invisible(NULL))
@@ -330,6 +332,7 @@ process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, leve
 
 #' Serialize a metadata value for storage
 #' @keywords internal
+#' @noRd
 serialize_metadata_value <- function(value) {
   if (is.null(value)) {
     return(list(value = "NULL", type = "NULL"))
@@ -350,6 +353,7 @@ serialize_metadata_value <- function(value) {
 
 #' Deserialize a metadata value from storage
 #' @keywords internal
+#' @noRd
 deserialize_metadata_value <- function(value_str, type_str) {
   if (is.na(value_str) || value_str == "NULL" || value_str == "NA") {
     return(NA)
@@ -371,6 +375,7 @@ deserialize_metadata_value <- function(value_str, type_str) {
 
 #' Register a metadata field in the fields tracking table
 #' @keywords internal
+#' @noRd
 register_metadata_field <- function(con, field_name, field_type) {
   now <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
 
@@ -543,6 +548,7 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
 #' 
 #' Uses a single SQL query with COALESCE to get values with proper inheritance
 #' @keywords internal
+#' @noRd
 get_metadata_field <- function(con, db_uuid, field_name, sessions, bundles) {
   
   if (length(sessions) == 0) return(character(0))
@@ -609,6 +615,7 @@ get_metadata_field <- function(con, db_uuid, field_name, sessions, bundles) {
 
 #' Validate and set metadata with user interaction for unknown fields
 #' @keywords internal
+#' @noRd
 set_metadata_validated <- function(corpus_obj, meta_list, session, bundle, level) {
   
   con <- get_connection(corpus_obj)

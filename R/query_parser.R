@@ -48,6 +48,7 @@ NULL
 #' @param query_string EQL query string to parse
 #' @return A list describing the parsed query structure
 #' @keywords internal
+#' @noRd
 parse_eql_query <- function(query_string) {
   query_string <- trimws(query_string)
 

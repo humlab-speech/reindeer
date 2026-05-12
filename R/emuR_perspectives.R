@@ -24,6 +24,7 @@
 #' set_osciOverlay(ae,"default","rms")
 #' serve(ae)
 #'
+#' @noRd
 set_specOverlay <- function(emuDBhandle,perspective,trackname){
   perspectiveNames <- .list_perspectives(emuDBhandle)$name
   trackNames <- .list_ssffTrackDefinitions(emuDBhandle)$name

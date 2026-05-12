@@ -49,6 +49,7 @@
 #' @param purpose Optional short string describing what the user was
 #'   trying to do (e.g. "draft annotation generation").
 #' @keywords internal
+#' @noRd
 .companion_abort <- function(pkg, purpose = NULL,
                              call = rlang::caller_env()) {
   url <- switch(pkg,
@@ -84,6 +85,7 @@
 #' the caret line. Designed to be passed straight into cli::cli_abort.
 #'
 #' @keywords internal
+#' @noRd
 .eql_caret <- function(query_string, pos = NA_integer_,
                        label = "Input:") {
   if (is.na(pos) || pos < 1L || pos > nchar(query_string) + 1L) {

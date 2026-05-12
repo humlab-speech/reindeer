@@ -148,6 +148,7 @@ query <- function(emuDB, eql, ...) {
 #' @param opts Additional options
 #' @return list(sql = "...", params = list(...))
 #' @keywords internal
+#' @noRd
 build_base_sql <- function(db_path, parsed, opts = list()) {
   result_level <- opts$result_level %||% NULL
 
@@ -174,6 +175,7 @@ build_base_sql <- function(db_path, parsed, opts = list()) {
 #' side of the conjunction to the requested scope.
 #'
 #' @keywords internal
+#' @noRd
 build_scope_filter_sql <- function(db_path, parsed) {
   column <- if (identical(parsed$kind, "session")) "i.session" else "i.bundle"
   operator <- parsed$operator
@@ -221,6 +223,7 @@ build_scope_filter_sql <- function(db_path, parsed) {
 #'
 #' Returns a parameterized query as list(sql, params) to prevent SQL injection.
 #' @keywords internal
+#' @noRd
 build_simple_query_sql <- function(db_path, parsed) {
   level <- parsed$level
   operator <- parsed$operator
@@ -347,6 +350,7 @@ build_function_query_sql <- function(db_path, parsed) {
 
 #' Eager scope-filter executor — reuses the lazy SQL builder
 #' @keywords internal
+#' @noRd
 execute_scope_filter_eager <- function(db_path, parsed, con = NULL) {
   q <- build_scope_filter_sql(db_path, parsed)
   if (is.null(con)) {

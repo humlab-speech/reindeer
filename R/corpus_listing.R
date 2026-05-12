@@ -16,6 +16,7 @@
 #' @param obj A corpus object or emuDBhandle-like list with basePath and dbName
 #' @return A tibble with column \code{name}
 #' @keywords internal
+#' @noRd
 .list_sessions <- function(obj) {
   bp <- .extract_basePath_dbName(obj)
   basePath <- bp$basePath
@@ -54,6 +55,7 @@
 #' @param session Optional session name to filter by
 #' @return A tibble with columns \code{session} and \code{name}
 #' @keywords internal
+#' @noRd
 .list_bundles <- function(obj, session = NULL) {
   bp <- .extract_basePath_dbName(obj)
   basePath <- bp$basePath
@@ -132,6 +134,7 @@
 #' @param obj A corpus object or emuDBhandle-like list
 #' @return A tibble with column \code{name}
 #' @keywords internal
+#' @noRd
 .list_perspectives <- function(obj) {
   config <- load_DBconfig(obj)
   perspectives <- config$EMUwebAppConfig$perspectives
@@ -149,6 +152,7 @@
 #' @param obj A corpus object or emuDBhandle-like list
 #' @return A tibble with columns \code{name}, \code{columnName}, \code{fileExtension}
 #' @keywords internal
+#' @noRd
 .list_ssffTrackDefinitions <- function(obj) {
   config <- load_DBconfig(obj)
   tracks <- config$ssffTrackDefinitions
@@ -174,6 +178,7 @@
 #' @param config A DBconfig list (as returned by \code{load_DBconfig})
 #' @return Character vector of track names
 #' @keywords internal
+#' @noRd
 .get_ssff_tracks_in_use <- function(config) {
   if (is.null(config$ssffTrackDefinitions)) return(character(0))
   vapply(config$ssffTrackDefinitions, function(t) t$name %||% "", character(1))
@@ -187,6 +192,7 @@
 #' @param obj Object to check
 #' @return Invisible \code{TRUE} on success; aborts otherwise
 #' @keywords internal
+#' @noRd
 .check_db_handle <- function(obj) {
   if (S7::S7_inherits(obj, corpus)) return(invisible(TRUE))
   if (is.list(obj) && inherits(obj, "emuDBhandle")) return(invisible(TRUE))
@@ -275,6 +281,7 @@ peek_signals <- function(corpus_obj, extension = NULL) {
 #' @param obj A corpus object or emuDBhandle-like list
 #' @return A list with \code{basePath} and \code{dbName}
 #' @keywords internal
+#' @noRd
 .extract_basePath_dbName <- function(obj) {
   if (S7::S7_inherits(obj, corpus)) {
     return(list(basePath = obj@basePath, dbName = obj@dbName))

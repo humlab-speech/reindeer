@@ -8,6 +8,7 @@
 #' @param level One of "session" or "bundle" (currently informational only)
 #' @return TRUE if a file was written, FALSE if a file already existed
 #' @keywords internal
+#' @noRd
 .write_metadata_skeleton <- function(meta_path, level = c("session", "bundle")) {
   level <- match.arg(level)
   if (file.exists(meta_path)) {
@@ -59,6 +60,7 @@ corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, 
 
 #' Set database-level metadata
 #' @keywords internal
+#' @noRd
 set_metadata_database <- function(corpus_obj, metadata_list) {
   # Write to METADATA.json in database root
   db_meta_file <- file.path(corpus_obj@basePath,
@@ -91,6 +93,7 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
 
 #' Set session-level metadata
 #' @keywords internal
+#' @noRd
 set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
   con <- get_corpus_connection(corpus_obj)
   
@@ -148,6 +151,7 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
 
 #' Set bundle-level metadata
 #' @keywords internal
+#' @noRd
 set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, metadata_list) {
   con <- get_corpus_connection(corpus_obj)
   
@@ -206,6 +210,7 @@ set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, met
 
 #' Import media files to corpus bundles
 #' @keywords internal
+#' @noRd
 corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, media_spec) {
   # media_spec can be:
   # - Single file path: imports to mediafileExtension
@@ -290,6 +295,7 @@ corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, med
 
 #' Import media file to a specific bundle
 #' @keywords internal
+#' @noRd
 import_media_to_bundle <- function(corpus_obj, session_name, bundle_name, 
                                   file_path, channel_map) {
   

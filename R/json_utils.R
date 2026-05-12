@@ -33,6 +33,7 @@
 #' data <- read_json_fast("config.json")
 #' data <- read_json_fast("data.json", simplifyVector = FALSE)
 #' }
+#' @noRd
 read_json_fast <- function(path, simplifyVector = TRUE, ...) {
   assertthat::assert_that(
     assertthat::is.string(path),
@@ -82,6 +83,7 @@ read_json_fast <- function(path, simplifyVector = TRUE, ...) {
 #' \dontrun{
 #' data <- parse_json_fast('{"name": "test", "value": 42}')
 #' }
+#' @noRd
 parse_json_fast <- function(txt, simplifyVector = TRUE, ...) {
   assertthat::assert_that(
     assertthat::is.string(txt),
@@ -129,6 +131,7 @@ parse_json_fast <- function(txt, simplifyVector = TRUE, ...) {
 #' \dontrun{
 #' write_json_compat(list(a = 1, b = 2), "output.json")
 #' }
+#' @noRd
 write_json_compat <- function(x, path, auto_unbox = TRUE, pretty = TRUE, ...) {
   assertthat::assert_that(
     assertthat::is.string(path),
@@ -166,6 +169,7 @@ write_json_compat <- function(x, path, auto_unbox = TRUE, pretty = TRUE, ...) {
 #' \dontrun{
 #' json_str <- to_json_compat(list(a = 1, b = 2))
 #' }
+#' @noRd
 to_json_compat <- function(x, auto_unbox = TRUE, ...) {
   assertthat::assert_that(
     assertthat::is.flag(auto_unbox),
@@ -192,6 +196,7 @@ to_json_compat <- function(x, auto_unbox = TRUE, ...) {
 #' \dontrun{
 #' get_json_strategy()
 #' }
+#' @noRd
 get_json_strategy <- function() {
   list(
     read_files = "RcppSimdJson::fload() [2-10x faster than jsonlite]",

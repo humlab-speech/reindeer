@@ -261,6 +261,7 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 
 #' Flag corpus metadata as dirty (internal helper for auto-regeneration)
 #' @keywords internal
+#' @noRd
 .mark_metadata_dirty <- function(corpus_obj) {
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(invisible(NULL))
   tryCatch(
@@ -273,6 +274,7 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 
 #' Test whether a corpus has pending metadata changes
 #' @keywords internal
+#' @noRd
 .is_metadata_dirty <- function(corpus_obj) {
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(FALSE)
   file.exists(file.path(corpus_obj@basePath, ".cmdi_dirty"))
@@ -280,6 +282,7 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 
 #' Clear the metadata-dirty flag (after FAIR artifacts are regenerated)
 #' @keywords internal
+#' @noRd
 .clear_metadata_dirty <- function(corpus_obj) {
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(invisible(NULL))
   flag <- file.path(corpus_obj@basePath, ".cmdi_dirty")
@@ -289,6 +292,7 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 
 #' Clear metadata at a specific level
 #' @keywords internal
+#' @noRd
 clear_metadata <- function(corpus_obj, session, bundle, level) {
   basePath <- corpus_obj@basePath
   
@@ -339,6 +343,7 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #' enriched <- enrich(segs, corp, with = "metadata")
 #'
 #' @keywords internal
+#' @noRd
 biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm = "sha1") {
   
   if (!is.data.frame(segs_tbl) || !all(c("session", "bundle") %in% names(segs_tbl))) {
@@ -379,6 +384,7 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
 #' @param algorithm Hash algorithm (default: "sha1")
 #' @return The corpus object, invisibly
 #' @keywords internal
+#' @noRd
 add_digests <- function(corpus_obj, sessionPattern = ".*", bundlePattern = ".*",
                        algorithm = "sha1") {
   
@@ -394,6 +400,7 @@ add_digests <- function(corpus_obj, sessionPattern = ".*", bundlePattern = ".*",
 
 #' Get database UUID from corpus object
 #' @keywords internal
+#' @noRd
 get_db_uuid <- function(corpus_obj) {
   config <- load_DBconfig(corpus_obj)
   config$UUID
@@ -401,12 +408,14 @@ get_db_uuid <- function(corpus_obj) {
 
 #' Get connection from corpus object (alias for get_corpus_connection)
 #' @keywords internal
+#' @noRd
 get_connection <- function(corpus_obj) {
   get_corpus_connection(corpus_obj)
 }
 
 #' List sessions from cache
 #' @keywords internal
+#' @noRd
 list_sessions_from_cache <- function(con, db_uuid) {
   DBI::dbGetQuery(con,
     "SELECT name FROM session WHERE db_uuid = ?",
@@ -416,6 +425,7 @@ list_sessions_from_cache <- function(con, db_uuid) {
 
 #' List bundles from cache
 #' @keywords internal
+#' @noRd
 list_bundles_from_cache <- function(con, db_uuid) {
   DBI::dbGetQuery(con,
     "SELECT session, name FROM bundle WHERE db_uuid = ?",

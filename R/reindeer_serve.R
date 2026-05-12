@@ -837,6 +837,7 @@ S7::method(serve, corpus) <- function(corpus,
 #'
 #' @return Path to EMU-webApp dist directory
 #' @keywords internal
+#' @noRd
 get_webapp_dir <- function() {
   # Check option first
   webapp_path <- getOption("reindeer.emuWebApp.dir")
@@ -887,6 +888,7 @@ get_webapp_dir <- function() {
 #' @return Logical vector of matches
 #' @keywords internal
 #' @note Replaces emuR:::emuR_regexprl to avoid internal dependency
+#' @noRd
 reindeer_regexprl <- function(pattern, x) {
   grepl(pattern, x, perl = TRUE)
 }
@@ -898,6 +900,7 @@ reindeer_regexprl <- function(pattern, x) {
 #'
 #' @keywords internal
 #' @note Replaces emuR internal constants to avoid ::: dependency
+#' @noRd
 .emu_suffixes <- list(
   session = "_ses",
   bundle_dir = "_bndl",
@@ -906,14 +909,17 @@ reindeer_regexprl <- function(pattern, x) {
 
 #' Get session suffix
 #' @keywords internal
+#' @noRd
 get_session_suffix <- function() .emu_suffixes$session
 
 #' Get bundle directory suffix
 #' @keywords internal
+#' @noRd
 get_bundle_dir_suffix <- function() .emu_suffixes$bundle_dir
 
 #' Get annotation suffix
 #' @keywords internal
+#' @noRd
 get_annotation_suffix <- function() .emu_suffixes$annotation
 
 #' Guess MIME type from file extension
@@ -924,6 +930,7 @@ get_annotation_suffix <- function() .emu_suffixes$annotation
 #' @return MIME type string
 #' @keywords internal
 #' @note Replaces emuR:::guess_type to avoid internal dependency
+#' @noRd
 guess_mime_type <- function(path) {
   ext <- tolower(tools::file_ext(path))
   switch(ext,
@@ -952,6 +959,7 @@ guess_mime_type <- function(path) {
 #' @param corpus A reindeer corpus object
 #' @return An emuDBhandle object
 #' @keywords internal
+#' @noRd
 get_emuDBhandle <- function(corpus) {
   # Get connection from corpus
   conn <- get_connection(corpus)

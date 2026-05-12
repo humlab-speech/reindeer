@@ -221,6 +221,7 @@ extended_segment_list <- S7::new_class(
 #' @param x Object to test
 #' @return Logical
 #' @keywords internal
+#' @noRd
 is_extended_segment_list <- function(x) {
   S7::S7_inherits(x, extended_segment_list)
 }

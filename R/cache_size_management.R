@@ -26,6 +26,7 @@
 #' format_bytes(1048576)        # "1.00 MB"
 #' format_bytes(1073741824)     # "1.00 GB"
 #' }
+#' @noRd
 format_bytes <- function(bytes) {
   if (is.na(bytes) || bytes == 0) {
     return("0 B")
@@ -45,6 +46,7 @@ format_bytes <- function(bytes) {
 #' @param size_string Character string like "500 MB", "2 GB", or "500MB"
 #' @return Number of bytes (unnamed numeric)
 #' @keywords internal
+#' @noRd
 parse_size_string <- function(size_string) {
   size_string <- trimws(toupper(size_string))
 
@@ -90,6 +92,7 @@ parse_size_string <- function(size_string) {
 #' @param recursive If TRUE and path is directory, get total size recursively
 #' @return Size in bytes
 #' @keywords internal
+#' @noRd
 get_file_size <- function(path, recursive = FALSE) {
   if (!file.exists(path)) {
     return(0)
@@ -182,6 +185,7 @@ check_cache_size <- function(cache_path,
 #' @param pattern File pattern to match (e.g., "\\.sqlite$")
 #' @return Data frame with file sizes
 #' @keywords internal
+#' @noRd
 get_cache_dir_summary <- function(cache_dir, pattern = NULL) {
 
   if (!dir.exists(cache_dir)) {
@@ -234,6 +238,7 @@ get_cache_dir_summary <- function(cache_dir, pattern = NULL) {
 #' @param verbose Show messages
 #' @return Cache size information
 #' @keywords internal
+#' @noRd
 check_quantify_cache_size <- function(corpus_obj,
                                        warn_threshold = "500 MB",
                                        max_threshold = "2 GB",
@@ -264,6 +269,7 @@ check_quantify_cache_size <- function(corpus_obj,
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' check_all_cache_sizes(corp)
+#' @noRd
 check_all_cache_sizes <- function(corpus_obj,
                                    verbose = TRUE) {
 
@@ -300,6 +306,7 @@ check_all_cache_sizes <- function(corpus_obj,
 #' @param verbose Show messages
 #' @return Number of files deleted
 #' @keywords internal
+#' @noRd
 remove_old_cache_files <- function(cache_dir,
                                     days_old = 30,
                                     pattern = "\\.sqlite$",
@@ -369,6 +376,7 @@ remove_old_cache_files <- function(cache_dir,
 #' @param verbose Show messages
 #' @return Number of files deleted
 #' @keywords internal
+#' @noRd
 clean_quantify_cache <- function(corpus_obj,
                                   days_old = 30,
                                   dry_run = FALSE,
@@ -407,6 +415,7 @@ clean_quantify_cache <- function(corpus_obj,
 #'
 #' # Delete files older than 7 days
 #' clean_all_caches(corp, days_old = 7)
+#' @noRd
 clean_all_caches <- function(corpus_obj,
                               days_old = 30,
                               dry_run = FALSE,
@@ -442,6 +451,7 @@ clean_all_caches <- function(corpus_obj,
 #' @param corpus_obj A corpus object
 #' @return Path to cache directory
 #' @keywords internal
+#' @noRd
 get_quantify_cache_dir <- function(corpus_obj) {
   # This should match the location used in quantify/enrich
   file.path(corpus_obj@basePath, ".quantify_cache")
@@ -461,6 +471,7 @@ get_quantify_cache_dir <- function(corpus_obj) {
 #' corp <- corpus("path/to/db_emuDB")
 #' list_cache_files(corp, "quantify")
 #' list_cache_files(corp, "all")
+#' @noRd
 list_cache_files <- function(corpus_obj, cache_type = "all") {
 
   cache_type <- match.arg(cache_type, c("all", "quantify"))

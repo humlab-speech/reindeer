@@ -15,6 +15,7 @@
 #'
 #' @importFrom data.table data.table setDT setkey setkeyv := .SD .N .I .GRP
 #' @importFrom data.table setnames setcolorder rbindlist dcast
+#' @noRd
 dspp_metadataParameters_dt <- function(recompute=FALSE,
                                         id.columns=c("Age","Gender"),
                                         impute=TRUE,
@@ -70,6 +71,7 @@ dspp_metadataParameters_dt <- function(recompute=FALSE,
 
 #' Process gender-specific data with data.table
 #' @keywords internal
+#' @noRd
 process_gender_data <- function(defaults, genders, impute, defaultsEstimatedSampleSize) {
   # Filter to specified genders
   dt <- defaults[Gender %in% genders,
@@ -81,6 +83,7 @@ process_gender_data <- function(defaults, genders, impute, defaultsEstimatedSamp
 
 #' Process unspecified gender data with data.table
 #' @keywords internal
+#' @noRd
 process_unspecified_data <- function(defaults, impute, defaultsEstimatedSampleSize) {
   # Select relevant columns (no Gender filter)
   dt <- defaults[, .(Age_lower, Age_upper, Parameter, Setting,
@@ -97,6 +100,7 @@ process_unspecified_data <- function(defaults, impute, defaultsEstimatedSampleSi
 #' @param impute logical; impute missing values?
 #' @param by_gender logical; include Gender in grouping?
 #' @keywords internal
+#' @noRd
 .process_dspp_data <- function(dt, impute, by_gender = TRUE) {
   group_cols <- if (by_gender) {
     c("Gender", "Parameter", "Setting", "Study participants", "Study identifier")

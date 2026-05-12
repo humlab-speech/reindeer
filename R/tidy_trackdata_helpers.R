@@ -73,6 +73,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 
 #' Clear the tidy trackdata cache
 #' @keywords internal
+#' @noRd
 clear_tidy_cache <- function() {
   # Close any database connections
   for (obj_name in ls(envir = .tidy_cache)) {

@@ -10,6 +10,7 @@ NULL
 
 #' Subset corpus to get bundle list with metadata
 #' @keywords internal
+#' @noRd
 .subset_corpus <- function(x, i, j, ..., drop = FALSE) {
   # Handle various indexing patterns
   session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"
@@ -399,6 +400,7 @@ S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
 #' @param verbose Whether to show loading messages (default: FALSE)
 #' @return An emuDBhandle with valid connection
 #' @keywords internal
+#' @noRd
 get_handle <- function(corpus_obj, verbose = FALSE) {
   # Create native handle using cached connection
   handle <- list(
@@ -423,6 +425,7 @@ get_handle <- function(corpus_obj, verbose = FALSE) {
 #' @param corpus_obj A corpus object
 #' @return A DBI connection to the cache SQLite database
 #' @keywords internal
+#' @noRd
 get_or_create_connection <- function(corpus_obj) {
   env <- corpus_obj@.connection
   if (!is.null(env$con) && DBI::dbIsValid(env$con)) return(env$con)
@@ -437,6 +440,7 @@ get_or_create_connection <- function(corpus_obj) {
 #' Close the cached connection
 #' @param corpus_obj A corpus object
 #' @keywords internal
+#' @noRd
 close_connection <- function(corpus_obj) {
   env <- corpus_obj@.connection
   if (!is.null(env$con) && DBI::dbIsValid(env$con)) {
@@ -448,12 +452,14 @@ close_connection <- function(corpus_obj) {
 
 #' Get SQLite connection for corpus cache (delegates to cached connection)
 #' @keywords internal
+#' @noRd
 get_corpus_connection <- function(corpus_obj) {
   get_or_create_connection(corpus_obj)
 }
 
 #' Get metadata for bundles matching patterns
 #' @keywords internal
+#' @noRd
 get_metadata_for_patterns <- function(corpus_obj, session_pattern, bundle_pattern) {
   con <- get_corpus_connection(corpus_obj)
   
@@ -500,6 +506,7 @@ get_metadata_for_patterns <- function(corpus_obj, session_pattern, bundle_patter
 
 #' Get values for a metadata field with inheritance
 #' @keywords internal
+#' @noRd
 get_metadata_field_values <- function(con, db_uuid, field_name, sessions, bundles) {
   values <- character(length(sessions))
   types <- character(length(sessions))

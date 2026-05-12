@@ -16,6 +16,7 @@
 #' @param verbose Logical; passed through to underlying collectors.
 #' @return A list with named summary fields.
 #' @keywords internal
+#' @noRd
 collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("Input must be a {.cls corpus} object")

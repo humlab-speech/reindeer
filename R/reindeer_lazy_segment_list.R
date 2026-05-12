@@ -78,6 +78,7 @@ collect <- function(lazy_sl, verbose = FALSE) {
 }
 
 #' @export
+#' @noRd
 collect.default <- function(lazy_sl, verbose = FALSE) {
   # S7 classes use namespaced names ("reindeer::lazy_segment_list"), so S3
 
@@ -176,6 +177,7 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
 #' @param verbose Logical
 #' @return list(sql = "...", params = list(...))
 #' @keywords internal
+#' @noRd
 build_sql_from_parts <- function(query_parts, verbose = FALSE) {
   # Start with base query -- list(sql, params)
   if (is.null(query_parts$base)) {
@@ -204,6 +206,7 @@ build_sql_from_parts <- function(query_parts, verbose = FALSE) {
 #' @param verbose Logical
 #' @return list(sql, params) -- modified query
 #' @keywords internal
+#' @noRd
 apply_transform <- function(query, transform, verbose = FALSE) {
   type <- transform$type
   
@@ -226,6 +229,7 @@ apply_transform <- function(query, transform, verbose = FALSE) {
 #' @param n integer -- number of steps forward
 #' @return list(sql, params) -- modified query
 #' @keywords internal
+#' @noRd
 apply_scout_transform <- function(query, n = 1) {
   n <- as.integer(n)
   sql <- paste0(
@@ -246,6 +250,7 @@ apply_scout_transform <- function(query, n = 1) {
 #' @param n integer -- number of steps backward
 #' @return list(sql, params) -- modified query
 #' @keywords internal
+#' @noRd
 apply_retreat_transform <- function(query, n = 1) {
   n <- as.integer(n)
   sql <- paste0(
@@ -266,6 +271,7 @@ apply_retreat_transform <- function(query, n = 1) {
 #' @param level character -- target level to ascend to
 #' @return list(sql, params) -- modified query
 #' @keywords internal
+#' @noRd
 apply_ascend_transform <- function(query, level) {
   sql <- paste0(
     "WITH base AS (", query$sql, ") ",
@@ -290,6 +296,7 @@ apply_ascend_transform <- function(query, level) {
 #' @param level character -- target level to descend to
 #' @return list(sql, params) -- modified query
 #' @keywords internal
+#' @noRd
 apply_descend_transform <- function(query, level) {
   sql <- paste0(
     "WITH base AS (", query$sql, ") ",
@@ -463,6 +470,7 @@ S7::method(as.data.frame, lazy_segment_list) <- function(x, ...) {
 #' @param x An object
 #' @return Logical
 #' @keywords internal
+#' @noRd
 is_lazy <- function(x) {
   S7::S7_inherits(x, lazy_segment_list) && !x@.state$materialized
 }
@@ -472,6 +480,7 @@ is_lazy <- function(x) {
 #' @param x An object
 #' @return Logical
 #' @keywords internal
+#' @noRd
 needs_collect <- function(x) {
   is_lazy(x)
 }

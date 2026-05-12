@@ -20,6 +20,7 @@
 #' @param verbose Logical; show messages
 #'
 #' @keywords internal
+#' @noRd
 write_bundle_metadata <- function(db_handle,
                                    session,
                                    bundle,
@@ -82,6 +83,7 @@ write_bundle_metadata <- function(db_handle,
 #' @param verbose Logical; show messages
 #'
 #' @keywords internal
+#' @noRd
 write_session_metadata <- function(db_handle,
                                     session,
                                     metadata,
@@ -146,6 +148,7 @@ write_session_metadata <- function(db_handle,
 #' @param verbose Logical; show messages
 #'
 #' @keywords internal
+#' @noRd
 save_annotation_with_sync <- function(db_handle,
                                       session,
                                       bundle,
@@ -213,6 +216,7 @@ save_annotation_with_sync <- function(db_handle,
 #' @param verbose Logical; show messages
 #'
 #' @keywords internal
+#' @noRd
 add_session_with_sync <- function(db_handle,
                                    name,
                                    trigger_sync = TRUE,
@@ -257,6 +261,7 @@ add_session_with_sync <- function(db_handle,
 #' @param verbose Logical; show messages
 #'
 #' @keywords internal
+#' @noRd
 remove_session_with_sync <- function(db_handle,
                                       name,
                                       trigger_sync = TRUE,
@@ -309,6 +314,7 @@ remove_session_with_sync <- function(db_handle,
 #' @param verbose Logical; show messages
 #'
 #' @keywords internal
+#' @noRd
 update_config_with_sync <- function(db_handle,
                                      config,
                                      trigger_sync = TRUE,
@@ -364,6 +370,7 @@ update_config_with_sync <- function(db_handle,
 #' @param verbose Logical; show progress
 #'
 #' @keywords internal
+#' @noRd
 batch_update_metadata <- function(db_handle,
                                    updates,
                                    trigger_sync = TRUE,
