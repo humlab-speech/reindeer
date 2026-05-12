@@ -86,6 +86,38 @@ parse_simple_query <- function(query_string) {
     query_string <- sub("^#", "", query_string)
   }
 
+  # Scope predicates: `Session == X` / `Bundle == X` (and variants) filter on
+  # the segment's owning session/bundle rather than on item labels. Parser
+  # detects these early so executors can route them through a dedicated
+  # WHERE clause instead of trying to resolve "Session" as an annotation level.
+  scope_pattern <- "^(Session|Bundle)\\s*(==|!=|=~|!~)\\s*(?:'([^']*)'|\"([^\"]*)\"|(.+))$"
+  scope_match <- regexec(scope_pattern, query_string)
+  scope_matches <- regmatches(query_string, scope_match)[[1]]
+  if (length(scope_matches) >= 4 && scope_matches[1] != "") {
+    kind  <- tolower(scope_matches[2])  # "session" or "bundle"
+    operator <- scope_matches[3]
+    value <- if (scope_matches[4] != "") {
+      scope_matches[4]
+    } else if (scope_matches[5] != "") {
+      scope_matches[5]
+    } else {
+      trimws(scope_matches[6])
+    }
+    alternatives <- NULL
+    if (operator %in% c("==", "!=") && grepl("\\|", value)) {
+      alternatives <- trimws(strsplit(value, "\\|")[[1]])
+      value <- alternatives[1]
+    }
+    return(list(
+      type = "scope_filter",
+      kind = kind,
+      operator = operator,
+      value = value,
+      alternatives = alternatives,
+      projection = has_projection
+    ))
+  }
+
   # Handle bare level name (no operator) — means "all items on this level"
   bare_level_pattern <- "^([A-Za-z_]+)(?::([A-Za-z_]+))?$"
   bare_match <- regexec(bare_level_pattern, query_string)

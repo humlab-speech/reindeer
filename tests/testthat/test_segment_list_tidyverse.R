@@ -36,9 +36,10 @@ test_that("segment_list inherits tbl_df, tbl, and data.frame", {
   expect_identical(s@db_path, "/tmp/x")
 })
 
-test_that("query returns a tbl_df segment_list", {
+test_that("query returns a tbl_df segment_list (via collect)", {
   ae <- create_isolated_ae_corpus()
-  segs <- query(ae, "Phonetic == n")
+  # Default is lazy as of v0.7.0; collect() materialises a segment_list.
+  segs <- collect(query(ae, "Phonetic == n"))
   expect_s3_class(segs, "tbl_df")
   expect_true(is_segment_list(segs))
 })

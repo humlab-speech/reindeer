@@ -150,10 +150,11 @@ query <- function(emuDB, eql, ...) {
 #' @keywords internal
 build_base_sql <- function(db_path, parsed, opts = list()) {
   result_level <- opts$result_level %||% NULL
-  
+
   # Build SQL based on query type — all builders return list(sql, params)
   result <- switch(parsed$type,
     "simple" = build_simple_query_sql(db_path, parsed),
+    "scope_filter" = build_scope_filter_sql(db_path, parsed),
     "sequence" = build_sequence_query_sql(db_path, parsed, result_level),
     "dominance" = build_dominance_query_sql(db_path, parsed, result_level),
     "function" = build_function_query_sql(db_path, parsed),
@@ -161,8 +162,59 @@ build_base_sql <- function(db_path, parsed, opts = list()) {
     "disjunction" = build_disjunction_query_sql(db_path, parsed, result_level),
     .query_abort("Unknown query type: {.val {parsed$type}}")
   )
-  
+
   return(result)
+}
+
+#' Build SQL for a scope filter (`Session == X` / `Bundle == Y`)
+#'
+#' Returns ALL items whose owning session (or bundle) matches the predicate.
+#' When used standalone, gives every annotation in that session/bundle.
+#' When used in a conjunction, the INTERSECT semantics narrow the other
+#' side of the conjunction to the requested scope.
+#'
+#' @keywords internal
+build_scope_filter_sql <- function(db_path, parsed) {
+  column <- if (identical(parsed$kind, "session")) "i.session" else "i.bundle"
+  operator <- parsed$operator
+  pattern <- parsed$value
+  alts <- parsed$alternatives
+
+  base_sql <- paste0(
+    "SELECT i.*, l.label as labels, ",
+    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
+    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
+    "FROM items i ",
+    "INNER JOIN labels l ON ",
+    "  i.db_uuid = l.db_uuid AND ",
+    "  i.session = l.session AND ",
+    "  i.bundle = l.bundle AND ",
+    "  i.item_id = l.item_id ",
+    "WHERE 1 = 1 "
+  )
+  params <- list()
+
+  if (operator %in% c("==", "!=")) {
+    if (!is.null(alts) && length(alts) > 1) {
+      placeholders <- paste(rep("?", length(alts)), collapse = ",")
+      op_sql <- if (operator == "==") "IN" else "NOT IN"
+      base_sql <- paste0(base_sql, "AND ", column, " ", op_sql,
+                         " (", placeholders, ")")
+      params <- c(params, as.list(alts))
+    } else {
+      op_sql <- if (operator == "==") "=" else "!="
+      base_sql <- paste0(base_sql, "AND ", column, " ", op_sql, " ?")
+      params <- c(params, list(pattern))
+    }
+  } else if (operator == "=~") {
+    base_sql <- paste0(base_sql, "AND ", column, " REGEXP ?")
+    params <- c(params, list(pattern))
+  } else if (operator == "!~") {
+    base_sql <- paste0(base_sql, "AND NOT (", column, " REGEXP ?)")
+    params <- c(params, list(pattern))
+  }
+
+  list(sql = base_sql, params = params)
 }
 
 #' Build SQL for Simple Query
@@ -250,6 +302,8 @@ build_sequence_query_sql <- function(db_path, parsed, result_level = NULL) {
   on.exit(DBI::dbDisconnect(con))
   q <- build_sequence_query_sql_impl(db_path, parsed, result_level, con = con)
   if (is.null(q)) return(.empty_query_sql())
+  # Strip trailing ORDER BY so the SQL can nest inside a compound operator.
+  q$sql <- sub("\\s*ORDER BY[^()]*$", "", q$sql)
   q
 }
 
@@ -258,6 +312,7 @@ build_dominance_query_sql <- function(db_path, parsed, result_level = NULL) {
   on.exit(DBI::dbDisconnect(con))
   q <- build_dominance_query_sql_impl(db_path, parsed, result_level, con = con)
   if (is.null(q)) return(.empty_query_sql())
+  q$sql <- sub("\\s*ORDER BY[^()]*$", "", q$sql)
   q
 }
 
@@ -272,13 +327,38 @@ build_function_query_sql <- function(db_path, parsed) {
   value <- as.numeric(parsed$value)
   position <- parsed$position
 
-  if (func_name %in% c("Start", "End", "Medial")) {
+  q <- if (func_name %in% c("Start", "End", "Medial")) {
     build_position_function_sql(func_name, level1, level2, operator, value, position)
   } else if (func_name == "Num") {
     build_count_function_sql(level1, level2, operator, value)
   } else {
     .query_abort("Unknown function: {.val {func_name}}")
   }
+
+  # ORDER BY is invalid inside an INTERSECT / UNION compound on SQLite, so
+  # strip a trailing ORDER BY here — the lazy path applies its own ordering
+  # after collect(), and conjunction/disjunction can safely embed the result.
+  q$sql <- sub("\\s*ORDER BY[^()]*$", "", q$sql)
+  q
+}
+
+#' Eager scope-filter executor — reuses the lazy SQL builder
+#' @keywords internal
+execute_scope_filter_eager <- function(db_path, parsed, con = NULL) {
+  q <- build_scope_filter_sql(db_path, parsed)
+  if (is.null(con)) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
+  df <- if (length(q$params) == 0L) {
+    DBI::dbGetQuery(con, q$sql)
+  } else {
+    DBI::dbGetQuery(con, q$sql, params = q$params)
+  }
+  if ("labels" %in% names(df) && !"label" %in% names(df)) {
+    names(df)[names(df) == "labels"] <- "label"
+  }
+  df
 }
 
 build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
@@ -314,6 +394,7 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
     
     result <- switch(parsed$type,
       "simple" = execute_simple_query_corrected(db_path, parsed, con = con),
+      "scope_filter" = execute_scope_filter_eager(db_path, parsed, con = con),
       "sequence" = execute_sequence_query_corrected(db_path, parsed, result_level, con = con),
       "dominance" = execute_dominance_query_corrected(db_path, parsed, result_level, con = con),
       "function" = execute_function_query_corrected(db_path, parsed, con = con),
