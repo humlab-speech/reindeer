@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.8.0
+Version: 0.8.1
 Date: 2026-05-12
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -63,3 +63,43 @@ Depends:
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 LinkingTo: Rcpp
+Collate: 
+    'RcppExports.R'
+    'annotation_io.R'
+    'cache_size_management.R'
+    'cache_utils.R'
+    'conditions.R'
+    'corpus_class.R'
+    'corpus_creation.R'
+    'corpus_database.R'
+    'corpus_describe.R'
+    'corpus_listing.R'
+    'corpus_metadata_io.R'
+    'corpus_methods.R'
+    'emuR_perspectives.R'
+    'json_utils.R'
+    'metadata_core.R'
+    'metadata_import_export.R'
+    'query_executor.R'
+    'query_parser.R'
+    'reindeer.R'
+    'reindeer_autosync.R'
+    'reindeer_autosync_wrappers.R'
+    'reindeer_cmdi.R'
+    'reindeer_corpus_config.R'
+    'reindeer_data.R'
+    'reindeer_demodata.R'
+    'reindeer_lazy_segment_list.R'
+    'segment_list_classes.R'
+    'reindeer_enrich.R'
+    'reindeer_psychoacoustics.R'
+    'reindeer_sequence_ops_optimized.R'
+    'reindeer_serve.R'
+    'reindeer_signal_extensions_dt.R'
+    'schema_validation.R'
+    'segment_list_display.R'
+    'segment_list_dplyr.R'
+    'segment_list_provenance.R'
+    'segment_list_quantify.R'
+    'tidy_trackdata_helpers.R'
+    'zzz.R'

@@ -1,3 +1,6 @@
+#' @include segment_list_classes.R reindeer_lazy_segment_list.R corpus_class.R
+NULL
+
 #' Enrich corpus with DSP-derived tracks
 #'
 #' Apply digital signal processing (DSP) functions from the superassp package
@@ -52,45 +55,136 @@
 #' 
 #' @seealso [quantify()]
 #' @export
-enrich <- function(corpus_obj, .using, ...,
-                   .metadata_fields = c("Gender", "Age"),
-                   .signal_extension = NULL,
-                   .force = FALSE,
-                   .verbose = TRUE,
-                   .parallel = TRUE,
-                   .workers = NULL,
-                   .use_cache = FALSE,
-                   .cache_dir = NULL,
-                   .cache_format = c("auto", "qs", "rds"),
-                   with = NULL) {
-  # Segment-level enrichment: enrich(segs, corp, with = "metadata") joins
-  # metadata columns onto a segment_list. Folded in from the former
-  # biographize() entry point.
-  if (S7::S7_inherits(corpus_obj, reindeer::segment_list) ||
-      S7::S7_inherits(corpus_obj, reindeer::lazy_segment_list) ||
-      S7::S7_inherits(corpus_obj, reindeer::extended_segment_list)) {
-    segs <- corpus_obj
-    if (S7::S7_inherits(segs, reindeer::lazy_segment_list)) {
-      segs <- collect(segs)
-    }
-    if (!identical(with, "metadata")) {
-      cli::cli_abort(c(
-        "Cannot enrich a segment_list without {.arg with = \"metadata\"}",
-        "i" = "For DSP enrichment use {.code enrich(corpus, .using = ...)}."
-      ))
-    }
-    # Second positional argument is the corpus when first is a segment_list.
-    return(biographize(segs, .using))
-  }
+enrich <- S7::new_generic("enrich", "object")
 
-  .cache_format <- match.arg(.cache_format)
+#' Enrich corpus method - corpus-level DSP processing
+#'
+#' Apply a DSP function across every signal file in the corpus, using
+#' age/gender-aware parameters derived from per-bundle metadata.
+#'
+#' @param object A corpus object.
+#' @param .using A DSP function from superassp (e.g. forest, ksvF0).
+#' @param ... Forwarded to the DSP function as user-supplied parameters.
+#' @param .metadata_fields Metadata fields fed to [derive_dsp_parameters()].
+#' @param .signal_extension Override the corpus' mediafileExtension.
+#' @param .force Force recomputation when track files already exist.
+#' @param .verbose,.parallel,.workers,.use_cache,.cache_dir,.cache_format See `?enrich`.
+#' @return The corpus, invisibly.
+#' @name enrich.corpus
+S7::method(enrich, corpus) <- function(object, .using, ...,
+                                       .metadata_fields = c("Gender", "Age"),
+                                       .signal_extension = NULL,
+                                       .force = FALSE,
+                                       .verbose = TRUE,
+                                       .parallel = TRUE,
+                                       .workers = NULL,
+                                       .use_cache = FALSE,
+                                       .cache_dir = NULL,
+                                       .cache_format = c("auto", "qs", "rds")) {
+  dsp_fun_name <- deparse(substitute(.using))
+  .enrich_corpus_impl(
+    corpus_obj = object,
+    .using = .using,
+    dsp_fun_name = dsp_fun_name,
+    user_params = list(...),
+    .metadata_fields = .metadata_fields,
+    .signal_extension = .signal_extension,
+    .force = .force,
+    .verbose = .verbose,
+    .parallel = .parallel,
+    .workers = .workers,
+    .use_cache = .use_cache,
+    .cache_dir = .cache_dir,
+    .cache_format = .cache_format
+  )
+}
+
+#' Enrich segment_list method - join metadata or delegate DSP to quantify
+#'
+#' `enrich(segs, corp, with = "metadata")` joins corpus metadata onto the
+#' segment_list (folded in from the former `biographize()` entry point).
+#' `enrich(segs, .using = fn)` delegates to [quantify()] for segment-level
+#' DSP extraction so users only need to learn one verb.
+#'
+#' @param object A segment_list (or extended_segment_list).
+#' @param corpus_obj The corpus to pull metadata from (required when
+#'   `with = "metadata"`).
+#' @param ... Forwarded to [quantify()] when `.using` is supplied.
+#' @param with One of `"metadata"` (default) or `NULL`. Set to `NULL` when
+#'   only running DSP via `.using`.
+#' @param .using Optional DSP function; if supplied, delegates to [quantify()].
+#' @return A segment_list (metadata-joined) or extended_segment_list (DSP).
+#' @name enrich.segment_list
+S7::method(enrich, segment_list) <- function(object, corpus_obj = NULL, ...,
+                                              with = "metadata",
+                                              .using = NULL) {
+  if (!is.null(.using)) {
+    return(quantify(object, .using, ...))
+  }
+  if (!identical(with, "metadata")) {
+    cli::cli_abort(c(
+      "Cannot enrich a segment_list without {.arg with = \"metadata\"}",
+      "i" = "For DSP enrichment use {.code enrich(corpus, .using = ...)} or pass {.arg .using}."
+    ))
+  }
+  if (is.null(corpus_obj)) {
+    cli::cli_abort("{.arg corpus_obj} is required when {.code with = \"metadata\"}.")
+  }
+  biographize(object, corpus_obj)
+}
+
+#' Enrich method for extended_segment_list
+#'
+#' Same semantics as the segment_list method: metadata join by default,
+#' DSP delegation via `.using`.
+#'
+#' @inheritParams enrich.segment_list
+#' @return A segment_list or extended_segment_list.
+#' @name enrich.extended_segment_list
+S7::method(enrich, extended_segment_list) <- function(object, corpus_obj = NULL, ...,
+                                                       with = "metadata",
+                                                       .using = NULL) {
+  if (!is.null(.using)) {
+    return(quantify(object, .using, ...))
+  }
+  if (!identical(with, "metadata")) {
+    cli::cli_abort(c(
+      "Cannot enrich an extended_segment_list without {.arg with = \"metadata\"}",
+      "i" = "For DSP enrichment pass {.arg .using}."
+    ))
+  }
+  if (is.null(corpus_obj)) {
+    cli::cli_abort("{.arg corpus_obj} is required when {.code with = \"metadata\"}.")
+  }
+  biographize(object, corpus_obj)
+}
+
+#' Enrich method for lazy_segment_list
+#'
+#' Materialises via [collect()] then dispatches to the segment_list method.
+#'
+#' @param object A lazy_segment_list.
+#' @param ... Forwarded to the segment_list method.
+#' @return A segment_list or extended_segment_list.
+#' @name enrich.lazy_segment_list
+S7::method(enrich, lazy_segment_list) <- function(object, ...) {
+  enrich(collect(object), ...)
+}
+
+# Internal implementation of corpus-level DSP enrichment.
+# Split out so the S7 method body stays small and the implementation can
+# be unit-tested independently of the dispatcher.
+.enrich_corpus_impl <- function(corpus_obj, .using, dsp_fun_name, user_params,
+                                .metadata_fields, .signal_extension,
+                                .force, .verbose, .parallel, .workers,
+                                .use_cache, .cache_dir, .cache_format) {
+  .cache_format <- match.arg(.cache_format,
+                             choices = c("auto", "qs", "rds"))
 
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
   }
-  
-  # Get DSP function name and package
-  dsp_fun_name <- deparse(substitute(.using))
+
   if (is.function(.using)) {
     dsp_fun <- .using
   } else {
@@ -250,7 +344,7 @@ enrich <- function(corpus_obj, .using, ...,
       signal_files_with_meta = signal_files_with_meta,
       dsp_fun = dsp_fun,
       metadata_fields = .metadata_fields,
-      user_params = list(...),
+      user_params = user_params,
       verbose = FALSE,
       cache_conn = cache_conn,
       cache_format = .cache_format,
@@ -262,7 +356,7 @@ enrich <- function(corpus_obj, .using, ...,
     for (i in seq_len(nrow(signal_files_with_meta))) {
       results[[i]] <- process_bundle(
         i, signal_files_with_meta, dsp_fun,
-        .metadata_fields, list(...), FALSE,
+        .metadata_fields, user_params, FALSE,
         cache_conn = cache_conn, cache_format = .cache_format
       )
       if (.verbose) {

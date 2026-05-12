@@ -4,28 +4,14 @@
 \alias{enrich}
 \title{Enrich corpus with DSP-derived tracks}
 \usage{
-enrich(
-  corpus_obj,
-  .using,
-  ...,
-  .metadata_fields = c("Gender", "Age"),
-  .signal_extension = NULL,
-  .force = FALSE,
-  .verbose = TRUE,
-  .parallel = TRUE,
-  .workers = NULL,
-  .use_cache = FALSE,
-  .cache_dir = NULL,
-  .cache_format = c("auto", "qs", "rds"),
-  with = NULL
-)
+enrich(object, ...)
 }
 \arguments{
+\item{...}{Additional arguments passed to the DSP function}
+
 \item{corpus_obj}{A corpus object}
 
 \item{.using}{A DSP function from superassp package (e.g., forest, ksvF0)}
-
-\item{...}{Additional arguments passed to the DSP function}
 
 \item{.metadata_fields}{Character vector of metadata fields to use for parameter derivation
 Default: c("Gender", "Age")}
