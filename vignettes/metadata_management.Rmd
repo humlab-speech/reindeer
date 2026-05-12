@@ -1,253 +1,146 @@
 ---
-title: "Efficient Metadata Management in Reindeer"
+title: "Metadata Management"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Efficient Metadata Management in Reindeer}
+  %\VignetteIndexEntry{Metadata Management}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
-)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
 ```
 
-## Introduction
+## Why metadata matters in reindeer
 
-The reindeer package provides an optimized metadata management system that combines the flexibility of hierarchical metadata with the performance of SQL caching. This vignette demonstrates how to work with corpus metadata efficiently.
+Speaker metadata is what lets `quantify()` and `enrich()` pick the
+right DSP parameters for each recording — child versus adult, female
+versus male, fast versus slow speech. Set the metadata once, then
+every downstream analysis automatically uses age- and gender-aware
+windows, formant ranges, and pitch limits. This vignette covers how
+to write, read, and round-trip that metadata.
 
-## Setup
+## Three levels, one rule
 
-```{r setup, eval=FALSE}
+Metadata can live at three levels:
+
+1. **Database** — defaults that apply to every bundle.
+2. **Session** — overrides for one session.
+3. **Bundle** — overrides for one recording.
+
+When you ask for a value, **bundle wins over session, session wins
+over database**. This lets you set `Project = "MyStudy"` once at the
+database level and only override what differs.
+
+## Writing metadata
+
+`set_metadata()` is the canonical writer. It writes to
+`METADATA.json` on disk (the ground truth) and refreshes the cache.
+
+```{r}
 library(reindeer)
 
-# Create or load a corpus
-ae <- corpus("path/to/ae_emuDB")
-```
+corp <- corpus("path/to/ae_emuDB")
 
-## Understanding Metadata Hierarchy
-
-Metadata in reindeer follows a three-level hierarchy:
-
-1. **Database level**: Defaults for all bundles
-2. **Session level**: Overrides for bundles in a session
-3. **Bundle level**: Specific to one recording
-
-This allows you to set common properties once and override them where needed.
-
-## Setting Metadata
-
-### Database-Wide Defaults
-
-```{r database-metadata, eval=FALSE}
-# Set project-level metadata
-add_metadata(ae, list(
-  Project = "Speech Perception Study",
-  Year = 2024,
-  Institution = "University X"
+# Database-wide defaults
+set_metadata(corp, list(
+  Project = "Vowel Perception Study",
+  Year = 2026,
+  Institution = "Humlab"
 ))
+
+# Session-level: one speaker for all that session's bundles
+set_metadata(corp,
+             list(Speaker = "P001", Age = 25, Gender = "Female"),
+             session = "Session1")
+
+# Bundle-level: details for one recording
+set_metadata(corp,
+             list(Quality = "Excellent", Microphone = "SM58"),
+             session = "Session1", bundle = "Recording001")
 ```
 
-### Session-Level Metadata
+A bracket shortcut writes at the bundle level:
 
-```{r session-metadata, eval=FALSE}
-# Set speaker metadata for a session
-add_metadata(ae, list(
-  Speaker = "P001",
-  Age = 25,
-  Gender = "Female",
-  Dialect = "Northern"
-), session = "Session1")
+```{r}
+corp["Session1", "Recording001"] <- list(SamplingRate = 44100)
 ```
 
-### Bundle-Level Metadata
+`add_metadata()` is a deprecated alias of `set_metadata()` and still
+works for now.
 
-```{r bundle-metadata, eval=FALSE}
-# Set recording-specific metadata
-add_metadata(ae, list(
-  RecordingQuality = "Excellent",
-  BackgroundNoise = "Low",
-  Date = as.Date("2024-01-15")
-), session = "Session1", bundle = "Recording001")
+## Reading metadata
 
-# Alternative bracket syntax
-ae["Session1", "Recording001"] <- list(
-  Microphone = "Shure SM58",
-  SamplingRate = 44100
-)
+`get_metadata()` returns one row per bundle with inheritance already
+resolved.
+
+```{r}
+get_metadata(corp)                              # everything
+get_metadata(corp, session_pattern = "Session1")
+get_metadata(corp, bundle_pattern = "Recording0[1-3].*")
 ```
 
-## Retrieving Metadata
+For most pipelines you don't need to call this directly — use
+`enrich(segs, corp)` and reindeer joins the metadata for you.
 
-### Get All Metadata
+## Round-tripping through a spreadsheet
 
-```{r get-metadata, eval=FALSE}
-# Gather from .meta_json files and cache
-gather_metadata(ae)
+For batch editing, export everything to Excel, edit there, and load it
+back:
 
-# Retrieve with inheritance resolved
-metadata <- get_metadata(ae)
+```{r}
+export_metadata(corp, "ae_metadata.xlsx")
 
-# View structure
-head(metadata)
+# ... edit in Excel: rows are bundles, columns are fields ...
+
+load_metadata(corp, source = "excel", path = "ae_metadata.xlsx")
 ```
 
-### Filter Metadata
+The workbook has three sheets — `bundles`, `sessions`, `database` —
+matching the inheritance levels. Add columns to introduce new fields;
+clear cells to drop them.
 
-```{r filter-metadata, eval=FALSE}
-# Get metadata for specific sessions
-session1_meta <- get_metadata(ae, session_pattern = "Session1")
+## Refreshing after manual edits
 
-# Get metadata for specific bundles
-recording_meta <- get_metadata(ae, bundle_pattern = "Recording.*")
+If you (or a collaborator) edited the `METADATA.json` files outside R,
+tell reindeer to rescan:
+
+```{r}
+load_metadata(corp)            # source = "files" is the default
 ```
 
-## Excel Workflow
+`gather_metadata(corp)` is a deprecated alias and does the same thing.
 
-For batch editing, use Excel export/import:
+## Sanity-checking metadata
 
-```{r excel-workflow, eval=FALSE}
-# Export to Excel
-export_metadata(ae, "corpus_metadata.xlsx", 
-               mandatory = c("Age", "Gender"))
+After a big edit, look at what's there and what `quantify()` will pick:
 
-# Edit in Excel...
-# - Fix misspellings
-# - Fill in missing values
-# - Standardize formats
+```{r}
+get_metadata(corp) |> dplyr::glimpse()        # column overview
 
-# Re-import
-import_metadata(ae, "corpus_metadata.xlsx")
+dsp_parameters(age = 8,  gender = "Male")     # what params for a kid?
+dsp_parameters(age = 45, gender = "Female")   # …for an adult?
+dsp_parameters(corpus_obj = corp)             # one row per bundle
 ```
 
-## Metadata in Analysis
+If the corpus has Age/Gender on every bundle, `dsp_parameters(corp)`
+gives you a per-bundle parameter table — a quick check that no
+recording will be analysed with the wrong settings.
 
-### Enriching Query Results
+## FAIR / CMDI export
 
-```{r biographize, eval=FALSE}
-# Query for segments
-vowels <- query(ae, "Phonetic =~ '[aeiou]'")
+`describe_corpus()` writes README.md, a CMDI XML file, and DataCite
+JSON next to the corpus. With `options(reindeer.auto_cmdi = TRUE)` it
+runs automatically the next time you open the corpus after any
+metadata change.
 
-# Add metadata
-vowels_enriched <- biographize(vowels, ae)
-
-# Now you can analyze by metadata
-vowels_by_group <- vowels_enriched[, .(
-  count = .N,
-  mean_duration = mean(end - start)
-), by = .(Gender, labels)]
+```{r}
+describe_corpus(corp)
+options(reindeer.auto_cmdi = TRUE)
 ```
 
-### Filtering by Metadata
+## Where next
 
-```{r filter-analysis, eval=FALSE}
-# Get metadata first
-meta <- get_metadata(ae)
-
-# Filter to specific speakers
-meta <- get_metadata(ae)
-young_speakers <- meta[meta$Age < 30, c("session", "bundle")]
-
-# Query only those bundles
-results <- query(ae, "Phonetic == s")
-```
-
-## Corpus Summary
-
-Get comprehensive corpus information including metadata diagnostics:
-
-```{r summary, eval=FALSE}
-summary(ae)
-```
-
-This shows:
-- Basic corpus statistics
-- Level and link definitions
-- SSFF track definitions
-- Metadata field coverage and types
-
-## Type Validation
-
-The system tracks field types and validates assignments:
-
-```{r type-validation, eval=FALSE}
-# First use establishes type
-ae["S1", "B1"] <- list(Age = 25)  # numeric
-
-# This works (compatible type)
-ae["S1", "B2"] <- list(Age = 30)  # Also numeric
-
-# This fails (incompatible type)
-ae["S1", "B3"] <- list(Age = "thirty")  # Error: type mismatch
-```
-
-## Diagnostics
-
-Identify metadata issues:
-
-```{r diagnostics, eval=FALSE}
-# Get metadata diagnostics
-summary(ae)  # Includes metadata section
-
-# Check for misspellings by examining field names
-meta <- get_metadata(ae)
-unique(names(meta))
-
-# Look for similar names that might be typos
-# E.g., "Gendar" vs "Gender", "Speakr" vs "Speaker"
-```
-
-## Best Practices
-
-1. **Set database defaults early**: Common fields like Project, Year
-2. **Use session metadata for speaker properties**: Age, Gender, Dialect
-3. **Reserve bundle level for recording details**: Quality, Date, Equipment
-4. **Call `gather_metadata()` after manual edits**: Keep cache in sync
-5. **Use Excel for batch corrections**: Fix inconsistencies across bundles
-6. **Check `summary()` regularly**: Identify misspellings and coverage gaps
-7. **Document your metadata schema**: Keep a record of expected fields
-
-## Performance Comparison
-
-The optimized system is significantly faster than direct file reading:
-
-| Operation | Old System | New System | Speedup |
-|-----------|------------|------------|---------|
-| Gather metadata (1000 bundles) | 45s | 2.1s | 21x |
-| Retrieve metadata | 12s | 0.08s | 150x |
-| Single metadata update | 0.5s | 0.02s | 25x |
-
-This makes interactive metadata exploration practical even for large corpora.
-
-## Advanced: Metadata Inheritance Inspection
-
-To see the effective metadata for a specific bundle (with inheritance resolved):
-
-```{r inheritance, eval=FALSE}
-# Get all metadata with inheritance resolved
-all_meta <- get_metadata(ae)
-
-# Filter to specific bundle
-effective <- all_meta[all_meta$session == "S1" & all_meta$bundle == "B1", ]
-print(effective)
-
-# The returned values reflect the precedence: bundle > session > database
-# To inspect raw values at each level, read the .meta_json files directly:
-# - Database: <db_emuDB>/METADATA.json
-# - Session:  <db_emuDB>/<session>_ses/METADATA.json
-# - Bundle:   <db_emuDB>/<session>_ses/<bundle>_bndl/METADATA.json
-```
-
-## Conclusion
-
-The reindeer metadata system provides:
-
-- **Flexibility**: Three-level hierarchy with inheritance
-- **Performance**: SQL caching for fast retrieval
-- **Safety**: Type validation and error checking
-- **Convenience**: Excel export/import for batch editing
-- **Transparency**: Ground truth remains in .meta_json files
-
-This enables efficient metadata management for large speech corpora while maintaining compatibility with the emuR ecosystem.
+- `vignette("getting_started")` — the five-minute pipeline.
+- `?set_metadata`, `?get_metadata`, `?load_metadata`,
+  `?dsp_parameters` — function reference.
