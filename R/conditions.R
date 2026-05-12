@@ -39,6 +39,36 @@
                  class = c("reindeer_cache_error", "reindeer_error"))
 }
 
+#' Abort with a "missing companion package" condition.
+#'
+#' Raised when a reindeer entry point depends on a companion package
+#' (erodex, protoscribe, eggstract, superassp) that is not installed.
+#' Catch with `tryCatch(..., reindeer_missing_companion_error = ...)`.
+#'
+#' @param pkg Character; the missing package name.
+#' @param purpose Optional short string describing what the user was
+#'   trying to do (e.g. "draft annotation generation").
+#' @keywords internal
+.companion_abort <- function(pkg, purpose = NULL,
+                             call = rlang::caller_env()) {
+  url <- switch(pkg,
+    erodex     = "https://github.com/humlab-speech/erodex",
+    protoscribe = "https://github.com/humlab-speech/protoscribe",
+    eggstract  = "https://github.com/humlab-speech/eggstract",
+    superassp  = "https://github.com/humlab-speech/superassp",
+    NULL
+  )
+  msg <- c(
+    sprintf("The {.pkg %s} package is required%s but is not installed.",
+            pkg, if (!is.null(purpose)) sprintf(" for %s", purpose) else ""),
+    "i" = if (!is.null(url)) sprintf("Install: {.code remotes::install_github(\"%s\")}",
+                                      sub("^https://github.com/", "", url))
+          else sprintf("Install: {.code install.packages(\"%s\")}", pkg)
+  )
+  cli::cli_abort(msg, call = call,
+                 class = c("reindeer_missing_companion_error", "reindeer_error"))
+}
+
 #' @keywords internal
 .query_warn <- function(message, ..., call = rlang::caller_env(),
                         .envir = rlang::caller_env()) {

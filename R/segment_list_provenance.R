@@ -126,7 +126,7 @@ provenance <- function(seg) {
 #' segs <- query(corp, "Phonetic == t") |> scout(1) |> ascend_to("Word")
 #' dropped(segs)        # cumulative
 #' dropped(segs, 2L)    # how many segs scout() dropped
-#' @keywords internal
+#' @export
 dropped <- function(seg, step = NULL) {
   prov <- provenance(seg)
   if (nrow(prov) == 0L) return(0L)
@@ -141,4 +141,49 @@ dropped <- function(seg, step = NULL) {
     cli::cli_abort("{.arg step} {step} out of range (1:{nrow(prov)})")
   }
   prov$rows_lost[step]
+}
+
+#' Per-step row-loss summary for a segment_list pipeline
+#'
+#' Tidy companion to [provenance()] and [dropped()] for debugging
+#' filter/scout/ascend chains. Returns a one-row-per-step tibble with
+#' the verb that ran, how many rows entered and left, and how many were
+#' dropped. Use this when [dropped()] tells you something was lost and
+#' you want to know *where* in the pipeline.
+#'
+#' @param seg A `segment_list` (or `extended_segment_list` /
+#'   `lazy_segment_list`, which is collected first).
+#' @return A tibble with one row per step: `step`, `verb`, `call`,
+#'   `rows_in`, `rows_out`, `rows_lost`, `pct_lost`.
+#' @examplesIf interactive()
+#' segs <- query(corp, "Phonetic == t") |>
+#'         dplyr::filter(label != "never_matches") |>
+#'         scout(1)
+#' dropped_rows(segs)
+#' @export
+dropped_rows <- function(seg) {
+  prov <- provenance(seg)
+  if (nrow(prov) == 0L) {
+    return(tibble::tibble(
+      step = integer(),
+      verb = character(),
+      call = character(),
+      rows_in = integer(),
+      rows_out = integer(),
+      rows_lost = integer(),
+      pct_lost = numeric()
+    ))
+  }
+  pct <- ifelse(is.na(prov$rows_in) | prov$rows_in == 0,
+                NA_real_,
+                100 * prov$rows_lost / prov$rows_in)
+  tibble::tibble(
+    step = prov$step,
+    verb = prov$verb,
+    call = prov$call,
+    rows_in = prov$rows_in,
+    rows_out = prov$rows_out,
+    rows_lost = prov$rows_lost,
+    pct_lost = round(pct, 1)
+  )
 }
