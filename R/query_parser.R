@@ -162,6 +162,25 @@ parse_simple_query <- function(query_string) {
     trimws(matches[7])
   }
 
+  # Reject a value that is itself an operator fragment — happens when the
+  # user wrote e.g. "Phonetic ==" and the regex backtracked, matching
+  # `=` as the operator and the trailing `=` as the value. Surface the
+  # parse error at query() time instead of letting an empty query run.
+  if (operator == "=" && value %in% c("=", "~")) {
+    op_pos <- regexpr("==|=~|!~|!=|=", query_string)
+    .query_abort(c(
+      "Cannot parse simple query: missing right-hand value.",
+      .eql_caret(query_string, pos = op_pos, label = "Query:")
+    ))
+  }
+  if (!nzchar(value)) {
+    op_pos <- regexpr("==|=~|!~|!=|=", query_string)
+    .query_abort(c(
+      "Cannot parse simple query: empty right-hand value.",
+      .eql_caret(query_string, pos = op_pos, label = "Query:")
+    ))
+  }
+
   # Check for label alternatives (pipe-separated): m | n | p
   # Only for == and != operators (not regex)
   alternatives <- NULL
