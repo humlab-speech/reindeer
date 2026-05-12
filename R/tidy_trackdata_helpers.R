@@ -89,16 +89,26 @@ clear_tidy_cache <- function() {
 }
 
 #' Generate cache key for quantify results
+#'
+#' Includes the segment scope (session/bundle/start/end), the DSP
+#' function name, every parameter that affects the DSP output, AND
+#' the `.at` extraction points. Without `.at` in the key, two calls
+#' with different time-point requests share a cache entry and return
+#' the wrong timepoints. Bundle metadata (Age/Gender) is folded in
+#' automatically because `derive_dsp_parameters()` bakes those
+#' fields into `params` before the key is produced.
+#'
 #' @noRd
-.make_quantify_cache_key <- function(segment_info, dsp_function, params) {
-  # Create a unique key based on segment and parameters
+.make_quantify_cache_key <- function(segment_info, dsp_function, params,
+                                     .at = NULL) {
   key_parts <- c(
     segment_info$session,
-    segment_info$bundle, 
+    segment_info$bundle,
     as.character(segment_info$start),
     as.character(segment_info$end),
     deparse(substitute(dsp_function))[1],
-    digest::digest(params, algo = "xxhash64")
+    digest::digest(params, algo = "xxhash64"),
+    if (is.null(.at)) "NA" else digest::digest(.at, algo = "xxhash64")
   )
   paste(key_parts, collapse = "_")
 }
@@ -458,10 +468,11 @@ clear_tidy_cache <- function() {
       dt_valid[, cache_key := {
         vapply(seq_len(.N), function(i) {
           .make_quantify_cache_key(
-            list(session = session[i], bundle = bundle[i], 
+            list(session = session[i], bundle = bundle[i],
                  start = start[i], end = end[i]),
             dsp_function,
-            dsp_params
+            dsp_params,
+            .at = .at
           )
         }, character(1))
       }]
