@@ -327,7 +327,7 @@ test_that("lazy query with regex operator =~ works", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
 
-  lsl <- query(corp, "Phonetic =~ s.*", lazy = TRUE)
+  lsl <- query(corp, "Phonetic =~ ^s.*$", lazy = TRUE)
   result <- collect(lsl)
   expect_true(S7::S7_inherits(result, segment_list))
   expect_true(all(grepl("^s", result$labels, ignore.case = TRUE)))

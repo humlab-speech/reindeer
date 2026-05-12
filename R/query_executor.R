@@ -181,7 +181,7 @@ build_scope_filter_sql <- function(db_path, parsed) {
   alts <- parsed$alternatives
 
   base_sql <- paste0(
-    "SELECT i.*, l.label as labels, ",
+    "SELECT i.*, l.label as labels, l.name as attribute, ",
     "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
     "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
     "FROM items i ",
@@ -240,8 +240,11 @@ build_simple_query_sql <- function(db_path, parsed) {
   # Emit columns that downstream lazy transforms (scout/retreat/ascend/
   # descend) expect: start/end_item_id and start/end_item_seq_idx aliases.
   # For simple queries each row's start and end refer to the same item.
+  # Project l.name AS attribute so format_as_emuRsegs() picks up the
+  # attribute name from the predicate (e.g. "Text") rather than falling
+  # back to the host level ("Word").
   base_sql <- paste0(
-    "SELECT i.*, l.label as labels, ",
+    "SELECT i.*, l.label as labels, l.name as attribute, ",
     "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
     "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
     "FROM items i ",
@@ -365,10 +368,18 @@ build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
   left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
   right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
   if (is.null(left_result) || is.null(right_result)) return(NULL)
-  # SQLite does not accept parenthesised SELECTs around a compound operator;
-  # use the bare form.
+  # Tuple-EXISTS instead of INTERSECT: the left side carries the row shape
+  # of a segment_list, the right side just supplies an item-identity filter.
+  # This is robust to column-count mismatches between disparate builders
+  # (function vs simple) and to two attribute predicates on the same items
+  # (e.g. `[Text == always & Accent == S]`).
   list(
-    sql = paste0(left_result$sql, " INTERSECT ", right_result$sql),
+    sql = paste0(
+      "SELECT base.* FROM (", left_result$sql, ") base ",
+      "WHERE EXISTS (SELECT 1 FROM (", right_result$sql, ") sub ",
+      "WHERE sub.db_uuid = base.db_uuid AND sub.session = base.session ",
+      "AND sub.bundle = base.bundle AND sub.item_id = base.item_id)"
+    ),
     params = c(left_result$params, right_result$params)
   )
 }
