@@ -2,15 +2,71 @@
 % Please edit documentation in R/segment_list_quantify.R
 \name{quantify}
 \alias{quantify}
-\title{Quantify generic - Apply DSP to segments}
+\alias{quantify.segment_list}
+\title{Extract acoustic measurements from segments}
 \usage{
 quantify(object, ...)
 }
 \arguments{
-\item{object}{The object to quantify}
+\item{object}{A \code{segment_list} (eager) or \code{lazy_segment_list}.}
 
-\item{...}{Additional arguments passed to methods}
+\item{...}{Forwarded to the DSP function. Values you pass win over
+metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...).}
+
+\item{dsp_function}{A DSP function. Common choices: \code{superassp::forest}
+(formants), \code{superassp::ksvF0} (pitch), \code{superassp::rmsana}
+(intensity), \code{superassp::dftSpectrum}.}
+
+\item{.at}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
+gives one row per segment (e.g. \code{0.5} for midpoint); a vector
+multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}).}
+
+\item{.use_metadata}{Look up DSP parameters from speaker metadata.
+Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
+
+\item{.use_cache}{Reuse persistent results when the cache key
+matches. Default \code{FALSE}. See \code{\link[=inspect_cache]{inspect_cache()}} for what's stored.
+When enabled, the returned tibble gains a \code{.cache_status} column
+(\code{"hit"} / \code{"miss"}).}
+
+\item{.cache_dir, .cache_format}{Where and how to persist cached
+results.}
+
+\item{.parallel, .workers}{Run segments concurrently via a
+multi-session future plan. Default: on, with \code{detectCores() - 1}.}
+
+\item{.verbose}{Print a per-step progress summary.}
+
+\item{.optimize}{Use the vectorised data.table backend. Default
+\code{TRUE}; turn off only for debugging.}
+}
+\value{
+An \code{extended_segment_list}: the input columns plus one
+column per DSP output (e.g. \code{F1}, \code{F2}, \code{F3}).
 }
 \description{
-Quantify generic - Apply DSP to segments
+Apply a DSP function (typically from \code{superassp}) to every segment
+in a \code{segment_list} and get one row of measurements back per segment
+— or per time point when \code{.at} is given. Parameters are picked from
+speaker metadata (\code{Age}, \code{Gender}) unless overridden through \code{...}.
+For lazy pipelines \code{quantify()} records the request and runs it at
+the next \code{\link[=collect]{collect()}}.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/ae_emuDB")
+segs <- query(corp, "Phonetic =~ [aeiou]")
+
+# Formants at the midpoint
+quantify(segs, superassp::forest, .at = 0.5)
+
+# Pitch contour: 11 evenly spaced points
+quantify(segs, superassp::ksvF0, .at = seq(0, 1, 0.1))
+
+# Override metadata-derived parameters
+quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=enrich]{enrich()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
 }

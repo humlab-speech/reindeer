@@ -13,38 +13,37 @@
 #' @include segment_list_classes.R reindeer_lazy_segment_list.R
 NULL
 
-#' Scout Forward in Sequence
+#' Move forward or backward along an annotation level
 #'
-#' Navigate forward through sequential items on the same level, optionally
-#' capturing multiple items. Optimized implementation using data.table.
+#' Given a `segment_list`, returns the item(s) `steps_forward` positions
+#' away on the same level — typically the previous or next phone, word,
+#' or syllable. Use negative steps to go backward, or `capture > 1` to
+#' grab a run of consecutive items.
 #'
-#' @param .segments segment_list or lazy_segment_list object
-#' @param steps_forward Integer; number of steps to move forward (positive) or backward (negative)
-#' @param count_from Character; "START" or "END" of segment
-#' @param capture Integer; number of consecutive items to capture (default 1)
-#' @param ignore_bundle_boundaries Logical; whether to cross bundle boundaries
-#' @param calculate_times Logical; whether to calculate start/end times
-#' @param times_from Character; level to use for time calculation
-#' @param .from corpus object (optional, for additional context)
-#' @param .quiet Logical; suppress messages
-#' @param collect Logical; force materialization (default TRUE)
-#'
-#' @return segment_list (or lazy_segment_list if collect=FALSE)
-#' @export
-#'
+#' @param .segments A `segment_list` or `lazy_segment_list`.
+#' @param steps_forward Integer offset. `1` = next item, `-1` = previous,
+#'   `2` = item after next.
+#' @param count_from `"START"` (default) or `"END"` — which edge of the
+#'   current segment to count from.
+#' @param capture Number of consecutive items to return per input
+#'   segment. Default `1`.
+#' @param ignore_bundle_boundaries If `TRUE`, walk past the end of a
+#'   bundle into the next one. Default `FALSE` (recommended).
+#' @param calculate_times,times_from Recompute start/end times after the
+#'   move; advanced, defaults are usually right.
+#' @param .from Optional `corpus` (only needed if the segment list lost
+#'   its `db_path`).
+#' @param .quiet Suppress informational messages.
+#' @param collect Materialise the result (default `TRUE`). With
+#'   `FALSE` the operation is deferred into the lazy plan.
+#' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
 #' @examplesIf interactive()
-#' # Get next phoneme
-#' next_phone <- scout(segments, steps_forward = 1)
-#'
-#' # Get previous phoneme
-#' prev_phone <- scout(segments, steps_forward = -1)
-#'
-#' # Get next 2 phonemes
-#' next_two <- scout(segments, steps_forward = 1, capture = 2)
-#'
-#' # Lazy version
-#' lazy_next <- scout(segments, steps_forward = 1, collect = FALSE)
-#' result <- collect(lazy_next)
+#' corp <- corpus("path/to/ae_emuDB")
+#' stops <- query(corp, "Phonetic =~ [ptk]")
+#' next_phone <- scout(stops, steps_forward = 1)     # following phoneme
+#' prev_two   <- scout(stops, steps_forward = -1, capture = 2)
+#' @seealso [ascend_to()], [descend_to()]
+#' @export
 scout <- S7::new_generic("scout", ".segments")
 
 #' Scout method for segment_list (eager data.table path)
@@ -324,18 +323,26 @@ retreat <- function(.segments, steps_backward, ...) {
   scout(.segments, steps_forward = -abs(steps_backward), ...)
 }
 
-#' Ascend to Higher Level in Hierarchy
+#' Move up the annotation hierarchy
 #'
-#' Navigate upward through the annotation hierarchy following dominance links.
-#' Optimized implementation using data.table.
+#' Returns the parent item(s) at `level` for every segment in the input.
+#' Follows the dominance links recorded in the corpus, so e.g. ascending
+#' from a phone to `"Word"` gives the containing word, and from a
+#' phone to `"Syllable"` gives the containing syllable.
 #'
-#' @param .segments segment_list or lazy_segment_list object
-#' @param level Character; target level name to ascend to
-#' @param .from corpus object (optional)
-#' @param .quiet Logical; suppress messages
-#' @param collect Logical; force materialization (default TRUE)
-#'
-#' @return segment_list (or lazy_segment_list if collect=FALSE)
+#' @param .segments A `segment_list` or `lazy_segment_list`.
+#' @param level Name of the target level.
+#' @param .from Optional `corpus` (only needed if the segment list lost
+#'   its `db_path`).
+#' @param .quiet Suppress informational messages.
+#' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
+#'   into the lazy plan.
+#' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/ae_emuDB")
+#' vowels <- query(corp, "Phonetic =~ [aeiou]")
+#' words  <- ascend_to(vowels, "Word")
+#' @seealso [descend_to()], [scout()]
 #' @export
 ascend_to <- S7::new_generic("ascend_to", ".segments")
 
@@ -502,17 +509,22 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   return(result)
 }
 
-#' Descend to Lower Level in Hierarchy
+#' Move down the annotation hierarchy
 #'
-#' Navigate downward through the annotation hierarchy following dominance links.
+#' Returns the child item(s) at `level` for every segment in the input.
+#' Inverse of [ascend_to()]: descending from a word to `"Phonetic"`
+#' gives every phone in that word.
 #'
-#' @param .segments segment_list or lazy_segment_list object
-#' @param level Character; target level name to descend to
-#' @param .from corpus object (optional)
-#' @param .quiet Logical; suppress messages
-#' @param collect Logical; force materialization (default TRUE)
-#'
-#' @return segment_list (or lazy_segment_list if collect=FALSE)
+#' @param .segments A `segment_list` or `lazy_segment_list`.
+#' @param level Name of the target level.
+#' @param .from Optional `corpus`.
+#' @param .quiet Suppress messages.
+#' @param collect Materialise (default `TRUE`).
+#' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
+#' @examplesIf interactive()
+#' words  <- query(corp, "Word =~ .*")
+#' phones <- descend_to(words, "Phonetic")
+#' @seealso [ascend_to()], [scout()]
 #' @export
 descend_to <- S7::new_generic("descend_to", ".segments")
 

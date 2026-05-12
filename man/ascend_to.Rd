@@ -4,25 +4,39 @@
 \alias{ascend_to}
 \alias{ascend_to.segment_list}
 \alias{ascend_to.lazy_segment_list}
-\title{Ascend to Higher Level in Hierarchy}
+\title{Move up the annotation hierarchy}
 \usage{
 ascend_to(.segments, ...)
 }
 \arguments{
-\item{.segments}{segment_list or lazy_segment_list object}
+\item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
 
-\item{level}{Character; target level name to ascend to}
+\item{level}{Name of the target level.}
 
-\item{.from}{corpus object (optional)}
+\item{.from}{Optional \code{corpus} (only needed if the segment list lost
+its \code{db_path}).}
 
-\item{.quiet}{Logical; suppress messages}
+\item{.quiet}{Suppress informational messages.}
 
-\item{collect}{Logical; force materialization (default TRUE)}
+\item{collect}{Materialise (default \code{TRUE}); pass \code{FALSE} to defer
+into the lazy plan.}
 }
 \value{
-segment_list (or lazy_segment_list if collect=FALSE)
+A \code{segment_list} (or \code{lazy_segment_list} when \code{collect = FALSE}).
 }
 \description{
-Navigate upward through the annotation hierarchy following dominance links.
-Optimized implementation using data.table.
+Returns the parent item(s) at \code{level} for every segment in the input.
+Follows the dominance links recorded in the corpus, so e.g. ascending
+from a phone to \code{"Word"} gives the containing word, and from a
+phone to \code{"Syllable"} gives the containing syllable.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/ae_emuDB")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
+words  <- ascend_to(vowels, "Word")
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=descend_to]{descend_to()}}, \code{\link[=scout]{scout()}}
 }

@@ -1,50 +1,54 @@
-#' Quantify generic - Apply DSP to segments
-#' @param object The object to quantify
-#' @param ... Additional arguments passed to methods
+#' Extract acoustic measurements from segments
+#'
+#' Apply a DSP function (typically from `superassp`) to every segment
+#' in a `segment_list` and get one row of measurements back per segment
+#' — or per time point when `.at` is given. Parameters are picked from
+#' speaker metadata (`Age`, `Gender`) unless overridden through `...`.
+#' For lazy pipelines `quantify()` records the request and runs it at
+#' the next [collect()].
+#'
+#' @param object A `segment_list` (eager) or `lazy_segment_list`.
+#' @param dsp_function A DSP function. Common choices: `superassp::forest`
+#'   (formants), `superassp::ksvF0` (pitch), `superassp::rmsana`
+#'   (intensity), `superassp::dftSpectrum`.
+#' @param ... Forwarded to the DSP function. Values you pass win over
+#'   metadata-derived ones (`nominalF1`, `windowSize`, ...).
+#' @param .at Relative time points to sample, each in `[0, 1]`. A scalar
+#'   gives one row per segment (e.g. `0.5` for midpoint); a vector
+#'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`).
+#' @param .use_metadata Look up DSP parameters from speaker metadata.
+#'   Default `TRUE`. See [dsp_parameters()] to preview.
+#' @param .use_cache Reuse persistent results when the cache key
+#'   matches. Default `FALSE`. See [inspect_cache()] for what's stored.
+#'   When enabled, the returned tibble gains a `.cache_status` column
+#'   (`"hit"` / `"miss"`).
+#' @param .cache_dir,.cache_format Where and how to persist cached
+#'   results.
+#' @param .parallel,.workers Run segments concurrently via a
+#'   multi-session future plan. Default: on, with `detectCores() - 1`.
+#' @param .verbose Print a per-step progress summary.
+#' @param .optimize Use the vectorised data.table backend. Default
+#'   `TRUE`; turn off only for debugging.
+#' @return An `extended_segment_list`: the input columns plus one
+#'   column per DSP output (e.g. `F1`, `F2`, `F3`).
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/ae_emuDB")
+#' segs <- query(corp, "Phonetic =~ [aeiou]")
+#'
+#' # Formants at the midpoint
+#' quantify(segs, superassp::forest, .at = 0.5)
+#'
+#' # Pitch contour: 11 evenly spaced points
+#' quantify(segs, superassp::ksvF0, .at = seq(0, 1, 0.1))
+#'
+#' # Override metadata-derived parameters
+#' quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
+#' @seealso [enrich()], [dsp_parameters()], [inspect_cache()]
 #' @name quantify
 #' @export
 quantify <- S7::new_generic("quantify", "object")
 
-#' Quantify method for segment_list - Apply DSP to query results
-#'
-#' Applies a DSP function to all segments in a segment_list, extracting
-#' acoustic measurements for each segment. This is equivalent to emuR::get_trackdata()
-#' but allows for custom DSP functions with metadata-driven parameters.
-#'
-#' @param object A segment_list object (from query/query)
-#' @param dsp_function A DSP function from superassp or similar
-#' @param ... Additional arguments passed to the DSP function
-#' @param .at Optional vector of relative time points (0-1) to extract from track
-#' @param .use_metadata Logical; whether to use bundle metadata for parameter derivation
-#' @param .verbose Logical; show progress messages
-#' @param .parallel Logical; use parallel processing (default TRUE)
-#' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
-#' @param .use_cache Logical; enable result caching (default FALSE)
-#' @param .cache_dir Character; cache directory path (default: \code{corpus@.cache_dir}, i.e. \code{basePath/.quantify_cache})
-#' @param .cache_format Character; serialization format - "auto" (uses qs if available,
-#'        otherwise base serialize), "qs" (faster, smaller, requires qs package),
-#'        or "rds" (base R serialize, slower, larger). Default: "auto"
-#' @param .optimize Logical; use optimized processing (default TRUE)
-#'
-#' @return An extended_segment_list with segment information and DSP-derived measurements
-#'
-#' @examplesIf interactive()
-#' segs <- query(corpus, "Phonetic == t")
-#' formants <- quantify(segs, superassp::forest)
-#'
-#' # Extract at specific time points
-#' formants_at_midpoint <- quantify(segs, superassp::forest, .at = 0.5)
-#' formants_three_points <- quantify(segs, superassp::forest, .at = c(0.2, 0.5, 0.8))
-#'
-#' # Disable parallel processing
-#' formants <- quantify(segs, superassp::forest, .parallel = FALSE)
-#'
-#' # Enable caching with qs format (faster, recommended)
-#' formants <- quantify(segs, superassp::forest, .use_cache = TRUE)
-#'
-#' # Force base R serialization
-#' formants <- quantify(segs, superassp::forest, .use_cache = TRUE, .cache_format = "rds")
-#'
+#' @rdname quantify
 #' @name quantify.segment_list
 S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .at = NULL,

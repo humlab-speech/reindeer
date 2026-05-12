@@ -2,80 +2,64 @@
 % Please edit documentation in R/reindeer_enrich.R
 \name{enrich}
 \alias{enrich}
-\title{Enrich corpus with DSP-derived tracks}
+\title{Add DSP tracks or metadata to a corpus or segment list}
 \usage{
 enrich(object, ...)
 }
 \arguments{
-\item{...}{Additional arguments passed to the DSP function}
+\item{object}{A \code{corpus} (run DSP corpus-wide) or \code{segment_list} /
+\code{lazy_segment_list} / \code{extended_segment_list} (join metadata or
+extract DSP per segment).}
 
-\item{corpus_obj}{A corpus object}
+\item{...}{Extra arguments forwarded to the DSP function (e.g.
+\code{minF}, \code{maxF}, \code{nominalF1}). User values override the
+metadata-derived defaults.}
 
-\item{.using}{A DSP function from superassp package (e.g., forest, ksvF0)}
+\item{.using}{A DSP function (typically \code{superassp::forest},
+\code{superassp::ksvF0}, etc.). Required for the corpus method.}
 
-\item{.metadata_fields}{Character vector of metadata fields to use for parameter derivation
-Default: c("Gender", "Age")}
+\item{.metadata_fields}{Metadata fields fed to \code{\link[=dsp_parameters]{dsp_parameters()}}.
+Default \code{c("Gender", "Age")}.}
 
-\item{.signal_extension}{File extension of signal files to process.
-Default: NULL (uses mediafileExtension from corpus config)}
+\item{.force}{Recompute even if track files already exist.}
 
-\item{.force}{Logical; if TRUE, recompute even if track files exist}
+\item{.parallel, .workers}{Use a multi-session future plan with this
+many workers. Default: parallel, \code{detectCores() - 1}.}
 
-\item{.verbose}{Logical; show progress and diagnostic messages}
+\item{.use_cache, .cache_dir, .cache_format}{Skip work that's already
+in the persistent cache. See \code{\link[=inspect_cache]{inspect_cache()}}.}
 
-\item{.parallel}{Logical; use parallel processing (default TRUE)}
+\item{.signal_extension}{Override the corpus' \code{mediafileExtension}.}
 
-\item{.workers}{Number of parallel workers (default: parallel::detectCores() - 1)}
-
-\item{.use_cache}{Logical; enable persistent caching of processed bundles (default FALSE)}
-
-\item{.cache_dir}{Character; cache directory path (default: \code{corpus@.cache_dir}, i.e. \code{basePath/.quantify_cache})}
-
-\item{.cache_format}{Character; serialization format - "auto", "qs", or "rds"}
+\item{.verbose}{Print progress. Default \code{TRUE}.}
 }
 \value{
-The corpus object (invisibly), with new SSFF track files created
+The corpus invisibly (corpus method), or an
+\code{extended_segment_list} / metadata-joined \code{segment_list} (segment
+method).
 }
 \description{
-Apply digital signal processing (DSP) functions from the superassp package
-to all signal files in a corpus, using metadata-driven parameter configuration.
-This function reads bundle and session-level metadata to determine optimal
-DSP parameters (e.g., formant analysis settings based on speaker age and gender).
-}
-\details{
-The function performs the following steps:
-\enumerate{
-\item Lists all signal files with the specified extension (or mediafileExtension)
-\item For each bundle, retrieves metadata (with database -> session -> bundle inheritance)
-\item Maps metadata fields to DSP function parameters (e.g., Age/Gender -> nominalF1)
-\item Applies the DSP function with derived parameters
-\item Registers new tracks in database configuration
-}
-
-Metadata-to-parameter mapping follows these rules:
-\itemize{
-\item Age and Gender are used to estimate formant frequencies (nominalF1, maxFormantHz)
-\item Other metadata fields are matched by name to function formals
-\item Database-level defaults apply unless overridden at session or bundle level
-}
-
-Parallel processing is used by default for improved performance on multi-core systems.
-Set .parallel = FALSE to disable parallel processing (useful for debugging).
+One verb that does the right thing depending on what you pass in.
+Give it a \code{corpus} and it runs the supplied DSP function over every
+signal file, picking age- and gender-aware parameters from the
+speaker metadata; the corpus comes back invisibly with the new
+track files written. Give it a \code{segment_list} and \code{with = "metadata"}
+(the default) and it joins the corpus metadata onto the segments;
+pass \code{.using = fn} to extract acoustic measurements via \code{\link[=quantify]{quantify()}}.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-# Enrich corpus with formant tracks
-corp |> enrich(.using = superassp::forest)
+corp <- corpus("path/to/ae_emuDB")
 
-# With explicit parameters
-corp |> enrich(.using = superassp::ksvF0,
-                minF = 75, maxF = 500,
-                .force = TRUE)
+# Corpus-wide formants, age/gender-aware parameters
+enrich(corp, .using = superassp::forest)
 
-# Disable parallel processing
-corp |> enrich(.using = superassp::forest, .parallel = FALSE)
+# Per-segment metadata join
+segs <- query(corp, "Phonetic =~ [aeiou]")
+enrich(segs, corp)                              # metadata join
+enrich(segs, .using = superassp::forest)        # delegates to quantify()
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=quantify]{quantify()}}
+\code{\link[=quantify]{quantify()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
 }

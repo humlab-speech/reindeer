@@ -4,37 +4,44 @@
 \alias{scout}
 \alias{scout.segment_list}
 \alias{scout.lazy_segment_list}
-\title{Scout Forward in Sequence}
+\title{Move forward or backward along an annotation level}
 \usage{
 scout(.segments, ...)
 }
 \arguments{
-\item{.segments}{segment_list or lazy_segment_list object}
+\item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
 
-\item{steps_forward}{Integer; number of steps to move forward (positive) or backward (negative)}
+\item{steps_forward}{Integer offset. \code{1} = next item, \code{-1} = previous,
+\code{2} = item after next.}
 
-\item{count_from}{Character; "START" or "END" of segment}
+\item{count_from}{\code{"START"} (default) or \code{"END"} — which edge of the
+current segment to count from.}
 
-\item{capture}{Integer; number of consecutive items to capture (default 1)}
+\item{capture}{Number of consecutive items to return per input
+segment. Default \code{1}.}
 
-\item{ignore_bundle_boundaries}{Logical; whether to cross bundle boundaries}
+\item{ignore_bundle_boundaries}{If \code{TRUE}, walk past the end of a
+bundle into the next one. Default \code{FALSE} (recommended).}
 
-\item{calculate_times}{Logical; whether to calculate start/end times}
+\item{calculate_times, times_from}{Recompute start/end times after the
+move; advanced, defaults are usually right.}
 
-\item{times_from}{Character; level to use for time calculation}
+\item{.from}{Optional \code{corpus} (only needed if the segment list lost
+its \code{db_path}).}
 
-\item{.from}{corpus object (optional, for additional context)}
+\item{.quiet}{Suppress informational messages.}
 
-\item{.quiet}{Logical; suppress messages}
-
-\item{collect}{Logical; force materialization (default TRUE)}
+\item{collect}{Materialise the result (default \code{TRUE}). With
+\code{FALSE} the operation is deferred into the lazy plan.}
 }
 \value{
-segment_list (or lazy_segment_list if collect=FALSE)
+A \code{segment_list}, or \code{lazy_segment_list} when \code{collect = FALSE}.
 }
 \description{
-Navigate forward through sequential items on the same level, optionally
-capturing multiple items. Optimized implementation using data.table.
+Given a \code{segment_list}, returns the item(s) \code{steps_forward} positions
+away on the same level — typically the previous or next phone, word,
+or syllable. Use negative steps to go backward, or \code{capture > 1} to
+grab a run of consecutive items.
 
 When \code{collect = TRUE} (default) the lazy plan is materialised first and
 the segment_list method runs; when \code{FALSE} a \code{scout} transform is
@@ -42,17 +49,12 @@ appended to the lazy plan for SQL-side evaluation at the next \code{collect()}.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-# Get next phoneme
-next_phone <- scout(segments, steps_forward = 1)
-
-# Get previous phoneme
-prev_phone <- scout(segments, steps_forward = -1)
-
-# Get next 2 phonemes
-next_two <- scout(segments, steps_forward = 1, capture = 2)
-
-# Lazy version
-lazy_next <- scout(segments, steps_forward = 1, collect = FALSE)
-result <- collect(lazy_next)
+corp <- corpus("path/to/ae_emuDB")
+stops <- query(corp, "Phonetic =~ [ptk]")
+next_phone <- scout(stops, steps_forward = 1)     # following phoneme
+prev_two   <- scout(stops, steps_forward = -1, capture = 2)
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}
 }

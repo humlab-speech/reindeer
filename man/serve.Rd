@@ -2,95 +2,52 @@
 % Please edit documentation in R/reindeer_serve.R
 \name{serve}
 \alias{serve}
-\title{Serve a corpus in the EMU-webApp annotation interface}
+\title{Open a corpus in the EMU-webApp annotation interface}
 \usage{
 serve(corpus, ...)
 }
 \arguments{
-\item{corpus}{A reindeer corpus object created with \code{corpus()}}
+\item{corpus}{A \code{corpus} object.}
 
-\item{...}{Additional arguments passed to the method, including
-\code{sessionPattern} (regex for sessions, default \code{".*"}),
-\code{bundlePattern} (regex for bundles, default \code{".*"}),
-\code{seglist} (optional segment_list to restrict bundles),
-\code{bundleListName} (optional bundle list name),
-\code{host} (server address, default \code{"127.0.0.1"}),
-\code{port} (server port, default \code{17890}),
-\code{autoOpenURL} (URL to open, set \code{""} to disable),
-\code{browser} (browser to use),
-\code{useViewer} (use RStudio viewer, default \code{TRUE}),
-\code{debug} (enable debug output, default \code{FALSE}),
-\code{debugLevel} (verbosity 0-8, default \code{0}).}
+\item{...}{Filters and server options:
+\code{sessionPattern} / \code{bundlePattern} (regex filters),
+\code{seglist} (a \code{segment_list} to restrict the bundles shown),
+\code{port} (default \code{17890}),
+\code{host} (default \code{"127.0.0.1"}),
+\code{useViewer} (default \code{TRUE} in RStudio),
+\code{autoOpenURL} (set \code{""} to skip browser launch).}
 }
 \value{
-Invisible TRUE
+Invisibly \code{TRUE}. The server keeps running until you press
+the \emph{clear} button in the webApp, close the tab, or run
+\code{httpuv::stopAllServers()}.
 }
 \description{
-Launches a local web server that serves a modified EMU-webApp for annotating
-and visualizing speech data. This function is adapted from \code{emuR::serve()} but
-serves a revised version of the annotation application from \verb{../EMU-webApp/dist/}.
+Launches a local web server and opens the EMU-webApp pointed at the
+corpus, so you can inspect waveforms and spectrograms, edit
+annotations, and have the changes write straight back to the corpus.
+Use \code{\link[=serve_app]{serve_app()}} if you also have \code{emuR} attached and want to avoid
+the name clash.
 }
-\details{
-This function creates an HTTP server with WebSocket support to enable
-real-time communication between the browser-based EMU-webApp and R. It
-serves the revised EMU-webApp from the \code{EMU-webApp} directory located
-at \verb{../EMU-webApp/} relative to the reindeer package.
+\section{EMU-webApp location}{
 
-The function implements the EMU-webApp websocket protocol v0.0.2, handling:
-\itemize{
-\item Database configuration retrieval
-\item Bundle list provision
-\item Bundle data (annotations, signal files, media) delivery
-\item Annotation saving and updates
-}
-
-To stop the server:
-\itemize{
-\item Press the 'clear' button in the EMU-webApp
-\item Close or reload the webApp in your browser
-\item Call \code{httpuv::stopAllServers()} in R
-}
-}
-\section{WebApp Location}{
-
-The function looks for the revised EMU-webApp in this order:
-\enumerate{
-\item R option: \code{getOption("reindeer.emuWebApp.dir")}
-\item Environment variable: \code{EMU_WEBAPP_DIR}
-\item Package installation: \code{system.file("EMU-webApp/dist", package = "reindeer")}
-\item Default fallback: \code{../EMU-webApp/dist} relative to package location
-}
-
-To set a custom path:
-
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{# Using R options (persistent within session)
+On first use, point reindeer at your EMU-webApp install:
+\preformatted{
 options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
-
-# Using environment variable (persistent across sessions)
+# or persistently:
 Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
-}\if{html}{\out{</div>}}
+}
+If neither is set reindeer looks at \code{system.file("EMU-webApp/dist", package = "reindeer")} and emits a helpful error otherwise.
 }
 
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-# Serve entire corpus
-corp <- corpus("path/to/mydb_emuDB")
+corp <- corpus("path/to/ae_emuDB")
 serve(corp)
-
-# Serve specific sessions
 serve(corp, sessionPattern = "Session.*")
-
-# Serve bundles matching a pattern
-serve(corp, bundlePattern = "msajc.*")
-
-# Serve only bundles from a query result
-segments <- query(corp, "Phonetic == t")
-serve(corp, seglist = segments)
-
-# Serve on a different port
-serve(corp, port = 8080)
-
-# Stop the server
-httpuv::stopAllServers()
+serve(corp, seglist = query(corp, "Duration > 500"))
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=serve_app]{serve_app()}}, \code{\link[=query]{query()}}
 }

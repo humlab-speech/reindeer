@@ -2,7 +2,7 @@
 % Please edit documentation in R/corpus_class.R
 \name{corpus}
 \alias{corpus}
-\title{Corpus Class - Represents an EmuR database with persistent connection and metadata management}
+\title{Open or create a speech corpus}
 \usage{
 corpus(
   path,
@@ -15,52 +15,54 @@ corpus(
 )
 }
 \arguments{
-\item{path}{Either a file path ending in '_emuDB' or an emuDBhandle object}
+\item{path}{Path to the corpus directory (the \verb{_emuDB} suffix is
+appended automatically if missing), or an existing \code{emuDBhandle}.}
 
-\item{verbose}{Show progress messages during construction}
+\item{verbose}{Print progress while loading. Default \code{FALSE}.}
 
-\item{create}{Logical; if TRUE and path doesn't exist, create a new database}
+\item{create}{If \code{TRUE} and the path does not exist, create an empty
+corpus there. Default \code{FALSE}.}
 
-\item{sync_eaf}{Logical; enable auto-sync of EAF files on annotation changes}
+\item{sync_eaf, sync_cmdi}{Keep ELAN \code{.eaf} files / CMDI metadata in
+sync with the corpus on each annotation or metadata change.
+Off by default.}
 
-\item{sync_cmdi}{Logical; enable auto-sync of CMDI metadata file on changes}
+\item{cache_dir}{Override the quantify/enrich cache directory.
+Default \verb{<basePath>/.quantify_cache}.}
 
-\item{cache_dir}{Character; path to quantify cache dir (default: \code{basePath/.quantify_cache})}
-
-\item{quick}{Logical; if TRUE, skip cache/metadata rebuild when existing cache is present}
+\item{quick}{Reuse the existing SQLite cache without rebuilding from
+\code{METADATA.json}. Faster startup; use after manual JSON edits
+only after calling \code{\link[=load_metadata]{load_metadata()}}.}
 }
 \value{
-A corpus object with access to database contents
+A \code{corpus} object.
 }
 \description{
-An S7 class representing a speech corpus that provides efficient access to
-annotations, metadata, and signal data stored in an Emu-SDMS database.
+\code{corpus()} is the entry point to every reindeer workflow. Point it at
+an EMU-SDMS database (a directory whose name ends in \verb{_emuDB}) and you
+get back a \code{corpus} object you can \code{\link[=query]{query()}}, \code{\link[=enrich]{enrich()}}, \code{\link[=serve]{serve()}},
+or \code{\link[=describe_corpus]{describe_corpus()}}.
 }
-\section{Properties}{
+\section{Bracket access}{
 
-\describe{
-\item{dbName}{The database name (without _emuDB suffix)}
-\item{basePath}{Full path to the database directory}
-\item{config}{Database configuration (DBconfig) loaded from JSON}
-\item{.uuid}{Database UUID for identification}
-\item{.connection}{Environment holding cached SQLite connection (reference semantics)}
-\item{.cache_dir}{Path to the quantify/enrich cache directory}
-\item{.sync}{Sync configuration list, or NULL if sync not configured}
+Once you have a corpus, you can read and write metadata by name:
+\preformatted{
+corp["Session1", "Bundle1"]                # read metadata
+corp["Session1", ]                         # all bundles in session
+corp["Sess.*", "Bund.*"]                   # regex
+corp["Session1", "Bundle1"] <- list(Age=25)# write metadata
+corp["Session1", "Bundle1"] <- "audio.mp3" # import media
 }
-}
-
-\section{Usage}{
-
-\describe{
-\item{\code{corpus(path)}}{Create corpus from path or emuDBhandle}
-\item{\code{corpus(path, sync_eaf=TRUE)}}{Enable EAF auto-sync}
-\item{\code{corp["Session","Bundle"]}}{Get bundle metadata}
-\item{\code{corp["Session",]}}{Get all bundles in session}
-\item{\code{corp[,"Bundle"]}}{Get bundle across sessions (if unique)}
-\item{\code{corp["Sess.*","Bund.*"]}}{Use regex patterns}
-\item{\code{corp["Session","Bundle"] <- list(Age=25)}}{Set metadata}
-\item{\code{corp["Session","Bundle"] <- "path/to/audio.mp3"}}{Import media}
-\item{\code{summary(corp)}}{Display comprehensive database summary}
-}
+For programmatic metadata see \code{\link[=set_metadata]{set_metadata()}} / \code{\link[=get_metadata]{get_metadata()}}.
 }
 
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/ae_emuDB")
+vowels <- query(corp, "Phonetic =~ [aeiou]")
+formants <- quantify(vowels, superassp::forest)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=query]{query()}}, \code{\link[=enrich]{enrich()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=serve_app]{serve_app()}}
+}

@@ -2,82 +2,40 @@
 # SERVE EMU-WEBAPP FOR REINDEER CORPUS
 # ==============================================================================
 
-#' Serve a corpus in the EMU-webApp annotation interface
+#' Open a corpus in the EMU-webApp annotation interface
 #'
-#' Launches a local web server that serves a modified EMU-webApp for annotating
-#' and visualizing speech data. This function is adapted from `emuR::serve()` but
-#' serves a revised version of the annotation application from `../EMU-webApp/dist/`.
+#' Launches a local web server and opens the EMU-webApp pointed at the
+#' corpus, so you can inspect waveforms and spectrograms, edit
+#' annotations, and have the changes write straight back to the corpus.
+#' Use [serve_app()] if you also have `emuR` attached and want to avoid
+#' the name clash.
 #'
-#' @param corpus A reindeer corpus object created with `corpus()`
-#' @param ... Additional arguments passed to the method, including
-#'   `sessionPattern` (regex for sessions, default `".*"`),
-#'   `bundlePattern` (regex for bundles, default `".*"`),
-#'   `seglist` (optional segment_list to restrict bundles),
-#'   `bundleListName` (optional bundle list name),
-#'   `host` (server address, default `"127.0.0.1"`),
-#'   `port` (server port, default `17890`),
-#'   `autoOpenURL` (URL to open, set `""` to disable),
-#'   `browser` (browser to use),
-#'   `useViewer` (use RStudio viewer, default `TRUE`),
-#'   `debug` (enable debug output, default `FALSE`),
-#'   `debugLevel` (verbosity 0-8, default `0`).
-#'
-#' @details
-#' This function creates an HTTP server with WebSocket support to enable
-#' real-time communication between the browser-based EMU-webApp and R. It
-#' serves the revised EMU-webApp from the `EMU-webApp` directory located
-#' at `../EMU-webApp/` relative to the reindeer package.
-#'
-#' The function implements the EMU-webApp websocket protocol v0.0.2, handling:
-#' - Database configuration retrieval
-#' - Bundle list provision
-#' - Bundle data (annotations, signal files, media) delivery
-#' - Annotation saving and updates
-#'
-#' To stop the server:
-#' - Press the 'clear' button in the EMU-webApp
-#' - Close or reload the webApp in your browser
-#' - Call `httpuv::stopAllServers()` in R
-#'
-#' @return Invisible TRUE
-#'
-#' @section WebApp Location:
-#' The function looks for the revised EMU-webApp in this order:
-#' 1. R option: `getOption("reindeer.emuWebApp.dir")`
-#' 2. Environment variable: `EMU_WEBAPP_DIR`
-#' 3. Package installation: `system.file("EMU-webApp/dist", package = "reindeer")`
-#' 4. Default fallback: `../EMU-webApp/dist` relative to package location
-#'
-#' To set a custom path:
-#' ```r
-#' # Using R options (persistent within session)
+#' @param corpus A `corpus` object.
+#' @param ... Filters and server options:
+#'   `sessionPattern` / `bundlePattern` (regex filters),
+#'   `seglist` (a `segment_list` to restrict the bundles shown),
+#'   `port` (default `17890`),
+#'   `host` (default `"127.0.0.1"`),
+#'   `useViewer` (default `TRUE` in RStudio),
+#'   `autoOpenURL` (set `""` to skip browser launch).
+#' @return Invisibly `TRUE`. The server keeps running until you press
+#'   the *clear* button in the webApp, close the tab, or run
+#'   `httpuv::stopAllServers()`.
+#' @section EMU-webApp location:
+#' On first use, point reindeer at your EMU-webApp install:
+#' \preformatted{
 #' options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
-#'
-#' # Using environment variable (persistent across sessions)
+#' # or persistently:
 #' Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
-#' ```
-#'
+#' }
+#' If neither is set reindeer looks at `system.file("EMU-webApp/dist",
+#' package = "reindeer")` and emits a helpful error otherwise.
 #' @examplesIf interactive()
-#' # Serve entire corpus
-#' corp <- corpus("path/to/mydb_emuDB")
+#' corp <- corpus("path/to/ae_emuDB")
 #' serve(corp)
-#'
-#' # Serve specific sessions
 #' serve(corp, sessionPattern = "Session.*")
-#'
-#' # Serve bundles matching a pattern
-#' serve(corp, bundlePattern = "msajc.*")
-#'
-#' # Serve only bundles from a query result
-#' segments <- query(corp, "Phonetic == t")
-#' serve(corp, seglist = segments)
-#'
-#' # Serve on a different port
-#' serve(corp, port = 8080)
-#'
-#' # Stop the server
-#' httpuv::stopAllServers()
-#'
+#' serve(corp, seglist = query(corp, "Duration > 500"))
+#' @seealso [serve_app()], [query()]
 #' @importFrom httpuv startServer stopAllServers
 #' @export
 serve <- S7::new_generic("serve", "corpus")

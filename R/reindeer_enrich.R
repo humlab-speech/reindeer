@@ -1,59 +1,47 @@
 #' @include segment_list_classes.R reindeer_lazy_segment_list.R corpus_class.R
 NULL
 
-#' Enrich corpus with DSP-derived tracks
+#' Add DSP tracks or metadata to a corpus or segment list
 #'
-#' Apply digital signal processing (DSP) functions from the superassp package
-#' to all signal files in a corpus, using metadata-driven parameter configuration.
-#' This function reads bundle and session-level metadata to determine optimal
-#' DSP parameters (e.g., formant analysis settings based on speaker age and gender).
+#' One verb that does the right thing depending on what you pass in.
+#' Give it a `corpus` and it runs the supplied DSP function over every
+#' signal file, picking age- and gender-aware parameters from the
+#' speaker metadata; the corpus comes back invisibly with the new
+#' track files written. Give it a `segment_list` and `with = "metadata"`
+#' (the default) and it joins the corpus metadata onto the segments;
+#' pass `.using = fn` to extract acoustic measurements via [quantify()].
 #'
-#' @param corpus_obj A corpus object
-#' @param .using A DSP function from superassp package (e.g., forest, ksvF0)
-#' @param ... Additional arguments passed to the DSP function
-#' @param .metadata_fields Character vector of metadata fields to use for parameter derivation
-#'        Default: c("Gender", "Age")
-#' @param .signal_extension File extension of signal files to process. 
-#'        Default: NULL (uses mediafileExtension from corpus config)
-#' @param .force Logical; if TRUE, recompute even if track files exist
-#' @param .verbose Logical; show progress and diagnostic messages
-#' @param .parallel Logical; use parallel processing (default TRUE)
-#' @param .workers Number of parallel workers (default: parallel::detectCores() - 1)
-#' @param .use_cache Logical; enable persistent caching of processed bundles (default FALSE)
-#' @param .cache_dir Character; cache directory path (default: \code{corpus@.cache_dir}, i.e. \code{basePath/.quantify_cache})
-#' @param .cache_format Character; serialization format - "auto", "qs", or "rds"
-#' 
-#' @return The corpus object (invisibly), with new SSFF track files created
-#' 
-#' @details
-#' The function performs the following steps:
-#' 1. Lists all signal files with the specified extension (or mediafileExtension)
-#' 2. For each bundle, retrieves metadata (with database -> session -> bundle inheritance)
-#' 3. Maps metadata fields to DSP function parameters (e.g., Age/Gender -> nominalF1)
-#' 4. Applies the DSP function with derived parameters
-#' 5. Registers new tracks in database configuration
-#' 
-#' Metadata-to-parameter mapping follows these rules:
-#' - Age and Gender are used to estimate formant frequencies (nominalF1, maxFormantHz)
-#' - Other metadata fields are matched by name to function formals
-#' - Database-level defaults apply unless overridden at session or bundle level
-#' 
-#' Parallel processing is used by default for improved performance on multi-core systems.
-#' Set .parallel = FALSE to disable parallel processing (useful for debugging).
-#' 
+#' @param object A `corpus` (run DSP corpus-wide) or `segment_list` /
+#'   `lazy_segment_list` / `extended_segment_list` (join metadata or
+#'   extract DSP per segment).
+#' @param .using A DSP function (typically `superassp::forest`,
+#'   `superassp::ksvF0`, etc.). Required for the corpus method.
+#' @param ... Extra arguments forwarded to the DSP function (e.g.
+#'   `minF`, `maxF`, `nominalF1`). User values override the
+#'   metadata-derived defaults.
+#' @param .metadata_fields Metadata fields fed to [dsp_parameters()].
+#'   Default `c("Gender", "Age")`.
+#' @param .force Recompute even if track files already exist.
+#' @param .parallel,.workers Use a multi-session future plan with this
+#'   many workers. Default: parallel, `detectCores() - 1`.
+#' @param .use_cache,.cache_dir,.cache_format Skip work that's already
+#'   in the persistent cache. See [inspect_cache()].
+#' @param .signal_extension Override the corpus' `mediafileExtension`.
+#' @param .verbose Print progress. Default `TRUE`.
+#' @return The corpus invisibly (corpus method), or an
+#'   `extended_segment_list` / metadata-joined `segment_list` (segment
+#'   method).
 #' @examplesIf interactive()
-#' # Enrich corpus with formant tracks
-#' corp |> enrich(.using = superassp::forest)
+#' corp <- corpus("path/to/ae_emuDB")
 #'
-#' # With explicit parameters
-#' corp |> enrich(.using = superassp::ksvF0,
-#'                 minF = 75, maxF = 500,
-#'                 .force = TRUE)
+#' # Corpus-wide formants, age/gender-aware parameters
+#' enrich(corp, .using = superassp::forest)
 #'
-#' # Disable parallel processing
-#' corp |> enrich(.using = superassp::forest, .parallel = FALSE)
-#' 
-#' @seealso [quantify()]
+#' # Per-segment metadata join
+#' segs <- query(corp, "Phonetic =~ [aeiou]")
+#' enrich(segs, corp)                              # metadata join
+#' enrich(segs, .using = superassp::forest)        # delegates to quantify()
+#' @seealso [quantify()], [dsp_parameters()], [inspect_cache()]
 #' @export
 enrich <- S7::new_generic("enrich", "object")
 

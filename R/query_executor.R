@@ -1,25 +1,33 @@
-#' Query an EMU database using EQL (EMU Query Language)
+#' Query a corpus with EMU Query Language (EQL)
 #'
-#' Executes a query against the SQLite cache of an EMU database and returns
-#' matching annotation segments. Supports simple, sequence, dominance,
-#' and function queries.
+#' Returns the annotation segments that match an EQL expression. Syntax
+#' is the same as `emuR::query()` so existing queries work unchanged;
+#' see the EMU-SDMS manual for the full grammar. Results come back as a
+#' tibble-like `segment_list` ready for [enrich()] / [quantify()] / dplyr.
 #'
-#' @param emuDB A \code{corpus} object, path to an emuDB directory, or emuDBhandle
-#' @param eql Character string with an EQL query (e.g. \code{"Phonetic == t"})
-#' @param ... Additional arguments: \code{lazy = FALSE} forces eager
-#'   materialisation. Defaults to \code{lazy = TRUE} as of v0.7.0, returning
-#'   a \code{lazy_segment_list} that auto-collects on data access.
-#' @return A \code{lazy_segment_list} (default) or a \code{\link{segment_list}}
-#'   when \code{lazy = FALSE}. Both behave identically for data access via
-#'   \code{$}, \code{[}, \code{nrow()}, \code{head()}, etc.
+#' By default the query is deferred until you actually access the data
+#' (`nrow()`, `head()`, `$`, dplyr verbs, [collect()] etc.). Pass
+#' `lazy = FALSE` to force immediate execution.
 #'
-#' @examples
-#' \dontrun{
-#' corp <- corpus("path/to/db_emuDB")
-#' segs <- query(corp, "Phonetic == t")
-#' segs <- query(corp, "[Phonetic == t -> Phonetic == s]")
-#' segs <- query(corp, "Phonetic == t", lazy = TRUE)
-#' }
+#' @param emuDB A `corpus` (preferred), a path to an `_emuDB` directory,
+#'   or an existing `emuDBhandle`.
+#' @param eql An EQL expression. Examples:
+#'   `"Phonetic == t"`, `"Phonetic =~ [aeiou]"`,
+#'   `"[Phonetic == t -> Phonetic =~ [aeiou]]"`,
+#'   `"[Syllable #== S ^ Phonetic =~ [aeiou]]"`.
+#' @param ... Passed to the executor. The most useful one is
+#'   `lazy = FALSE` for eager execution.
+#' @return A `segment_list` (eager) or `lazy_segment_list` (default).
+#' @section Common pitfalls:
+#'   * Use `==` (double equals) for equality — `=` triggers a parse error.
+#'   * Regex patterns go with `=~`/`!~`, exact strings with `==`/`!=`.
+#'   * Wrap sequences and dominances in `[ ]`: `[A -> B]`, `[A ^ B]`.
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/ae_emuDB")
+#' query(corp, "Phonetic == t")
+#' query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")
+#' query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
+#' @seealso [scout()], [ascend_to()], [descend_to()], [collect()]
 #' @export
 query <- function(emuDB, eql, ...) {
   # Handle corpus objects

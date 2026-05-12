@@ -2,34 +2,57 @@
 % Please edit documentation in R/query_executor.R
 \name{query}
 \alias{query}
-\title{Query an EMU database using EQL (EMU Query Language)}
+\title{Query a corpus with EMU Query Language (EQL)}
 \usage{
 query(emuDB, eql, ...)
 }
 \arguments{
-\item{emuDB}{A \code{corpus} object, path to an emuDB directory, or emuDBhandle}
+\item{emuDB}{A \code{corpus} (preferred), a path to an \verb{_emuDB} directory,
+or an existing \code{emuDBhandle}.}
 
-\item{eql}{Character string with an EQL query (e.g. \code{"Phonetic == t"})}
+\item{eql}{An EQL expression. Examples:
+\code{"Phonetic == t"}, \code{"Phonetic =~ [aeiou]"},
+\code{"[Phonetic == t -> Phonetic =~ [aeiou]]"},
+\code{"[Syllable #== S ^ Phonetic =~ [aeiou]]"}.}
 
-\item{...}{Additional arguments: \code{lazy = FALSE} forces eager
-materialisation. Defaults to \code{lazy = TRUE} as of v0.7.0, returning
-a \code{lazy_segment_list} that auto-collects on data access.}
+\item{...}{Passed to the executor. The most useful one is
+\code{lazy = FALSE} for eager execution.}
 }
 \value{
-A \code{lazy_segment_list} (default) or a \code{\link{segment_list}}
-when \code{lazy = FALSE}. Both behave identically for data access via
-\code{$}, \code{[}, \code{nrow()}, \code{head()}, etc.
+A \code{segment_list} (eager) or \code{lazy_segment_list} (default).
 }
 \description{
-Executes a query against the SQLite cache of an EMU database and returns
-matching annotation segments. Supports simple, sequence, dominance,
-and function queries.
+Returns the annotation segments that match an EQL expression. Syntax
+is the same as \code{emuR::query()} so existing queries work unchanged;
+see the EMU-SDMS manual for the full grammar. Results come back as a
+tibble-like \code{segment_list} ready for \code{\link[=enrich]{enrich()}} / \code{\link[=quantify]{quantify()}} / dplyr.
 }
+\details{
+By default the query is deferred until you actually access the data
+(\code{nrow()}, \code{head()}, \code{$}, dplyr verbs, \code{\link[=collect]{collect()}} etc.). Pass
+\code{lazy = FALSE} to force immediate execution.
+}
+\section{Common pitfalls}{
+
+\itemize{
+\item Use \code{==} (double equals) for equality — \code{=} triggers a parse error.
+\item Regex patterns go with \verb{=~}/\verb{!~}, exact strings with \code{==}/\code{!=}.
+\item Wrap sequences and dominances in \verb{[ ]}: \verb{[A -> B]}, \verb{[A ^ B]}.
+}
+
+[ ]: R:\%20
+[A -> B]: R:A\%20-\%3E\%20B
+[A ^ B]: R:A\%20\%5E\%20B
+}
+
 \examples{
-\dontrun{
-corp <- corpus("path/to/db_emuDB")
-segs <- query(corp, "Phonetic == t")
-segs <- query(corp, "[Phonetic == t -> Phonetic == s]")
-segs <- query(corp, "Phonetic == t", lazy = TRUE)
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- corpus("path/to/ae_emuDB")
+query(corp, "Phonetic == t")
+query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")
+query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
+\dontshow{\}) # examplesIf}
 }
+\seealso{
+\code{\link[=scout]{scout()}}, \code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}, \code{\link[=collect]{collect()}}
 }

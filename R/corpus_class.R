@@ -2,45 +2,42 @@
 # CORPUS S7 CLASS DEFINITION
 # ==============================================================================
 
-#' Corpus Class - Represents an EmuR database with persistent connection and metadata management
+#' Open or create a speech corpus
 #'
-#' An S7 class representing a speech corpus that provides efficient access to
-#' annotations, metadata, and signal data stored in an Emu-SDMS database.
+#' `corpus()` is the entry point to every reindeer workflow. Point it at
+#' an EMU-SDMS database (a directory whose name ends in `_emuDB`) and you
+#' get back a `corpus` object you can [query()], [enrich()], [serve()],
+#' or [describe_corpus()].
 #'
-#' @param path Either a file path ending in '_emuDB' or an emuDBhandle object
-#' @param verbose Show progress messages during construction
-#' @param create Logical; if TRUE and path doesn't exist, create a new database
-#' @param sync_eaf Logical; enable auto-sync of EAF files on annotation changes
-#' @param sync_cmdi Logical; enable auto-sync of CMDI metadata file on changes
-#' @param cache_dir Character; path to quantify cache dir (default: \code{basePath/.quantify_cache})
-#' @param quick Logical; if TRUE, skip cache/metadata rebuild when existing cache is present
-#'
-#' @returns A corpus object with access to database contents
-#'
-#' @section Properties:
-#' \describe{
-#'   \item{dbName}{The database name (without _emuDB suffix)}
-#'   \item{basePath}{Full path to the database directory}
-#'   \item{config}{Database configuration (DBconfig) loaded from JSON}
-#'   \item{.uuid}{Database UUID for identification}
-#'   \item{.connection}{Environment holding cached SQLite connection (reference semantics)}
-#'   \item{.cache_dir}{Path to the quantify/enrich cache directory}
-#'   \item{.sync}{Sync configuration list, or NULL if sync not configured}
+#' @param path Path to the corpus directory (the `_emuDB` suffix is
+#'   appended automatically if missing), or an existing `emuDBhandle`.
+#' @param create If `TRUE` and the path does not exist, create an empty
+#'   corpus there. Default `FALSE`.
+#' @param sync_eaf,sync_cmdi Keep ELAN `.eaf` files / CMDI metadata in
+#'   sync with the corpus on each annotation or metadata change.
+#'   Off by default.
+#' @param verbose Print progress while loading. Default `FALSE`.
+#' @param quick Reuse the existing SQLite cache without rebuilding from
+#'   `METADATA.json`. Faster startup; use after manual JSON edits
+#'   only after calling [load_metadata()].
+#' @param cache_dir Override the quantify/enrich cache directory.
+#'   Default `<basePath>/.quantify_cache`.
+#' @return A `corpus` object.
+#' @section Bracket access:
+#' Once you have a corpus, you can read and write metadata by name:
+#' \preformatted{
+#' corp["Session1", "Bundle1"]                # read metadata
+#' corp["Session1", ]                         # all bundles in session
+#' corp["Sess.*", "Bund.*"]                   # regex
+#' corp["Session1", "Bundle1"] <- list(Age=25)# write metadata
+#' corp["Session1", "Bundle1"] <- "audio.mp3" # import media
 #' }
-#'
-#' @section Usage:
-#' \describe{
-#'   \item{`corpus(path)`}{Create corpus from path or emuDBhandle}
-#'   \item{`corpus(path, sync_eaf=TRUE)`}{Enable EAF auto-sync}
-#'   \item{`corp["Session","Bundle"]`}{Get bundle metadata}
-#'   \item{`corp["Session",]`}{Get all bundles in session}
-#'   \item{`corp[,"Bundle"]`}{Get bundle across sessions (if unique)}
-#'   \item{`corp["Sess.*","Bund.*"]`}{Use regex patterns}
-#'   \item{`corp["Session","Bundle"] <- list(Age=25)`}{Set metadata}
-#'   \item{`corp["Session","Bundle"] <- "path/to/audio.mp3"`}{Import media}
-#'   \item{`summary(corp)`}{Display comprehensive database summary}
-#' }
-#'
+#' For programmatic metadata see [set_metadata()] / [get_metadata()].
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/ae_emuDB")
+#' vowels <- query(corp, "Phonetic =~ [aeiou]")
+#' formants <- quantify(vowels, superassp::forest)
+#' @seealso [query()], [enrich()], [load_metadata()], [serve_app()]
 #' @export
 corpus <- S7::new_class(
   "corpus",

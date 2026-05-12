@@ -4,24 +4,35 @@
 \alias{descend_to}
 \alias{descend_to.segment_list}
 \alias{descend_to.lazy_segment_list}
-\title{Descend to Lower Level in Hierarchy}
+\title{Move down the annotation hierarchy}
 \usage{
 descend_to(.segments, ...)
 }
 \arguments{
-\item{.segments}{segment_list or lazy_segment_list object}
+\item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
 
-\item{level}{Character; target level name to descend to}
+\item{level}{Name of the target level.}
 
-\item{.from}{corpus object (optional)}
+\item{.from}{Optional \code{corpus}.}
 
-\item{.quiet}{Logical; suppress messages}
+\item{.quiet}{Suppress messages.}
 
-\item{collect}{Logical; force materialization (default TRUE)}
+\item{collect}{Materialise (default \code{TRUE}).}
 }
 \value{
-segment_list (or lazy_segment_list if collect=FALSE)
+A \code{segment_list} (or \code{lazy_segment_list} when \code{collect = FALSE}).
 }
 \description{
-Navigate downward through the annotation hierarchy following dominance links.
+Returns the child item(s) at \code{level} for every segment in the input.
+Inverse of \code{\link[=ascend_to]{ascend_to()}}: descending from a word to \code{"Phonetic"}
+gives every phone in that word.
+}
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+words  <- query(corp, "Word =~ .*")
+phones <- descend_to(words, "Phonetic")
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=ascend_to]{ascend_to()}}, \code{\link[=scout]{scout()}}
 }
