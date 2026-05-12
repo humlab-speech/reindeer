@@ -192,6 +192,23 @@ corpus <- S7::new_class(
       gather_metadata_internal(corpus_obj, verbose = verbose)
     }
 
+    # Auto-regenerate FAIR artifacts when the dirty bit was flipped by an
+    # earlier metadata write. Gated by an option so power users can disable
+    # it; default off in 0.8.x to preserve the previous opt-in behaviour.
+    if (isTRUE(getOption("reindeer.auto_cmdi", FALSE)) &&
+        .is_metadata_dirty(corpus_obj)) {
+      tryCatch(
+        describe_corpus(corpus_obj, verbose = FALSE),
+        error = function(e) {
+          if (verbose) {
+            cli::cli_alert_warning(
+              "Auto-CMDI regeneration failed: {conditionMessage(e)}"
+            )
+          }
+        }
+      )
+    }
+
     corpus_obj
   },
   validator = function(self) {
