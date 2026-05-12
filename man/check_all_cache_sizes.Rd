@@ -4,21 +4,20 @@
 \alias{check_all_cache_sizes}
 \title{Check all cache sizes for a corpus}
 \usage{
-check_all_cache_sizes(corpus_obj, simulation_store = NULL, verbose = TRUE)
+check_all_cache_sizes(corpus_obj, verbose = TRUE)
 }
 \arguments{
 \item{corpus_obj}{A corpus object}
 
-\item{simulation_store}{Optional simulation store directory}
-
 \item{verbose}{Show messages}
 }
 \value{
-List with all cache sizes
+List with cache sizes
 }
 \description{
-Checks cache sizes for quantify/enrich and simulation caches.
-For draft annotation cache management, use protoscribe package functions.
+Checks cache sizes for the quantify/enrich cache.
+For draft annotation caches, use protoscribe; for simulation caches
+produced by \code{quantify_simulate()} / \code{enrich_simulate()}, use erodex.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}

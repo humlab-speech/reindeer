@@ -21,12 +21,13 @@ The **reindeer** package uses intelligent caching to dramatically speed up compu
 
 ## Cache Types
 
-Reindeer uses three types of caches:
+Reindeer manages a single cache directly:
 
 1. **Quantify/Enrich Cache** (`.quantify_cache/`): Stores results from `quantify()` and `enrich()` operations
-2. **Simulation Cache** (user-specified): Stores results from `quantify_simulate()` and `enrich_simulate()`
 
-> **Note:** Draft annotation caches (`.draft_cache/`) are managed by the [protoscribe](https://github.com/humlab-speech/protoscribe) package as of v0.3.0.
+> **Note:**
+> * Draft annotation caches (`.draft_cache/`) are managed by the [protoscribe](https://github.com/humlab-speech/protoscribe) package as of v0.3.0.
+> * Simulation result caches (sqlite files produced by `quantify_simulate()` and `enrich_simulate()`) are managed by the [erodex](https://github.com/humlab-speech/erodex) package — see `erodex::list_simulations()` and the `erodex` cache-management utilities.
 
 All caches use the high-performance **qs** package for fast serialization, providing:
 
@@ -62,9 +63,6 @@ To see what's taking up space:
 ```{r}
 # List all cache files, sorted by size
 manage_cache(corp, action = "list")
-
-# List only draft annotation caches
-manage_cache(corp, action = "list", cache_type = "draft")
 
 # List only quantify/enrich caches
 manage_cache(corp, action = "list", cache_type = "quantify")
@@ -113,12 +111,11 @@ manage_cache(corp, action = "clean", days_old = 7, dry_run = FALSE)
 Reindeer automatically warns you when caches grow large:
 
 **Warning Thresholds:**
-- Quantify/Draft caches: 500 MB (warning), 2 GB (critical)
-- Simulation caches: 1 GB (warning), 5 GB (critical)
+- Quantify/Enrich cache: 500 MB (warning), 2 GB (critical)
 
 You'll see warnings like:
 ```
-! Draft annotation cache is large: 1.25 GB (threshold: 500.00 MB)
+! Quantify/enrich cache is large: 1.25 GB (threshold: 500.00 MB)
 ℹ Consider running: manage_cache(corp, action = "clean", days_old = 30)
 ```
 
@@ -142,22 +139,6 @@ clean_quantify_cache(corp, days_old = 30)
 
 # Clean all caches at once
 clean_all_caches(corp, days_old = 30, dry_run = FALSE)
-```
-
-### Inspecting Cache Contents
-
-For simulation caches, you can list available simulations:
-
-```{r}
-# List all simulation caches
-list_simulations(simulation_store = "path/to/simulations")
-
-# Retrieve specific simulation results
-results <- reminisce(
-  simulation_store = "path/to/simulations",
-  .using = "forest",
-  nominalF1 = 500
-)
 ```
 
 ## Best Practices
@@ -189,12 +170,9 @@ manage_cache(corp, action = "clean", days_old = 60, dry_run = FALSE)
 
 ### 4. Simulation Caches
 
-Simulation caches can grow very large. Be more aggressive:
-
-```{r}
-# Clean simulations older than 14 days
-clean_simulation_cache("path/to/simulations", days_old = 14, dry_run = FALSE)
-```
+Simulation caches can grow very large. Manage them with the erodex
+package — see `?erodex::list_simulations` and the simulation
+cache-management utilities in erodex.
 
 ## Understanding Cache Invalidation
 
@@ -218,7 +196,9 @@ your_db_emuDB/
 └── _emuDBcache.sqlite     # Main database cache
 ```
 
-Simulation caches are stored in user-specified locations (often outside the database).
+Simulation caches (sqlite files) live wherever erodex's `quantify_simulate()` /
+`enrich_simulate()` was told to write them via `.simulation_store`, typically
+outside the corpus directory.
 
 ## Troubleshooting
 
@@ -274,4 +254,4 @@ The cache system in **reindeer** is designed to be transparent and automatic, bu
 
 - `?manage_cache` - Function documentation
 - `?quantify` - Learn about signal quantification
-- `vignette("simulation-infrastructure")` - Learn about simulation caching
+- `vignette("simulation-infrastructure", package = "erodex")` - Simulation caching in erodex

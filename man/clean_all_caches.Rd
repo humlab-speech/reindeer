@@ -4,18 +4,10 @@
 \alias{clean_all_caches}
 \title{Clean all caches for a corpus}
 \usage{
-clean_all_caches(
-  corpus_obj,
-  simulation_store = NULL,
-  days_old = 30,
-  dry_run = FALSE,
-  verbose = TRUE
-)
+clean_all_caches(corpus_obj, days_old = 30, dry_run = FALSE, verbose = TRUE)
 }
 \arguments{
 \item{corpus_obj}{A corpus object}
-
-\item{simulation_store}{Optional simulation store directory}
 
 \item{days_old}{Remove files older than this many days (default: 30)}
 
@@ -27,8 +19,8 @@ clean_all_caches(
 Named list with number of files deleted from each cache
 }
 \description{
-Cleans quantify/enrich and simulation caches. For draft annotation cache
-cleanup, use protoscribe package functions.
+Cleans the quantify/enrich cache. For draft annotation cache cleanup, use
+protoscribe; for simulation cache cleanup use erodex's pruning utilities.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}

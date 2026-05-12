@@ -2,13 +2,13 @@
 # CACHE SIZE MONITORING AND MANAGEMENT
 # ==============================================================================
 #
-# Unified infrastructure for monitoring and managing cache sizes across:
-# - Persistent quantify/enrich caches
-# - Simulation result caches
+# Infrastructure for monitoring and managing the persistent quantify/enrich
+# cache. Provides warnings when caches become large and utilities for cleanup.
 #
-# Provides warnings when caches become large and utilities for cleanup.
-#
-# Note: Draft annotation cache management is handled by the protoscribe package.
+# Note:
+# - Draft annotation cache management is handled by the protoscribe package.
+# - Simulation cache management (for results produced by erodex's
+#   quantify_simulate()/enrich_simulate()) lives in the erodex package.
 
 # ==============================================================================
 # SIZE UTILITIES
@@ -250,51 +250,21 @@ check_quantify_cache_size <- function(corpus_obj,
   )
 }
 
-#' Check simulation cache sizes
-#'
-#' @param simulation_store Simulation store directory
-#' @param warn_threshold Warning threshold (default: 1 GB)
-#' @param max_threshold Maximum threshold (default: 5 GB)
-#' @param verbose Show messages
-#' @return Cache size information
-#' @keywords internal
-check_simulation_cache_size <- function(simulation_store,
-                                         warn_threshold = "1 GB",
-                                         max_threshold = "5 GB",
-                                         verbose = TRUE) {
-
-  if (!dir.exists(simulation_store)) {
-    if (verbose) {
-      cli::cli_alert_info("Simulation store directory does not exist")
-    }
-    return(invisible(NULL))
-  }
-
-  check_cache_size(
-    simulation_store,
-    cache_type = "Simulation",
-    warn_threshold = warn_threshold,
-    max_threshold = max_threshold,
-    verbose = verbose
-  )
-}
-
 #' Check all cache sizes for a corpus
 #'
-#' Checks cache sizes for quantify/enrich and simulation caches.
-#' For draft annotation cache management, use protoscribe package functions.
+#' Checks cache sizes for the quantify/enrich cache.
+#' For draft annotation caches, use protoscribe; for simulation caches
+#' produced by `quantify_simulate()` / `enrich_simulate()`, use erodex.
 #'
 #' @param corpus_obj A corpus object
-#' @param simulation_store Optional simulation store directory
 #' @param verbose Show messages
-#' @return List with all cache sizes
+#' @return List with cache sizes
 #' @keywords internal
 #'
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' check_all_cache_sizes(corp)
 check_all_cache_sizes <- function(corpus_obj,
-                                   simulation_store = NULL,
                                    verbose = TRUE) {
 
   if (verbose) {
@@ -304,15 +274,7 @@ check_all_cache_sizes <- function(corpus_obj,
   # Check quantify cache
   quantify_info <- check_quantify_cache_size(corpus_obj, verbose = verbose)
 
-  # Check simulation cache if provided
-  simulation_info <- if (!is.null(simulation_store)) {
-    check_simulation_cache_size(simulation_store, verbose = verbose)
-  } else {
-    NULL
-  }
-
-  # Calculate total
-  total_size <- quantify_info$size_bytes + (simulation_info$size_bytes %||% 0)
+  total_size <- quantify_info$size_bytes %||% 0
 
   if (verbose) {
     cli::cli_alert_info("Total cache size: {.val {format_bytes(total_size)}}")
@@ -320,7 +282,6 @@ check_all_cache_sizes <- function(corpus_obj,
 
   invisible(list(
     quantify = quantify_info,
-    simulation = simulation_info,
     total_bytes = total_size,
     total_formatted = format_bytes(total_size)
   ))
@@ -423,34 +384,12 @@ clean_quantify_cache <- function(corpus_obj,
                           dry_run = dry_run, verbose = verbose)
 }
 
-#' Clean simulation cache
-#'
-#' @param simulation_store Simulation store directory
-#' @param days_old Remove files older than this many days (default: 30)
-#' @param dry_run If TRUE, only show what would be deleted
-#' @param verbose Show messages
-#' @return Number of files deleted
-#' @keywords internal
-clean_simulation_cache <- function(simulation_store,
-                                    days_old = 30,
-                                    dry_run = FALSE,
-                                    verbose = TRUE) {
-
-  if (verbose) {
-    cli::cli_h3("Cleaning simulation cache")
-  }
-
-  remove_old_cache_files(simulation_store, days_old, pattern = "\\.sqlite$",
-                          dry_run = dry_run, verbose = verbose)
-}
-
 #' Clean all caches for a corpus
 #'
-#' Cleans quantify/enrich and simulation caches. For draft annotation cache
-#' cleanup, use protoscribe package functions.
+#' Cleans the quantify/enrich cache. For draft annotation cache cleanup, use
+#' protoscribe; for simulation cache cleanup use erodex's pruning utilities.
 #'
 #' @param corpus_obj A corpus object
-#' @param simulation_store Optional simulation store directory
 #' @param days_old Remove files older than this many days (default: 30)
 #' @param dry_run If TRUE, only show what would be deleted
 #' @param verbose Show messages
@@ -469,7 +408,6 @@ clean_simulation_cache <- function(simulation_store,
 #' # Delete files older than 7 days
 #' clean_all_caches(corp, days_old = 7)
 clean_all_caches <- function(corpus_obj,
-                              simulation_store = NULL,
                               days_old = 30,
                               dry_run = FALSE,
                               verbose = TRUE) {
@@ -483,13 +421,7 @@ clean_all_caches <- function(corpus_obj,
 
   quantify_deleted <- clean_quantify_cache(corpus_obj, days_old, dry_run, verbose)
 
-  simulation_deleted <- if (!is.null(simulation_store)) {
-    clean_simulation_cache(simulation_store, days_old, dry_run, verbose)
-  } else {
-    0
-  }
-
-  total <- quantify_deleted + simulation_deleted
+  total <- quantify_deleted
 
   if (verbose) {
     if (dry_run) {
@@ -501,7 +433,6 @@ clean_all_caches <- function(corpus_obj,
 
   invisible(list(
     quantify = quantify_deleted,
-    simulation = simulation_deleted,
     total = total
   ))
 }
