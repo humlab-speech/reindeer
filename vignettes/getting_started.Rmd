@@ -10,679 +10,225 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
+  comment  = "#>",
+  eval     = FALSE
 )
 ```
 
-## Introduction
+## What reindeer does for you
 
-**reindeer** is an R package that extends [emuR](https://github.com/IPS-LMU/emuR) for working with speech data in challenging conditions. It provides:
+**reindeer** lets you treat an EMU-SDMS speech corpus the way you treat
+any tidy dataset:
 
-- **Optimized workflows** for large speech corpora
-- **Metadata management** with SQLite caching
-- **Age/gender-specific** signal processing parameters
-- **Intelligent caching** for computationally intensive operations
-- **Modern S7 classes** for type safety and performance
+- Open a corpus with `corpus()`.
+- Pull out annotation segments with `query()` using EMU Query Language.
+- Add measurements (formants, pitch, intensity…) with `quantify()`,
+  picking parameters from each speaker's metadata automatically.
+- Join speaker metadata with `enrich(..., with = "metadata")`.
+- Then plot, model, or write to disk with the dplyr verbs you already
+  know.
 
-This guide will walk you through the basics of using reindeer for your speech analysis workflow.
+This vignette shows the five-minute version of that loop, then expands
+each step.
 
 ## Installation
 
 ```{r}
-# Install from GitHub (development version)
-# install.packages("remotes")
-remotes::install_github("your-username/reindeer")
-
-# Load the package
+remotes::install_github("humlab-speech/reindeer")
 library(reindeer)
 ```
 
-## Quick Start: 5-Minute Workflow
-
-Here's a complete analysis workflow in just a few lines:
+## Five-minute workflow
 
 ```{r}
-# 1. Load your database
-corp <- corpus("path/to/your_database_emuDB")
+library(reindeer)
+library(dplyr)
 
-# 2. Query for segments
+corp <- corpus("path/to/your_emuDB")
+
+# 1. Query vowels
 vowels <- query(corp, "Phonetic =~ [aeiou]")
 
-# 3. Extract formant measurements
-formants <- quantify(vowels, superassp::forest)
+# 2. Extract formants at the midpoint
+formants <- quantify(vowels, superassp::forest, .at = 0.5)
 
-# 4. Add speaker metadata
-formants_with_meta <- biographize(formants, corp)
+# 3. Add speaker metadata
+data <- enrich(formants, corp)
 
-# 5. Analyze
-library(dplyr)
-formants_with_meta %>%
-  group_by(label, Gender) %>%
-  summarise(
-    mean_F1 = mean(F1, na.rm = TRUE),
-    mean_F2 = mean(F2, na.rm = TRUE)
-  )
+# 4. Summarise
+data |>
+  group_by(label, Gender) |>
+  summarise(mean_F1 = mean(F1, na.rm = TRUE),
+            mean_F2 = mean(F2, na.rm = TRUE),
+            .groups = "drop")
 ```
 
-That's it! Let's break down each step.
+That's the whole pipeline. The rest of the vignette walks through each
+verb in more detail.
 
-## Step 1: Loading Your Corpus
-
-The `corpus()` function is your entry point to working with EMU databases in reindeer.
-
-### Basic Usage
+## Step 1 — Open the corpus
 
 ```{r}
-# From a path
-corp <- corpus("path/to/database_emuDB")
-
-# With verbose output to see what's happening
-corp <- corpus("path/to/database_emuDB", verbose = TRUE)
+corp <- corpus("path/to/your_emuDB")
 ```
 
-### What Happens When You Load
+The trailing `_emuDB` is appended automatically if you leave it off.
+If the corpus does not exist yet, pass `create = TRUE`.
 
-When you create a corpus object, reindeer:
+## Step 2 — Query
 
-1. **Validates** the database structure
-2. **Builds a SQLite cache** for fast queries
-3. **Loads metadata** from .meta_json files
-4. **Initializes** persistent connections
+`query()` understands EMU Query Language (EQL). Common shapes:
 
 ```{r}
-# The corpus object contains
-corp@dbName        # Database name
-corp@basePath      # Full path to database
-corp@config        # Database configuration
+query(corp, "Phonetic == t")                       # exact match
+query(corp, "Phonetic =~ [aeiou]")                 # regex
+query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")    # sequence
+query(corp, "[Syllable #== S ^ Phonetic =~ [aeiou]]")    # dominance
 ```
 
-### Working with emuR
+Use `==` for equality (`=` triggers a parse error), `=~` / `!~` for
+regex, and wrap sequences and dominances in `[ ]`. See the
+[EQL grammar](https://ips-lmu.github.io/The-EMU-SDMS-Manual/chap-querysys.html)
+for the full reference.
 
-reindeer is fully compatible with emuR:
-
-```{r}
-# You can also load with emuR first
-handle <- emuR::load_emuDB("path/to/database_emuDB")
-
-# Then convert to reindeer corpus
-corp <- corpus(handle)
-```
-
-## Step 2: Querying Your Data
-
-reindeer provides optimized querying through `query()` (alias: `query()`).
-
-### Simple Queries
+Results are tidy: each row is one segment with `label`, `start`, `end`,
+`session`, `bundle`, plus a few bookkeeping columns. You can pipe the
+result through any dplyr verb.
 
 ```{r}
-# Exact match
-segments <- query(corp, "Phonetic == t")
-
-# Not equal
-segments <- query(corp, "Phonetic != t")
-
-# Regex pattern matching
 vowels <- query(corp, "Phonetic =~ [aeiou]")
-consonants <- query(corp, "Phonetic !~ [aeiou]")
+vowels |> filter(end - start > 100) |> count(label)
 ```
 
-### Advanced Queries
+## Step 3 — Quantify
+
+`quantify()` runs a DSP function on each segment and returns one row of
+measurements per segment (or per time point if you pass `.at`).
 
 ```{r}
-# Sequence: find /t/ followed by vowel
-seq <- query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")
-
-# Dominance: find vowels dominated by stressed syllables
-stressed_vowels <- query(corp, "[Syllable == S ^ Phonetic =~ [aeiou]]")
-
-# Conjunction (AND)
-long_vowels <- query(corp, "[Phonetic =~ [aeiou] & Duration > 100]")
-
-# Disjunction (OR)
-stops <- query(corp, "[Phonetic == p | Phonetic == t | Phonetic == k]")
+formants <- quantify(vowels, superassp::forest)                 # midpoint
+contour  <- quantify(vowels, superassp::ksvF0, .at = seq(0, 1, 0.1))
+intensity <- quantify(vowels, superassp::rmsana)
 ```
 
-### Projection
-
-Use `#` to specify which level to return:
+By default reindeer chooses age- and gender-aware parameters from each
+speaker's metadata (think: smaller windows for children, lower expected
+F1 for adult males). Preview what's being chosen with
+`dsp_parameters()`:
 
 ```{r}
-# Return the syllable, not the vowel
-syllables <- query(corp, "[Syllable #== S ^ Phonetic =~ [aeiou]]")
+dsp_parameters(age = 8, gender = "Male")
+dsp_parameters(corpus_obj = corp)   # one row per bundle
 ```
 
-### Query Results
-
-The result is a `segment_list` object:
+Override anything explicitly through `...`:
 
 ```{r}
-segments <- query(corp, "Phonetic == t")
-
-# View results
-print(segments)      # Pretty printed summary
-summary(segments)    # Detailed statistics
-
-# Access as data frame
-as.data.frame(segments)
-
-# Key columns
-segments$labels      # Segment labels
-segments$start       # Start time (ms)
-segments$end         # End time (ms)
-segments$session     # Session name
-segments$bundle      # Bundle name
+quantify(vowels, superassp::forest,
+         nominalF1 = 500, windowSize = 20, numFormants = 4)
 ```
 
-## Step 3: Signal Processing (Quantify)
+### Caching results
 
-Extract acoustic measurements from your segments with `quantify()`.
-
-### Basic Formant Analysis
+Slow DSP runs are worth caching. Turn it on once and reindeer will skip
+work that's already on disk:
 
 ```{r}
-# Extract formants at segment midpoint
-formants <- quantify(segments, superassp::forest)
+formants <- quantify(vowels, superassp::forest, .use_cache = TRUE)
+formants$.cache_status   # "hit" / "miss" per row
 
-# Result is an extended_segment_list
-formants$F1          # First formant
-formants$F2          # Second formant
-formants$F3          # Third formant
+inspect_cache(corp)      # see what's stored
 ```
 
-### Multiple Time Points
+## Step 4 — Add speaker metadata
+
+`enrich()` does double duty: with `with = "metadata"` it joins corpus
+metadata onto the segments; with `.using = fn` it forwards to
+`quantify()`.
 
 ```{r}
-# Extract at 20%, 50%, and 80% of segment duration
-formants_multi <- quantify(
-  segments,
-  superassp::forest,
-  .at = c(0.2, 0.5, 0.8)
-)
-
-# Now you have 3 rows per segment
-nrow(segments)           # e.g., 100
-nrow(formants_multi)     # e.g., 300 (3 per segment)
+data <- enrich(formants, corp)              # metadata join (default)
 ```
 
-### Different Analyses
+To set metadata in the first place, use `set_metadata()`:
 
 ```{r}
-# Pitch (F0)
-pitch <- quantify(segments, superassp::ksvF0)
-
-# Intensity
-intensity <- quantify(segments, superassp::rmsana)
-
-# Zero crossing rate
-zcr <- quantify(segments, superassp::zcrana)
-
-# Spectrum
-spectrum <- quantify(segments, superassp::dftSpectrum)
+set_metadata(corp, list(Project = "MyStudy"))                       # db level
+set_metadata(corp, list(Age = 25, Gender = "Female"),
+             session = "Session1")                                  # session
+set_metadata(corp, list(Quality = "Good"),
+             session = "Session1", bundle = "Bundle1")              # bundle
 ```
 
-### Custom Parameters
+Bundle wins over session, session wins over database default.
+`load_metadata(corp)` rescans the on-disk `METADATA.json` files into
+the cache when you have edited them outside R. For batch editing,
+round-trip through Excel:
 
 ```{r}
-# Override default parameters
-formants_custom <- quantify(
-  segments,
-  superassp::forest,
-  nominalF1 = 500,     # Expected F1 (Hz)
-  windowSize = 20,     # Window size (ms)
-  numFormants = 4      # Extract 4 formants
-)
+export_metadata(corp, "metadata.xlsx")        # edit in spreadsheet
+load_metadata(corp, source = "excel", path = "metadata.xlsx")
 ```
 
-### Metadata-Driven Parameters
+## Step 5 — Analyse
 
-reindeer automatically adjusts parameters based on speaker metadata:
-
-```{r}
-# If you've set Age and Gender metadata, these affect:
-# - nominalF1, nominalF2, nominalF3 (formants)
-# - Window sizes
-# - Pitch ranges
-
-# See default parameters
-data(DSPP)
-head(DSPP)
-```
-
-### Performance Options
+Once you have a tibble with measurements and metadata, the rest is
+ordinary R.
 
 ```{r}
-# Use caching for expensive analyses
-formants <- quantify(
-  segments,
-  superassp::forest,
-  .use_cache = TRUE,
-  .cache_format = "qs"  # Fast serialization
-)
-
-# Parallel processing (default for large segment lists)
-formants <- quantify(
-  segments,
-  superassp::forest,
-  .parallel = TRUE,
-  .workers = 4
-)
-
-# Verbose output
-formants <- quantify(
-  segments,
-  superassp::forest,
-  .verbose = TRUE
-)
-```
-
-## Step 4: Adding Metadata
-
-The `biographize()` function enriches your data with speaker metadata.
-
-### Basic Usage
-
-```{r}
-# Add all available metadata
-data_with_meta <- biographize(formants, corp)
-
-# Now you have speaker information
-data_with_meta$Age
-data_with_meta$Gender
-data_with_meta$Project
-# ... any metadata you've defined
-```
-
-### Setting Metadata
-
-Before you can use metadata, you need to set it:
-
-```{r}
-# Database-level (applies to all)
-add_metadata(corp, list(
-  Project = "MyStudy",
-  SampleRate = 44100
-))
-
-# Session-level (overrides database defaults)
-add_metadata(corp,
-  list(Speaker = "P01", Age = 25, Gender = "M"),
-  session = "Session1"
-)
-
-# Bundle-level (overrides session defaults)
-add_metadata(corp,
-  list(Quality = "Good", Notes = "Clear recording"),
-  session = "Session1",
-  bundle = "Bundle1"
-)
-```
-
-### Metadata Inheritance
-
-Reindeer uses a three-level hierarchy:
-
-1. **Database** → defaults for everything
-2. **Session** → overrides database
-3. **Bundle** → overrides session
-
-```{r}
-# View effective metadata for a bundle
-get_metadata(corp, session_pattern = "Session1", bundle_pattern = "Bundle1")
-```
-
-### Batch Metadata Management
-
-```{r}
-# Export to Excel for editing
-export_metadata(corp, "metadata.xlsx")
-
-# Edit in Excel...
-
-# Import back
-import_metadata(corp, "metadata.xlsx")
-
-# Refresh cache
-gather_metadata(corp)
-```
-
-## Step 5: Analysis and Visualization
-
-Once you have your enriched data, use standard R tools:
-
-```{r}
-library(dplyr)
 library(ggplot2)
 
-# Summary statistics
-formants_with_meta %>%
-  group_by(label, Gender) %>%
-  summarise(
-    n = n(),
-    mean_F1 = mean(F1, na.rm = TRUE),
-    sd_F1 = sd(F1, na.rm = TRUE),
-    mean_F2 = mean(F2, na.rm = TRUE),
-    sd_F2 = sd(F2, na.rm = TRUE)
-  )
-
-# Vowel plot
-ggplot(formants_with_meta, aes(x = F2, y = F1, color = label)) +
+ggplot(data, aes(x = F2, y = F1, color = label)) +
   geom_point(alpha = 0.5) +
   scale_x_reverse() +
   scale_y_reverse() +
   facet_wrap(~ Gender) +
   theme_minimal() +
-  labs(title = "Vowel Space by Gender")
-
-# Distribution plots
-ggplot(formants_with_meta, aes(x = F1, fill = Gender)) +
-  geom_density(alpha = 0.5) +
-  facet_wrap(~ label) +
-  theme_minimal()
+  labs(title = "Vowel space by gender")
 ```
 
-## Common Workflows
+## Interactive annotation (optional)
 
-### Vowel Analysis
+To inspect or edit annotations in a browser-based UI:
 
 ```{r}
-# Complete vowel analysis workflow
-corp <- corpus("path/to/db_emuDB")
-
-# Query vowels
-vowels <- query(corp, "Phonetic =~ [aeiouæɑɔ]")
-
-# Extract formants at midpoint
-formants <- quantify(vowels, superassp::forest, .at = 0.5)
-
-# Add metadata
-vowels_data <- biographize(formants, corp)
-
-# Normalize formants
-library(vowels)
-vowels_data$F1_norm <- norm.lobanov(vowels_data$F1,
-                                     vowels_data$Speaker)
-vowels_data$F2_norm <- norm.lobanov(vowels_data$F2,
-                                     vowels_data$Speaker)
-
-# Plot
-ggplot(vowels_data, aes(x = F2_norm, y = F1_norm, color = label)) +
-  geom_point(alpha = 0.6) +
-  stat_ellipse(level = 0.67) +
-  scale_x_reverse() +
-  scale_y_reverse() +
-  theme_minimal() +
-  labs(title = "Normalized Vowel Space")
+serve_app(corp)                              # whole corpus
+serve_app(corp, seglist = vowels)            # restrict to query result
+serve_app(corp, sessionPattern = "Session0[1-3]")
 ```
 
-### Pitch Analysis
+Close the tab or run `httpuv::stopAllServers()` to release the port.
+
+## Lazy pipelines and pipe-loss
+
+`query()` is lazy by default — it returns a `lazy_segment_list` and
+nothing actually runs until you call `nrow()`, `head()`, `collect()`,
+or any data-access method. Filter and navigate freely:
 
 ```{r}
-# Analyze pitch contours
-corp <- corpus("path/to/db_emuDB")
+plan <- query(corp, "Phonetic =~ [aeiou]") |>
+  filter(label != "@") |>
+  scout(steps_forward = 1) |>      # next phoneme
+  ascend_to("Word")                # parent word
 
-# Query intonation phrases
-phrases <- query(corp, "Intonation == IP")
-
-# Extract pitch at multiple points
-pitch_contour <- quantify(
-  phrases,
-  superassp::ksvF0,
-  .at = seq(0, 1, by = 0.1)  # Every 10%
-)
-
-# Add metadata
-pitch_data <- biographize(pitch_contour, corp)
-
-# Visualize
-ggplot(pitch_data, aes(x = time_rel, y = F0, group = bundle)) +
-  geom_line(alpha = 0.3) +
-  stat_summary(fun = mean, geom = "line", color = "red", size = 1) +
-  facet_wrap(~ Gender) +
-  theme_minimal() +
-  labs(
-    title = "Pitch Contours in Intonation Phrases",
-    x = "Relative Time",
-    y = "F0 (Hz)"
-  )
+collect(plan)                       # run it
 ```
 
-### VOT Measurement
+If a pipeline drops more than 25% of rows reindeer warns. Inspect the
+loss with:
 
 ```{r}
-# Voice Onset Time for stops
-corp <- corpus("path/to/db_emuDB")
-
-# Query stops at word onsets
-stops <- query(corp, "[Word #^ Phonetic =~ [ptk]]")
-
-# Get zero crossing rate (for burst detection)
-zcr <- quantify(
-  stops,
-  superassp::zcrana,
-  .at = seq(0, 0.2, by = 0.01)  # First 20% in 1% steps
-)
-
-# Add metadata
-vot_data <- biographize(zcr, corp)
-
-# Detect burst (simplified)
-library(tidyr)
-vot_summary <- vot_data %>%
-  group_by(session, bundle, label) %>%
-  mutate(
-    burst_point = which.max(zcr)[1],
-    vot_estimate = time_rel[burst_point] * (end - start)
-  ) %>%
-  slice(1) %>%
-  ungroup()
-
-# Compare by place of articulation
-ggplot(vot_summary, aes(x = label, y = vot_estimate)) +
-  geom_boxplot() +
-  theme_minimal() +
-  labs(
-    title = "VOT by Place of Articulation",
-    x = "Phoneme",
-    y = "VOT (ms)"
-  )
+provenance(plan)        # tibble: step / verb / rows_in / rows_out / rows_lost
+dropped_rows(plan)      # per-step row-loss summary
+dropped(plan)           # cumulative count
 ```
 
-## Tips and Best Practices
+## Where to go next
 
-### 1. Use Caching
-
-For large corpora or expensive analyses:
-
-```{r}
-# Enable caching
-formants <- quantify(segments, superassp::forest, .use_cache = TRUE)
-
-# Check cache status
-manage_cache(corp)
-
-# Clean old caches
-manage_cache(corp, action = "clean", days_old = 30)
-```
-
-### 2. Leverage Metadata
-
-Set up metadata early:
-
-```{r}
-# Export template
-export_metadata(corp, "metadata_template.xlsx")
-
-# Fill in Excel, then import
-import_metadata(corp, "metadata_filled.xlsx")
-```
-
-### 3. Use Verbose Mode for Debugging
-
-```{r}
-corp <- corpus("path/to/db_emuDB", verbose = TRUE)
-formants <- quantify(segments, superassp::forest, .verbose = TRUE)
-```
-
-### 4. Check Data Before Analysis
-
-```{r}
-# Summary statistics
-summary(segments)
-
-# Check for missing data
-sum(is.na(formants$F1))
-
-# Visualize distributions
-hist(formants$F1)
-```
-
-### 5. Optimize Queries
-
-```{r}
-# Be specific in queries to reduce processing time
-vowels <- query(corp, "Phonetic =~ [aeiou]")  # Good
-all_segs <- query(corp, "Phonetic =~ .*")     # Slower
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Problem:** `corpus()` fails with "Database path does not exist"
-
-```{r}
-# Solution: Check path
-dir.exists("path/to/database_emuDB")
-
-# Make sure it ends with _emuDB
-corp <- corpus("path/to/database_emuDB")
-```
-
-**Problem:** `query()` returns empty segment_list
-
-```{r}
-# Check your query syntax
-# Common issues:
-query(corp, "Phonetic = t")    # Wrong: use ==
-query(corp, "Phonetic == t")   # Correct
-
-# Check what levels exist
-corp@config$levelDefinitions
-```
-
-**Problem:** `quantify()` is very slow
-
-```{r}
-# Enable caching
-formants <- quantify(segments, superassp::forest, .use_cache = TRUE)
-
-# Use parallel processing
-formants <- quantify(segments, superassp::forest, .parallel = TRUE)
-
-# Reduce number of time points
-formants <- quantify(segments, superassp::forest, .at = 0.5)  # Just midpoint
-```
-
-**Problem:** Missing metadata after `biographize()`
-
-```{r}
-# Check if metadata exists
-get_metadata(corp)
-
-# Refresh metadata cache
-gather_metadata(corp)
-
-# Add metadata if missing
-add_metadata(corp, list(Gender = "M"), session = "Session1")
-```
-
-## Step 6: Interactive Annotation (Optional)
-
-For manual annotation and quality control, launch the EMU-webApp interface:
-
-```{r}
-# Open annotation interface for entire corpus
-serve(corp)
-
-# Or serve only specific segments (e.g., from a query)
-vowels <- query(corp, "Phonetic =~ [aeiou]")
-serve(corp, seglist = vowels)
-
-# The webApp opens in your browser/RStudio Viewer
-# - View spectrograms and waveforms
-# - Play audio
-# - Edit annotations
-# - Changes save automatically to the database
-```
-
-### Configuration
-
-First-time users need to configure the EMU-webApp path:
-
-```{r}
-# Set path to EMU-webApp (choose one method)
-
-# Option 1: R option (persistent within session)
-options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
-
-# Option 2: Environment variable (persistent across sessions)
-Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
-
-# Then serve
-serve(corp)
-```
-
-### Common Annotation Workflows
-
-```{r}
-# Review query results
-outliers <- query(corp, "Duration > 500")
-serve(corp, seglist = outliers)
-
-# Annotate specific sessions
-serve(corp, sessionPattern = "Session0[1-3]")
-
-# Annotate specific bundles
-serve(corp, bundlePattern = "recording_.*")
-```
-
-See `vignette("interactive_annotation")` for comprehensive annotation workflows.
-
-## Next Steps
-
-Now that you know the basics, explore:
-
-- **[interactive_annotation.Rmd](interactive_annotation.html)** - Manual annotation with EMU-webApp
-- **[metadata_management.Rmd](metadata_management.html)** - Deep dive into metadata
-- **[cache_management.Rmd](cache_management.html)** - Optimize performance
-- **[simulation-infrastructure.Rmd](simulation-infrastructure.html)** - Parameter exploration
-- **[query_benchmarks.qmd](query_benchmarks.html)** - Query optimization
-
-## Getting Help
-
-```{r}
-# Function documentation
-?corpus
-?query
-?quantify
-?biographize
-
-# Package overview
-help(package = "reindeer")
-
-# Vignettes
-browseVignettes("reindeer")
-```
-
-## Summary
-
-The reindeer workflow in 5 steps:
-
-1. **Load:** `corp <- corpus("path/to/db_emuDB")`
-2. **Query:** `segments <- query(corp, "Phonetic == t")`
-3. **Analyze:** `formants <- quantify(segments, superassp::forest)`
-4. **Enrich:** `data <- biographize(formants, corp)`
-5. **Annotate** (optional): `serve(corp, seglist = segments)`
-
-Happy analyzing! 🦌
+- `vignette("metadata_management")` — three-level inheritance,
+  spreadsheet round-trip, validation.
+- `vignette("cache_management")` — inspect_cache, cleanup, thresholds.
+- `vignette("interactive_annotation")` — full serve / EMU-webApp workflow.
+- `vignette("lazy_and_provenance")` — lazy plans, pipe-loss debugging.
+- `?corpus`, `?query`, `?quantify`, `?enrich`, `?set_metadata` —
+  function reference.
