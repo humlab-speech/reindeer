@@ -10,6 +10,8 @@
 #' - 2-5x faster than emuR::requery_seq for large datasets
 #'
 #' @author reindeer package
+#' @include segment_list_classes.R reindeer_lazy_segment_list.R
+NULL
 
 #' Scout Forward in Sequence
 #'
@@ -43,59 +45,25 @@
 #' # Lazy version
 #' lazy_next <- scout(segments, steps_forward = 1, collect = FALSE)
 #' result <- collect(lazy_next)
-scout <- function(.segments, 
-                  steps_forward,
-                  count_from = "START",
-                  capture = 1,
-                  ignore_bundle_boundaries = FALSE,
-                  calculate_times = TRUE,
-                  times_from = NULL,
-                  .from = NULL,
-                  .quiet = TRUE,
-                  collect = TRUE) {
-  
-  # Input validation
-  if (missing(.segments)) {
-    cli::cli_abort("{.arg .segments} is required")
-  }
+scout <- S7::new_generic("scout", ".segments")
+
+#' Scout method for segment_list (eager data.table path)
+#' @rdname scout
+#' @name scout.segment_list
+S7::method(scout, segment_list) <- function(.segments,
+                                              steps_forward,
+                                              count_from = "START",
+                                              capture = 1,
+                                              ignore_bundle_boundaries = FALSE,
+                                              calculate_times = TRUE,
+                                              times_from = NULL,
+                                              .from = NULL,
+                                              .quiet = TRUE,
+                                              collect = TRUE) {
   if (missing(steps_forward)) {
     cli::cli_abort("{.arg steps_forward} is required")
   }
-  
-  # Handle lazy evaluation
-  if (S7::S7_inherits(.segments, lazy_segment_list)) {
-    if (collect) {
-      # Materialise then run the eager data.table path. Avoids the lazy SQL
-      # transform chain (which has narrower schema guarantees than the
-      # data.table implementation).
-      return(scout(collect(.segments),
-                   steps_forward = steps_forward,
-                   count_from = count_from,
-                   capture = capture,
-                   ignore_bundle_boundaries = ignore_bundle_boundaries,
-                   calculate_times = calculate_times,
-                   times_from = times_from,
-                   .from = .from,
-                   .quiet = .quiet,
-                   collect = TRUE))
-    }
-    # collect = FALSE: keep deferring via the SQL transform chain.
-    transform <- list(
-      type = "scout",
-      n = steps_forward,
-      count_from = count_from,
-      capture = capture,
-      ignore_bundle_boundaries = ignore_bundle_boundaries
-    )
-    .segments@query_parts$transforms <- c(
-      .segments@query_parts$transforms,
-      list(transform)
-    )
-    return(.segments)
-  }
-  
-  # Materialized version using data.table
-  scout_dt(.segments, 
+  scout_dt(.segments,
            steps_forward = steps_forward,
            count_from = count_from,
            capture = capture,
@@ -104,6 +72,53 @@ scout <- function(.segments,
            times_from = times_from,
            .from = .from,
            .quiet = .quiet)
+}
+
+#' Scout method for lazy_segment_list
+#'
+#' When `collect = TRUE` (default) the lazy plan is materialised first and
+#' the segment_list method runs; when `FALSE` a `scout` transform is
+#' appended to the lazy plan for SQL-side evaluation at the next `collect()`.
+#'
+#' @rdname scout
+#' @name scout.lazy_segment_list
+S7::method(scout, lazy_segment_list) <- function(.segments,
+                                                   steps_forward,
+                                                   count_from = "START",
+                                                   capture = 1,
+                                                   ignore_bundle_boundaries = FALSE,
+                                                   calculate_times = TRUE,
+                                                   times_from = NULL,
+                                                   .from = NULL,
+                                                   .quiet = TRUE,
+                                                   collect = TRUE) {
+  if (missing(steps_forward)) {
+    cli::cli_abort("{.arg steps_forward} is required")
+  }
+  if (collect) {
+    return(scout(collect(.segments),
+                 steps_forward = steps_forward,
+                 count_from = count_from,
+                 capture = capture,
+                 ignore_bundle_boundaries = ignore_bundle_boundaries,
+                 calculate_times = calculate_times,
+                 times_from = times_from,
+                 .from = .from,
+                 .quiet = .quiet,
+                 collect = TRUE))
+  }
+  transform <- list(
+    type = "scout",
+    n = steps_forward,
+    count_from = count_from,
+    capture = capture,
+    ignore_bundle_boundaries = ignore_bundle_boundaries
+  )
+  .segments@query_parts$transforms <- c(
+    .segments@query_parts$transforms,
+    list(transform)
+  )
+  .segments
 }
 
 #' Scout Implementation Using data.table
@@ -320,31 +335,41 @@ retreat <- function(.segments, steps_backward, ...) {
 #'
 #' @return segment_list (or lazy_segment_list if collect=FALSE)
 #' @export
-ascend_to <- function(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE) {
-  
-  if (missing(.segments)) {
-    cli::cli_abort("{.arg .segments} is required")
-  }
+ascend_to <- S7::new_generic("ascend_to", ".segments")
+
+#' Ascend method for segment_list
+#' @rdname ascend_to
+#' @name ascend_to.segment_list
+S7::method(ascend_to, segment_list) <- function(.segments, level,
+                                                  .from = NULL,
+                                                  .quiet = TRUE,
+                                                  collect = TRUE) {
   if (missing(level)) {
     cli::cli_abort("{.arg level} is required")
   }
-  
-  # Handle lazy evaluation
-  if (S7::S7_inherits(.segments, lazy_segment_list)) {
-    if (collect) {
-      return(ascend_to(collect(.segments), level = level,
-                       .from = .from, .quiet = .quiet, collect = TRUE))
-    }
-    transform <- list(type = "ascend", level = level)
-    .segments@query_parts$transforms <- c(
-      .segments@query_parts$transforms,
-      list(transform)
-    )
-    return(.segments)
-  }
-
-  # Materialized version
   ascend_dt(.segments, level = level, .from = .from, .quiet = .quiet)
+}
+
+#' Ascend method for lazy_segment_list
+#' @rdname ascend_to
+#' @name ascend_to.lazy_segment_list
+S7::method(ascend_to, lazy_segment_list) <- function(.segments, level,
+                                                       .from = NULL,
+                                                       .quiet = TRUE,
+                                                       collect = TRUE) {
+  if (missing(level)) {
+    cli::cli_abort("{.arg level} is required")
+  }
+  if (collect) {
+    return(ascend_to(collect(.segments), level = level,
+                     .from = .from, .quiet = .quiet, collect = TRUE))
+  }
+  transform <- list(type = "ascend", level = level)
+  .segments@query_parts$transforms <- c(
+    .segments@query_parts$transforms,
+    list(transform)
+  )
+  .segments
 }
 
 #' Ascend Implementation Using data.table
@@ -486,32 +511,41 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #'
 #' @return segment_list (or lazy_segment_list if collect=FALSE)
 #' @export
-descend_to <- function(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE) {
-  
-  if (missing(.segments)) {
-    cli::cli_abort("{.arg .segments} is required")
-  }
+descend_to <- S7::new_generic("descend_to", ".segments")
+
+#' Descend method for segment_list
+#' @rdname descend_to
+#' @name descend_to.segment_list
+S7::method(descend_to, segment_list) <- function(.segments, level,
+                                                   .from = NULL,
+                                                   .quiet = TRUE,
+                                                   collect = TRUE) {
   if (missing(level)) {
     cli::cli_abort("{.arg level} is required")
   }
-  
-  # Handle lazy evaluation
-  if (S7::S7_inherits(.segments, lazy_segment_list)) {
-    if (collect) {
-      return(descend_to(collect(.segments), level = level,
-                        .from = .from, .quiet = .quiet, collect = TRUE))
-    }
-    transform <- list(type = "descend", level = level)
-    .segments@query_parts$transforms <- c(
-      .segments@query_parts$transforms,
-      list(transform)
-    )
-    return(.segments)
-  }
-
-
-  # Materialized version
   descend_dt(.segments, level = level, .from = .from, .quiet = .quiet)
+}
+
+#' Descend method for lazy_segment_list
+#' @rdname descend_to
+#' @name descend_to.lazy_segment_list
+S7::method(descend_to, lazy_segment_list) <- function(.segments, level,
+                                                        .from = NULL,
+                                                        .quiet = TRUE,
+                                                        collect = TRUE) {
+  if (missing(level)) {
+    cli::cli_abort("{.arg level} is required")
+  }
+  if (collect) {
+    return(descend_to(collect(.segments), level = level,
+                      .from = .from, .quiet = .quiet, collect = TRUE))
+  }
+  transform <- list(type = "descend", level = level)
+  .segments@query_parts$transforms <- c(
+    .segments@query_parts$transforms,
+    list(transform)
+  )
+  .segments
 }
 
 #' Descend Implementation Using data.table

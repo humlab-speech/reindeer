@@ -2,20 +2,11 @@
 % Please edit documentation in R/reindeer_sequence_ops_optimized.R
 \name{scout}
 \alias{scout}
-\title{Optimized Sequence Operations with data.table}
+\alias{scout.segment_list}
+\alias{scout.lazy_segment_list}
+\title{Scout Forward in Sequence}
 \usage{
-scout(
-  .segments,
-  steps_forward,
-  count_from = "START",
-  capture = 1,
-  ignore_bundle_boundaries = FALSE,
-  calculate_times = TRUE,
-  times_from = NULL,
-  .from = NULL,
-  .quiet = TRUE,
-  collect = TRUE
-)
+scout(.segments, ...)
 }
 \arguments{
 \item{.segments}{segment_list or lazy_segment_list object}
@@ -42,19 +33,13 @@ scout(
 segment_list (or lazy_segment_list if collect=FALSE)
 }
 \description{
-This module provides highly optimized implementations of sequential
-query operations (scout, retreat) using data.table and supporting
-lazy evaluation through SQL query building.
-}
-\section{Performance}{
+Navigate forward through sequential items on the same level, optionally
+capturing multiple items. Optimized implementation using data.table.
 
-\itemize{
-\item Uses data.table for fast joins and filtering
-\item Supports lazy evaluation via lazy_segment_list
-\item 2-5x faster than emuR::requery_seq for large datasets
+When \code{collect = TRUE} (default) the lazy plan is materialised first and
+the segment_list method runs; when \code{FALSE} a \code{scout} transform is
+appended to the lazy plan for SQL-side evaluation at the next \code{collect()}.
 }
-}
-
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Get next phoneme
@@ -70,11 +55,4 @@ next_two <- scout(segments, steps_forward = 1, capture = 2)
 lazy_next <- scout(segments, steps_forward = 1, collect = FALSE)
 result <- collect(lazy_next)
 \dontshow{\}) # examplesIf}
-}
-\author{
-reindeer package
-Scout Forward in Sequence
-
-Navigate forward through sequential items on the same level, optionally
-capturing multiple items. Optimized implementation using data.table.
 }

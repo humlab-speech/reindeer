@@ -2,9 +2,11 @@
 % Please edit documentation in R/reindeer_sequence_ops_optimized.R
 \name{ascend_to}
 \alias{ascend_to}
+\alias{ascend_to.segment_list}
+\alias{ascend_to.lazy_segment_list}
 \title{Ascend to Higher Level in Hierarchy}
 \usage{
-ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
+ascend_to(.segments, ...)
 }
 \arguments{
 \item{.segments}{segment_list or lazy_segment_list object}

@@ -2,9 +2,11 @@
 % Please edit documentation in R/reindeer_sequence_ops_optimized.R
 \name{descend_to}
 \alias{descend_to}
+\alias{descend_to.segment_list}
+\alias{descend_to.lazy_segment_list}
 \title{Descend to Lower Level in Hierarchy}
 \usage{
-descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
+descend_to(.segments, ...)
 }
 \arguments{
 \item{.segments}{segment_list or lazy_segment_list object}
