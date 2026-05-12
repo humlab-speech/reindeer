@@ -385,14 +385,12 @@ S7::method(enrich, lazy_segment_list) <- function(object, ...) {
 
 #' Derive DSP parameters from bundle metadata
 #'
-#' Maps metadata fields (Age, Gender) to DSP function parameters.
-#' Used by \code{\link{enrich}} and by companion packages such as erodex.
+#' Internal helper. End users should call [dsp_parameters()] instead;
+#' kept exported for companion packages (`erodex`) that share the
+#' age/gender derivation logic.
 #'
-#' @param dsp_fun The DSP function whose formals will be inspected.
-#' @param metadata A single-row data frame / list of bundle metadata values.
-#' @param metadata_fields Character vector of metadata field names to map.
-#' @param user_params Named list of user-supplied parameters (take precedence).
-#' @return Named list of DSP parameters ready to pass via \code{do.call}.
+#' @keywords internal
+#' @noRd
 #' @export
 derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_params) {
   

@@ -2,33 +2,32 @@
 % Please edit documentation in R/reindeer_psychoacoustics.R
 \name{erb}
 \alias{erb}
-\title{Convert Herz to Semitones Equivalent Rectangular Bandwidth (ERB)}
+\title{Convert frequency (Hz) to Equivalent Rectangular Bandwidth (ERB) number}
 \usage{
 erb(f)
 }
 \arguments{
-\item{f}{A vector of frequency values (in Hz)}
+\item{f}{Numeric vector of frequencies in Hz.}
 }
 \value{
-A vector of ERB values
+Numeric vector of ERB-numbers.
 }
 \description{
-Convert physical frequencies (in Hz) to number of Equivalent rectangular
-bandwidth (ERB) below the frequency. The ERB is  an approximation computed
-from the bandwidths of filters in human hearing, as modeled by rectangular
-band-pass filters.
-}
-\details{
-The formula for Number of ERBs given in
-\insertCite{Moore:1982ha}{reindeer} is used
-in the calculations.
+Maps physical frequencies (Hz) to the number of ERBs below them, using
+the rectangular-bandpass model of human auditory filters from
+\insertCite{Moore:1982ha}{reindeer}. Useful for psychoacoustic
+analyses where the perceptual scale matters more than the raw Hz.
 }
 \examples{
-f <- seq(1,10000,10)
-plot(f,erb(f))
-plot(erb(f),emuR::bark(f),lty=2,ylab="Zwicker et al. Bark scale")
-abline(a = 0, b=1,col="blue")
+erb(c(500, 1000, 2000, 4000))
+# ERB vs Bark scale
+f <- seq(50, 8000, 50)
+plot(f, erb(f), type = "l", ylab = "ERB / Bark")
+lines(f, emuR::bark(f), lty = 2)
 }
 \references{
 \insertAllCited{}
+}
+\seealso{
+\code{\link[=semitones]{semitones()}}
 }

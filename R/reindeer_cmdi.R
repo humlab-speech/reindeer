@@ -1,9 +1,12 @@
 #' Generate CMDI metadata file for an EMU speech corpus
 #'
-#' Creates a CMDI (Component Metadata Infrastructure) XML file containing
-#' corpus-level metadata for a speech database. This function collects information
-#' from the database configuration, session/bundle metadata (.meta_json files),
-#' and corpus structure to generate a CLARIN-compliant metadata description.
+#' Internal CMDI generator. End users should call
+#' `describe_corpus(corp, formats = "cmdi")` instead, which handles
+#' output paths, dirty-bit logic, and writes README + DataCite in the
+#' same call. This function remains exported for the auto-regen
+#' machinery and companion tooling.
+#'
+#' @keywords internal
 #'
 #' @param corpus A reindeer corpus object or emuDB handle
 #' @param output_file Path for the output CMDI XML file. If NULL, writes to
@@ -51,25 +54,8 @@
 #' The generated CMDI file follows the CLARIN metadata standards and can be
 #' ingested into CLARIN repositories.
 #'
-#' @examplesIf interactive()
-#' # Load corpus
-#' corpus <- load_emuDB("/path/to/ae_emuDB")
-#'
-#' # Generate CMDI with defaults
-#' create_cmdi_metadata(corpus)
-#'
-#' # Generate CMDI with custom information
-#' create_cmdi_metadata(
-#'   corpus,
-#'   corpus_title = "American English Speech Corpus",
-#'   corpus_description = "A corpus of American English speech...",
-#'   author = "John Doe",
-#'   institution = "University of Example",
-#'   contact_email = "contact@example.edu",
-#'   license = "CC-BY-4.0",
-#'   profile = "speech-corpus"
-#' )
-#'
+#' @keywords internal
+#' @noRd
 #' @export
 create_cmdi_metadata <- function(corpus,
                                   output_file = NULL,
