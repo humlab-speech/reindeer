@@ -967,3 +967,25 @@ get_emuDBhandle <- function(corpus) {
   class(handle) <- "emuDBhandle"
   return(handle)
 }
+
+
+# ============================================================================
+# Alias: serve_app() — disambiguate from emuR::serve()
+# ============================================================================
+
+#' Launch the EMU-webApp (alias for [serve()])
+#'
+#' Functionally identical to [serve()] but with a name that does not
+#' collide with `emuR::serve()`. Useful when both packages are
+#' attached.
+#'
+#' @param corpus A reindeer corpus object.
+#' @param ... Forwarded to [serve()].
+#' @return Invisible `TRUE`.
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/mydb_emuDB")
+#' serve_app(corp)
+#' @export
+serve_app <- function(corpus, ...) {
+  serve(corpus, ...)
+}
