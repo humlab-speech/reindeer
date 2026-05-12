@@ -144,7 +144,10 @@ parse_simple_query <- function(query_string) {
   matches <- regmatches(query_string, match)[[1]]
 
   if (length(matches) < 4) {
-    .query_abort("Cannot parse simple query: {.val {query_string}}")
+    .query_abort(c(
+      "Cannot parse simple query.",
+      .eql_caret(query_string, pos = 1L, label = "Query:")
+    ))
   }
 
   level <- matches[2]
@@ -183,7 +186,12 @@ parse_dominance_query <- function(query_string) {
   parts <- split_on_operator(inner, "^")
 
   if (is.null(parts) || length(parts) != 2) {
-    .query_abort("Invalid dominance query: {.val {query_string}}")
+    .query_abort(c(
+      "Invalid dominance query.",
+      .eql_caret(query_string,
+                 pos = regexpr("\\^", query_string),
+                 label = "Query:")
+    ))
   }
 
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -201,7 +209,12 @@ parse_sequence_query <- function(query_string) {
   parts <- split_on_operator(inner, "->")
 
   if (is.null(parts) || length(parts) != 2) {
-    .query_abort("Invalid sequence query: {.val {query_string}}")
+    .query_abort(c(
+      "Invalid sequence query.",
+      .eql_caret(query_string,
+                 pos = regexpr("->", query_string, fixed = TRUE),
+                 label = "Query:")
+    ))
   }
 
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -221,7 +234,12 @@ parse_conjunction_query <- function(query_string) {
   parts <- split_on_operator(inner, "&")
   
   if (length(parts) != 2) {
-    .query_abort("Invalid conjunction query: {.val {query_string}}")
+    .query_abort(c(
+      "Invalid conjunction query.",
+      .eql_caret(query_string,
+                 pos = regexpr("&", query_string, fixed = TRUE),
+                 label = "Query:")
+    ))
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -241,7 +259,12 @@ parse_disjunction_query <- function(query_string) {
   parts <- split_on_operator(inner, "|")
   
   if (length(parts) != 2) {
-    .query_abort("Invalid disjunction query: {.val {query_string}}")
+    .query_abort(c(
+      "Invalid disjunction query.",
+      .eql_caret(query_string,
+                 pos = regexpr("\\|", query_string),
+                 label = "Query:")
+    ))
   }
   
   left_query <- parse_eql_query(trimws(parts[1]))
@@ -331,7 +354,12 @@ parse_function_query <- function(query_string) {
     ))
   }
 
-  .query_abort("Cannot parse function query: {.val {query_string}}")
+  .query_abort(c(
+    "Cannot parse function query.",
+    .eql_caret(query_string,
+               pos = regexpr("\\(", query_string),
+               label = "Query:")
+  ))
 }
 
 # Open a query connection with REGEXP support
