@@ -1,0 +1,152 @@
+---
+title: "Lazy Pipelines and Pipe-Loss Debugging"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Lazy Pipelines and Pipe-Loss Debugging}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+## Why this vignette exists
+
+Reindeer pipelines are lazy by default: `query()` builds a plan, you
+attach `filter()`, `scout()`, `ascend_to()`, and so on, and nothing
+actually runs until you ask for data. That's fast — but it means a
+filter that silently drops 80% of your rows can sit unnoticed in the
+middle of a long pipe. Reindeer addresses this by recording per-step
+provenance and warning when a step drops too many rows.
+
+This vignette shows three things:
+
+1. Building and collecting a lazy pipeline.
+2. Reading the provenance trail to find where rows disappeared.
+3. Tuning the loss warning to your tolerance.
+
+## A lazy pipeline
+
+```{r}
+library(reindeer)
+library(dplyr)
+
+corp <- corpus("path/to/ae_emuDB")
+
+plan <- query(corp, "Phonetic =~ [aeiou]") |>
+  filter(label != "@") |>
+  scout(steps_forward = 1) |>
+  ascend_to("Word")
+
+class(plan)
+#> "reindeer::lazy_segment_list"
+```
+
+Nothing has run yet. Print the plan and you'll see the queued
+transforms with a rough row estimate.
+
+To materialise, ask for data:
+
+```{r}
+collect(plan)        # explicit
+nrow(plan)           # also triggers
+head(plan)           # ditto
+plan$labels          # ditto
+```
+
+dplyr verbs auto-collect, so this works too:
+
+```{r}
+plan |> filter(end - start > 100) |> summarise(n = n())
+```
+
+## Reading the provenance trail
+
+Every navigation verb and every dplyr verb appends a row to a
+provenance log on the result. Open it with `provenance()`:
+
+```{r}
+plan_done <- collect(plan)
+provenance(plan_done)
+# # A tibble: 4 x 7
+#    step verb       call                rows_in rows_out rows_lost ts
+#       1 query      query(corp, "...")        NA      812        NA …
+#       2 filter     filter(label != "@")     812      798        14 …
+#       3 scout      scout(steps_forward=1)   798      798         0 …
+#       4 ascend_to  ascend_to("Word")        798      624       174 …
+```
+
+The same information in row-loss form, friendlier for picking out the
+culprit step:
+
+```{r}
+dropped_rows(plan_done)
+# step verb       rows_lost pct_lost
+#    2 filter            14      1.7
+#    4 ascend_to        174     21.8
+```
+
+`dropped(plan_done)` returns the cumulative count
+(`14 + 174 = 188`). `dropped(plan_done, 4)` returns the loss at a
+specific step.
+
+## The 25 % loss warning
+
+If any navigation verb (`scout()`, `ascend_to()`, `descend_to()`)
+drops more than 25 % of its input, reindeer warns by default:
+
+```{r}
+plan |> scout(steps_forward = 99)
+#> Warning: scout dropped 612 rows (76.7%) — most segments hit a
+#> bundle boundary at this offset.
+```
+
+dplyr verbs are silent — losing rows there is usually intentional. To
+change the threshold:
+
+```{r}
+options(reindeer.loss_warn = 0.10)   # warn over 10%
+options(reindeer.loss_warn = 1.0)    # never warn
+```
+
+The cap on log size is governed by `options(reindeer.provenance_max =
+1000)` (default 1000 rows). Very long pipelines truncate from the
+front.
+
+## Provenance survives serialisation
+
+If you save a segment_list with `saveRDS()` or `qs::qsave()`, its
+provenance survives the round trip:
+
+```{r}
+qs::qsave(plan_done, "plan.qs")
+plan_back <- qs::qread("plan.qs")
+provenance(plan_back)        # same tibble as before
+```
+
+So you can hand a colleague the result of your pipeline and they can
+still see exactly how it was filtered.
+
+## Forcing eager mode
+
+If you want immediate execution — usually for debugging — pass
+`lazy = FALSE` to `query()`:
+
+```{r}
+query(corp, "Phonetic == t", lazy = FALSE)
+```
+
+Or call `collect()` early:
+
+```{r}
+segs <- collect(query(corp, "Phonetic == t"))
+```
+
+Eager pipelines also record provenance, so the inspection workflow is
+identical.
+
+## Where next
+
+- `vignette("getting_started")` — five-minute introduction.
+- `?query`, `?scout`, `?ascend_to`, `?provenance`, `?dropped_rows`.

@@ -1,3 +1,75 @@
+# reindeer 0.9.0 (2026-05-12)
+
+End of a two-sprint API + documentation overhaul. No new analysis
+capability — every change is in service of making the existing
+capability easier to find and use.
+
+## API simplification (sprint 1, v0.8.1–v0.8.10)
+
+- `enrich()` is now an S7 generic dispatching on corpus / segment_list
+  / lazy_segment_list / extended_segment_list. One verb for both
+  corpus-wide DSP and per-segment metadata joins.
+- `scout()` / `ascend_to()` / `descend_to()` converted to proper S7
+  generics with explicit eager and lazy methods.
+- `load_metadata(corp, source = c("files", "excel"), path = NULL)` and
+  `set_metadata()` are the canonical metadata entry points;
+  `gather_metadata()` and `add_metadata()` remain as deprecated
+  aliases for one cycle.
+- `inspect_cache(corp)` summarises every reindeer-managed cache at
+  once. `quantify()` results now carry a `.cache_status` column
+  (`"hit"` / `"miss"`) when caching is enabled.
+- `quantify()` cache key now hashes `.at` (extraction time points) so
+  calls with different `.at` no longer collide.
+- EQL parser is stricter: malformed queries like `"Phonetic =="`
+  (missing right-hand value) abort at `query()` time with a
+  caret-pointer error, not later inside `collect()`.
+- New public inspector `dsp_parameters(age, gender)` /
+  `dsp_parameters(corpus_obj)` shows which DSP parameters will be
+  selected for any speaker.
+- `serve_app()` is a name-clash-free alias for `serve()`, useful
+  when `emuR` is also attached.
+- FAIR artifacts (README, CMDI XML, DataCite JSON) auto-regenerate on
+  the dirty bit when `options(reindeer.auto_cmdi = TRUE)`.
+- New `dropped_rows(seg)` returns a per-step row-loss summary.
+
+## Documentation overhaul (sprint 2, v0.8.11–v0.9.0)
+
+- 194 → 55 man pages: 138 unexported helpers marked `@noRd`. The user
+  help index now shows only user-facing verbs.
+- `st()` renamed to `semitones()`; `st()` retained as a deprecated
+  alias. `erb()` docs rewritten for a user audience.
+- `derive_dsp_parameters()`, `get_corpus_cached()`, and
+  `create_cmdi_metadata()` marked `@keywords internal` so they
+  disappear from the user help index while staying callable from
+  companion packages.
+- All core-verb roxygen blocks rewritten to follow a user-focused
+  template (one-line summary, 2–4 sentence intro, user-facing
+  parameters only, copy-pasteable example, `@seealso` cross-links).
+  Killed S7-slot dumps, websocket-protocol notes, qs performance
+  brags, and `as of v0.7.0…` history.
+- Vignettes rewritten:
+  - `getting_started.Rmd` (688 → 175 LOC), recipe-focused.
+  - `metadata_management.Rmd` (253 → 130 LOC), three-level inheritance.
+  - `cache_management.Rmd` (257 → 95 LOC), built around
+    `inspect_cache()`.
+  - new `lazy_and_provenance.Rmd` documenting lazy plans,
+    `provenance()`, `dropped_rows()`, and the 25 % loss warning.
+- Removed: `vignettes/reindeer_workflow.qmd` (overlapped with
+  `getting_started`), `vignettes/query_benchmarks.qmd` (moved to
+  `benchmarking/QUERY_BENCHMARKS.md`).
+- DESCRIPTION Suggests now lists `erodex` and `eggstract` (previously
+  only mentioned in comments).
+- New classed condition `reindeer_missing_companion_error` with
+  install-hint message when a companion package is needed.
+
+## Behavioural notes for v0.8 users
+
+- The `quantify()` cache key changed; existing cached results from
+  pre-0.8.4 will re-compute on first call after upgrade.
+- Lazy `query()` rejects more malformed EQL eagerly. Wrap risky
+  user-supplied EQL in `tryCatch(...,
+  reindeer_query_error = ...)`.
+
 # reindeer 0.8.0 (2026-05-12)
 
 ## New exports (companion-package API)
