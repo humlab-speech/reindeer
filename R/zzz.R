@@ -11,8 +11,7 @@
   S7::method(summary, corpus) <- .summary_corpus
   S7::method(`[`, corpus) <- .subset_corpus
 
-  # Simulation S3 methods moved to the reindeer.simulation companion
-  # package in v0.7.0; no registration here.
+  # Simulation S3 methods moved to the erodex companion package; no registration here.
 
   # vctrs hooks — needed so vec_slice/dplyr operations don't reject S7 objects
   # as "scalars". tibble (Imports) brings vctrs as a transitive dep.

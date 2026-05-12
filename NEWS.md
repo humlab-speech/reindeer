@@ -1,3 +1,27 @@
+# reindeer 0.8.0 (2026-05-12)
+
+## New exports (companion-package API)
+
+Three internal helpers are now part of the public API so the **erodex**
+companion package can use them without `:::`:
+
+- `get_corpus_cached(segments, from = NULL)` — resolve a `corpus` from a
+  `segment_list`'s `db_path` property, with in-memory caching.
+- `derive_dsp_parameters(dsp_fun, metadata, metadata_fields, user_params)` —
+  map Age/Gender metadata to DSP function parameters (e.g. `nominalF1`).
+- `check_cache_size(cache_path, ...)` — size-check a cache file/directory and
+  emit threshold warnings.
+
+## Documentation
+
+- All references to the companion package renamed from `reindeer.simulation`
+  → **erodex** (`CLAUDE.md`, `NEWS.md`, `README.md`, `VIGNETTES_SUMMARY.md`,
+  `inst/agents/AGENT_GUIDE.md`, `doc/cache_management.R`, `R/zzz.R`).
+- Removed stale simulation code examples from `README.md` and
+  `VIGNETTES_SUMMARY.md` (functions live in erodex).
+
+---
+
 # reindeer 0.7.0 (2026-05-11)
 
 ## Breaking changes — API minimization
@@ -40,15 +64,15 @@ part of the public surface:
 - `disable_sync` — auto-sync configuration should live on the corpus.
 - `biographize(seg, corp)` — fold into `enrich(seg, corp, with = "metadata")`.
 
-### Companion package: `reindeer.simulation`
+### Companion package: `erodex`
 
 The parameter-grid simulation subsystem
 (`quantify_simulate` / `enrich_simulate` / `reminisce` /
 `reminisce_tracks` / `list_simulations`) and the
 `update_signal_hashes` / `get_signal_hashes` helpers that validate
-its caches moved to a sibling package `reindeer.simulation`. ~1900
+its caches moved to a sibling package **erodex**. ~1900
 LOC of `R/simulation_*.R` no longer ship with the reindeer core.
-Use `library(reindeer.simulation)` to access them; the package
+Use `library(erodex)` to access them; the package
 depends on `reindeer >= 0.7.0`.
 
 ## New features

@@ -116,13 +116,15 @@ get_file_size <- function(path, recursive = FALSE) {
 
 #' Check cache size and warn if large
 #'
-#' @param cache_path Path to cache file or directory
-#' @param cache_type Type of cache ("quantify", "simulation", "draft", "general")
-#' @param warn_threshold Warning threshold (bytes or size string like "500 MB")
-#' @param max_threshold Maximum threshold (bytes or size string)
-#' @param verbose Show informational messages
-#' @return List with size info and whether thresholds exceeded
-#' @keywords internal
+#' @param cache_path Path to cache file or directory.
+#' @param cache_type Type of cache (\code{"quantify"}, \code{"simulation"},
+#'   \code{"draft"}, \code{"general"}).
+#' @param warn_threshold Warning threshold (bytes or size string like \code{"500 MB"}).
+#' @param max_threshold Maximum threshold (bytes or size string).
+#' @param verbose Show informational messages.
+#' @return Invisible list with \code{size_bytes}, \code{warn_exceeded},
+#'   \code{max_exceeded} fields.
+#' @export
 check_cache_size <- function(cache_path,
                               cache_type = "general",
                               warn_threshold = "500 MB",

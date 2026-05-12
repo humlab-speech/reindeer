@@ -66,41 +66,11 @@ export_metadata(corp, "metadata.xlsx")
 import_metadata(corp, "metadata.xlsx")
 ```
 
-### 2. Signal Processing Simulation
-
-```r
-# Simulate with both DSP and preprocessing parameters
-results <- quantify_simulate(
-  segments,
-  .using = superassp::forest,
-  .simulate = list(
-    nominalF1 = seq(500, 900, 100)  # DSP parameters
-  ),
-  .prep_function = superassp::prep_recode,
-  .prep_simulate = list(
-    sample_rate = c(16000, 22050, 44100),  # Preprocessing
-    format = "wav"
-  ),
-  .simulation_store = "simulations/formants"
-)
-
-# Creates 5 × 3 = 15 combinations per segment
-print(results)
-```
-
-### 3. Track Enrichment
+### 2. Track Enrichment
 
 ```r
 # Add formant tracks to corpus
 corp %>% enrich(.using = superassp::forest)
-
-# Simulate track generation with parameter grids
-track_sim <- enrich_simulate(
-  corp,
-  .using = superassp::ksvF0,
-  .simulate = list(minF = c(50, 75, 100)),
-  .simulation_store = "simulations/pitch"
-)
 ```
 
 ## Performance Benchmarks
@@ -119,8 +89,6 @@ Compared to standard emuR workflows:
 - [Package website](https://humlab-speech.github.io/reindeer/)
 - [Tidy Speech Processing](https://humlab-speech.github.io/reindeer/articles/Tidy_speech_processing.html)
 - [Metadata Management](https://humlab-speech.github.io/reindeer/articles/metadata_management.html)
-- [Simulation Infrastructure](https://humlab-speech.github.io/reindeer/articles/simulation-infrastructure.html)
-
 ## Key Components
 
 ### S7 Classes
@@ -138,12 +106,10 @@ Compared to standard emuR workflows:
 - `gather_metadata()`: Efficient metadata caching
 - `biographize()`: Add metadata to query results
 
-### Simulation System
+### Companion Packages
 
-- `quantify_simulate()`: Parameter grid exploration on segments
-- `enrich_simulate()`: Track generation parameter exploration
-- `prep_passthrough()`: Test utility for preprocessing (no transformation)
-- `reminisce()` / `reminisce_tracks()`: Retrieve cached simulations
+- **[erodex](https://github.com/humlab-speech/erodex)**: Parameter-grid DSP simulation (`quantify_simulate`, `enrich_simulate`, `reminisce`, `list_simulations`)
+- **[protoscribe](https://github.com/humlab-speech/protoscribe)**: Draft annotation generation
 
 ## Testing
 

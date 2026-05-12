@@ -290,11 +290,16 @@ enrich <- function(corpus_obj, .using, ...,
 }
 
 #' Derive DSP parameters from bundle metadata
-#' 
-#' Internal function to map metadata fields to DSP function parameters.
-#' Uses age and gender to estimate formant frequencies when applicable.
-#' 
-#' @keywords internal
+#'
+#' Maps metadata fields (Age, Gender) to DSP function parameters.
+#' Used by \code{\link{enrich}} and by companion packages such as erodex.
+#'
+#' @param dsp_fun The DSP function whose formals will be inspected.
+#' @param metadata A single-row data frame / list of bundle metadata values.
+#' @param metadata_fields Character vector of metadata field names to map.
+#' @param user_params Named list of user-supplied parameters (take precedence).
+#' @return Named list of DSP parameters ready to pass via \code{do.call}.
+#' @export
 derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_params) {
   
   # Get formal arguments of DSP function

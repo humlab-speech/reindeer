@@ -104,7 +104,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   }
 
   # Try to get corpus from db_path (PHASE 1: Cached corpus loading)
-  corpus_obj <- .get_corpus_cached(object, NULL)
+  corpus_obj <- get_corpus_cached(object, NULL)
 
   if (is.null(corpus_obj)) {
     cli::cli_abort(c(

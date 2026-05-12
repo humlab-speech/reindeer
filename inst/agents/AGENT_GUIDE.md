@@ -110,9 +110,13 @@ dspp_metadataParameters_dt()  # returns full table
 
 ### Simulation System
 
-For systematic parameter exploration:
+Parameter-grid simulation has moved to the **erodex** companion package
+(`../erodex`). Use `library(erodex)` to access it.
+
 ```r
-quantify_simulate(
+library(erodex)
+
+erodex::quantify_simulate(
   segments,
   .using = superassp::forest,
   .simulate = list(nominalF1 = seq(500, 900, 100)),
@@ -122,9 +126,9 @@ quantify_simulate(
 )
 # Creates outer product: 3 sample_rates x 5 nominalF1 = 15 combos per segment
 
-list_simulations("simulations/formants")
-reminisce("simulations/formants", simulation_id = "...")
-reminisce_tracks(corp, simulation_store = "simulations/formants")
+erodex::list_simulations("simulations/formants")
+erodex::reminisce(segments, parameters = list(nominalF1 = 700), cache_path = "...")
+erodex::reminisce_tracks(corp, cache_path = "...")
 ```
 
 ## Bundled Praat Scripts

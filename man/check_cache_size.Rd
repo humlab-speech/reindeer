@@ -13,20 +13,21 @@ check_cache_size(
 )
 }
 \arguments{
-\item{cache_path}{Path to cache file or directory}
+\item{cache_path}{Path to cache file or directory.}
 
-\item{cache_type}{Type of cache ("quantify", "simulation", "draft", "general")}
+\item{cache_type}{Type of cache (\code{"quantify"}, \code{"simulation"},
+\code{"draft"}, \code{"general"}).}
 
-\item{warn_threshold}{Warning threshold (bytes or size string like "500 MB")}
+\item{warn_threshold}{Warning threshold (bytes or size string like \code{"500 MB"}).}
 
-\item{max_threshold}{Maximum threshold (bytes or size string)}
+\item{max_threshold}{Maximum threshold (bytes or size string).}
 
-\item{verbose}{Show informational messages}
+\item{verbose}{Show informational messages.}
 }
 \value{
-List with size info and whether thresholds exceeded
+Invisible list with \code{size_bytes}, \code{warn_exceeded},
+\code{max_exceeded} fields.
 }
 \description{
 Check cache size and warn if large
 }
-\keyword{internal}

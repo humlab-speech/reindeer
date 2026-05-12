@@ -6,8 +6,19 @@
 \usage{
 derive_dsp_parameters(dsp_fun, metadata, metadata_fields, user_params)
 }
-\description{
-Internal function to map metadata fields to DSP function parameters.
-Uses age and gender to estimate formant frequencies when applicable.
+\arguments{
+\item{dsp_fun}{The DSP function whose formals will be inspected.}
+
+\item{metadata}{A single-row data frame / list of bundle metadata values.}
+
+\item{metadata_fields}{Character vector of metadata field names to map.}
+
+\item{user_params}{Named list of user-supplied parameters (take precedence).}
 }
-\keyword{internal}
+\value{
+Named list of DSP parameters ready to pass via \code{do.call}.
+}
+\description{
+Maps metadata fields (Age, Gender) to DSP function parameters.
+Used by \code{\link{enrich}} and by companion packages such as erodex.
+}

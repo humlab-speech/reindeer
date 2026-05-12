@@ -215,27 +215,27 @@ See DEPRECATED_FUNCTIONS.md for complete list of files marked for deletion.
 
 `R/reindeer_lazy_segment_list.R` implements lazy evaluation for query chains but is not yet integrated into main workflow. This is a planned optimization.
 
-### 4. Simulation System (MOVED TO reindeer.simulation)
+### 4. Simulation System (MOVED TO erodex)
 
 **As of v0.7.0**, all parameter-grid simulation functionality moved to
-the companion **[reindeer.simulation](../reindeer.simulation/)** package.
+the companion **[erodex](../erodex/)** package.
 The reindeer core no longer ships `quantify_simulate`, `enrich_simulate`,
 `reminisce`, `reminisce_tracks`, or `list_simulations`.
 
 ```r
-library(reindeer.simulation)
+library(erodex)
 library(reindeer)
 
 corp <- corpus("path/to/db")
 segments <- query(corp, "Phonetic == t")
-reindeer.simulation::quantify_simulate(
+erodex::quantify_simulate(
   segments, .using = superassp::forest,
   .simulate = list(nominalF1 = seq(500, 900, 100)),
   .simulation_store = "simulations/formants"
 )
 ```
 
-See the reindeer.simulation README for usage details.
+See the erodex README for usage details.
 
 ### 5. Draft Annotation System (MOVED TO PROTOSCRIBE)
 

@@ -142,39 +142,7 @@ serve(corp, bundleListName = "Annotator_A")
 
 ---
 
-### 5. **Simulation Infrastructure**
-**File**: `simulation-infrastructure.Rmd`
-**Status**: ✅ Complete
-**Audience**: Researchers, Method developers
-
-**Contents**:
-- Parameter space exploration
-- `quantify_simulate()` and `enrich_simulate()`
-- Preprocessing parameter grids
-- Result retrieval with `reminisce()`
-- Cache management for simulations
-- Visualization and analysis
-
-**Use Cases**:
-- Exploring DSP parameter effects
-- Method comparison
-- Optimal parameter selection
-- Publication-ready parameter sensitivity analyses
-
-**Example**:
-```r
-quantify_simulate(
-  segments,
-  .using = superassp::forest,
-  .simulate = list(nominalF1 = seq(500, 900, 100)),
-  .prep_function = superassp::prep_recode,
-  .prep_simulate = list(sample_rate = c(16000, 22050, 44100))
-)
-```
-
----
-
-### 6. **Automatic Transcription Workflow**
+### 5. **Automatic Transcription Workflow**
 **File**: `transcription_workflow.Rmd`
 **Status**: ✅ Complete
 **Audience**: ASR integration, Automatic annotation
@@ -271,7 +239,6 @@ All vignettes assume:
 - **getting_started**: dplyr, ggplot2
 - **interactive_annotation**: None (just reindeer)
 - **metadata_management**: dplyr, openxlsx
-- **simulation-infrastructure**: ggplot2, tidyr
 - **transcription_workflow**: reticulate (for ASR), rPraat (for MFA)
 
 ---
@@ -293,7 +260,8 @@ All vignettes assume:
 → `cache_management.Rmd`
 
 **...explore parameter effects**
-→ `simulation-infrastructure.Rmd`
+→ `erodex` companion package (`library(erodex)`)
+
 
 **...integrate automatic speech recognition**
 → `transcription_workflow.Rmd`
@@ -331,10 +299,10 @@ browseVignettes("reindeer")
 
 1. **Corpus loading** - getting_started
 2. **Query system** - getting_started, query_benchmarks
-3. **Signal processing** - getting_started, simulation-infrastructure
+3. **Signal processing** - getting_started
 4. **Metadata management** - metadata_management, getting_started
 5. **Cache management** - cache_management
-6. **Simulation system** - simulation-infrastructure
+6. **Simulation system** - erodex package
 7. **Transcription workflow** - transcription_workflow
 8. **Interactive annotation** - interactive_annotation (NEW)
 9. **Complete workflows** - reindeer_workflow
@@ -386,7 +354,7 @@ The recommended learning path:
 2. metadata_management.Rmd (if using metadata)
 3. interactive_annotation.Rmd (if annotating)
 4. cache_management.Rmd (when working with large corpora)
-5. simulation-infrastructure.Rmd (for parameter optimization)
+5. erodex package vignette (for parameter optimization)
 6. transcription_workflow.Rmd (for ASR integration)
 
 ### 4. Cross-Reference Features

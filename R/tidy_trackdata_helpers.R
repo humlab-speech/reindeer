@@ -7,9 +7,17 @@
 # Environment for caching quantify results
 .quantify_cache <- new.env(parent = emptyenv())
 
-#' Get or create corpus from segment list (with caching)
-#' @noRd
-.get_corpus_cached <- function(.segments, .from = NULL) {
+#' Get or create corpus from a segment list (with caching)
+#'
+#' Resolves a \code{\link{corpus}} object from a segment list, using the
+#' \code{db_path} property and an in-memory cache.  Used by companion packages
+#' such as erodex that receive a segment list and need the backing corpus.
+#'
+#' @param .segments A \code{segment_list} object.
+#' @param .from Optional corpus object; returned as-is when provided.
+#' @return A \code{corpus} object.
+#' @export
+get_corpus_cached <- function(.segments, .from = NULL) {
   # If .from is provided and is a corpus, use it directly
   if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
     return(.from)
