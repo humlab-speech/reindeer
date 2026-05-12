@@ -220,6 +220,7 @@ import_metadata <- function(corpus_obj, Excelfile) {
 #' add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
 #'
 #' @export
+#' @rdname set_metadata
 add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL,
                         reset.before.add = FALSE) {
 

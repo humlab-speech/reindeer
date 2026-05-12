@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.8.2
+Version: 0.8.3
 Date: 2026-05-12
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -80,6 +80,7 @@ Collate:
     'json_utils.R'
     'metadata_core.R'
     'metadata_import_export.R'
+    'metadata_unified.R'
     'query_executor.R'
     'query_parser.R'
     'reindeer.R'
