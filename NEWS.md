@@ -1,3 +1,16 @@
+# reindeer 0.9.3 (2026-05-13)
+
+CI fix for the pkgdown deploy.
+
+- `.github/workflows/pkgdown.yaml` now installs only hard
+  dependencies (`dependencies: '"hard"'`) plus explicit `knitr` and
+  `rmarkdown`. Skipping Suggests avoids compiling the heavy GitHub
+  packages `superassp` and `av` during every docs build. All
+  vignettes use `eval = FALSE`, so the runtime DSP companions are
+  not needed to render the site. The first post-merge CI run failed
+  at the `setup-r-dependencies` step because of these compile
+  attempts; this change unblocks the deploy.
+
 # reindeer 0.9.2 (2026-05-13)
 
 pkgdown / GitHub Pages alignment.
