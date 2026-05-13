@@ -49,3 +49,6 @@ benchmarking/*.csv
 benchmarking/*.txt
 /doc/
 /Meta/
+
+# pkgdown site — built by CI, never commit
+docs/

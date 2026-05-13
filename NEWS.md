@@ -1,3 +1,43 @@
+# reindeer 0.9.2 (2026-05-13)
+
+pkgdown / GitHub Pages alignment.
+
+- `_pkgdown.yml` rewritten to reflect the v0.9.0 API surface. Drops
+  references to functions removed before v0.9 (`peek_at`, `ask_for`,
+  `biographize`, `quantify_simulate`, `enrich_simulate`,
+  `reminisce*`, `suggest`, `transcribe*`, `build_emuDB_cache`,
+  `compute_signal_hash`, `dspp_metadataParameters_dt`) and to four
+  deleted vignettes (`reindeer_workflow`, `query_benchmarks`,
+  `simulation-infrastructure`, `Tidy_speech_processing`). Reference
+  index reorganised into nine sections matching the canonical verbs
+  (Corpus / Query / Measurement / Metadata / Navigation / Cache /
+  Provenance / Psychoacoustic helpers / Interactive annotation), with
+  deprecated aliases (`add_metadata`, `gather_metadata`,
+  `import_metadata`, `serve`, `st`) hidden via the `internal:`
+  section. Home title and description rewritten to match the
+  scientific-tool framing of the new `README.md`. Author updated to
+  Fredrik Nylén with ORCID link. `lang: en` and an `opengraph` block
+  added.
+- `.github/workflows/pkgdown.yaml` modernised to the current r-lib v2
+  reference recipe: `actions/upload-pages-artifact@v3` +
+  `actions/deploy-pages@v4`. Removes the `JamesIves/...` deploy step
+  and the `gh-pages` branch dependency. Adds `pages: write` /
+  `id-token: write` permissions and explicit `r-version: release`.
+  Deployment requires switching the repo's Pages source to "GitHub
+  Actions" once.
+- `.github/workflows/R-CMD-check.yaml` no longer references the
+  dead `S7speedy` branch; `v0.7-breaking` added until it merges to
+  `main`.
+- `docs/` is no longer tracked in git; `.gitignore` updated. CI
+  regenerates the site on every push to `main`.
+- Stale `vignettes/transcription_workflow.Rmd` deleted (the "moved
+  to protoscribe" stub is already covered by `README.md`).
+- `vignettes/interactive_annotation.Rmd` updated to call
+  `serve_app()` instead of the deprecated `serve()` alias, and the
+  broken `vignette("transcription_workflow")` cross-link removed.
+- `README.md` no longer references the non-existent
+  `man/figures/logo.png`.
+
 # reindeer 0.9.1 (2026-05-13)
 
 Documentation patch.
@@ -106,7 +146,7 @@ companion package can use them without `:::`:
 - Removed stale simulation code examples from `README.md` and
   `VIGNETTES_SUMMARY.md` (functions live in erodex).
 
----
+<hr/>
 
 # reindeer 0.7.0 (2026-05-11)
 
@@ -212,7 +252,7 @@ hierarchy levels, ORDER BY before compound operators in some function
 queries, WITH wrappers inside sub-queries) also remain — exposed by
 the `lazy = TRUE` default flip and tracked alongside the parser work.
 
----
+<hr/>
 
 # reindeer 0.6.1 (2026-05-11)
 
@@ -239,7 +279,7 @@ sub-queries, and it skips the `params =` argument to `dbGetQuery`
 when the params list is empty (DBI rejects empty params lists when
 the SQL has no `?` placeholders).
 
----
+<hr/>
 
 # reindeer 0.6.0 (2026-05-11)
 
@@ -265,7 +305,7 @@ segment list, so the lazy semantics differ); deferring it is left for
 a future release. Lazy SQL building for sequence / dominance / function
 queries (the open TODOs in `R/query_executor.R`) is also deferred.
 
----
+<hr/>
 
 # reindeer 0.5.2 (2026-05-11)
 
@@ -295,7 +335,7 @@ The remaining seven plain `stop()` / `warning()` calls in
 guard prevents regressions: any future plain `stop()` / `warning()`
 under `R/` (excluding `R/deprecated/`) will fail the test suite.
 
----
+<hr/>
 
 # reindeer 0.5.1 (2026-05-10)
 
@@ -326,7 +366,7 @@ flow into both README and DataCite output.
 (The function is named `describe_corpus()` rather than `describe()`
 to avoid colliding with `testthat::describe()`.)
 
----
+<hr/>
 
 # reindeer 0.5.0 (2026-05-10)
 
@@ -365,7 +405,7 @@ is capped at the last 1000 entries (`options(reindeer.provenance_max)`).
 at session and bundle level so downstream `gather_metadata()` no longer
 silently skips fresh bundles. Existing files are never overwritten.
 
----
+<hr/>
 
 # reindeer 0.3.2 (2026-02-05)
 
@@ -373,7 +413,7 @@ silently skips fresh bundles. Existing files are never overwritten.
 
 Version bump for consistency with ongoing development.
 
----
+<hr/>
 
 # reindeer 0.3.1 (Documentation Update - 2026-02-05)
 
@@ -386,7 +426,7 @@ Updated cache management documentation to clarify that:
 
 **No functional changes** - documentation only.
 
----
+<hr/>
 
 # reindeer 0.3.0 (BREAKING CHANGES - 2026-02-05)
 
@@ -485,7 +525,7 @@ protoscribe::clean_draft_cache(corp, days_old = 30)
 
 **No action needed if:** You only use reindeer for corpus management, queries (`ask_for()`), signal processing (`quantify()`), or metadata operations.
 
----
+<hr/>
 
 # reindeer 0.2.5 (Development)
 
@@ -578,7 +618,7 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 # VISP["Svenska", "Erik"] <- "path/to/audio.wav"
 ```
 
----
+<hr/>
 
 ## Code Quality Improvements 🧹
 
@@ -619,7 +659,7 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 * `PHASE3_REFACTORING_PLAN.md` - Large file refactoring plan
 * `PHASE3_PROGRESS.md` - Refactoring progress tracking
 
----
+<hr/>
 # reindeer 0.2.4
 
 ## Major Performance Improvements ⚡
@@ -733,7 +773,7 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 
 None - 100% backward compatible
 
----
+<hr/>
 
 # reindeer 0.2.3
 

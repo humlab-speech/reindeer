@@ -1,4 +1,4 @@
-# reindeer <img src="man/figures/logo.png" align="right" height="139" alt="" />
+# reindeer
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/humlab-speech/reindeer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/humlab-speech/reindeer/actions/workflows/R-CMD-check.yaml)

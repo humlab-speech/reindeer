@@ -1,4 +1,6 @@
 url: https://humlab-speech.github.io/reindeer/
+lang: en
+
 template:
   bootstrap: 5
   bootswatch: flatly
@@ -6,20 +8,26 @@ template:
     primary: "#0054AD"
     border-radius: 0.5rem
     btn-border-radius: 0.25rem
+  opengraph:
+    twitter:
+      creator: "@humlab"
+      card: summary
 
 development:
   mode: auto
 
 home:
-  title: "reindeer: Enhanced EMU-SDMS for Speech Research"
+  title: "reindeer: Reproducible Analysis of Speech Corpora"
   description: >
-    R package extending emuR capabilities for working with speech data,
-    including metadata management, signal processing optimization, and
-    advanced query systems.
+    An R package for reproducible analysis of EMU-SDMS speech corpora.
+    Provides tidyverse-friendly query and measurement workflows,
+    three-level speaker metadata that drives age- and gender-aware DSP,
+    and automatic generation of standards-compliant archival metadata
+    (CMDI, DataCite).
 
 authors:
-  Fredrik Karlsson:
-    href: https://github.com/frkkan96
+  Fredrik Nylén:
+    href: https://orcid.org/0000-0003-3373-0934
 
 navbar:
   structure:
@@ -29,6 +37,7 @@ navbar:
     home:
       icon: fas fa-home
       href: index.html
+      aria-label: Home
     reference:
       text: Reference
       href: reference/index.html
@@ -37,117 +46,124 @@ navbar:
       menu:
       - text: Getting Started
         href: articles/getting_started.html
-      - text: Cache Management
-        href: articles/cache_management.html
       - text: Metadata Management
         href: articles/metadata_management.html
-      - text: Transcription Workflow
-        href: articles/transcription_workflow.html
-      - text: Simulation Infrastructure
-        href: articles/simulation-infrastructure.html
-      - text: Reindeer Workflow
-        href: articles/reindeer_workflow.html
+      - text: Cache Management
+        href: articles/cache_management.html
+      - text: Lazy Pipelines and Pipe-Loss Debugging
+        href: articles/lazy_and_provenance.html
+      - text: Interactive Annotation
+        href: articles/interactive_annotation.html
     news:
       text: News
       href: news/index.html
     github:
       icon: fab fa-github
       href: https://github.com/humlab-speech/reindeer
+      aria-label: GitHub repository
 
 reference:
-- title: "Corpus Management"
-  desc: "Core corpus and database management"
+- title: "Corpus"
+  desc: "Open, describe, and validate an EMU-SDMS corpus."
   contents:
   - corpus
-  - peek_at
+  - describe_corpus
+  - validate_corpus
   - peek_signals
-  - summary.corpus
+  - glimpse
 
-- title: "Querying"
-  desc: "Query language and segment retrieval"
+- title: "Query"
+  desc: "EMU Query Language and segment-list classes."
   contents:
-  - ask_for
   - query
   - segment_list
   - extended_segment_list
+  - lazy_segment_list
+  - is_segment_list
+  - as_segment_list
+  - collect
 
-- title: "Signal Processing"
-  desc: "DSP functions and track quantification"
+- title: "Measurement"
+  desc: "DSP measurement with speaker-aware parameters."
   contents:
   - quantify
   - enrich
-  - biographize
-  - dspp_metadataParameters_dt
+  - dsp_parameters
 
-- title: "Simulation Infrastructure"
-  desc: "Parameter space exploration and testing"
+- title: "Metadata"
+  desc: "Three-level speaker metadata: write, read, round-trip."
   contents:
-  - quantify_simulate
-  - enrich_simulate
-  - reminisce
-  - reminisce_tracks
-  - list_simulations
-  - prep_passthrough
-  - verify_prep_params
-
-- title: "Metadata Management"
-  desc: "Metadata operations with SQLite caching"
-  contents:
-  - gather_metadata
+  - set_metadata
   - get_metadata
-  - add_metadata
+  - load_metadata
   - export_metadata
-  - import_metadata
 
-- title: "Transcription"
-  desc: "Transcription and suggestion systems"
+- title: "Navigation"
+  desc: "Move through the annotation hierarchy."
   contents:
-  - suggest
-  - transcribe
-  - transcribe_parallel
+  - scout
+  - ascend_to
+  - descend_to
 
-- title: "Cache Management"
-  desc: "Cache monitoring and cleanup utilities"
+- title: "Cache"
+  desc: "Inspect and prune the persistent measurement cache."
   contents:
+  - inspect_cache
   - manage_cache
-  - check_all_cache_sizes
-  - check_quantify_cache_size
-  - check_draft_cache_size
-  - clean_all_caches
-  - clean_quantify_cache
-  - clean_draft_cache
-  - list_cache_files
+  - check_cache_size
 
-- title: "Utilities"
-  desc: "Helper functions and utilities"
+- title: "Provenance"
+  desc: "Per-step row accounting for pipe-loss debugging."
   contents:
-  - build_emuDB_cache
-  - get_corpus_connection
-  - derive_dsp_parameters
-  - compute_signal_hash
-  - update_signal_hashes
+  - provenance
+  - dropped
+  - dropped_rows
 
-- title: "Test Utilities"
-  desc: "Functions for package testing"
+- title: "Psychoacoustic helpers"
+  desc: "Frequency-scale conversions used in DSP."
   contents:
-  - create_test_corpus_for_simulation
+  - semitones
+  - erb
+
+- title: "Interactive annotation"
+  desc: "Launch the EMU-webApp from R."
+  contents:
+  - serve_app
+
+- title: internal
+  contents:
+  - reindeer
+  - add_metadata
+  - gather_metadata
+  - import_metadata
+  - serve
+  - st
+  - DSPP
+  - cache_utils
+  - enrich.corpus
+  - enrich.extended_segment_list
+  - enrich.lazy_segment_list
+  - enrich.segment_list
+  - quantify.lazy_segment_list
+  - print.bundle_list
+  - print.extended_segment_list
+  - print.lazy_segment_list
+  - print.segment_list
+  - summary.extended_segment_list
+  - summary.lazy_segment_list
+  - summary.segment_list
+  - "[<-.corpus"
 
 articles:
-- title: "Getting Started"
+- title: "Getting started"
   navbar: ~
   contents:
   - getting_started
-  - cache_management
-  - metadata_management
 
 - title: "Workflows"
   navbar: ~
   contents:
-  - reindeer_workflow
-  - transcription_workflow
-
-- title: "Advanced Topics"
-  navbar: ~
-  contents:
-  - simulation-infrastructure
-  - query_benchmarks
+  - metadata_management
+  - cache_management
+  - lazy_and_provenance
+  - interactive_annotation
