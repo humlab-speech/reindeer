@@ -1,3 +1,17 @@
+# reindeer 0.9.1 (2026-05-13)
+
+Documentation patch.
+
+- `README.md` rewritten to match the v0.9.0 API and to present
+  reindeer as a tool for reproducible speech-corpus analysis rather
+  than a feature list. Removes stale verb names (`biographize`,
+  `gather_metadata`, `add_metadata`, `import_metadata`), the
+  duplicate `query()` listing, the deprecated `.meta_json`
+  reference, the obsolete "Tidy speech processing" vignette link,
+  and the 0.1.x citation. Adds capability tour for speaker-aware
+  DSP, lazy + provenance, persistent cache with `.cache_status`,
+  FAIR / CMDI export, `serve_app()`, and the `eggstract` companion.
+
 # reindeer 0.9.0 (2026-05-12)
 
 End of a two-sprint API + documentation overhaul. No new analysis

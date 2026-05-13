@@ -7,157 +7,171 @@
 [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 <!-- badges: end -->
 
-An R package for working with speech data in a nordic climate. **reindeer** extends the capabilities of [emuR](https://github.com/IPS-LMU/emuR) with optimized workflows for metadata management, signal processing, and advanced querying.
+**reindeer** is an R package for reproducible analysis of speech
+corpora. It extends [emuR](https://github.com/IPS-LMU/emuR) with a
+tidyverse-friendly query and measurement workflow, three-level speaker
+metadata that drives age- and gender-aware DSP, and automatic
+generation of standards-compliant archival metadata (CMDI, DataCite).
+It is designed for phonetic and clinical-phonetic research where the
+provenance of every measurement matters.
 
-## Features
+## What reindeer is for
 
-- 🗄️ **Optimized Metadata Management**: SQLite-backed caching with 150x speedup over standard emuR
-- 🔍 **Advanced Query System**: Direct SQLite queries for faster segment retrieval
-- 📊 **Signal Processing**: Age/gender-specific DSP parameters with data.table optimization
-- 🧪 **Simulation Infrastructure**: Systematic parameter space exploration with preprocessing support
-- 🔗 **S7 Object System**: Modern, type-safe corpus and segment_list classes
-- ⚡ **Performance**: 3-4x faster operations through qs serialization and vectorization
+- Analysing annotated speech databases (EMU-SDMS format) at the
+  segment, word, and utterance levels.
+- Extracting acoustic measurements (formants, pitch, intensity, …)
+  with DSP parameters chosen from each speaker's metadata.
+- Treating segment lists as tidy tables so dplyr, ggplot2, and the rest
+  of the tidyverse work without translation.
+- Auditing every step of a pipeline through a provenance trail that
+  survives serialisation.
+- Producing FAIR archival metadata (CMDI, DataCite, README) without
+  manual XML editing.
 
 ## Installation
 
 ```r
-# Install from GitHub
+# Reindeer + signal-processing companion
 remotes::install_github("humlab-speech/reindeer")
-
-# With superassp for signal processing
-remotes::install_github("humlab-speech/superassp", ref = "cpp_optimization")
+remotes::install_github("humlab-speech/superassp")
 ```
 
-## Quick Start
+## Five-minute workflow
 
 ```r
 library(reindeer)
+library(dplyr)
 
-# Load corpus with automatic caching
-corp <- corpus("path/to/database_emuDB")
+corp <- corpus("path/to/your_emuDB")
 
-# Query segments with optimized SQLite backend
-segments <- query(corp, "Phonetic == t")
+# 1. Query vowels via EMU Query Language
+vowels <- query(corp, "Phonetic =~ [aeiou]")
 
-# Quantify with metadata-driven DSP parameters
-results <- quantify(segments, superassp::forest)
+# 2. Extract formants at the midpoint
+formants <- quantify(vowels, superassp::forest, .at = 0.5)
 
-# Add metadata to results
-results_meta <- biographize(results, corp)
+# 3. Join speaker metadata
+data <- enrich(formants, corp)
+
+# 4. Summarise with dplyr
+data |>
+  group_by(label, Gender) |>
+  summarise(mean_F1 = mean(F1, na.rm = TRUE),
+            mean_F2 = mean(F2, na.rm = TRUE),
+            .groups = "drop")
 ```
 
-## Core Workflows
+See `vignette("getting_started")` for the expanded walkthrough.
 
-### 1. Metadata Management
+## Capability tour
+
+### Speaker-aware DSP
+
+Set Age / Gender once; every `quantify()` and `enrich()` call picks
+appropriate formant ranges, window lengths, and pitch limits.
 
 ```r
-# Gather metadata from .meta_json files into SQLite cache
-gather_metadata(corp)
+set_metadata(corp,
+             list(Speaker = "P001", Age = 25, Gender = "Female"),
+             session = "Session1")
 
-# Retrieve with inheritance (bundle → session → database)
-metadata <- get_metadata(corp)
-
-# Set metadata programmatically
-add_metadata(corp, list(Age = 25, Gender = "Male"),
-             session = "S1", bundle = "B1")
-
-# Export/import via Excel for batch editing
-export_metadata(corp, "metadata.xlsx")
-import_metadata(corp, "metadata.xlsx")
+dsp_parameters(corpus_obj = corp)   # inspect what each bundle will use
 ```
 
-### 2. Track Enrichment
+See `vignette("metadata_management")`.
+
+### Lazy pipelines and provenance
+
+`query()` builds a plan; nothing runs until you collect, print, or pipe
+into a dplyr verb. Every step is recorded, so silent row loss is
+visible.
 
 ```r
-# Add formant tracks to corpus
-corp %>% enrich(.using = superassp::forest)
+plan <- query(corp, "Phonetic =~ [aeiou]") |>
+  filter(label != "@") |>
+  scout(steps_forward = 1) |>
+  ascend_to("Word")
+
+result <- collect(plan)
+provenance(result)     # per-step row counts
+dropped_rows(result)   # which steps lost rows
 ```
 
-## Performance Benchmarks
+A navigation step that drops more than 25 % of its input warns by
+default. See `vignette("lazy_and_provenance")`.
 
-Compared to standard emuR workflows:
+### Persistent measurement cache
 
-| Operation | emuR | reindeer | Speedup |
-|-----------|------|----------|---------|
-| Metadata retrieval (1000 bundles) | 12s | 0.08s | **150x** |
-| Query execution | Standard | Optimized | **2-5x** |
-| Cache serialization | base | qs | **3-4x** |
-| DSP parameter computation | dplyr | data.table | **3-5x** |
+```r
+formants <- quantify(vowels, superassp::forest, .use_cache = TRUE)
+table(formants$.cache_status)   # "hit" / "miss"
+inspect_cache(corp)
+```
+
+The cache key includes the DSP parameters and the bundle's
+Age / Gender, so external metadata edits invalidate the right rows.
+See `vignette("cache_management")`.
+
+### FAIR archival metadata
+
+`describe_corpus()` writes a README, CMDI XML, and DataCite JSON next
+to the corpus. With `options(reindeer.auto_cmdi = TRUE)` it runs
+automatically after any metadata change.
+
+```r
+describe_corpus(corp)
+```
+
+### Interactive annotation
+
+```r
+serve_app(corp)                                  # all bundles
+serve_app(corp, seglist = query(corp, "..."))    # a query result
+```
+
+`serve_app()` launches a local instance of the EMU-webApp so you can
+inspect, correct, or extend annotations from R.
+
+## Companion packages
+
+- **[superassp](https://github.com/humlab-speech/superassp)** —
+  formant, pitch, voice-quality, and other DSP functions used inside
+  `quantify()`.
+- **[protoscribe](https://github.com/humlab-speech/protoscribe)** —
+  draft annotation generation (VAD, VOT, MOMEL/INTSINT, …).
+- **[erodex](https://github.com/humlab-speech/erodex)** — parameter-
+  grid simulation and result inspection.
+- **[eggstract](https://github.com/humlab-speech/eggstract)** —
+  electroglottography measurements.
 
 ## Documentation
 
 - [Package website](https://humlab-speech.github.io/reindeer/)
-- [Tidy Speech Processing](https://humlab-speech.github.io/reindeer/articles/Tidy_speech_processing.html)
-- [Metadata Management](https://humlab-speech.github.io/reindeer/articles/metadata_management.html)
-## Key Components
-
-### S7 Classes
-
-- **`corpus`**: Main class with persistent SQLite connection
-- **`segment_list`**: Query results with time-aligned segments
-- **`extended_segment_list`**: Segments enriched with metadata/tracks
-- **`lazy_segment_list`**: Delayed evaluation (planned optimization)
-
-### Optimized Functions
-
-- `query()` / `query()`: Direct SQLite EQL queries
-- `quantify()`: DSP analysis with metadata-driven parameters
-- `enrich()`: Corpus-wide track generation
-- `gather_metadata()`: Efficient metadata caching
-- `biographize()`: Add metadata to query results
-
-### Companion Packages
-
-- **[erodex](https://github.com/humlab-speech/erodex)**: Parameter-grid DSP simulation (`quantify_simulate`, `enrich_simulate`, `reminisce`, `list_simulations`)
-- **[protoscribe](https://github.com/humlab-speech/protoscribe)**: Draft annotation generation
-
-## Testing
-
-```r
-# Run all tests
-devtools::test()
-
-# Run specific test file
-testthat::test_file("tests/testthat/test_simulation_preprocessing.R")
-
-# Check package
-devtools::check()
-```
-
-## Development
-
-Built with modern R best practices:
-- S7 object system for type safety
-- data.table for performance
-- SQLite for caching
-- GitHub Actions CI/CD
-- pkgdown documentation
-- Test coverage with codecov
-
-## Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure R CMD check passes
-5. Submit a pull request
+- `vignette("getting_started")` — five-minute pipeline.
+- `vignette("metadata_management")` — three-level inheritance,
+  Excel round-trip, FAIR export.
+- `vignette("cache_management")` — inspecting and pruning the quantify
+  cache.
+- `vignette("lazy_and_provenance")` — lazy plans, provenance, and
+  pipe-loss debugging.
 
 ## Citation
 
-If you use reindeer in your research, please cite:
+If you use reindeer in published work, please cite:
 
 ```
-Karlsson, F. (2025). reindeer: Enhanced EMU-SDMS for Speech Research.
-R package version 0.1.17. https://github.com/humlab-speech/reindeer
+Nylén, F. (2026). reindeer: Reproducible Analysis of Speech Corpora
+in R. R package version 0.9.0.
+https://github.com/humlab-speech/reindeer
 ```
 
 ## License
 
-GPL (>= 2)
+GPL (>= 2).
 
-## See Also
+## See also
 
-- [emuR](https://github.com/IPS-LMU/emuR) - EMU Speech Database Management System
-- [superassp](https://github.com/humlab-speech/superassp) - Advanced Signal Processing
-- [EMU-SDMS Manual](https://ips-lmu.github.io/The-EMU-SDMS-Manual/)
+- [emuR](https://github.com/IPS-LMU/emuR) — the EMU Speech Database
+  Management System this package builds on.
+- [EMU-SDMS Manual](https://ips-lmu.github.io/The-EMU-SDMS-Manual/) —
+  reference for the corpus format and EMU Query Language.
