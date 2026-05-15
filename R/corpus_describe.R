@@ -217,12 +217,189 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   invisible(path)
 }
 
+#' @keywords internal
+.emit_citation_cff <- function(summary, path) {
+  # Build authors list — CFF requires at least one author.
+  team <- summary$project$team
+  authors <- list()
+  if (is.data.frame(team) && nrow(team) > 0) {
+    for (i in seq_len(nrow(team))) {
+      nm <- team$name[i]
+      entry <- if (grepl("\\s", nm)) {
+        parts <- strsplit(nm, "\\s+")[[1]]
+        list(
+          `family-names` = utils::tail(parts, 1L),
+          `given-names` = paste(parts[-length(parts)], collapse = " ")
+        )
+      } else {
+        list(name = nm)
+      }
+      if (!is.null(team$affiliation) && nzchar(team$affiliation[i])) {
+        entry$affiliation <- team$affiliation[i]
+      }
+      authors[[length(authors) + 1L]] <- entry
+    }
+  } else if (is.list(team) && length(team) > 0) {
+    for (member in team) {
+      nm <- member$name %||% "Unknown"
+      entry <- if (grepl("\\s", nm)) {
+        parts <- strsplit(nm, "\\s+")[[1]]
+        list(
+          `family-names` = utils::tail(parts, 1L),
+          `given-names` = paste(parts[-length(parts)], collapse = " ")
+        )
+      } else {
+        list(name = nm)
+      }
+      if (!is.null(member$affiliation) && nzchar(member$affiliation)) {
+        entry$affiliation <- member$affiliation
+      }
+      authors[[length(authors) + 1L]] <- entry
+    }
+  }
+  if (length(authors) == 0L) {
+    cli::cli_alert_warning(
+      "No corpus author in METADATA.json; writing CITATION.cff with a placeholder."
+    )
+    authors[[1L]] <- list(name = "Unknown")
+  }
+
+  cff <- list(
+    `cff-version` = "1.2.0",
+    message = paste0(
+      "If you use this corpus, please cite it using the metadata in this file."
+    ),
+    title = summary$name,
+    type = "dataset",
+    authors = authors,
+    identifiers = list(list(type = "other", value = summary$uuid,
+                            description = "Corpus UUID")),
+    abstract = summary$project$description %||%
+      "Speech corpus packaged with the reindeer R package.",
+    keywords = c("speech corpus", "linguistic data"),
+    `date-released` = format(Sys.Date(), "%Y-%m-%d")
+  )
+  if (!is.null(summary$project$website) && nzchar(summary$project$website)) {
+    cff$url <- summary$project$website
+  }
+
+  # Write a YAML 1.2 document by hand so we don't add a yaml dep.
+  lines <- character()
+  add <- function(...) lines <<- c(lines, paste0(...))
+  esc <- function(x) {
+    if (is.null(x) || is.na(x)) return("")
+    s <- gsub('"', '\\"', as.character(x), fixed = TRUE)
+    paste0('"', s, '"')
+  }
+  add('cff-version: "', cff$`cff-version`, '"')
+  add("message: ", esc(cff$message))
+  add("title: ", esc(cff$title))
+  add("type: ", cff$type)
+  add("date-released: ", esc(cff$`date-released`))
+  if (!is.null(cff$url)) add("url: ", esc(cff$url))
+  add("abstract: ", esc(cff$abstract))
+  add("authors:")
+  for (a in cff$authors) {
+    if (!is.null(a$`family-names`)) {
+      add("  - family-names: ", esc(a$`family-names`))
+      add("    given-names: ", esc(a$`given-names`))
+    } else {
+      add("  - name: ", esc(a$name))
+    }
+    if (!is.null(a$affiliation)) {
+      add("    affiliation: ", esc(a$affiliation))
+    }
+  }
+  add("identifiers:")
+  for (id in cff$identifiers) {
+    add("  - type: ", id$type)
+    add("    value: ", esc(id$value))
+    add("    description: ", esc(id$description))
+  }
+  add("keywords:")
+  for (kw in cff$keywords) add("  - ", esc(kw))
+
+  writeLines(lines, path, useBytes = TRUE)
+  invisible(path)
+}
+
+#' @keywords internal
+.emit_jsonld <- function(summary, path) {
+  publication_year <- as.integer(format(Sys.Date(), "%Y"))
+  if (!is.null(summary$project$startDate)) {
+    yr <- suppressWarnings(as.integer(substr(summary$project$startDate, 1, 4)))
+    if (!is.na(yr)) publication_year <- yr
+  }
+
+  creators <- list()
+  team <- summary$project$team
+  if (is.data.frame(team) && nrow(team) > 0) {
+    for (i in seq_len(nrow(team))) {
+      creators[[length(creators) + 1L]] <- list(
+        `@type` = "Person",
+        name = team$name[i],
+        affiliation = if (!is.null(team$affiliation) &&
+                            nzchar(team$affiliation[i])) {
+          list(`@type` = "Organization", name = team$affiliation[i])
+        } else NULL
+      )
+    }
+  } else if (is.list(team) && length(team) > 0) {
+    for (member in team) {
+      creators[[length(creators) + 1L]] <- list(
+        `@type` = "Person",
+        name = member$name %||% "Unknown",
+        affiliation = if (!is.null(member$affiliation) &&
+                            nzchar(member$affiliation)) {
+          list(`@type` = "Organization", name = member$affiliation)
+        } else NULL
+      )
+    }
+  }
+  if (length(creators) == 0L) {
+    creators <- list(list(`@type` = "Person", name = "Unknown"))
+  }
+
+  doc <- list(
+    `@context` = "https://schema.org",
+    `@type` = "Dataset",
+    name = summary$name,
+    identifier = summary$uuid,
+    description = summary$project$description %||%
+      "Speech corpus packaged with the reindeer R package.",
+    creator = creators,
+    datePublished = paste0(publication_year),
+    encodingFormat = paste0("audio/", summary$media_extension),
+    keywords = c("speech corpus", "linguistic data"),
+    inLanguage = "und",
+    distribution = list(list(
+      `@type` = "DataDownload",
+      encodingFormat = "application/x-emudb",
+      contentSize = paste0(summary$n_bundles, " bundles")
+    ))
+  )
+  if (!is.null(summary$project$funder) && nzchar(summary$project$funder)) {
+    doc$funder <- list(`@type` = "Organization",
+                       name = summary$project$funder)
+  }
+  if (!is.null(summary$total_duration_sec)) {
+    # ISO 8601 duration approximation: PT<sec>S
+    doc$duration <- paste0("PT",
+                           round(summary$total_duration_sec, 1), "S")
+  }
+
+  jsonlite::write_json(
+    doc, path, auto_unbox = TRUE, pretty = TRUE, null = "null"
+  )
+  invisible(path)
+}
+
 #' Emit standards-compliant corpus documentation
 #'
-#' Produces README, CMDI XML, and DataCite 4.5 JSON for a corpus in one
-#' call. All three formats are derived from a single shared summary
-#' built by `collect_corpus_summary()`. CMDI delegates to
-#' `create_cmdi_metadata()`.
+#' Produces README, CMDI XML, DataCite 4.5 JSON, CITATION.cff, and
+#' schema.org JSON-LD for a corpus in one call. All formats are derived
+#' from a single shared summary built by `collect_corpus_summary()`.
+#' CMDI delegates to `create_cmdi_metadata()`.
 #'
 #' Existing files at the target paths are never overwritten unless
 #' `force = TRUE`.
@@ -231,7 +408,7 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
 #' @param output_dir Directory to write outputs into. Defaults to the
 #'   corpus base path.
 #' @param formats Character vector of formats to emit. Any subset of
-#'   `c("readme", "cmdi", "datacite")`.
+#'   `c("readme", "cmdi", "datacite", "cff", "jsonld")`.
 #' @param profile CMDI profile (`"speech-corpus"`, `"media-corpus"`,
 #'   `"speech-corpus-dlu"`).
 #' @param force Logical; overwrite existing files.
@@ -241,19 +418,20 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' describe_corpus(corp)
-#' describe_corpus(corp, formats = "readme", force = TRUE)
+#' describe_corpus(corp, formats = c("cff", "jsonld"), force = TRUE)
 #'
 #' @export
 describe_corpus <- function(corpus_obj,
                      output_dir = NULL,
-                     formats = c("readme", "cmdi", "datacite"),
+                     formats = c("readme", "cmdi", "datacite", "cff", "jsonld"),
                      profile = "speech-corpus",
                      force = FALSE,
                      verbose = TRUE) {
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("Input must be a {.cls corpus} object")
   }
-  formats <- match.arg(formats, several.ok = TRUE)
+  valid <- c("readme", "cmdi", "datacite", "cff", "jsonld")
+  formats <- match.arg(formats, choices = valid, several.ok = TRUE)
   if (is.null(output_dir)) output_dir <- corpus_obj@basePath
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
@@ -297,6 +475,24 @@ describe_corpus <- function(corpus_obj,
     }
     .emit_datacite(summary, target)
     written <- c(written, datacite = target)
+    if (verbose) cli::cli_alert_success("Wrote {.path {target}}")
+  }
+  if ("cff" %in% formats) {
+    target <- file.path(output_dir, "CITATION.cff")
+    if (file.exists(target) && !force) {
+      target <- file.path(output_dir, "CITATION-generated.cff")
+    }
+    .emit_citation_cff(summary, target)
+    written <- c(written, cff = target)
+    if (verbose) cli::cli_alert_success("Wrote {.path {target}}")
+  }
+  if ("jsonld" %in% formats) {
+    target <- file.path(output_dir, "_corpus_jsonld.json")
+    if (file.exists(target) && !force) {
+      target <- file.path(output_dir, "_corpus_jsonld-generated.json")
+    }
+    .emit_jsonld(summary, target)
+    written <- c(written, jsonld = target)
     if (verbose) cli::cli_alert_success("Wrote {.path {target}}")
   }
 

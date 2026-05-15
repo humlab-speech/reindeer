@@ -7,7 +7,7 @@
 describe_corpus(
   corpus_obj,
   output_dir = NULL,
-  formats = c("readme", "cmdi", "datacite"),
+  formats = c("readme", "cmdi", "datacite", "cff", "jsonld"),
   profile = "speech-corpus",
   force = FALSE,
   verbose = TRUE
@@ -20,7 +20,7 @@ describe_corpus(
 corpus base path.}
 
 \item{formats}{Character vector of formats to emit. Any subset of
-\code{c("readme", "cmdi", "datacite")}.}
+\code{c("readme", "cmdi", "datacite", "cff", "jsonld")}.}
 
 \item{profile}{CMDI profile (\code{"speech-corpus"}, \code{"media-corpus"},
 \code{"speech-corpus-dlu"}).}
@@ -33,10 +33,10 @@ corpus base path.}
 A named character vector of paths written, invisibly.
 }
 \description{
-Produces README, CMDI XML, and DataCite 4.5 JSON for a corpus in one
-call. All three formats are derived from a single shared summary
-built by \code{collect_corpus_summary()}. CMDI delegates to
-\code{create_cmdi_metadata()}.
+Produces README, CMDI XML, DataCite 4.5 JSON, CITATION.cff, and
+schema.org JSON-LD for a corpus in one call. All formats are derived
+from a single shared summary built by \code{collect_corpus_summary()}.
+CMDI delegates to \code{create_cmdi_metadata()}.
 }
 \details{
 Existing files at the target paths are never overwritten unless
@@ -46,6 +46,6 @@ Existing files at the target paths are never overwritten unless
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")
 describe_corpus(corp)
-describe_corpus(corp, formats = "readme", force = TRUE)
+describe_corpus(corp, formats = c("cff", "jsonld"), force = TRUE)
 \dontshow{\}) # examplesIf}
 }

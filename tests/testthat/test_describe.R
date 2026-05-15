@@ -88,3 +88,79 @@ test_that("describe(formats='cmdi') delegates to create_cmdi_metadata and writes
   expect_true(file.exists(out["cmdi"]))
   expect_match(readLines(out["cmdi"], n = 1), "<\\?xml", fixed = FALSE)
 })
+
+test_that("describe(formats='cff') writes a CITATION.cff with required keys", {
+  ae <- create_isolated_ae_corpus()
+  out_dir <- withr::local_tempdir()
+  out <- describe_corpus(ae, output_dir = out_dir, formats = "cff",
+                         verbose = FALSE)
+  expect_true(file.exists(out["cff"]))
+  txt <- paste(readLines(out["cff"]), collapse = "\n")
+  expect_match(txt, "^cff-version:")
+  expect_match(txt, "title:")
+  expect_match(txt, "authors:")
+  expect_match(txt, "type: dataset")
+})
+
+test_that("describe(formats='jsonld') writes a schema.org Dataset JSON-LD doc", {
+  ae <- create_isolated_ae_corpus()
+  out_dir <- withr::local_tempdir()
+  out <- describe_corpus(ae, output_dir = out_dir, formats = "jsonld",
+                         verbose = FALSE)
+  expect_true(file.exists(out["jsonld"]))
+  doc <- jsonlite::read_json(out["jsonld"])
+  expect_equal(doc[["@context"]], "https://schema.org")
+  expect_equal(doc[["@type"]], "Dataset")
+  expect_true("name" %in% names(doc))
+  expect_true("creator" %in% names(doc))
+  expect_true("distribution" %in% names(doc))
+})
+
+test_that("CITATION.cff falls back to placeholder author with no team metadata", {
+  ae <- create_isolated_ae_corpus()
+  out_dir <- withr::local_tempdir()
+  # Emits a cli::cli_alert_warning (printed, not signalled), so we just
+  # check the file contents reflect the fallback.
+  describe_corpus(ae, output_dir = out_dir, formats = "cff", verbose = FALSE)
+  txt <- paste(readLines(file.path(out_dir, "CITATION.cff")), collapse = "\n")
+  expect_match(txt, "Unknown")
+})
+
+test_that("CITATION.cff uses METADATA.json team entries when present", {
+  ae <- create_isolated_ae_corpus()
+  add_metadata(ae, list(
+    project = list(name = "TeamCorpus"),
+    team = list(
+      list(name = "Jane Doe", affiliation = "Test University"),
+      list(name = "Bob",      affiliation = "Other Place")
+    )
+  ))
+  out_dir <- withr::local_tempdir()
+  out <- describe_corpus(ae, output_dir = out_dir, formats = "cff",
+                         verbose = FALSE)
+  txt <- paste(readLines(out["cff"]), collapse = "\n")
+  expect_match(txt, "family-names: \"Doe\"")
+  expect_match(txt, "given-names: \"Jane\"")
+  expect_match(txt, "Test University")
+  expect_match(txt, "name: \"Bob\"")
+})
+
+test_that("describe('cff','jsonld') honors force=FALSE on pre-existing files", {
+  ae <- create_isolated_ae_corpus()
+  out_dir <- withr::local_tempdir()
+  writeLines("# pre-existing CFF", file.path(out_dir, "CITATION.cff"))
+  writeLines('{"placeholder": true}',
+             file.path(out_dir, "_corpus_jsonld.json"))
+
+  out <- suppressWarnings(
+    describe_corpus(ae, output_dir = out_dir,
+                    formats = c("cff", "jsonld"),
+                    verbose = FALSE)
+  )
+  expect_equal(unname(out["cff"]),
+               file.path(out_dir, "CITATION-generated.cff"))
+  expect_equal(unname(out["jsonld"]),
+               file.path(out_dir, "_corpus_jsonld-generated.json"))
+  expect_equal(readLines(file.path(out_dir, "CITATION.cff"))[1],
+               "# pre-existing CFF")
+})

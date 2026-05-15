@@ -1,3 +1,26 @@
+# reindeer 0.9.5 (2026-05-15)
+
+FAIR completion, stage 2 of v1.0 roadmap: CITATION.cff and schema.org
+JSON-LD adjuncts to `describe_corpus()`.
+
+- `describe_corpus()` gains two new format keys: `"cff"` writes a
+  Citation File Format 1.2.0 `CITATION.cff` at the corpus root, and
+  `"jsonld"` writes a schema.org `Dataset` JSON-LD document as
+  `_corpus_jsonld.json`. The default `formats` argument now includes
+  both, so `describe_corpus(corp)` produces five FAIR artifacts in one
+  call (README, CMDI, DataCite, CFF, JSON-LD).
+- Both new emitters share `collect_corpus_summary()` with the existing
+  README/CMDI/DataCite path; team members in `METADATA.json` are split
+  into `family-names` / `given-names` for CFF and rendered as
+  `schema.org Person` for JSON-LD. With no team metadata, CFF falls
+  back to a placeholder author and prints a `cli_alert_warning`.
+- Force semantics match the existing emitters: pre-existing files
+  remain untouched and a `*-generated` companion is written instead;
+  `force = TRUE` or a dirty metadata bit overwrites in place.
+- Five new test cases in `tests/testthat/test_describe.R` cover CFF
+  shape, JSON-LD shape, placeholder fallback, team-driven authors,
+  and the no-clobber rule.
+
 # reindeer 0.9.4 (2026-05-15)
 
 Tidyverse depth, stage 1 of v1.0 roadmap: track-aware pivot, nesting, and
