@@ -1,3 +1,70 @@
+# reindeer 1.0.0 (2026-05-15)
+
+First stable release. Bundles the six feature stages shipped in
+0.9.4 - 0.9.9 into a coherent v1.0 baseline. No new code or breaking
+changes vs 0.9.9 — only the version label, the consolidated release
+notes below, and final test verification.
+
+The v1.0 work targeted the three productivity axes called out in the
+roadmap (`/Users/frkkan96/.claude/plans/the-reindeer-package-aims-sorted-pie.md`):
+tidyverse depth, FAIR / interop exports, and sister-package glue.
+Lazy-optimizer work and richer error data-slots remain on the v1.1
+roadmap (see *Future Work* below).
+
+## Highlights since 0.9.3
+
+### Tidyverse depth
+- 0.9.4: track-aware `pivot_tracks_longer()` / `pivot_tracks_wider()`,
+  `nest_by_speaker()` / `nest_by_session()` / `nest_by_bundle()`, plus
+  tidyselect helpers `segment_cols()`, `metadata_cols()`,
+  `track_cols()`, `signal_cols()`.
+- 0.9.7: `autoplot()` S3 methods for `segment_list` /
+  `extended_segment_list` with auto-detected types (formants, pitch,
+  spectrogram fallback, labels) and helper geoms
+  `geom_formant_trajectory()`, `geom_label_tier()`,
+  `geom_pitch_track()`.
+
+### FAIR / interop exports
+- 0.9.5: `describe_corpus()` now emits five FAIR artifacts in one
+  call (README, CMDI, DataCite, CITATION.cff, schema.org JSON-LD).
+- 0.9.6: `read_textgrid()` / `write_textgrid()` for Praat
+  `.TextGrid` (long + short format, UTF-8 / UTF-16 BOM), and
+  `read_eaf()` / `write_eaf()` for ELAN `.eaf` (deterministic
+  `ts1..tsN` slot allocation, one TIER per level, optional media
+  descriptor).
+
+### Sister-package glue
+- 0.9.8: `quantify_egg()` / `enrich_egg()` route EGG-track DSP via
+  eggstract (gated by bundle-level `HasEGG`). `propose_annotations()`
+  dispatches to protoscribe's draft generators (VAD / VOT / periods /
+  MOMEL-INTSINT). New end-to-end vignette
+  `vignettes/end_to_end_pipeline.Rmd`.
+
+### Interactive ergonomics
+- 0.9.9: RStudio addin gadgets — `browse_corpus_gadget()` for a
+  tree-view session/bundle browser, `edit_metadata_gadget()` for an
+  editable `DT::datatable` whose changes round-trip through
+  `add_metadata()`.
+
+## Test coverage added in v1.0
+
+122 new test cases across `test_pivot_tracks.R`, `test_describe.R`,
+`test_interop_textgrid.R`, `test_interop_elan.R`, `test_autoplot.R`,
+`test_companion_glue.R`, and `test_addins.R`. All passing on
+`load_all()` + `test_file()`.
+
+## Future work (deferred to v1.1)
+
+- Lazy `explain()` and query optimizer (filter pushdown into the SQL
+  builder, lazy `biographize`, serialization-safe lazy plans).
+- Richer error data-slots (`reindeer_query_error$problematic_token`,
+  `$position`, `$suggested_fix`) and recovery helpers.
+- DOI minting on top of `describe_corpus()` (Zenodo / DataCite API).
+- BIDS-speech export.
+- DuckDB cache backend as an analytic-workload option.
+- EAF export hook into `R/reindeer_autosync.R` for bidirectional
+  sync once round-trip semantics settle.
+
 # reindeer 0.9.9 (2026-05-15)
 
 Interactive ergonomics, stage 6 of v1.0 roadmap: RStudio addin gadgets
