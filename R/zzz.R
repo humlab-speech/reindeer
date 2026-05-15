@@ -76,6 +76,15 @@
     registerS3method("semi_join",  cls, .lazy_dplyr_semi_join,  envir = dn)
   }
 
+  # ggplot2 is in Suggests; register autoplot S3 methods only if installed.
+  if (requireNamespace("ggplot2", quietly = TRUE)) {
+    gn <- asNamespace("ggplot2")
+    registerS3method("autoplot", "reindeer::segment_list",
+                     .autoplot_segment_list, envir = gn)
+    registerS3method("autoplot", "reindeer::extended_segment_list",
+                     .autoplot_extended_segment_list, envir = gn)
+  }
+
   # dplyr is in Suggests; register reconstruct hooks only if available so
   # filter()/mutate()/select()/arrange() preserve segment_list class + props.
   if (requireNamespace("dplyr", quietly = TRUE)) {

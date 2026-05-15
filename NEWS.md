@@ -1,3 +1,25 @@
+# reindeer 0.9.7 (2026-05-15)
+
+Visual analytics, stage 4 of v1.0 roadmap: ggplot2 autoplot methods and
+helper geoms for segment_list / extended_segment_list.
+
+- New `autoplot()` S3 methods for `segment_list` and
+  `extended_segment_list`. The extended method auto-detects an
+  appropriate `type` (formants when `F1_`/`F2_` columns are present,
+  pitch when `F0_`/`pitch_` columns are present, labels otherwise) and
+  pivots wide tracks through `pivot_tracks_longer()` for plotting.
+  `type = "spectrogram"` is recognised but falls back to labels with
+  a `cli_alert_info` when the raw signal isn't available.
+- New helper layers: `geom_formant_trajectory()`,
+  `geom_label_tier()`, `geom_pitch_track()` — thin wrappers that pick
+  sensible aesthetic mappings for the canonical `track_long` shape so
+  users don't have to memorise the plumbing.
+- `ggplot2` added to `Suggests`. Methods abort with
+  `reindeer_missing_companion_error` when called without it. S3
+  registration happens in `.onLoad` only if `ggplot2` is installed.
+- 8 new tests covering label, formant, pitch, spectrogram-fallback,
+  and the three helper geoms.
+
 # reindeer 0.9.6 (2026-05-15)
 
 Field-standard interop, stage 3 of v1.0 roadmap: Praat TextGrid and
