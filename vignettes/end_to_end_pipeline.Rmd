@@ -1,0 +1,166 @@
+---
+title: "End-to-end pipeline with reindeer + companion packages"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{End-to-end pipeline with reindeer + companion packages}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+## What this vignette covers
+
+A full pipeline that walks a corpus from raw recordings to publishable
+analysis, gluing reindeer's verbs to four companion packages:
+
+- **superassp** for the audio-side DSP (formants, F0, intensity, ...).
+- **eggstract** for the electroglottography (EGG) DSP when EGG signal
+  files are present.
+- **protoscribe** for draft annotation generation (VAD, VOT, periods,
+  MOMEL/INTSINT).
+- **erodex** for parameter-grid simulations.
+
+reindeer itself supplies the corpus class, metadata system, EQL query
+engine, lazy pipeline, provenance accounting, tidyverse-friendly
+verbs, and FAIR documentation emitters. The companion packages plug
+into well-defined extension points and are gated by
+`requireNamespace()` checks so the pipeline degrades gracefully when a
+companion is not installed.
+
+## 1. Load the corpus
+
+```{r}
+library(reindeer)
+corp <- corpus("path/to/your_emuDB")
+corp
+```
+
+## 2. Document baseline metadata
+
+Set the database-level project descriptor and any per-bundle flags
+that gate downstream tooling. Setting `HasEGG = TRUE` on the bundles
+that have EGG recordings tells `quantify_egg()` which segments to
+process.
+
+```{r}
+add_metadata(corp, list(
+  project = list(
+    name = "Demo Corpus",
+    description = "End-to-end pipeline demo for the reindeer R package."
+  )
+))
+
+# Per-bundle: declare EGG availability.
+for (bndl in c("bundle_001", "bundle_002")) {
+  add_metadata(corp, list(HasEGG = TRUE),
+               session = "ses_01", bundle = bndl)
+}
+```
+
+## 3. Suggest annotations with protoscribe
+
+protoscribe's `draft_*` functions generate annotation suggestions
+without writing them to the corpus. reindeer wraps them so review can
+happen in the EMU-webApp via `serve_app()`.
+
+```{r}
+# VAD: voice-activity-driven Segment-level suggestions.
+vad_suggestions <- propose_annotations(corp, type = "vad",
+                                        .review = FALSE)
+head(vad_suggestions)
+
+# Open the review UI; accept/edit interactively, save when happy.
+propose_annotations(corp, type = "periods", .review = TRUE)
+```
+
+## 4. Query and navigate
+
+```{r}
+vowels <- query(corp, "Phonetic == V") |>
+  ascend_to("Word") |>
+  dplyr::filter(end - start > 80)
+provenance(vowels)
+dropped_rows(vowels)
+```
+
+## 5. Quantify the audio side (superassp)
+
+```{r}
+audio_measures <- vowels |>
+  collect() |>
+  quantify(superassp::forest, .at = seq(0, 1, 0.1))
+```
+
+## 6. Quantify the EGG side (eggstract)
+
+`quantify_egg()` only runs on bundles whose `HasEGG = TRUE` flag is
+set; the rest pass through untouched.
+
+```{r}
+egg_measures <- vowels |>
+  collect() |>
+  biographize(corp) |>          # joins HasEGG and speaker metadata
+  quantify_egg(.using = eggstract::ksvF0,
+                .at = seq(0, 1, 0.1))
+```
+
+## 7. Reshape for plots
+
+```{r}
+long_formants <- audio_measures |> pivot_tracks_longer()
+
+# All formants on one panel
+ggplot2::autoplot(audio_measures, type = "formants")
+
+# Or build it from primitives
+library(ggplot2)
+ggplot(long_formants) + geom_formant_trajectory()
+```
+
+## 8. Parameter-grid simulation (erodex)
+
+When you need to sweep DSP parameters, hand off to erodex. The
+simulation result re-enters the reindeer pipeline as a regular
+extended_segment_list.
+
+```{r}
+library(erodex)
+erodex::quantify_simulate(
+  vowels |> collect(),
+  .using = superassp::forest,
+  .simulate = list(nominalF1 = seq(500, 900, 100)),
+  .simulation_store = "simulations/formants"
+)
+```
+
+## 9. Export to field-standard formats
+
+Interop with Praat and ELAN is one line each:
+
+```{r}
+write_textgrid(vowels |> collect(), "out/vowels.TextGrid")
+write_eaf(vowels |> collect(), "out/vowels.eaf",
+          media_url = "audio/clip.wav")
+```
+
+## 10. Publishable corpus documentation
+
+`describe_corpus()` emits five FAIR artifacts in one call: README,
+CMDI, DataCite, CITATION.cff, and a schema.org JSON-LD `Dataset`
+descriptor.
+
+```{r}
+describe_corpus(corp)
+list.files(corp@basePath, pattern = "CITATION|cmdi|jsonld|datacite|README")
+```
+
+## What's next
+
+- **Lazy optimizer** (`explain()`, filter pushdown, lazy
+  `biographize`) — slated for v1.1.
+- **DOI minting** — Zenodo / DataCite integration on top of
+  `describe_corpus()` — also v1.1.
+- **BIDS-speech export** — when the spec firms up.

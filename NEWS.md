@@ -1,3 +1,28 @@
+# reindeer 0.9.8 (2026-05-15)
+
+Sister-package glue, stage 5 of v1.0 roadmap: first-class wrappers for
+the eggstract and protoscribe companions, plus an end-to-end pipeline
+vignette.
+
+- New `quantify_egg()` / `enrich_egg()` route EGG-track measurement
+  to the eggstract companion. `quantify_egg()` filters input
+  segments to bundles whose `HasEGG` metadata flag is truthy
+  (gateable with `.require_egg_flag = FALSE`) and forwards to
+  [quantify()] with `eggstract::ksvF0` as the default DSP function.
+  Aborts with `reindeer_missing_companion_error` when eggstract is
+  not installed.
+- New `propose_annotations(corpus, type)` dispatches to one of
+  protoscribe's draft generators
+  (`draft_vad`, `draft_vot`, `draft_periods`, `draft_momel_intsint`)
+  and optionally launches `serve_app()` for interactive review. The
+  `.commit` argument is reserved for a future release; suggestions
+  are returned for inspection only by default.
+- New vignette `end_to_end_pipeline.Rmd` walks a corpus from raw
+  recordings to publishable FAIR artifacts using reindeer +
+  superassp + eggstract + protoscribe + erodex in one narrative.
+- 6 new test cases in `tests/testthat/test_companion_glue.R` exercise
+  the missing-companion gates and the `HasEGG` filtering logic.
+
 # reindeer 0.9.7 (2026-05-15)
 
 Visual analytics, stage 4 of v1.0 roadmap: ggplot2 autoplot methods and
