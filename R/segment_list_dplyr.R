@@ -7,6 +7,19 @@
 # preserved, instead of degrading to a plain tibble. The methods are registered
 # at .onLoad time (see zzz.R) because their generic class names contain `::`.
 
+# Single source of truth for the segment_list required-column list. Used by
+# the validator, the dplyr_reconstruct hooks, the bracket method, and the
+# pivot/nest helpers in segment_list_pivot.R / segment_list_nest.R.
+#' @keywords internal
+.required_segment_cols <- function() {
+  c(
+    "labels", "start", "end", "db_uuid", "session", "bundle",
+    "start_item_id", "end_item_id", "level", "attribute",
+    "start_item_seq_idx", "end_item_seq_idx", "type",
+    "sample_start", "sample_end", "sample_rate"
+  )
+}
+
 #' @keywords internal
 .vec_proxy_segment_list <- function(x, ...) {
   attrs_to_strip <- c("db_uuid", "db_path")
@@ -26,13 +39,7 @@
 
 #' @keywords internal
 .dplyr_reconstruct_segment_list <- function(data, template) {
-  required_cols <- c(
-    "labels", "start", "end", "db_uuid", "session", "bundle",
-    "start_item_id", "end_item_id", "level", "attribute",
-    "start_item_seq_idx", "end_item_seq_idx", "type",
-    "sample_start", "sample_end", "sample_rate"
-  )
-  if (!all(required_cols %in% names(data))) {
+  if (!all(.required_segment_cols() %in% names(data))) {
     return(tibble::as_tibble(data))
   }
   out <- segment_list(data, db_uuid = template@db_uuid, db_path = template@db_path)
@@ -124,13 +131,7 @@
   proxy <- .vec_proxy_segment_list(x)
   out <- .fn(proxy, y, by = by, copy = copy, suffix = suffix, ..., keep = keep)
   if (!is.data.frame(out)) return(out)
-  required_cols <- c(
-    "labels", "start", "end", "db_uuid", "session", "bundle",
-    "start_item_id", "end_item_id", "level", "attribute",
-    "start_item_seq_idx", "end_item_seq_idx", "type",
-    "sample_start", "sample_end", "sample_rate"
-  )
-  if (!all(required_cols %in% names(out))) {
+  if (!all(.required_segment_cols() %in% names(out))) {
     return(tibble::as_tibble(out))
   }
   rebuilt <- segment_list(out, db_uuid = x@db_uuid, db_path = x@db_path)
@@ -157,13 +158,7 @@
 
 #' @keywords internal
 .dplyr_reconstruct_extended_segment_list <- function(data, template) {
-  required_cols <- c(
-    "labels", "start", "end", "db_uuid", "session", "bundle",
-    "start_item_id", "end_item_id", "level", "attribute",
-    "start_item_seq_idx", "end_item_seq_idx", "type",
-    "sample_start", "sample_end", "sample_rate"
-  )
-  if (!all(required_cols %in% names(data))) {
+  if (!all(.required_segment_cols() %in% names(data))) {
     return(tibble::as_tibble(data))
   }
   remaining_dsp <- intersect(template@dsp_columns, names(data))

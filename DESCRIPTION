@@ -1,8 +1,8 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.9.3
-Date: 2026-05-13
+Version: 0.9.4
+Date: 2026-05-15
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-3373-0934"))
@@ -36,6 +36,8 @@ Imports:
     RSQLite,
     RcppSimdJson,
     tibble,
+    tidyselect,
+    rlang,
     httpuv,
     jsonvalidate
 Suggests:
@@ -105,7 +107,10 @@ Collate:
     'schema_validation.R'
     'segment_list_display.R'
     'segment_list_dplyr.R'
+    'segment_list_nest.R'
+    'segment_list_pivot.R'
     'segment_list_provenance.R'
     'segment_list_quantify.R'
+    'segment_list_tidyselect.R'
     'tidy_trackdata_helpers.R'
     'zzz.R'

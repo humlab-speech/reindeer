@@ -1,3 +1,26 @@
+# reindeer 0.9.4 (2026-05-15)
+
+Tidyverse depth, stage 1 of v1.0 roadmap: track-aware pivot, nesting, and
+tidyselect helpers for segment_list / extended_segment_list.
+
+- New `pivot_tracks_longer()` / `pivot_tracks_wider()` reshape wide-form
+  DSP measurements (`F1_0.0`, `F1_0.5`, …) and list-column tracks to / from
+  long form. The long-form result is a `track_long` tibble that carries
+  `db_uuid`, `db_path`, and provenance as attributes; one segment maps to
+  many rows so the segment_list class intentionally drops on the way out.
+- New `nest_by_speaker()` / `nest_by_session()` / `nest_by_bundle()`
+  return a one-row-per-group tibble with a list-column whose entries are
+  per-group segment_list slices. The nest step is appended to the
+  provenance log.
+- New tidyselect helpers `segment_cols()`, `metadata_cols()`,
+  `track_cols()`, and `signal_cols()` partition columns into required
+  segment, DSP-derived track, and metadata groups. Usable inside
+  `dplyr::select()` and any other tidyselect-aware verb.
+- `tidyselect` and `rlang` added to `Imports`.
+- Internal: the required-column list is now sourced from a single
+  `.required_segment_cols()` helper (previously duplicated across
+  `R/segment_list_dplyr.R`).
+
 # reindeer 0.9.3 (2026-05-13)
 
 CI fix for the pkgdown deploy.
