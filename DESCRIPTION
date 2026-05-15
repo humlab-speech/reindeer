@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.9.8
+Version: 0.9.9
 Date: 2026-05-15
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -60,7 +60,10 @@ Suggests:
     vctrs,
     ggplot2,
     rPraat,
-    withr
+    withr,
+    shiny,
+    miniUI,
+    DT
 Remotes:
   github::humlab-speech/superassp,
   github::humlab-speech/av
@@ -72,8 +75,10 @@ Depends:
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 LinkingTo: Rcpp
-Collate: 
+Collate:
     'RcppExports.R'
+    'addin_browse_corpus.R'
+    'addin_edit_metadata.R'
     'annotation_io.R'
     'cache_size_management.R'
     'cache_utils.R'

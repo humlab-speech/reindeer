@@ -1,3 +1,25 @@
+# reindeer 0.9.9 (2026-05-15)
+
+Interactive ergonomics, stage 6 of v1.0 roadmap: RStudio addin gadgets
+for corpus browsing and metadata editing.
+
+- New `browse_corpus_gadget(corpus)` opens a miniUI dialog with a
+  session/bundle tree and a side pane displaying
+  `collect_corpus_summary()` plus the selected bundle's metadata.
+  Returns the corpus invisibly so the call composes with pipelines.
+- New `edit_metadata_gadget(corpus, level)` opens an editable
+  `DT::datatable` over `metadata_session` or `metadata_bundle`. On
+  accept, the diff is computed via `.metadata_diff()` and applied via
+  [add_metadata()] so `METADATA.json` files remain authoritative.
+- `inst/rstudio/addins.dcf` registers both gadgets so they appear in
+  RStudio's Addins menu under "Browse Corpus" and "Edit Metadata".
+- Added `shiny`, `miniUI`, `DT` to `Suggests`. Both gadgets abort with
+  `reindeer_missing_companion_error` when any of those is missing.
+- `.metadata_diff()` is exposed as an internal helper for unit
+  testing; gadget logic is tested headlessly via 14 cases covering
+  identical snapshots, value changes, additions, removals, and
+  level-aware key columns.
+
 # reindeer 0.9.8 (2026-05-15)
 
 Sister-package glue, stage 5 of v1.0 roadmap: first-class wrappers for

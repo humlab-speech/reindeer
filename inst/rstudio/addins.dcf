@@ -1,0 +1,9 @@
+Name: Browse Corpus
+Description: Open the reindeer corpus browser gadget: tree-view of sessions and bundles with metadata preview.
+Binding: browse_corpus_gadget
+Interactive: true
+
+Name: Edit Metadata
+Description: Edit session- or bundle-level metadata in an interactive table; changes round-trip through add_metadata().
+Binding: edit_metadata_gadget
+Interactive: true
