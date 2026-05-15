@@ -1,3 +1,26 @@
+# reindeer 0.9.6 (2026-05-15)
+
+Field-standard interop, stage 3 of v1.0 roadmap: Praat TextGrid and
+ELAN .eaf round-trip.
+
+- New `read_textgrid()` / `write_textgrid()` for Praat `.TextGrid`
+  files. Pure-R implementation with BOM-based UTF-8 / UTF-16 detection,
+  support for both long and short text formats, and tier-per-level
+  output from a `segment_list`. Returns a flat tibble of `tier`,
+  `type`, `start`, `end`, `label`.
+- New `read_eaf()` / `write_eaf()` for ELAN `.eaf` files. Emits a
+  minimal but valid EAF 2.8 document with deterministic `ts1..tsN`
+  time-slot IDs, one `<TIER>` per level, and an optional media
+  descriptor. Reads `ALIGNABLE_ANNOTATION` rows back into a tibble
+  with `tier`, `parent`, `linguistic_type`, `start`, `end`, `label`.
+- Both writers accept any `segment_list` or compatible tibble with
+  `start`, `end`, `labels`, `level` columns; segment_list times in ms
+  are converted to seconds for TextGrid output and to integer ms for
+  EAF output.
+- Added `rPraat` and `withr` to Suggests for optional acceleration and
+  tests.
+- 12 new TextGrid tests and 11 new EAF tests, all passing.
+
 # reindeer 0.9.5 (2026-05-15)
 
 FAIR completion, stage 2 of v1.0 roadmap: CITATION.cff and schema.org

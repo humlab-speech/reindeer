@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 0.9.5
+Version: 0.9.6
 Date: 2026-05-15
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -57,7 +57,9 @@ Suggests:
     readr,
     rstudioapi,
     dplyr (>= 1.0.0),
-    vctrs
+    vctrs,
+    rPraat,
+    withr
 Remotes:
   github::humlab-speech/superassp,
   github::humlab-speech/av
@@ -88,6 +90,8 @@ Collate:
     'reindeer_signal_extensions_dt.R'
     'dsp_parameters_public.R'
     'emuR_perspectives.R'
+    'interop_elan.R'
+    'interop_textgrid.R'
     'json_utils.R'
     'metadata_core.R'
     'metadata_import_export.R'
