@@ -2,16 +2,20 @@
 # Tests equivalence with emuR::query()
 
 library(testthat)
-library(emuR)
+# NB: do NOT `library(emuR)` here — emuR exports a `query()` that would mask
+# reindeer::query(), causing every `query(ae_path, ...)` call below to call
+# emuR's variant (which rejects character paths) and abort. All emuR uses
+# below are fully qualified instead.
 
 # Setup test database
 setup_test_db <- function() {
+  skip_if_no_emuR()
   temp_dir <- tempdir()
   if (!dir.exists(file.path(temp_dir, 'emuR_demoData'))) {
-    create_emuRdemoData(dir = temp_dir)
+    emuR::create_emuRdemoData(dir = temp_dir)
   }
   ae_path <- file.path(temp_dir, 'emuR_demoData', 'ae_emuDB')
-  ae <- load_emuDB(ae_path, verbose = FALSE)
+  ae <- emuR::load_emuDB(ae_path, verbose = FALSE)
 
   # Ensure cache exists by running a simple query with emuR::query
   suppressMessages(emuR::query(ae, "Phonetic == t"))

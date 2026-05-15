@@ -1,3 +1,17 @@
+# reindeer 1.0.1 (2026-05-15)
+
+Test-only patch — no production code changes.
+
+- `tests/testthat/test_query_optimized.R` no longer calls
+  `library(emuR)` at the top of the file. That call put emuR's
+  `query()` last in the runner's search path so every unqualified
+  `query(ae_path, ...)` resolved to `emuR::query()` and aborted in
+  `check_emuDBhandle()` (`$ operator is invalid for atomic vectors`).
+  emuR usages are now fully qualified (`emuR::create_emuRdemoData`,
+  `emuR::load_emuDB`) and `setup_test_db()` calls `skip_if_no_emuR()`
+  up front. The ~85 errors previously emitted by this file under
+  `devtools::test()` and `R CMD check` are gone.
+
 # reindeer 1.0.0 (2026-05-15)
 
 First stable release. Bundles the six feature stages shipped in
