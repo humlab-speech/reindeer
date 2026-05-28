@@ -107,7 +107,7 @@ corpus <- S7::new_class(
       }
 
       # Build/update cache (skip if quick mode and cache already exists)
-      cache_file <- file.path(basePath, paste0(dbName, "_emuDBcache.sqlite"))
+      cache_file <- file.path(basePath, paste0(dbName, database.cache.suffix))
       if (quick && file.exists(cache_file)) {
         if (verbose) cli::cli_alert_info("Quick mode: reusing existing cache")
       } else {
@@ -125,7 +125,7 @@ corpus <- S7::new_class(
       basePath <- handle$basePath
 
       # Ensure cache exists (in quick mode, skip rebuild if cache present)
-      cache_file <- file.path(basePath, paste0(dbName, "_emuDBcache.sqlite"))
+      cache_file <- file.path(basePath, paste0(dbName, database.cache.suffix))
       if (!file.exists(cache_file)) {
         build_emuDB_cache(basePath, verbose = verbose)
       } else if (!quick) {

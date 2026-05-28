@@ -46,7 +46,7 @@ that have EGG recordings tells `quantify_egg()` which segments to
 process.
 
 ```{r}
-add_metadata(corp, list(
+set_metadata(corp, list(
   project = list(
     name = "Demo Corpus",
     description = "End-to-end pipeline demo for the reindeer R package."
@@ -55,7 +55,7 @@ add_metadata(corp, list(
 
 # Per-bundle: declare EGG availability.
 for (bndl in c("bundle_001", "bundle_002")) {
-  add_metadata(corp, list(HasEGG = TRUE),
+  set_metadata(corp, list(HasEGG = TRUE),
                session = "ses_01", bundle = bndl)
 }
 ```
@@ -102,7 +102,7 @@ set; the rest pass through untouched.
 ```{r}
 egg_measures <- vowels |>
   collect() |>
-  biographize(corp) |>          # joins HasEGG and speaker metadata
+  enrich(corp, with = "metadata") |>  # joins HasEGG and speaker metadata
   quantify_egg(.using = eggstract::ksvF0,
                 .at = seq(0, 1, 0.1))
 ```
@@ -160,7 +160,7 @@ list.files(corp@basePath, pattern = "CITATION|cmdi|jsonld|datacite|README")
 ## What's next
 
 - **Lazy optimizer** (`explain()`, filter pushdown, lazy
-  `biographize`) — slated for v1.1.
+  metadata enrichment) — slated for v1.1.
 - **DOI minting** — Zenodo / DataCite integration on top of
   `describe_corpus()` — also v1.1.
 - **BIDS-speech export** — when the spec firms up.

@@ -37,7 +37,7 @@ query <- function(emuDB, eql, ...) {
     
     # Try both naming conventions
     db_path1 <- file.path(base_path, paste0(db_name, "_emuDB.sqlite"))
-    db_path2 <- file.path(base_path, paste0(db_name, "_emuDBcache.sqlite"))
+    db_path2 <- file.path(base_path, paste0(db_name, database.cache.suffix))
     
     if (file.exists(db_path1)) {
       db_path <- db_path1
@@ -57,7 +57,7 @@ query <- function(emuDB, eql, ...) {
     
     # Try both naming conventions
     db_path1 <- file.path(emuDB, paste0(db_name, "_emuDB.sqlite"))
-    db_path2 <- file.path(emuDB, paste0(db_name, "_emuDBcache.sqlite"))
+    db_path2 <- file.path(emuDB, paste0(db_name, database.cache.suffix))
     
     if (file.exists(db_path1)) {
       db_path <- db_path1
@@ -78,7 +78,7 @@ query <- function(emuDB, eql, ...) {
     }
     
     db_path1 <- file.path(base_path, paste0(db_name, "_emuDB.sqlite"))
-    db_path2 <- file.path(base_path, paste0(db_name, "_emuDBcache.sqlite"))
+    db_path2 <- file.path(base_path, paste0(db_name, database.cache.suffix))
     
     if (file.exists(db_path1)) {
       db_path <- db_path1
@@ -104,11 +104,16 @@ query <- function(emuDB, eql, ...) {
     # Return lazy segment list without executing query
     # Build base SQL query but don't execute — returns list(sql, params)
     parsed <- parse_eql_query(eql)
-    base_query <- build_base_sql(db_path, parsed, dots)
-    
-    # Get db_uuid from database
-    conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+
+    # One connection threaded through all sub-builders avoids per-branch
+    # connection churn on nested EQL (e.g. `[A & [B -> C]]` previously spawned
+    # 5+ connections at SQL-build time).
+    conn <- .open_query_connection(db_path)
     on.exit(DBI::dbDisconnect(conn))
+
+    base_query <- build_base_sql(db_path, parsed, dots, con = conn)
+
+    # Get db_uuid from database (reuses the same connection)
     db_uuid_result <- DBI::dbGetQuery(conn, "SELECT uuid FROM emu_db LIMIT 1")
     db_uuid <- if (nrow(db_uuid_result) > 0) db_uuid_result$uuid[1] else ""
     
@@ -157,18 +162,20 @@ query <- function(emuDB, eql, ...) {
 #' @return list(sql = "...", params = list(...))
 #' @keywords internal
 #' @noRd
-build_base_sql <- function(db_path, parsed, opts = list()) {
+build_base_sql <- function(db_path, parsed, opts = list(), con = NULL) {
   result_level <- opts$result_level %||% NULL
 
-  # Build SQL based on query type — all builders return list(sql, params)
+  # Build SQL based on query type — all builders return list(sql, params).
+  # `con` is threaded through so nested builders share a single connection;
+  # NULL falls back to per-builder open/close for back-compat.
   result <- switch(parsed$type,
-    "simple" = build_simple_query_sql(db_path, parsed),
+    "simple" = build_simple_query_sql(db_path, parsed, con = con),
     "scope_filter" = build_scope_filter_sql(db_path, parsed),
-    "sequence" = build_sequence_query_sql(db_path, parsed, result_level),
-    "dominance" = build_dominance_query_sql(db_path, parsed, result_level),
-    "function" = build_function_query_sql(db_path, parsed),
-    "conjunction" = build_conjunction_query_sql(db_path, parsed, result_level),
-    "disjunction" = build_disjunction_query_sql(db_path, parsed, result_level),
+    "sequence" = build_sequence_query_sql(db_path, parsed, result_level, con = con),
+    "dominance" = build_dominance_query_sql(db_path, parsed, result_level, con = con),
+    "function" = build_function_query_sql(db_path, parsed, con = con),
+    "conjunction" = build_conjunction_query_sql(db_path, parsed, result_level, con = con),
+    "disjunction" = build_disjunction_query_sql(db_path, parsed, result_level, con = con),
     .query_abort("Unknown query type: {.val {parsed$type}}")
   )
 
@@ -232,7 +239,7 @@ build_scope_filter_sql <- function(db_path, parsed) {
 #' Returns a parameterized query as list(sql, params) to prevent SQL injection.
 #' @keywords internal
 #' @noRd
-build_simple_query_sql <- function(db_path, parsed) {
+build_simple_query_sql <- function(db_path, parsed, con = NULL) {
   level <- parsed$level
   operator <- parsed$operator
   pattern <- parsed$pattern %||% parsed$value
@@ -242,8 +249,11 @@ build_simple_query_sql <- function(db_path, parsed) {
   # the *attribute* "Text" which lives on level "Word" (or wherever defined).
   # The eager execute_simple_query_corrected path resolves this via
   # .resolve_level_attribute; mirror it here so lazy parity holds.
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
   resolved <- .resolve_level_attribute(con, level, attribute)
   level <- resolved$level
   attribute <- resolved$attribute
@@ -311,9 +321,12 @@ build_simple_query_sql <- function(db_path, parsed) {
 # resolved to zero rows). The lazy path turns that into an empty-shape
 # SELECT so collect() yields a zero-row segment_list rather than aborting.
 
-build_sequence_query_sql <- function(db_path, parsed, result_level = NULL) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+build_sequence_query_sql <- function(db_path, parsed, result_level = NULL, con = NULL) {
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
   q <- build_sequence_query_sql_impl(db_path, parsed, result_level, con = con)
   if (is.null(q)) return(.empty_query_sql())
   # Strip trailing ORDER BY so the SQL can nest inside a compound operator.
@@ -321,18 +334,24 @@ build_sequence_query_sql <- function(db_path, parsed, result_level = NULL) {
   q
 }
 
-build_dominance_query_sql <- function(db_path, parsed, result_level = NULL) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+build_dominance_query_sql <- function(db_path, parsed, result_level = NULL, con = NULL) {
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
   q <- build_dominance_query_sql_impl(db_path, parsed, result_level, con = con)
   if (is.null(q)) return(.empty_query_sql())
   q$sql <- sub("\\s*ORDER BY[^()]*$", "", q$sql)
   q
 }
 
-build_function_query_sql <- function(db_path, parsed) {
-  con <- .open_query_connection(db_path)
-  on.exit(DBI::dbDisconnect(con))
+build_function_query_sql <- function(db_path, parsed, con = NULL) {
+  own_con <- is.null(con)
+  if (own_con) {
+    con <- .open_query_connection(db_path)
+    on.exit(DBI::dbDisconnect(con))
+  }
 
   func_name <- parsed$func_name
   level1 <- .resolve_level_attribute(con, parsed$level1, parsed$level1)$level
@@ -376,9 +395,9 @@ execute_scope_filter_eager <- function(db_path, parsed, con = NULL) {
   df
 }
 
-build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
-  left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
-  right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
+build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL, con = NULL) {
+  left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level), con = con)
+  right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level), con = con)
   if (is.null(left_result) || is.null(right_result)) return(NULL)
   # Tuple-EXISTS instead of INTERSECT: the left side carries the row shape
   # of a segment_list, the right side just supplies an item-identity filter.
@@ -396,9 +415,9 @@ build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
   )
 }
 
-build_disjunction_query_sql <- function(db_path, parsed, result_level = NULL) {
-  left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level))
-  right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level))
+build_disjunction_query_sql <- function(db_path, parsed, result_level = NULL, con = NULL) {
+  left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level), con = con)
+  right_result <- build_base_sql(db_path, parsed$right, list(result_level = result_level), con = con)
   if (is.null(left_result) || is.null(right_result)) return(NULL)
   list(
     sql = paste0(left_result$sql, " UNION ", right_result$sql),

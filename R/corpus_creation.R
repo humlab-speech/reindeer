@@ -134,7 +134,7 @@ create_new_emuDB <- function(path, db_name, verbose = FALSE) {
     jsonlite::write_json(db_config, config_path, auto_unbox = TRUE, pretty = TRUE)
 
     # Create empty SQLite cache
-    cache_path <- file.path(path, paste0(db_name, "_emuDBcache.sqlite"))
+    cache_path <- file.path(path, paste0(db_name, database.cache.suffix))
     con <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
 

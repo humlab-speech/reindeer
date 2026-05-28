@@ -66,8 +66,8 @@ A bracket shortcut writes at the bundle level:
 corp["Session1", "Recording001"] <- list(SamplingRate = 44100)
 ```
 
-`add_metadata()` is a deprecated alias of `set_metadata()` and still
-works for now.
+`add_metadata()` is a deprecated alias of `set_metadata()`; existing
+scripts keep working, but new code should use `set_metadata()`.
 
 ## Reading metadata
 

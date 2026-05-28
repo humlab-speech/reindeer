@@ -1,8 +1,19 @@
 # Reindeer Package Vignettes - Complete Guide
 
-**Package Version**: 0.1.4
+> **STATUS: STALE (kept as historical dev note).**
+> This file describes vignettes planned during the v0.1.x cycle.
+> The shipping vignettes for v1.0+ live in `vignettes/` — see that
+> directory for the current set (`getting_started.Rmd`,
+> `metadata_management.Rmd`, `cache_management.Rmd`,
+> `lazy_and_provenance.Rmd`, `interactive_annotation.Rmd`,
+> `end_to_end_pipeline.Rmd`). Files mentioned below such as
+> `transcription_workflow.Rmd` and `query_benchmarks.qmd` were
+> never shipped and live in companion packages (protoscribe / erodex)
+> or as benchmarking scripts under `benchmarking/`.
+
+**Package Version**: 0.1.4 (historical — current is 1.0.x; see DESCRIPTION)
 **Last Updated**: 2025-11-21
-**Total Vignettes**: 8 (7 active + 1 deprecated)
+**Total Vignettes**: 8 (7 active + 1 deprecated) — historical count
 
 ## Overview
 

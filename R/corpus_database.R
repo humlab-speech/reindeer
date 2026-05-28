@@ -28,7 +28,7 @@ build_emuDB_cache <- function(database_dir,
 
   # Setup paths
   db_config_path <- file.path(database_dir, paste0(db_name, "_DBconfig.json"))
-  cache_path <- file.path(database_dir, paste0(db_name, "_emuDBcache.sqlite"))
+  cache_path <- file.path(database_dir, paste0(db_name, database.cache.suffix))
 
   if (!file.exists(db_config_path)) {
     cli::cli_abort("Database config file not found: {.path {db_config_path}}")
@@ -227,6 +227,9 @@ initialize_database_schema <- function(con, uuid, db_name) {
   DBI::dbExecute(con, "CREATE INDEX links_both_ids_idx ON links(db_uuid, session, bundle, from_id, to_id)")
   DBI::dbExecute(con, "CREATE INDEX links_to_id_idx ON links(db_uuid, session, bundle, to_id)")
   DBI::dbExecute(con, "CREATE INDEX label_nameLabel_idx ON labels(db_uuid, bundle, session, item_id)")
+  # Covers the simple-query access pattern: WHERE i.level=? AND l.name=? AND l.label=?
+  # (paired with items_level_seq_idx). Without this, label lookups full-scan the labels table.
+  DBI::dbExecute(con, "CREATE INDEX labels_name_label_idx ON labels(db_uuid, name, label)")
 
   # Insert database record
   DBI::dbExecute(con, "INSERT INTO emu_db (uuid, name) VALUES (?, ?)", params = list(uuid, db_name))

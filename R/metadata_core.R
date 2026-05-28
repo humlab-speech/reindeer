@@ -446,49 +446,48 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
     return(tibble::tibble(session = character(), bundle = character()))
   }
   
-  # OPTIMIZATION: Single mega-query using PIVOT to get all metadata at once
-  # This is MUCH faster than looping through fields
+  # Inheritance resolved via LEFT JOIN + COALESCE (bundle > session > database).
+  # Replaces an earlier UNION-of-CROSS-JOINs that produced
+  # O(sessions x bundles x fields) intermediate rows before window dedup.
+  #
+  # Strategy: enumerate every (bundle, field_name) we *could* have a value for
+  # by UNIONing the field-name dimension across the three metadata tables,
+  # then left-join each level and COALESCE in precedence order.
   query <- "
-    WITH all_metadata AS (
-      -- Bundle-level metadata
-      SELECT
-        session, bundle, field_name, field_value, field_type, 1 as priority
-      FROM metadata_bundle
-      WHERE db_uuid = ?
-
-      UNION ALL
-
-      -- Session-level metadata
-      SELECT
-        ms.session, b.name as bundle, ms.field_name, ms.field_value, ms.field_type, 2 as priority
-      FROM metadata_session ms
-      CROSS JOIN bundle b
-      WHERE ms.db_uuid = ? AND b.db_uuid = ? AND b.session = ms.session
-
-      UNION ALL
-
-      -- Database-level metadata
-      SELECT
-        b.session, b.name as bundle, md.field_name, md.field_value, md.field_type, 3 as priority
-      FROM metadata_database md
-      CROSS JOIN bundle b
-      WHERE md.db_uuid = ? AND b.db_uuid = ?
+    WITH field_universe AS (
+      SELECT DISTINCT field_name FROM metadata_bundle   WHERE db_uuid = ?
+      UNION
+      SELECT DISTINCT field_name FROM metadata_session  WHERE db_uuid = ?
+      UNION
+      SELECT DISTINCT field_name FROM metadata_database WHERE db_uuid = ?
     ),
-    ranked_metadata AS (
-      SELECT
-        session, bundle, field_name, field_value, field_type,
-        ROW_NUMBER() OVER (PARTITION BY session, bundle, field_name ORDER BY priority) as rn
-      FROM all_metadata
+    cells AS (
+      SELECT b.session, b.name AS bundle, f.field_name
+      FROM bundle b
+      CROSS JOIN field_universe f
+      WHERE b.db_uuid = ?
     )
-    SELECT session, bundle, field_name, field_value, field_type
-    FROM ranked_metadata
-    WHERE rn = 1
+    SELECT
+      c.session,
+      c.bundle,
+      c.field_name,
+      COALESCE(mb.field_value, ms.field_value, md.field_value) AS field_value,
+      COALESCE(mb.field_type,  ms.field_type,  md.field_type)  AS field_type
+    FROM cells c
+    LEFT JOIN metadata_bundle mb
+      ON mb.db_uuid = ? AND mb.session = c.session
+     AND mb.bundle  = c.bundle AND mb.field_name = c.field_name
+    LEFT JOIN metadata_session ms
+      ON ms.db_uuid = ? AND ms.session = c.session
+     AND ms.field_name = c.field_name
+    LEFT JOIN metadata_database md
+      ON md.db_uuid = ? AND md.field_name = c.field_name
+    WHERE COALESCE(mb.field_value, ms.field_value, md.field_value) IS NOT NULL
   "
 
-  # Execute query - get all metadata in one go
   metadata_long <- data.table::setDT(DBI::dbGetQuery(
     con, query,
-    params = list(db_uuid, db_uuid, db_uuid, db_uuid, db_uuid)
+    params = list(db_uuid, db_uuid, db_uuid, db_uuid, db_uuid, db_uuid, db_uuid)
   ))
   
   if (nrow(metadata_long) == 0) {

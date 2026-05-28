@@ -100,17 +100,39 @@ clear_tidy_cache <- function() {
 #'
 #' @noRd
 .make_quantify_cache_key <- function(segment_info, dsp_function, params,
-                                     .at = NULL) {
+                                     .at = NULL,
+                                     .precomputed = NULL) {
+  # `.precomputed` is the list returned by `.precompute_cache_key_parts()`:
+  # call sites that loop over many segments should compute it ONCE outside
+  # the loop instead of paying digest cost per row.
+  pre <- .precomputed %||% .precompute_cache_key_parts(dsp_function, params, .at)
   key_parts <- c(
     segment_info$session,
     segment_info$bundle,
     as.character(segment_info$start),
     as.character(segment_info$end),
-    deparse(substitute(dsp_function))[1],
-    digest::digest(params, algo = "xxhash64"),
-    if (is.null(.at)) "NA" else digest::digest(.at, algo = "xxhash64")
+    pre$dsp_name,
+    pre$params_digest,
+    pre$at_digest
   )
   paste(key_parts, collapse = "_")
+}
+
+#' Precompute the loop-invariant parts of a quantify cache key.
+#'
+#' The DSP function name + params digest + .at digest don't change across
+#' segments in a single quantify() call, but `.make_quantify_cache_key()`
+#' was recomputing them for every row. Hoist them out and reuse.
+#'
+#' @param dsp_function The DSP function symbol the caller passed in. The
+#'   caller must wrap with `substitute()` so we can recover its source name.
+#' @noRd
+.precompute_cache_key_parts <- function(dsp_function, params, .at = NULL) {
+  list(
+    dsp_name = deparse(substitute(dsp_function))[1],
+    params_digest = digest::digest(params, algo = "xxhash64"),
+    at_digest = if (is.null(.at)) "NA" else digest::digest(.at, algo = "xxhash64")
+  )
 }
 
 #' Get cached quantify result
@@ -463,8 +485,11 @@ clear_tidy_cache <- function() {
       return(list())
     }
     
-    # Generate cache keys if caching enabled
+    # Generate cache keys if caching enabled.
+    # Precompute the loop-invariant key parts ONCE — params/.at digests don't
+    # change across segments and digesting per-row was visible at 10k+ rows.
     if (use_cache && !is.null(cache_conn)) {
+      key_pre <- .precompute_cache_key_parts(dsp_function, dsp_params, .at)
       dt_valid[, cache_key := {
         vapply(seq_len(.N), function(i) {
           .make_quantify_cache_key(
@@ -472,7 +497,8 @@ clear_tidy_cache <- function() {
                  start = start[i], end = end[i]),
             dsp_function,
             dsp_params,
-            .at = .at
+            .at = .at,
+            .precomputed = key_pre
           )
         }, character(1))
       }]

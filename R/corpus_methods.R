@@ -429,7 +429,7 @@ get_handle <- function(corpus_obj, verbose = FALSE) {
 get_or_create_connection <- function(corpus_obj) {
   env <- corpus_obj@.connection
   if (!is.null(env$con) && DBI::dbIsValid(env$con)) return(env$con)
-  cache_path <- file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, "_emuDBcache.sqlite"))
+  cache_path <- file.path(corpus_obj@basePath, paste0(corpus_obj@dbName, database.cache.suffix))
   if (!file.exists(cache_path)) {
     cli::cli_abort("Cache file not found at {.path {cache_path}}. Run corpus(path) to rebuild.")
   }
