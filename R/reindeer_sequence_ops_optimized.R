@@ -35,7 +35,11 @@ NULL
 #'   its `db_path`).
 #' @param .quiet Suppress informational messages.
 #' @param collect Materialise the result (default `TRUE`). With
-#'   `FALSE` the operation is deferred into the lazy plan.
+#'   `FALSE` the operation is deferred into the lazy plan — note that
+#'   the lazy SQL path for `scout` / `ascend_to` / `descend_to` does
+#'   not yet preserve every derived column (labels, attribute,
+#'   start_item_id, ...), so eager evaluation is the safe default
+#'   until full SQL parity lands.
 #' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")
@@ -77,7 +81,9 @@ S7::method(scout, segment_list) <- function(.segments,
 #'
 #' When `collect = TRUE` (default) the lazy plan is materialised first and
 #' the segment_list method runs; when `FALSE` a `scout` transform is
-#' appended to the lazy plan for SQL-side evaluation at the next `collect()`.
+#' appended to the lazy plan for SQL-side evaluation at the next
+#' `collect()`. The SQL form does not yet preserve every derived column,
+#' so eager remains the safe default.
 #'
 #' @rdname scout
 #' @name scout.lazy_segment_list
@@ -336,7 +342,8 @@ retreat <- function(.segments, steps_backward, ...) {
 #'   its `db_path`).
 #' @param .quiet Suppress informational messages.
 #' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
-#'   into the lazy plan.
+#'   into the lazy plan (see note in [scout()] about partial SQL
+#'   coverage).
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")
@@ -519,7 +526,9 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' @param level Name of the target level.
 #' @param .from Optional `corpus`.
 #' @param .quiet Suppress messages.
-#' @param collect Materialise (default `TRUE`).
+#' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
+#'   into the lazy plan (see note in [scout()] about partial SQL
+#'   coverage).
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' words  <- query(corp, "Word =~ .*")

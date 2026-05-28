@@ -32,7 +32,11 @@ its \code{db_path}).}
 \item{.quiet}{Suppress informational messages.}
 
 \item{collect}{Materialise the result (default \code{TRUE}). With
-\code{FALSE} the operation is deferred into the lazy plan.}
+\code{FALSE} the operation is deferred into the lazy plan — note that
+the lazy SQL path for \code{scout} / \code{ascend_to} / \code{descend_to} does
+not yet preserve every derived column (labels, attribute,
+start_item_id, ...), so eager evaluation is the safe default
+until full SQL parity lands.}
 }
 \value{
 A \code{segment_list}, or \code{lazy_segment_list} when \code{collect = FALSE}.
@@ -45,7 +49,9 @@ grab a run of consecutive items.
 
 When \code{collect = TRUE} (default) the lazy plan is materialised first and
 the segment_list method runs; when \code{FALSE} a \code{scout} transform is
-appended to the lazy plan for SQL-side evaluation at the next \code{collect()}.
+appended to the lazy plan for SQL-side evaluation at the next
+\code{collect()}. The SQL form does not yet preserve every derived column,
+so eager remains the safe default.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}

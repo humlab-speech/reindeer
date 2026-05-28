@@ -19,7 +19,8 @@ its \code{db_path}).}
 \item{.quiet}{Suppress informational messages.}
 
 \item{collect}{Materialise (default \code{TRUE}); pass \code{FALSE} to defer
-into the lazy plan.}
+into the lazy plan (see note in \code{\link[=scout]{scout()}} about partial SQL
+coverage).}
 }
 \value{
 A \code{segment_list} (or \code{lazy_segment_list} when \code{collect = FALSE}).

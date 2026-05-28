@@ -4,9 +4,11 @@
 #
 # Records the row count delta across every verb that touches a segment_list,
 # so users can answer "where did 27 of my 100 segments go?" without manual
-# bookkeeping. Provenance lives as a tibble on the `reindeer_provenance`
-# attribute of the segment_list and is preserved through tidyverse verbs via
-# the dplyr_reconstruct hook.
+# bookkeeping. Provenance is stored internally as a list-of-row-records on
+# the `reindeer_provenance` attribute (cheap to append to). When the user
+# calls provenance() / dropped() / dropped_rows() we materialise that list
+# into a tibble on demand. The list form replaces the earlier tibble-per-
+# step vctrs::vec_rbind which copied the entire history on every verb.
 
 # Internal: empty provenance tibble with the canonical column structure
 .empty_provenance <- function() {
@@ -21,12 +23,64 @@
   )
 }
 
-# Internal: append one row to a provenance tibble, applying the truncation cap
+# Internal: coerce whatever the attribute currently holds into the list form
+# used by the new append path. Accepts:
+#   - NULL                -> empty list
+#   - a list of records   -> returned as-is
+#   - a tibble (legacy)   -> converted row-by-row into a list of records
+.coerce_provenance_to_list <- function(prov) {
+  if (is.null(prov)) return(list())
+  if (is.list(prov) && !is.data.frame(prov)) return(prov)
+  if (is.data.frame(prov) && nrow(prov) > 0L) {
+    return(lapply(seq_len(nrow(prov)), function(i) {
+      list(
+        verb = as.character(prov$verb[i]),
+        call = as.character(prov$call[i]),
+        rows_in = as.integer(prov$rows_in[i]),
+        rows_out = as.integer(prov$rows_out[i]),
+        rows_lost = as.integer(prov$rows_lost[i]),
+        ts = prov$ts[i]
+      )
+    }))
+  }
+  list()
+}
+
+# Internal: convert the list-of-records form back into the public tibble form
+.provenance_list_to_tibble <- function(prov_list) {
+  if (!is.list(prov_list) || length(prov_list) == 0L) return(.empty_provenance())
+  tibble::tibble(
+    step = seq_along(prov_list),
+    verb = vapply(prov_list, function(e) as.character(e$verb), character(1)),
+    call = vapply(prov_list, function(e) {
+      v <- e$call
+      if (is.null(v)) NA_character_ else as.character(v)
+    }, character(1)),
+    rows_in = vapply(prov_list, function(e) {
+      v <- e$rows_in
+      if (is.null(v)) NA_integer_ else as.integer(v)
+    }, integer(1)),
+    rows_out = vapply(prov_list, function(e) {
+      v <- e$rows_out
+      if (is.null(v)) NA_integer_ else as.integer(v)
+    }, integer(1)),
+    rows_lost = vapply(prov_list, function(e) {
+      v <- e$rows_lost
+      if (is.null(v)) NA_integer_ else as.integer(v)
+    }, integer(1)),
+    ts = do.call(c, lapply(prov_list, function(e) {
+      if (is.null(e$ts)) as.POSIXct(NA) else e$ts
+    }))
+  )
+}
+
+# Internal: append one record to a provenance list, applying the truncation cap.
+# Returns the updated list (list-mode storage avoids vctrs::vec_rbind copying
+# the full history on every verb).
 .append_provenance_row <- function(prov, verb, call, rows_in, rows_out) {
-  if (is.null(prov)) prov <- .empty_provenance()
+  prov_list <- .coerce_provenance_to_list(prov)
   call_str <- if (is.null(call)) NA_character_ else paste(deparse(call), collapse = " ")
-  new_row <- tibble::tibble(
-    step = nrow(prov) + 1L,
+  new_entry <- list(
     verb = as.character(verb),
     call = call_str,
     rows_in = as.integer(rows_in),
@@ -34,16 +88,17 @@
     rows_lost = as.integer(rows_in) - as.integer(rows_out),
     ts = Sys.time()
   )
-  out <- vctrs::vec_rbind(prov, new_row)
+  prov_list[[length(prov_list) + 1L]] <- new_entry
+
   cap <- getOption("reindeer.provenance_max", 1000L)
-  if (nrow(out) > cap) {
-    out <- out[(nrow(out) - cap + 1L):nrow(out), ]
+  if (length(prov_list) > cap) {
+    prov_list <- prov_list[(length(prov_list) - cap + 1L):length(prov_list)]
     cli::cli_warn(c(
       "Provenance log truncated to last {cap} entries.",
       "i" = "Set {.code options(reindeer.provenance_max = N)} to raise the cap."
     ))
   }
-  out
+  prov_list
 }
 
 # Internal: row count or NA for arbitrary objects (handles non-data.frame inputs)
@@ -112,7 +167,11 @@ provenance <- function(seg) {
   }
   prov <- attr(seg, "reindeer_provenance")
   if (is.null(prov)) return(.empty_provenance())
-  prov
+  # Internal storage is list-of-records; the public form is a tibble.
+  # Legacy tibble-form attributes still round-trip cleanly through
+  # the list->tibble materialisation path.
+  if (is.data.frame(prov)) return(prov)
+  .provenance_list_to_tibble(prov)
 }
 
 #' Cumulative or per-step row loss for a segment_list pipeline
