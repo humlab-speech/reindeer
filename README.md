@@ -43,6 +43,11 @@ library(reindeer)
 library(dplyr)
 
 corp <- corpus("path/to/your_emuDB")
+# (or `corp <- demo_corpus()` to follow along with the bundled sample.)
+
+# 0. Record speaker metadata so DSP picks age/gender-aware parameters
+set_metadata(corp, list(Speaker = "P001", Age = 25, Gender = "Female"),
+             session = "Session1")
 
 # 1. Query vowels via EMU Query Language
 vowels <- query(corp, "Phonetic =~ [aeiou]")
@@ -110,7 +115,10 @@ inspect_cache(corp)
 
 The cache key includes the DSP parameters and the bundle's
 Age / Gender, so external metadata edits invalidate the right rows.
-See `vignette("cache_management")`.
+Enabling the cache turns iterative re-runs of an analysis on a large
+corpus from minutes back to seconds, at the cost of some disk space
+in `.quantify_cache/` next to the database. See
+`vignette("cache_management")`.
 
 ### FAIR archival metadata
 
@@ -154,6 +162,10 @@ inspect, correct, or extend annotations from R.
   cache.
 - `vignette("lazy_and_provenance")` — lazy plans, provenance, and
   pipe-loss debugging.
+- `vignette("end_to_end_pipeline")` — one walk through corpus open →
+  metadata → DSP → simulation → archival metadata.
+- `vignette("interactive_annotation")` — driving the EMU-webApp from
+  R for review and correction.
 
 ## Citation
 
@@ -161,7 +173,7 @@ If you use reindeer in published work, please cite:
 
 ```
 Nylén, F. (2026). reindeer: Reproducible Analysis of Speech Corpora
-in R. R package version 0.9.0.
+in R. R package version 1.0.1.
 https://github.com/humlab-speech/reindeer
 ```
 

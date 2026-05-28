@@ -410,20 +410,26 @@ register_metadata_field <- function(con, field_name, field_type) {
 #' Read metadata with inheritance resolved
 #'
 #' Returns a tidy one-row-per-bundle tibble with the effective metadata
-#' value at every level, picking bundle over session over database
-#' defaults. This is what most analyses want — feed it to
-#' [`dplyr::left_join`] against a `segment_list`, or use
-#' [enrich(segs, corp)][enrich()] to do the join for you.
+#' value for every bundle, with inheritance applied in
+#' **bundle > session > database** precedence — a value set at a more
+#' specific scope wins over a less specific one. This is what most
+#' analyses want — feed it to [`dplyr::left_join`] against a
+#' `segment_list`, or use [enrich(segs, corp)][enrich()] to do the join
+#' for you.
 #'
 #' @param corpus_obj A `corpus`.
 #' @param session_pattern,bundle_pattern Optional regex filters.
-#' @return A tibble: columns `session`, `bundle`, plus one column per
-#'   metadata field.
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' get_metadata(corp)
-#' get_metadata(corp, session_pattern = "Session1")
+#' @return A tibble with one row per bundle. Always contains
+#'   `session` and `bundle` columns; one additional column per metadata
+#'   field that exists anywhere in the corpus, named after the field.
+#'   Field columns carry the original R type (numeric, integer, logical,
+#'   or character) as recorded when the metadata was written.
+#' @family metadata
 #' @seealso [set_metadata()], [load_metadata()], [enrich()]
+#' @examplesIf interactive()
+#' corp <- demo_corpus()
+#' get_metadata(corp)
+#' get_metadata(corp, session_pattern = "0000")
 #' @export
 get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".*") {
   

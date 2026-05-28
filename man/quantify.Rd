@@ -37,12 +37,20 @@ multi-session future plan. Default: on, with \code{detectCores() - 1}.}
 
 \item{.verbose}{Print a per-step progress summary.}
 
-\item{.optimize}{Use the vectorised data.table backend. Default
-\code{TRUE}; turn off only for debugging.}
+\item{.optimize}{Use optimized computation (default \code{TRUE}; turn off
+only for debugging).}
 }
 \value{
-An \code{extended_segment_list}: the input columns plus one
-column per DSP output (e.g. \code{F1}, \code{F2}, \code{F3}).
+An \link{extended_segment_list}: every column of the input
+\code{segment_list} (see \code{\link[=query]{query()}} for the column inventory), plus one
+column per DSP output column produced by \code{dsp_function} (consult
+the function's own help — for example \code{superassp::forest} adds
+\code{F1}, \code{F2}, \code{F3}, \code{B1}, \code{B2}, \code{B3}). When \code{.at} is a vector, an
+extra \code{.time_point} column records which relative time each row
+came from. When \code{.use_cache = TRUE}, a \code{.cache_status} column
+reports \code{"hit"} or \code{"miss"} per row. The DSP function and its
+added columns are also recorded on the object as the S7 properties
+\verb{@dsp_function} and \verb{@dsp_columns}.
 }
 \description{
 Apply a DSP function (typically from \code{superassp}) to every segment
@@ -54,8 +62,8 @@ the next \code{\link[=collect]{collect()}}.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/ae_emuDB")
-segs <- query(corp, "Phonetic =~ [aeiou]")
+corp <- demo_corpus()
+segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 
 # Formants at the midpoint
 quantify(segs, superassp::forest, .at = 0.5)
@@ -69,4 +77,8 @@ quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
 }
 \seealso{
 \code{\link[=enrich]{enrich()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
+
+Other signal: 
+\code{\link{enrich}()}
 }
+\concept{signal}

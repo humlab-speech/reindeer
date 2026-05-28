@@ -26,10 +26,12 @@ set_metadata(
 
 \item{metadataList}{Named list of field/value pairs to write.}
 
-\item{session}{Optional session name (writes session-level metadata).}
+\item{session}{Optional session name. Required to write at session
+level, and required (together with \code{bundle}) to write at bundle
+level.}
 
-\item{bundle}{Optional bundle name (requires \code{session}; writes
-bundle-level metadata).}
+\item{bundle}{Optional bundle name. When given, \code{session} must also
+be provided; together they identify a bundle-level scope.}
 
 \item{reset.before.add}{Logical; if \code{TRUE}, clear existing fields at
 the given scope before writing.}
@@ -44,10 +46,24 @@ Sets metadata at the database, session, or bundle level. Writes to
 METADATA.json (ground truth) and updates the SQLite cache. Level is
 determined by which of \code{session}/\code{bundle} are provided.
 
-\code{set_metadata()} is the preferred name for writing metadata; it is
-a thin wrapper around \code{\link[=add_metadata]{add_metadata()}} kept for \code{get/set} symmetry
-with \code{\link[=get_metadata]{get_metadata()}}. \code{add_metadata()} remains available as an
-alias (it predates \code{set_metadata} and is still used in older code).
+Writes one or more metadata fields at the chosen scope. The scope is
+chosen by which of \code{session} and \code{bundle} you pass:
+\itemize{
+\item neither — \emph{database} level (defaults that apply to every bundle).
+\item \code{session} only — \emph{session} level (overrides the database default
+for that session's bundles).
+\item \code{session} + \code{bundle} — \emph{bundle} level (overrides both).
+}
+}
+\details{
+On read, \code{\link[=get_metadata]{get_metadata()}} resolves inheritance with
+\strong{bundle > session > database} precedence: a value set at a more
+specific scope wins over a less specific one. Writes are stored in
+the bundle / session / database \code{METADATA.json} files (the ground
+truth) and mirrored to the SQLite cache.
+
+\code{add_metadata()} is the older spelling; it remains as an alias of
+\code{set_metadata()} for backwards compatibility.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
@@ -56,7 +72,19 @@ add_metadata(corp, list(Project = "MyStudy"))
 add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
 \dontshow{\}) # examplesIf}
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-set_metadata(corp, list(Project = "MyStudy"))
-set_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
+corp <- demo_corpus()
+set_metadata(corp, list(Project = "MyStudy"))                 # database
+set_metadata(corp, list(Age = 25, Gender = "Female"),
+             session = "0000")                                 # session
+set_metadata(corp, list(Quality = "Good"),
+             session = "0000", bundle = "msajc003")            # bundle
 \dontshow{\}) # examplesIf}
 }
+\seealso{
+\code{\link[=get_metadata]{get_metadata()}} for the matching reader, \code{\link[=load_metadata]{load_metadata()}}
+for bulk import.
+
+Other metadata: 
+\code{\link{get_metadata}()}
+}
+\concept{metadata}

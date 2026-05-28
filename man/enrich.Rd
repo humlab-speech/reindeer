@@ -34,9 +34,18 @@ in the persistent cache. See \code{\link[=inspect_cache]{inspect_cache()}}.}
 \item{.verbose}{Print progress. Default \code{TRUE}.}
 }
 \value{
-The corpus invisibly (corpus method), or an
-\code{extended_segment_list} / metadata-joined \code{segment_list} (segment
-method).
+The corpus invisibly (corpus method), or for the segment
+methods:
+\itemize{
+\item \strong{Metadata join} (default, \code{with = "metadata"} or passing a
+corpus): the input \code{segment_list} with one extra column for every
+metadata field defined anywhere in the corpus, named after the
+field. Inheritance is resolved (bundle > session > database)
+before the join — see \code{\link[=get_metadata]{get_metadata()}} for the field set.
+\item \strong{DSP} (\code{.using = fn}): an \link{extended_segment_list} equivalent to
+\code{\link[=quantify]{quantify()}}'s output — input columns plus one column per DSP
+output (e.g. \code{F1}, \code{F2}, \code{F3} for \code{superassp::forest}).
+}
 }
 \description{
 One verb that does the right thing depending on what you pass in.
@@ -49,17 +58,22 @@ pass \code{.using = fn} to extract acoustic measurements via \code{\link[=quanti
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/ae_emuDB")
+corp <- demo_corpus()
 
 # Corpus-wide formants, age/gender-aware parameters
 enrich(corp, .using = superassp::forest)
 
 # Per-segment metadata join
-segs <- query(corp, "Phonetic =~ [aeiou]")
+segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 enrich(segs, corp)                              # metadata join
 enrich(segs, .using = superassp::forest)        # delegates to quantify()
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=quantify]{quantify()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
+\code{\link[=quantify]{quantify()}}, \code{\link[=get_metadata]{get_metadata()}}, \code{\link[=dsp_parameters]{dsp_parameters()}},
+\code{\link[=inspect_cache]{inspect_cache()}}
+
+Other signal: 
+\code{\link{quantify}()}
 }
+\concept{signal}

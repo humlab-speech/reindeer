@@ -125,6 +125,13 @@ reference:
   - semitones
   - erb
 
+- title: "Visualization"
+  desc: "ggplot2 layers and autoplot methods for segment lists."
+  contents:
+  - geom_formant_trajectory
+  - geom_pitch_track
+  - geom_label_tier
+
 - title: "Interactive annotation"
   desc: "Launch the EMU-webApp from R."
   contents:

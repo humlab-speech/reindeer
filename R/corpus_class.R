@@ -17,12 +17,19 @@
 #'   sync with the corpus on each annotation or metadata change.
 #'   Off by default.
 #' @param verbose Print progress while loading. Default `FALSE`.
-#' @param quick Reuse the existing SQLite cache without rebuilding from
-#'   `METADATA.json`. Faster startup; use after manual JSON edits
-#'   only after calling [load_metadata()].
+#' @param quick Skip the cache rebuild on open. Use this only when you
+#'   know the cache is current (e.g. immediately after the previous
+#'   session closed cleanly). After any manual edit to a `METADATA.json`
+#'   or annotation file, leave it `FALSE` so reindeer can re-sync.
 #' @param cache_dir Override the quantify/enrich cache directory.
 #'   Default `<basePath>/.quantify_cache`.
-#' @return A `corpus` object.
+#' @return A `corpus` object. The S7 class exposes the following
+#'   properties you can read from user code (use `@`):
+#'   * `@dbName` — corpus name (the basename minus `_emuDB`).
+#'   * `@basePath` — path to the `_emuDB` directory.
+#'   * `@config` — parsed `_DBconfig.json` (level + link definitions).
+#'   * Internal: `@.uuid`, `@.connection`, `@.cache_dir`, `@.sync` —
+#'     used by the cache machinery; treat as read-only.
 #' @section Bracket access:
 #' Once you have a corpus, you can read and write metadata by name:
 #' \preformatted{
@@ -33,11 +40,12 @@
 #' corp["Session1", "Bundle1"] <- "audio.mp3" # import media
 #' }
 #' For programmatic metadata see [set_metadata()] / [get_metadata()].
+#' @seealso [demo_corpus()], [query()], [enrich()], [load_metadata()],
+#'   [serve_app()]
 #' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' vowels <- query(corp, "Phonetic =~ [aeiou]")
+#' corp <- demo_corpus()
+#' vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #' formants <- quantify(vowels, superassp::forest)
-#' @seealso [query()], [enrich()], [load_metadata()], [serve_app()]
 #' @export
 corpus <- S7::new_class(
   "corpus",

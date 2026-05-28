@@ -19,7 +19,22 @@ or an existing \code{emuDBhandle}.}
 \code{lazy = FALSE} for eager execution.}
 }
 \value{
-A \code{segment_list} (eager) or \code{lazy_segment_list} (default).
+A \link{lazy_segment_list} (default) or a \link{segment_list}
+(\code{lazy = FALSE}). Both have one row per matched annotation with the
+following columns:
+\itemize{
+\item \code{session}, \code{bundle} — corpus location.
+\item \code{start}, \code{end} — segment times in ms (start == end for events).
+\item \code{label} — the annotation label that matched.
+\item \code{level}, \code{attribute}, \code{type} — annotation level and the matched
+attribute name, plus the level type (\code{SEGMENT} / \code{EVENT} /
+\code{ITEM}).
+\item \code{start_item_id}, \code{end_item_id}, \code{start_item_seq_idx},
+\code{end_item_seq_idx} — internal item references used by
+\code{\link[=scout]{scout()}} / \code{\link[=ascend_to]{ascend_to()}} / \code{\link[=descend_to]{descend_to()}}.
+\item \code{db_uuid} — for joining against the cache.
+Provenance is recorded on the result; see \code{\link[=provenance]{provenance()}}.
+}
 }
 \description{
 Returns the annotation segments that match an EQL expression. Syntax
@@ -28,10 +43,32 @@ see the EMU-SDMS manual for the full grammar. Results come back as a
 tibble-like \code{segment_list} ready for \code{\link[=enrich]{enrich()}} / \code{\link[=quantify]{quantify()}} / dplyr.
 }
 \details{
-By default the query is deferred until you actually access the data
+Since v0.7 the query is \strong{deferred by default}: a \link{lazy_segment_list}
+is returned and the SQL fires only when you access the rows
 (\code{nrow()}, \code{head()}, \code{$}, dplyr verbs, \code{\link[=collect]{collect()}} etc.). Pass
 \code{lazy = FALSE} to force immediate execution.
 }
+\section{Supported EQL features}{
+
+reindeer's query engine targets parity with \code{emuR::query()} and
+supports:
+\itemize{
+\item Equality / inequality: \code{Level == "a"}, \code{Level != "a"},
+with label alternatives via \code{|} (e.g. \code{"m|n|p"}).
+\item Regex: \code{Level =~ "[aeiou]"}, \verb{Level !~ "[aeiou]"}.
+\item Sequences: \verb{[A -> B]} (immediate adjacency at the same level).
+\item Dominance: \verb{[A ^ B]} (A dominates B in the hierarchy);
+\verb{[Syllable #== S ^ Phonetic =~ "[aeiou]"]} projects the
+dominating level.
+\item Conjunction \code{&} and disjunction \code{|} of sub-queries inside
+brackets.
+\item Position functions: \code{Start()}, \code{End()}, \code{Medial()}, \code{Num()}.
+\item Scope filters on \code{Session} / \code{Bundle}.
+\item Attribute-as-level resolution: querying a defined attribute
+name (e.g. \code{Text == "always"}) resolves to its host level.
+}
+}
+
 \section{Common pitfalls}{
 
 \itemize{
@@ -47,12 +84,14 @@ By default the query is deferred until you actually access the data
 
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/ae_emuDB")
-query(corp, "Phonetic == t")
-query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")
-query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
+corp <- demo_corpus()
+query(corp, "Phonetic == n")                          # lazy by default
+query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]") # sequence
+query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)      # eager
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=scout]{scout()}}, \code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}, \code{\link[=collect]{collect()}}
+\code{\link[=scout]{scout()}}, \code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}, \code{\link[=collect]{collect()}},
+\code{\link[=provenance]{provenance()}}
 }
+\concept{query}

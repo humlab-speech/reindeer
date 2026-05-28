@@ -6,7 +6,7 @@
 \usage{
 propose_annotations(
   corpus,
-  type = c("vad", "vot", "periods", "momel"),
+  type = c("vad", "vot", "periods", "momel", "slam", "slam_plus", "slamp3"),
   .review = TRUE,
   .commit = FALSE,
   ...

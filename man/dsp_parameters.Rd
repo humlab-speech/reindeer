@@ -23,12 +23,11 @@ internal DSPP table (windowSize, minF, maxF, nominalF1, nominalF2,
 nominalF3, plus any others present).
 }
 \description{
-Returns the DSP parameter row that would be selected for a given
-speaker's age and gender, drawn from the empirical / LOESS-smoothed
-defaults table that powers \code{\link[=enrich]{enrich()}} and \code{\link[=quantify]{quantify()}} when
-\code{.use_metadata = TRUE}. Use this to preview what windowSize, minF,
-nominalF1/F2/F3 etc. will be passed to a DSP routine before you run
-it, or to compare two speakers side-by-side.
+Returns the age/gender-appropriate DSP parameters that
+\code{\link[=enrich]{enrich()}} and \code{\link[=quantify]{quantify()}} would pass to a DSP routine when
+\code{.use_metadata = TRUE}. Use this to preview what \code{windowSize},
+\code{minF}, \code{nominalF1/F2/F3} etc. will be applied before you run
+a quantification, or to compare two speakers side-by-side.
 }
 \details{
 Pass \code{age} and \code{gender} directly to look up a single row, or pass a

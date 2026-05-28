@@ -27,13 +27,23 @@
 #' @param .parallel,.workers Run segments concurrently via a
 #'   multi-session future plan. Default: on, with `detectCores() - 1`.
 #' @param .verbose Print a per-step progress summary.
-#' @param .optimize Use the vectorised data.table backend. Default
-#'   `TRUE`; turn off only for debugging.
-#' @return An `extended_segment_list`: the input columns plus one
-#'   column per DSP output (e.g. `F1`, `F2`, `F3`).
+#' @param .optimize Use optimized computation (default `TRUE`; turn off
+#'   only for debugging).
+#' @return An [extended_segment_list]: every column of the input
+#'   `segment_list` (see [query()] for the column inventory), plus one
+#'   column per DSP output column produced by `dsp_function` (consult
+#'   the function's own help — for example `superassp::forest` adds
+#'   `F1`, `F2`, `F3`, `B1`, `B2`, `B3`). When `.at` is a vector, an
+#'   extra `.time_point` column records which relative time each row
+#'   came from. When `.use_cache = TRUE`, a `.cache_status` column
+#'   reports `"hit"` or `"miss"` per row. The DSP function and its
+#'   added columns are also recorded on the object as the S7 properties
+#'   `@dsp_function` and `@dsp_columns`.
+#' @family signal
+#' @seealso [enrich()], [dsp_parameters()], [inspect_cache()]
 #' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' segs <- query(corp, "Phonetic =~ [aeiou]")
+#' corp <- demo_corpus()
+#' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #'
 #' # Formants at the midpoint
 #' quantify(segs, superassp::forest, .at = 0.5)
@@ -43,7 +53,6 @@
 #'
 #' # Override metadata-derived parameters
 #' quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
-#' @seealso [enrich()], [dsp_parameters()], [inspect_cache()]
 #' @name quantify
 #' @export
 quantify <- S7::new_generic("quantify", "object")

@@ -12,23 +12,32 @@ get_metadata(corpus_obj, session_pattern = ".*", bundle_pattern = ".*")
 \item{session_pattern, bundle_pattern}{Optional regex filters.}
 }
 \value{
-A tibble: columns \code{session}, \code{bundle}, plus one column per
-metadata field.
+A tibble with one row per bundle. Always contains
+\code{session} and \code{bundle} columns; one additional column per metadata
+field that exists anywhere in the corpus, named after the field.
+Field columns carry the original R type (numeric, integer, logical,
+or character) as recorded when the metadata was written.
 }
 \description{
 Returns a tidy one-row-per-bundle tibble with the effective metadata
-value at every level, picking bundle over session over database
-defaults. This is what most analyses want — feed it to
-\code{\link[dplyr:mutate-joins]{dplyr::left_join}} against a \code{segment_list}, or use
-\link[=enrich]{enrich(segs, corp)} to do the join for you.
+value for every bundle, with inheritance applied in
+\strong{bundle > session > database} precedence — a value set at a more
+specific scope wins over a less specific one. This is what most
+analyses want — feed it to \code{\link[dplyr:mutate-joins]{dplyr::left_join}} against a
+\code{segment_list}, or use \link[=enrich]{enrich(segs, corp)} to do the join
+for you.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/ae_emuDB")
+corp <- demo_corpus()
 get_metadata(corp)
-get_metadata(corp, session_pattern = "Session1")
+get_metadata(corp, session_pattern = "0000")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=set_metadata]{set_metadata()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=enrich]{enrich()}}
+
+Other metadata: 
+\code{\link{add_metadata}()}
 }
+\concept{metadata}

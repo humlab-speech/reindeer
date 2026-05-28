@@ -92,6 +92,7 @@ Collate:
     'corpus_listing.R'
     'corpus_metadata_io.R'
     'corpus_methods.R'
+    'deprecated_stubs.R'
     'reindeer_lazy_segment_list.R'
     'segment_list_classes.R'
     'reindeer_enrich.R'

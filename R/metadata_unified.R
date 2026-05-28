@@ -49,22 +49,42 @@ load_metadata <- function(corpus_obj,
 
 #' Set metadata on a corpus, session, or bundle
 #'
-#' `set_metadata()` is the preferred name for writing metadata; it is
-#' a thin wrapper around [add_metadata()] kept for `get/set` symmetry
-#' with [get_metadata()]. `add_metadata()` remains available as an
-#' alias (it predates `set_metadata` and is still used in older code).
+#' Writes one or more metadata fields at the chosen scope. The scope is
+#' chosen by which of `session` and `bundle` you pass:
+#' * neither — *database* level (defaults that apply to every bundle).
+#' * `session` only — *session* level (overrides the database default
+#'   for that session's bundles).
+#' * `session` + `bundle` — *bundle* level (overrides both).
+#'
+#' On read, [get_metadata()] resolves inheritance with
+#' **bundle > session > database** precedence: a value set at a more
+#' specific scope wins over a less specific one. Writes are stored in
+#' the bundle / session / database `METADATA.json` files (the ground
+#' truth) and mirrored to the SQLite cache.
+#'
+#' `add_metadata()` is the older spelling; it remains as an alias of
+#' `set_metadata()` for backwards compatibility.
 #'
 #' @param corpus_obj A corpus object.
 #' @param metadataList Named list of field/value pairs to write.
-#' @param session Optional session name (writes session-level metadata).
-#' @param bundle Optional bundle name (requires `session`; writes
-#'   bundle-level metadata).
+#' @param session Optional session name. Required to write at session
+#'   level, and required (together with `bundle`) to write at bundle
+#'   level.
+#' @param bundle Optional bundle name. When given, `session` must also
+#'   be provided; together they identify a bundle-level scope.
 #' @param reset.before.add Logical; if `TRUE`, clear existing fields at
 #'   the given scope before writing.
 #' @return The corpus object, invisibly.
+#' @family metadata
+#' @seealso [get_metadata()] for the matching reader, [load_metadata()]
+#'   for bulk import.
 #' @examplesIf interactive()
-#' set_metadata(corp, list(Project = "MyStudy"))
-#' set_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
+#' corp <- demo_corpus()
+#' set_metadata(corp, list(Project = "MyStudy"))                 # database
+#' set_metadata(corp, list(Age = 25, Gender = "Female"),
+#'              session = "0000")                                 # session
+#' set_metadata(corp, list(Quality = "Good"),
+#'              session = "0000", bundle = "msajc003")            # bundle
 #' @export
 set_metadata <- function(corpus_obj, metadataList,
                          session = NULL, bundle = NULL,

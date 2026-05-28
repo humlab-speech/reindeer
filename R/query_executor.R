@@ -5,7 +5,8 @@
 #' see the EMU-SDMS manual for the full grammar. Results come back as a
 #' tibble-like `segment_list` ready for [enrich()] / [quantify()] / dplyr.
 #'
-#' By default the query is deferred until you actually access the data
+#' Since v0.7 the query is **deferred by default**: a [lazy_segment_list]
+#' is returned and the SQL fires only when you access the rows
 #' (`nrow()`, `head()`, `$`, dplyr verbs, [collect()] etc.). Pass
 #' `lazy = FALSE` to force immediate execution.
 #'
@@ -17,17 +18,48 @@
 #'   `"[Syllable #== S ^ Phonetic =~ [aeiou]]"`.
 #' @param ... Passed to the executor. The most useful one is
 #'   `lazy = FALSE` for eager execution.
-#' @return A `segment_list` (eager) or `lazy_segment_list` (default).
+#' @return A [lazy_segment_list] (default) or a [segment_list]
+#'   (`lazy = FALSE`). Both have one row per matched annotation with the
+#'   following columns:
+#'   * `session`, `bundle` — corpus location.
+#'   * `start`, `end` — segment times in ms (start == end for events).
+#'   * `label` — the annotation label that matched.
+#'   * `level`, `attribute`, `type` — annotation level and the matched
+#'     attribute name, plus the level type (`SEGMENT` / `EVENT` /
+#'     `ITEM`).
+#'   * `start_item_id`, `end_item_id`, `start_item_seq_idx`,
+#'     `end_item_seq_idx` — internal item references used by
+#'     [scout()] / [ascend_to()] / [descend_to()].
+#'   * `db_uuid` — for joining against the cache.
+#'   Provenance is recorded on the result; see [provenance()].
+#' @section Supported EQL features:
+#'   reindeer's query engine targets parity with `emuR::query()` and
+#'   supports:
+#'   * Equality / inequality: `Level == "a"`, `Level != "a"`,
+#'     with label alternatives via `|` (e.g. `"m|n|p"`).
+#'   * Regex: `Level =~ "[aeiou]"`, `Level !~ "[aeiou]"`.
+#'   * Sequences: `[A -> B]` (immediate adjacency at the same level).
+#'   * Dominance: `[A ^ B]` (A dominates B in the hierarchy);
+#'     `[Syllable #== S ^ Phonetic =~ "[aeiou]"]` projects the
+#'     dominating level.
+#'   * Conjunction `&` and disjunction `|` of sub-queries inside
+#'     brackets.
+#'   * Position functions: `Start()`, `End()`, `Medial()`, `Num()`.
+#'   * Scope filters on `Session` / `Bundle`.
+#'   * Attribute-as-level resolution: querying a defined attribute
+#'     name (e.g. `Text == "always"`) resolves to its host level.
 #' @section Common pitfalls:
 #'   * Use `==` (double equals) for equality — `=` triggers a parse error.
 #'   * Regex patterns go with `=~`/`!~`, exact strings with `==`/`!=`.
 #'   * Wrap sequences and dominances in `[ ]`: `[A -> B]`, `[A ^ B]`.
+#' @family query
+#' @seealso [scout()], [ascend_to()], [descend_to()], [collect()],
+#'   [provenance()]
 #' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' query(corp, "Phonetic == t")
-#' query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")
-#' query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
-#' @seealso [scout()], [ascend_to()], [descend_to()], [collect()]
+#' corp <- demo_corpus()
+#' query(corp, "Phonetic == n")                          # lazy by default
+#' query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]") # sequence
+#' query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)      # eager
 #' @export
 query <- function(emuDB, eql, ...) {
   # Handle corpus objects

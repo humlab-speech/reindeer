@@ -30,12 +30,21 @@ Off by default.}
 \item{cache_dir}{Override the quantify/enrich cache directory.
 Default \verb{<basePath>/.quantify_cache}.}
 
-\item{quick}{Reuse the existing SQLite cache without rebuilding from
-\code{METADATA.json}. Faster startup; use after manual JSON edits
-only after calling \code{\link[=load_metadata]{load_metadata()}}.}
+\item{quick}{Skip the cache rebuild on open. Use this only when you
+know the cache is current (e.g. immediately after the previous
+session closed cleanly). After any manual edit to a \code{METADATA.json}
+or annotation file, leave it \code{FALSE} so reindeer can re-sync.}
 }
 \value{
-A \code{corpus} object.
+A \code{corpus} object. The S7 class exposes the following
+properties you can read from user code (use \code{@}):
+\itemize{
+\item \verb{@dbName} — corpus name (the basename minus \verb{_emuDB}).
+\item \verb{@basePath} — path to the \verb{_emuDB} directory.
+\item \verb{@config} — parsed \verb{_DBconfig.json} (level + link definitions).
+\item Internal: \verb{@.uuid}, \verb{@.connection}, \verb{@.cache_dir}, \verb{@.sync} —
+used by the cache machinery; treat as read-only.
+}
 }
 \description{
 \code{corpus()} is the entry point to every reindeer workflow. Point it at
@@ -58,11 +67,12 @@ For programmatic metadata see \code{\link[=set_metadata]{set_metadata()}} / \cod
 
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/ae_emuDB")
-vowels <- query(corp, "Phonetic =~ [aeiou]")
+corp <- demo_corpus()
+vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 formants <- quantify(vowels, superassp::forest)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=query]{query()}}, \code{\link[=enrich]{enrich()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=serve_app]{serve_app()}}
+\code{\link[=demo_corpus]{demo_corpus()}}, \code{\link[=query]{query()}}, \code{\link[=enrich]{enrich()}}, \code{\link[=load_metadata]{load_metadata()}},
+\code{\link[=serve_app]{serve_app()}}
 }

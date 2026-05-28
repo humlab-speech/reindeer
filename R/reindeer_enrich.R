@@ -28,20 +28,29 @@ NULL
 #'   in the persistent cache. See [inspect_cache()].
 #' @param .signal_extension Override the corpus' `mediafileExtension`.
 #' @param .verbose Print progress. Default `TRUE`.
-#' @return The corpus invisibly (corpus method), or an
-#'   `extended_segment_list` / metadata-joined `segment_list` (segment
-#'   method).
+#' @return The corpus invisibly (corpus method), or for the segment
+#'   methods:
+#'   * **Metadata join** (default, `with = "metadata"` or passing a
+#'     corpus): the input `segment_list` with one extra column for every
+#'     metadata field defined anywhere in the corpus, named after the
+#'     field. Inheritance is resolved (bundle > session > database)
+#'     before the join — see [get_metadata()] for the field set.
+#'   * **DSP** (`.using = fn`): an [extended_segment_list] equivalent to
+#'     [quantify()]'s output — input columns plus one column per DSP
+#'     output (e.g. `F1`, `F2`, `F3` for `superassp::forest`).
+#' @family signal
+#' @seealso [quantify()], [get_metadata()], [dsp_parameters()],
+#'   [inspect_cache()]
 #' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
+#' corp <- demo_corpus()
 #'
 #' # Corpus-wide formants, age/gender-aware parameters
 #' enrich(corp, .using = superassp::forest)
 #'
 #' # Per-segment metadata join
-#' segs <- query(corp, "Phonetic =~ [aeiou]")
+#' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #' enrich(segs, corp)                              # metadata join
 #' enrich(segs, .using = superassp::forest)        # delegates to quantify()
-#' @seealso [quantify()], [dsp_parameters()], [inspect_cache()]
 #' @export
 enrich <- S7::new_generic("enrich", "object")
 
