@@ -315,6 +315,32 @@ test_that("print method does not error for materialized lazy_segment_list", {
   expect_no_error(capture.output(print(lsl), type = "message"))
 })
 
+test_that("print method caches the preview row-count across calls", {
+  skip_if_no_emuR()
+  corp <- create_shared_ae_corpus()
+
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
+  expect_null(lsl@.state$preview_count)
+  capture.output(print(lsl), type = "message")
+  cached_after_first <- lsl@.state$preview_count
+  expect_true(is.numeric(cached_after_first))
+  expect_true(cached_after_first >= 0)
+  # Second print should reuse the cached count; not strictly observable
+  # without a SQL probe, so we just assert the cache is still populated.
+  capture.output(print(lsl), type = "message")
+  expect_identical(lsl@.state$preview_count, cached_after_first)
+})
+
+test_that("print(..., preview = FALSE) skips the count query", {
+  skip_if_no_emuR()
+  corp <- create_shared_ae_corpus()
+
+  lsl <- query(corp, "Phonetic == t", lazy = TRUE)
+  expect_no_error(capture.output(print(lsl, preview = FALSE), type = "message"))
+  # No preview path means preview_count never gets populated.
+  expect_null(lsl@.state$preview_count)
+})
+
 test_that("summary method does not error for lazy_segment_list", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()

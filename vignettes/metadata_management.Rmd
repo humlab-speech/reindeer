@@ -66,6 +66,22 @@ A bracket shortcut writes at the bundle level:
 corp["Session1", "Recording001"] <- list(SamplingRate = 44100)
 ```
 
+The same bracket also reads — `corp[session, bundle]` returns the
+bundle's resolved metadata as a list, and you can pass regex on either
+side to scan a slice of the corpus:
+
+```{r}
+corp["Session1", "Recording001"]    # all metadata for one bundle
+corp["Session1", ]                  # every bundle in Session1
+corp["Sess.*", "Recording0[1-3].*"] # regex on both axes
+```
+
+Assigning a character path imports a media file at the bundle scope:
+
+```{r}
+corp["Session1", "Recording001"] <- "audio/take1.wav"
+```
+
 `add_metadata()` is a deprecated alias of `set_metadata()`; existing
 scripts keep working, but new code should use `set_metadata()`.
 

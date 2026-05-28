@@ -24,27 +24,43 @@ extended_segment_list(
 \item{dsp_columns}{Character vector of column names added by DSP processing}
 }
 \value{
-An \code{extended_segment_list} object (inherits from segment_list)
+An \code{extended_segment_list} object (inherits from segment_list).
+Adds two read-only S7 properties on top of \code{segment_list}:
+\itemize{
+\item \verb{@dsp_function} — character; the name of the DSP function whose
+output extended this list (e.g. \code{"superassp::forest"}).
+\item \verb{@dsp_columns} — character vector; the columns the DSP function
+added (e.g. \code{c("F1", "F2", "F3", "B1", "B2", "B3")}). Use this
+to programmatically discover the new measurement columns.
+When \code{\link[=quantify]{quantify()}} is called with \code{.use_cache = TRUE}, the data
+frame also gains a \code{.cache_status} column with values \code{"hit"} /
+\code{"miss"}.
+}
 }
 \description{
 An S7 class representing a segment list with DSP-derived measurements.
-This extends segment_list with additional columns from DSP processing
-(e.g., formants, pitch, intensity).
+Returned by \code{\link[=quantify]{quantify()}} and by the segment-list DSP path of
+\code{\link[=enrich]{enrich()}}. Inherits everything from \code{segment_list} (and from
+\code{tbl_df} / \code{tbl} / \code{data.frame}), so dplyr verbs and the tidyverse
+work transparently.
 }
 \section{Structure}{
 
-An extended_segment_list contains all segment_list columns plus
-additional columns added by DSP processing via quantify().
+An \code{extended_segment_list} contains every column of the originating
+\link[=segment_list]{segment_list} (see its \code{Structure}
+section), plus one column per DSP output (the names depend on
+\code{dsp_function} — look at \verb{@dsp_columns} to see them). When
+\code{\link[=quantify]{quantify()}} was called with a vector \code{.at}, an extra \code{.time_point}
+column records the relative time each row was sampled at.
 }
 
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-# Query and quantify
-segs <- query(corpus, "Phonetic == t")
+corp <- demo_corpus()
+segs <- query(corp, "Phonetic == t", lazy = FALSE)
 extended <- quantify(segs, superassp::forest)
 
-# Extended segment list contains formant measurements
-print(extended)
-summary(extended)
+extended@dsp_function     # which DSP fn produced the new columns
+extended@dsp_columns      # which columns it added
 \dontshow{\}) # examplesIf}
 }

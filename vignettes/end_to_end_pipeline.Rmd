@@ -58,6 +58,17 @@ for (bndl in c("bundle_001", "bundle_002")) {
   set_metadata(corp, list(HasEGG = TRUE),
                session = "ses_01", bundle = bndl)
 }
+
+# Per-session: speaker biographics that drive age/gender-aware DSP.
+# These flow automatically into quantify()/enrich() when
+# .use_metadata = TRUE — formant ranges, pitch limits, and window sizes
+# all get picked from the speaker's row of the DSPP table.
+set_metadata(corp,
+             list(Speaker = "P001", Age = 25, Gender = "Female"),
+             session = "ses_01")
+
+# Preview what each bundle's DSP parameters will be:
+dsp_parameters(corpus_obj = corp)
 ```
 
 ## 3. Suggest annotations with protoscribe
@@ -88,11 +99,39 @@ dropped_rows(vowels)
 
 ## 5. Quantify the audio side (superassp)
 
+`.use_metadata = TRUE` (the default) tells `quantify()` to pick the
+formant ranges and window size from the speaker's `Age` / `Gender`
+metadata.
+
 ```{r}
 audio_measures <- vowels |>
   collect() |>
   quantify(superassp::forest, .at = seq(0, 1, 0.1))
 ```
+
+### Iterating with the cache
+
+When you tweak downstream code and re-run the pipeline, turn the cache
+on. The first call populates it; every subsequent call with the same
+parameters and metadata returns rows from disk. The `.cache_status`
+column lets you tell hits from misses at a glance.
+
+```{r}
+# First pass: cache populates (.cache_status all "miss")
+audio_measures <- vowels |>
+  collect() |>
+  quantify(superassp::forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
+table(audio_measures$.cache_status)
+
+# Iterating: same call returns from cache (.cache_status all "hit")
+audio_measures <- vowels |>
+  collect() |>
+  quantify(superassp::forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
+table(audio_measures$.cache_status)
+```
+
+Editing a bundle's `Age` or `Gender` invalidates only that bundle's
+rows; the rest of the cache stays warm.
 
 ## 6. Quantify the EGG side (eggstract)
 
