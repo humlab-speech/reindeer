@@ -232,15 +232,29 @@ apply_transform <- function(query, transform, verbose = FALSE) {
 #' @noRd
 apply_scout_transform <- function(query, n = 1) {
   n <- as.integer(n)
+  # Project the segment_list-shaped columns the eager path emits so
+  # collect()'s deduce_item_times + format_as_emuRsegs see what they
+  # expect: items.* plus labels/attribute and start/end_item_id +
+  # start/end_item_seq_idx aliases.
   sql <- paste0(
     "WITH base AS (", query$sql, ") ",
-    "SELECT i.* FROM items i ",
+    "SELECT i.*, ",
+    "  l.label AS labels, l.name AS attribute, ",
+    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
+    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
+    "FROM items i ",
     "INNER JOIN base b ON ",
     "  i.db_uuid = b.db_uuid AND ",
     "  i.session = b.session AND ",
     "  i.bundle = b.bundle AND ",
     "  i.level = b.level AND ",
-    "  i.seq_idx = b.end_item_seq_idx + ?")
+    "  i.seq_idx = b.end_item_seq_idx + ? ",
+    "LEFT JOIN labels l ON ",
+    "  l.db_uuid = i.db_uuid AND ",
+    "  l.session = i.session AND ",
+    "  l.bundle = i.bundle AND ",
+    "  l.item_id = i.item_id AND ",
+    "  l.name = b.attribute")
   list(sql = sql, params = c(query$params, list(n)))
 }
 
@@ -255,13 +269,23 @@ apply_retreat_transform <- function(query, n = 1) {
   n <- as.integer(n)
   sql <- paste0(
     "WITH base AS (", query$sql, ") ",
-    "SELECT i.* FROM items i ",
+    "SELECT i.*, ",
+    "  l.label AS labels, l.name AS attribute, ",
+    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
+    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
+    "FROM items i ",
     "INNER JOIN base b ON ",
     "  i.db_uuid = b.db_uuid AND ",
     "  i.session = b.session AND ",
     "  i.bundle = b.bundle AND ",
     "  i.level = b.level AND ",
-    "  i.seq_idx = b.start_item_seq_idx - ?")
+    "  i.seq_idx = b.start_item_seq_idx - ? ",
+    "LEFT JOIN labels l ON ",
+    "  l.db_uuid = i.db_uuid AND ",
+    "  l.session = i.session AND ",
+    "  l.bundle = i.bundle AND ",
+    "  l.item_id = i.item_id AND ",
+    "  l.name = b.attribute")
   list(sql = sql, params = c(query$params, list(n)))
 }
 
@@ -273,19 +297,31 @@ apply_retreat_transform <- function(query, n = 1) {
 #' @keywords internal
 #' @noRd
 apply_ascend_transform <- function(query, level) {
+  # Project segment_list-shape columns; default attribute on the target
+  # level is the level name itself, so label lookup keys on l.name = i.level.
   sql <- paste0(
     "WITH base AS (", query$sql, ") ",
-    "SELECT DISTINCT i.* FROM items i ",
-    "INNER JOIN links l ON ",
-    "  l.db_uuid = i.db_uuid AND ",
-    "  l.session = i.session AND ",
-    "  l.bundle = i.bundle AND ",
-    "  l.to_id = i.item_id ",
+    "SELECT DISTINCT i.*, ",
+    "  lb.label AS labels, lb.name AS attribute, ",
+    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
+    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
+    "FROM items i ",
+    "INNER JOIN links lk ON ",
+    "  lk.db_uuid = i.db_uuid AND ",
+    "  lk.session = i.session AND ",
+    "  lk.bundle = i.bundle AND ",
+    "  lk.to_id = i.item_id ",
     "INNER JOIN base b ON ",
-    "  l.db_uuid = b.db_uuid AND ",
-    "  l.session = b.session AND ",
-    "  l.bundle = b.bundle AND ",
-    "  l.from_id = b.start_item_id ",
+    "  lk.db_uuid = b.db_uuid AND ",
+    "  lk.session = b.session AND ",
+    "  lk.bundle = b.bundle AND ",
+    "  lk.from_id = b.start_item_id ",
+    "LEFT JOIN labels lb ON ",
+    "  lb.db_uuid = i.db_uuid AND ",
+    "  lb.session = i.session AND ",
+    "  lb.bundle = i.bundle AND ",
+    "  lb.item_id = i.item_id AND ",
+    "  lb.name = i.level ",
     "WHERE i.level = ?")
   list(sql = sql, params = c(query$params, list(level)))
 }
@@ -300,17 +336,27 @@ apply_ascend_transform <- function(query, level) {
 apply_descend_transform <- function(query, level) {
   sql <- paste0(
     "WITH base AS (", query$sql, ") ",
-    "SELECT DISTINCT i.* FROM items i ",
-    "INNER JOIN links l ON ",
-    "  l.db_uuid = i.db_uuid AND ",
-    "  l.session = i.session AND ",
-    "  l.bundle = i.bundle AND ",
-    "  l.from_id = i.item_id ",
+    "SELECT DISTINCT i.*, ",
+    "  lb.label AS labels, lb.name AS attribute, ",
+    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
+    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
+    "FROM items i ",
+    "INNER JOIN links lk ON ",
+    "  lk.db_uuid = i.db_uuid AND ",
+    "  lk.session = i.session AND ",
+    "  lk.bundle = i.bundle AND ",
+    "  lk.from_id = i.item_id ",
     "INNER JOIN base b ON ",
-    "  l.db_uuid = b.db_uuid AND ",
-    "  l.session = b.session AND ",
-    "  l.bundle = b.bundle AND ",
-    "  l.to_id = b.start_item_id ",
+    "  lk.db_uuid = b.db_uuid AND ",
+    "  lk.session = b.session AND ",
+    "  lk.bundle = b.bundle AND ",
+    "  lk.to_id = b.start_item_id ",
+    "LEFT JOIN labels lb ON ",
+    "  lb.db_uuid = i.db_uuid AND ",
+    "  lb.session = i.session AND ",
+    "  lb.bundle = i.bundle AND ",
+    "  lb.item_id = i.item_id AND ",
+    "  lb.name = i.level ",
     "WHERE i.level = ?")
   list(sql = sql, params = c(query$params, list(level)))
 }
