@@ -323,75 +323,88 @@ apply_descend_transform <- function(query, level) {
 #' @param x lazy_segment_list object
 #' @param ... Additional arguments (unused)
 #' @name print.lazy_segment_list
-S7::method(print, lazy_segment_list) <- function(x, ...) {
+S7::method(print, lazy_segment_list) <- function(x, ..., preview = TRUE) {
   cli::cli_rule(
     left = cli::style_bold("lazy_segment_list"),
     right = if (x@.state$materialized) "{cli::col_green('\u2713 materialized')}" else "{cli::col_silver('\u29d7 lazy')}"
   )
-  
+
   cli::cli_text("")
-  
+
   if (x@.state$materialized && !is.null(x@.state$cache)) {
     cli::cli_alert_success("Query executed (cached)")
     cli::cli_text("")
     print(x@.state$cache, ...)
-  } else {
-    cli::cli_alert_info("Query not yet executed")
-    
-    # Query structure
-    cli::cli_text("")
-    cli::cli_text("{.strong Query plan:}")
-    
-    if (!is.null(x@query_parts$base)) {
-      base_preview <- substr(x@query_parts$base$sql, 1, 60)
-      cli::cli_text("  Base: {.code {base_preview}}...")
-    }
-    
-    # Show transforms
-    if (!is.null(x@query_parts$transforms) && length(x@query_parts$transforms) > 0) {
-      cli::cli_text("")
-      cli::cli_text("  {.strong Transforms:}")
-      for (i in seq_along(x@query_parts$transforms)) {
-        t <- x@query_parts$transforms[[i]]
-        t_desc <- paste(names(t[-1]), t[-1], sep = "=", collapse = ", ")
-        cli::cli_text("    {i}. {.fn {t$type}} ({t_desc})")
-      }
-    }
-    
-    # Try to estimate size and show preview using a single connection
-    tryCatch({
-      query <- build_sql_from_parts(x@query_parts)
-      conn <- DBI::dbConnect(RSQLite::SQLite(), x@db_path)
-      on.exit(DBI::dbDisconnect(conn), add = TRUE)
-      
-      # Row count
-      count_sql <- paste0("SELECT COUNT(*) as n FROM (", query$sql, ")")
-      n <- DBI::dbGetQuery(conn, count_sql, params = query$params)$n
-      cli::cli_text("")
-      cli::cli_text("  Estimated result: {cli::col_blue(n)} row{?s}")
-      
-      cli::cli_text("")
-      cli::cli_text("{.emph Call {.fn collect} to execute and get results}")
-      
-      # Preview
-      cli::cli_text("")
-      cli::cli_text("{.strong Preview (first 3 rows):}")
-      preview_sql <- paste0(query$sql, " LIMIT 3")
-      preview_tbl <- tibble::as_tibble(DBI::dbGetQuery(conn, preview_sql, params = query$params))
-      
-      if (nrow(preview_tbl) > 0) {
-        print(preview_tbl)
-      } else {
-        cli::cli_alert_warning("Query would return 0 rows")
-      }
-    }, error = function(e) {
-      cli::cli_text("")
-      cli::cli_text("{.emph Call {.fn collect} to execute and get results}")
-      cli::cli_text("")
-      cli::cli_alert_warning("Could not generate preview")
-    })
+    return(invisible(x))
   }
-  
+
+  cli::cli_alert_info("Query not yet executed")
+
+  # Query structure
+  cli::cli_text("")
+  cli::cli_text("{.strong Query plan:}")
+
+  if (!is.null(x@query_parts$base)) {
+    base_preview <- substr(x@query_parts$base$sql, 1, 60)
+    cli::cli_text("  Base: {.code {base_preview}}...")
+  }
+
+  if (!is.null(x@query_parts$transforms) && length(x@query_parts$transforms) > 0) {
+    cli::cli_text("")
+    cli::cli_text("  {.strong Transforms:}")
+    for (i in seq_along(x@query_parts$transforms)) {
+      t <- x@query_parts$transforms[[i]]
+      t_desc <- paste(names(t[-1]), t[-1], sep = "=", collapse = ", ")
+      cli::cli_text("    {i}. {.fn {t$type}} ({t_desc})")
+    }
+  }
+
+  if (!isTRUE(preview)) {
+    cli::cli_text("")
+    cli::cli_text("{.emph Call {.fn collect} to execute and get results; pass {.code preview = TRUE} for an estimated count.}")
+    return(invisible(x))
+  }
+
+  # Try to estimate size and show preview using a single connection.
+  # Cache the row count on the object's mutable .state so repeated REPL
+  # prints don't re-run the (potentially expensive) COUNT(*).
+  tryCatch({
+    query <- build_sql_from_parts(x@query_parts)
+    conn <- DBI::dbConnect(RSQLite::SQLite(), x@db_path)
+    on.exit(DBI::dbDisconnect(conn), add = TRUE)
+
+    cached_n <- x@.state$preview_count
+    n <- if (!is.null(cached_n)) {
+      cached_n
+    } else {
+      count_sql <- paste0("SELECT COUNT(*) as n FROM (", query$sql, ")")
+      n_val <- DBI::dbGetQuery(conn, count_sql, params = query$params)$n
+      x@.state$preview_count <- n_val
+      n_val
+    }
+    cli::cli_text("")
+    cli::cli_text("  Estimated result: {cli::col_blue(n)} row{?s}")
+
+    cli::cli_text("")
+    cli::cli_text("{.emph Call {.fn collect} to execute and get results}")
+
+    cli::cli_text("")
+    cli::cli_text("{.strong Preview (first 3 rows):}")
+    preview_sql <- paste0(query$sql, " LIMIT 3")
+    preview_tbl <- tibble::as_tibble(DBI::dbGetQuery(conn, preview_sql, params = query$params))
+
+    if (nrow(preview_tbl) > 0) {
+      print(preview_tbl)
+    } else {
+      cli::cli_alert_warning("Query would return 0 rows")
+    }
+  }, error = function(e) {
+    cli::cli_text("")
+    cli::cli_text("{.emph Call {.fn collect} to execute and get results}")
+    cli::cli_text("")
+    cli::cli_alert_warning("Could not generate preview")
+  })
+
   invisible(x)
 }
 

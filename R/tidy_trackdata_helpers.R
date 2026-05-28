@@ -205,19 +205,26 @@ clear_tidy_cache <- function() {
     paste0(seg_df$bundle, ".", media_ext)
   )
   
+  # Hoist file existence checks out of the per-group loop — one vectorised
+  # filesystem hit beats N system calls when batches cluster on the same
+  # missing files. Drops missing-file groups before the lapply runs.
+  unique_files <- unique(seg_df$signal_file)
+  exists_map <- stats::setNames(file.exists(unique_files), unique_files)
+  if (.verbose) {
+    missing_files <- names(exists_map)[!exists_map]
+    for (mf in missing_files) {
+      cli::cli_alert_warning("Signal file not found: {basename(mf)}")
+    }
+  }
+  seg_df <- seg_df[exists_map[seg_df$signal_file], , drop = FALSE]
+  if (nrow(seg_df) == 0L) return(list())
+
   # Split by file
   file_groups <- split(seg_df, seg_df$signal_file)
-  
+
   # Process each file's segments together
   results <- lapply(file_groups, function(file_segs) {
     signal_file <- unique(file_segs$signal_file)[1]
-    
-    if (!file.exists(signal_file)) {
-      if (.verbose) {
-        cli::cli_alert_warning("Signal file not found: {basename(signal_file)}")
-      }
-      return(NULL)
-    }
     
     # Process all segments from this file
     segment_results <- lapply(seq_len(nrow(file_segs)), function(i) {

@@ -131,7 +131,7 @@ pivot_tracks_longer <- function(seg,
         row[[values_to]] <- proxy_w[[col]]
         row
       })
-      pieces$wide <- do.call(rbind, stacked)
+      pieces$wide <- data.table::rbindlist(stacked, use.names = TRUE, fill = TRUE)
     }
   }
 
@@ -150,7 +150,7 @@ pivot_tracks_longer <- function(seg,
       base[[values_to]] <- unlist(vals, use.names = FALSE)
       base
     })
-    pieces$list <- do.call(rbind, list_pieces)
+    pieces$list <- data.table::rbindlist(list_pieces, use.names = TRUE, fill = TRUE)
   }
 
   out <- if (length(pieces) == 0L) {
@@ -158,9 +158,12 @@ pivot_tracks_longer <- function(seg,
   } else if (length(pieces) == 1L) {
     pieces[[1]]
   } else {
-    # Align columns before rbind
+    # Align columns before binding
     common <- Reduce(intersect, lapply(pieces, names))
-    do.call(rbind, lapply(pieces, function(p) p[, common, drop = FALSE]))
+    data.table::rbindlist(
+      lapply(pieces, function(p) p[, common, drop = FALSE]),
+      use.names = TRUE, fill = TRUE
+    )
   }
 
   db_uuid <- if (S7::S7_inherits(seg, segment_list)) seg@db_uuid else NULL

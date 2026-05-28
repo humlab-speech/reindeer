@@ -188,8 +188,10 @@
     }
   }
 
+  # data.table::rbindlist avoids the O(n^2) copy cost of growing
+  # an intermediate data.frame via repeated rbind().
   items_df <- if (length(items_list) > 0) {
-    do.call(rbind, items_list)
+    as.data.frame(data.table::rbindlist(items_list, use.names = TRUE, fill = TRUE))
   } else {
     data.frame(
       db_uuid = character(), session = character(), bundle = character(),
@@ -201,7 +203,7 @@
   }
 
   labels_df <- if (length(labels_list) > 0) {
-    do.call(rbind, labels_list)
+    as.data.frame(data.table::rbindlist(labels_list, use.names = TRUE, fill = TRUE))
   } else {
     data.frame(
       db_uuid = character(), session = character(), bundle = character(),
@@ -212,7 +214,7 @@
   }
 
   links_df <- if (length(links_list) > 0) {
-    do.call(rbind, links_list)
+    as.data.frame(data.table::rbindlist(links_list, use.names = TRUE, fill = TRUE))
   } else {
     data.frame(
       db_uuid = character(), session = character(), bundle = character(),

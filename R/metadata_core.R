@@ -71,14 +71,110 @@ initialize_metadata_schema <- function(con) {
         ON DELETE CASCADE ON UPDATE CASCADE
     )")
   
+  # metadata_mtime table - tracks last-seen mtime of each METADATA.json
+  # file so gather_metadata() can short-circuit when nothing on disk has
+  # changed since the last scan. Path is relative to the corpus basePath.
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS metadata_mtime (
+      db_uuid VARCHAR(36),
+      rel_path TEXT,
+      mtime REAL,
+      PRIMARY KEY (db_uuid, rel_path)
+    )")
+
   # Indices for efficient queries
   DBI::dbExecute(con, "
-    CREATE INDEX IF NOT EXISTS idx_metadata_bundle_field 
+    CREATE INDEX IF NOT EXISTS idx_metadata_bundle_field
     ON metadata_bundle(db_uuid, field_name)")
-  
+
   DBI::dbExecute(con, "
-    CREATE INDEX IF NOT EXISTS idx_metadata_session_field 
+    CREATE INDEX IF NOT EXISTS idx_metadata_session_field
     ON metadata_session(db_uuid, field_name)")
+}
+
+#' Collect the mtime of every METADATA.json under a corpus
+#'
+#' Returns a data.frame with `rel_path` (relative to `basePath`) and the
+#' file's current `mtime` as a numeric POSIX seconds value, for every
+#' database / session / bundle metadata file that exists on disk.
+#'
+#' @noRd
+.metadata_files_mtime <- function(con, basePath, db_uuid) {
+  files <- character(0)
+
+  db_meta_file <- file.path(basePath, metadata.filename)
+  if (file.exists(db_meta_file)) files <- c(files, db_meta_file)
+
+  sessions <- list_sessions_from_cache(con, db_uuid)
+  if (nrow(sessions) > 0) {
+    sess_files <- file.path(basePath, paste0(sessions$name, "_ses"),
+                            metadata.filename)
+    files <- c(files, sess_files[file.exists(sess_files)])
+  }
+
+  bundles <- list_bundles_from_cache(con, db_uuid)
+  if (nrow(bundles) > 0) {
+    bndl_files <- file.path(basePath, paste0(bundles$session, "_ses"),
+                            paste0(bundles$name, "_bndl"),
+                            metadata.filename)
+    files <- c(files, bndl_files[file.exists(bndl_files)])
+  }
+
+  if (length(files) == 0L) {
+    return(data.frame(rel_path = character(), mtime = numeric(),
+                      stringsAsFactors = FALSE))
+  }
+
+  data.frame(
+    rel_path = sub(paste0("^", normalizePath(basePath, mustWork = FALSE), "/?"), "",
+                   normalizePath(files, mustWork = FALSE)),
+    mtime = as.numeric(file.mtime(files)),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Has any tracked METADATA.json file changed since the last gather?
+#'
+#' Compares disk mtimes against the cached values in `metadata_mtime`.
+#' Returns `FALSE` only when the set of files AND their mtimes match
+#' exactly — any added, removed, or modified file triggers a `TRUE`,
+#' i.e. "rebuild needed".
+#'
+#' @noRd
+.metadata_needs_refresh <- function(con, basePath, db_uuid) {
+  disk <- .metadata_files_mtime(con, basePath, db_uuid)
+  stored <- tryCatch(
+    DBI::dbGetQuery(con,
+      "SELECT rel_path, mtime FROM metadata_mtime WHERE db_uuid = ?",
+      params = list(db_uuid)),
+    error = function(e) data.frame(rel_path = character(), mtime = numeric())
+  )
+  if (nrow(disk) != nrow(stored)) return(TRUE)
+  if (nrow(disk) == 0L) return(FALSE)
+  # Compare sorted by path for a stable order
+  disk <- disk[order(disk$rel_path), , drop = FALSE]
+  stored <- stored[order(stored$rel_path), , drop = FALSE]
+  if (!identical(disk$rel_path, stored$rel_path)) return(TRUE)
+  # mtime equality within 1ms (file systems vary)
+  any(abs(disk$mtime - stored$mtime) > 1e-3)
+}
+
+#' Persist the current mtime snapshot to the cache.
+#' @noRd
+.metadata_record_mtime <- function(con, basePath, db_uuid) {
+  disk <- .metadata_files_mtime(con, basePath, db_uuid)
+  DBI::dbExecute(con, "DELETE FROM metadata_mtime WHERE db_uuid = ?",
+                 params = list(db_uuid))
+  if (nrow(disk) == 0L) return(invisible(NULL))
+  payload <- data.frame(
+    db_uuid = db_uuid,
+    rel_path = disk$rel_path,
+    mtime = disk$mtime,
+    stringsAsFactors = FALSE
+  )
+  DBI::dbWriteTable(con, "metadata_mtime", payload,
+                    append = TRUE, overwrite = FALSE)
+  invisible(NULL)
 }
 
 # ==============================================================================
@@ -115,10 +211,21 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   basePath <- corpus_obj@basePath
   db_uuid <- get_db_uuid(corpus_obj)
   con <- get_connection(corpus_obj)
-  
+
   # Initialize schema if needed
   initialize_metadata_schema(con)
-  
+
+  # Fast-path: if every tracked METADATA.json has an unchanged mtime since
+  # the last successful gather, the cache is already current — skip the
+  # full rescan. Repeated gather_metadata() calls in the same session
+  # (and across sessions when files haven't moved) become near-free.
+  if (!.metadata_needs_refresh(con, basePath, db_uuid)) {
+    if (verbose) {
+      cli::cli_alert_success("Metadata cache up-to-date (no METADATA.json changes detected)")
+    }
+    return(invisible(corpus_obj))
+  }
+
   # Clear existing metadata (we're rebuilding from ground truth)
   DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?", params = list(db_uuid))
   DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?", params = list(db_uuid))
@@ -218,22 +325,24 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     })
   }
   
-  # OPTIMIZATION: Bulk process all bundle metadata in a single transaction
-  # This is MUCH faster than individual inserts
+  # OPTIMIZATION: Bulk process all bundle metadata in a single transaction.
+  # Field registration is deduped here — the previous version called
+  # register_metadata_field once per (bundle, field) which means O(N) SQL
+  # round-trips for a single distinct field name.
   DBI::dbWithTransaction(con, {
-    # Collect all metadata records
     all_records <- list()
-    
+    fields_seen <- list()  # field_name -> field_type (first wins)
+
     for (i in seq_along(all_metadata)) {
       meta_data <- all_metadata[[i]]
-      
+
       if (length(meta_data) > 0) {
         session_name <- existing_bundles$session[i]
         bundle_name <- existing_bundles$name[i]
-        
+
         for (field_name in names(meta_data)) {
           field_info <- serialize_metadata_value(meta_data[[field_name]])
-          
+
           all_records[[length(all_records) + 1]] <- data.frame(
             db_uuid = db_uuid,
             session = session_name,
@@ -243,24 +352,35 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
             field_type = field_info$type,
             stringsAsFactors = FALSE
           )
-          
-          # Register field
-          register_metadata_field(con, field_name, field_info$type)
+
+          if (is.null(fields_seen[[field_name]])) {
+            fields_seen[[field_name]] <- field_info$type
+          }
         }
       }
-      
+
       if (verbose && i %% 10 == 0) {
         cli::cli_progress_update(set = i)
       }
     }
-    
+
+    # Register each distinct field exactly once
+    for (fname in names(fields_seen)) {
+      register_metadata_field(con, fname, fields_seen[[fname]])
+    }
+
     # Bulk insert all records at once
     if (length(all_records) > 0) {
-      combined_records <- do.call(rbind, all_records)
-      DBI::dbWriteTable(con, "metadata_bundle", combined_records, 
-                       append = TRUE, overwrite = FALSE)
+      combined_records <- data.table::rbindlist(all_records, use.names = TRUE, fill = TRUE)
+      DBI::dbWriteTable(con, "metadata_bundle",
+                        as.data.frame(combined_records),
+                        append = TRUE, overwrite = FALSE)
     }
   })
+
+  # Snapshot current mtimes so the next gather can short-circuit if
+  # nothing changed.
+  .metadata_record_mtime(con, basePath, db_uuid)
   
   if (verbose) {
     cli::cli_progress_done()
