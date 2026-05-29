@@ -12,10 +12,13 @@
 # before they're written to the corpus.
 
 .protoscribe_dispatch <- list(
-  vad     = "draft_vad",
-  vot     = "draft_vot",
-  periods = "draft_periods",
-  momel   = "draft_momel_intsint"
+  vad      = "draft_vad",
+  vot      = "draft_vot",
+  periods  = "draft_periods",
+  momel    = "draft_momel_intsint",
+  slam     = "draft_slam",
+  slam_plus = "draft_slam_plus",
+  slamp3   = "draft_slamp3"
 )
 
 #' Propose draft annotations via the protoscribe companion package
@@ -41,7 +44,8 @@
 #' library(protoscribe)
 #' propose_annotations(corp, type = "vad")
 #' @export
-propose_annotations <- function(corpus, type = c("vad", "vot", "periods", "momel"),
+propose_annotations <- function(corpus, type = c("vad", "vot", "periods", "momel",
+                                                 "slam", "slam_plus", "slamp3"),
                                   .review = TRUE, .commit = FALSE, ...) {
   if (!requireNamespace("protoscribe", quietly = TRUE)) {
     .companion_abort("protoscribe", purpose = "draft annotation generation")
