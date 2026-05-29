@@ -152,19 +152,20 @@ test_that("EAF sync triggers on annotation changes", {
   
   # Check result structure
   expect_true(is.list(result))
-  
-  # EAF should be generated (or at least attempted)
-  # Some bundles might fail if they have no annotations, so we check more flexibly
-  if (file.exists(eaf_file)) {
-    # Verify EAF is valid XML if it exists
-    eaf_content <- readLines(eaf_file, warn = FALSE)
-    expect_true(any(grepl("<ANNOTATION_DOCUMENT", eaf_content)))
-    expect_true(any(grepl("</ANNOTATION_DOCUMENT>", eaf_content)))
-  } else {
-    # If EAF doesn't exist, at least check that annotation file exists
-    expect_true(file.exists(annot_file))
-    skip("EAF file was not generated - may have no annotations")
-  }
+  expect_true(file.exists(annot_file))
+
+  # sync_annot_to_eaf() depends on convert_emu_to_eaf(), which is
+  # declared in globalVariables() but is not actually defined anywhere
+  # in R/ — the EAF write path therefore reliably fails at runtime on
+  # every bundle. This skip is a known-broken marker, not a fixture
+  # quirk; reinstate the EAF assertions below once that function lands.
+  skip_if_not(exists("convert_emu_to_eaf", mode = "function"),
+              "sync_annot_to_eaf needs convert_emu_to_eaf() (not implemented)")
+
+  expect_true(file.exists(eaf_file))
+  eaf_content <- readLines(eaf_file, warn = FALSE)
+  expect_true(any(grepl("<ANNOTATION_DOCUMENT", eaf_content)))
+  expect_true(any(grepl("</ANNOTATION_DOCUMENT>", eaf_content)))
 })
 
 
@@ -559,7 +560,12 @@ test_that("EAF files are valid after sync", {
     }
   }
   
-  skip_if(length(eaf_files) == 0, message = "No EAF files generated")
+  # Same known-broken dependency as above: until convert_emu_to_eaf()
+  # exists, sync_database() cannot produce EAF files even on the ae
+  # demo data, which ships with annotations on every bundle.
+  skip_if_not(exists("convert_emu_to_eaf", mode = "function"),
+              "sync_annot_to_eaf needs convert_emu_to_eaf() (not implemented)")
+  expect_true(length(eaf_files) > 0)
   
   # Validate each EAF file
   for (eaf_file in eaf_files) {
