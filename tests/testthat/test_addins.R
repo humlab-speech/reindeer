@@ -61,9 +61,14 @@ test_that(".metadata_diff respects level key columns", {
 })
 
 test_that("addins.dcf has the expected bindings", {
-  pkg <- find.package("reindeer")
-  dcf_path <- file.path(pkg, "rstudio", "addins.dcf")
-  skip_if_not(file.exists(dcf_path))
+  # system.file() resolves both the source tree (inst/rstudio/) and an
+  # installed package layout (rstudio/), so the test runs cleanly under
+  # devtools::test() and R CMD check. addins.dcf is checked into the
+  # repo at inst/rstudio/addins.dcf — a missing file is a packaging
+  # regression worth failing on, not a benign "skip and move on".
+  dcf_path <- system.file("rstudio", "addins.dcf", package = "reindeer")
+  expect_true(nzchar(dcf_path))
+  expect_true(file.exists(dcf_path))
   dcf <- read.dcf(dcf_path)
   expect_true("Binding" %in% colnames(dcf))
   expect_true("browse_corpus_gadget" %in% dcf[, "Binding"])
