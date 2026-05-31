@@ -153,15 +153,6 @@ test_that("EAF sync triggers on annotation changes", {
   # Check result structure
   expect_true(is.list(result))
   expect_true(file.exists(annot_file))
-
-  # sync_annot_to_eaf() depends on convert_emu_to_eaf(), which is
-  # declared in globalVariables() but is not actually defined anywhere
-  # in R/ — the EAF write path therefore reliably fails at runtime on
-  # every bundle. This skip is a known-broken marker, not a fixture
-  # quirk; reinstate the EAF assertions below once that function lands.
-  skip_if_not(exists("convert_emu_to_eaf", mode = "function"),
-              "sync_annot_to_eaf needs convert_emu_to_eaf() (not implemented)")
-
   expect_true(file.exists(eaf_file))
   eaf_content <- readLines(eaf_file, warn = FALSE)
   expect_true(any(grepl("<ANNOTATION_DOCUMENT", eaf_content)))
@@ -560,11 +551,6 @@ test_that("EAF files are valid after sync", {
     }
   }
   
-  # Same known-broken dependency as above: until convert_emu_to_eaf()
-  # exists, sync_database() cannot produce EAF files even on the ae
-  # demo data, which ships with annotations on every bundle.
-  skip_if_not(exists("convert_emu_to_eaf", mode = "function"),
-              "sync_annot_to_eaf needs convert_emu_to_eaf() (not implemented)")
   expect_true(length(eaf_files) > 0)
   
   # Validate each EAF file

@@ -25,7 +25,7 @@ utils::globalVariables(c(
   "Age", "Age_lower", "Age_upper", "Gender", "Parameter", "Setting",
   "Study", "Study identifier", "identifier", "Study participants",
   "bundle", "cache_key", "cached_result",
-  "check_corpusObj", "convert_emu_to_eaf",
+  "check_corpusObj",
   "data", "end", "end_item_seq_idx", "extension",
   "field_name", "field_type", "file_exists", "file_group_id",
   "from_id", "full_path", "head",

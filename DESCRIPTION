@@ -102,6 +102,7 @@ Collate:
     'ggplot_autoplot.R'
     'ggplot_geoms.R'
     'interop_elan.R'
+    'interop_elan_autosync.R'
     'interop_textgrid.R'
     'json_utils.R'
     'metadata_core.R'
