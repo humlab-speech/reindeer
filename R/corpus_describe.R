@@ -435,16 +435,36 @@ describe_corpus <- function(corpus_obj,
   if (is.null(output_dir)) output_dir <- corpus_obj@basePath
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
+  # The drift guard and state file only govern emission into the corpus's own
+  # directory (the automatic default). Explicit exports to another directory
+  # always emit.
+  is_default_dir <- normalizePath(output_dir, mustWork = FALSE) ==
+    normalizePath(corpus_obj@basePath, mustWork = FALSE)
+  state_file <- file.path(output_dir, ".cmdi_state")
+
   # Auto-regenerate: if add_metadata() / create_session_and_bundle() flipped
   # the dirty bit, force a rewrite of the FAIR artifacts to keep them in
   # sync with the underlying METADATA.json files.
-  if (.is_metadata_dirty(corpus_obj)) {
+  dirty <- .is_metadata_dirty(corpus_obj)
+  if (dirty) {
     if (verbose) {
       cli::cli_alert_info(
         "Metadata changed since last {.fn describe_corpus} - regenerating artifacts."
       )
     }
     force <- TRUE
+  }
+
+  # Drift guard: skip regeneration when the metadata state is unchanged since
+  # the last emission into this corpus dir (keeps auto-regeneration cheap and
+  # idempotent). force = TRUE and custom output dirs bypass it.
+  state_hash <- .metadata_state_hash(corpus_obj)
+  if (is_default_dir && !force && !dirty) {
+    prev_hash <- if (file.exists(state_file)) readLines(state_file, warn = FALSE)[1] else ""
+    if (identical(state_hash, prev_hash)) {
+      if (verbose) cli::cli_alert_info("FAIR artifacts up-to-date; nothing to regenerate.")
+      return(invisible(character()))
+    }
   }
 
   summary <- collect_corpus_summary(corpus_obj, verbose = verbose)
@@ -494,6 +514,11 @@ describe_corpus <- function(corpus_obj,
     .emit_jsonld(summary, target)
     written <- c(written, jsonld = target)
     if (verbose) cli::cli_alert_success("Wrote {.path {target}}")
+  }
+
+  # Record the emitted state so the drift guard can skip unchanged reruns.
+  if (is_default_dir) {
+    tryCatch(writeLines(state_hash, state_file), error = function(e) NULL)
   }
 
   # Artifacts are back in sync — clear the dirty bit.

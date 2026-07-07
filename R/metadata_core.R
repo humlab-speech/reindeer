@@ -92,32 +92,53 @@ initialize_metadata_schema <- function(con) {
     ON metadata_session(db_uuid, field_name)")
 }
 
-#' Collect the mtime of every METADATA.json under a corpus
+#' Resolve which metadata file to read at one hierarchy level.
+#'
+#' Prefers the modern `METADATA.json`; falls back to the legacy
+#' `<name>.meta_json` only when `METADATA.json` is absent at that level.
+#' This enforces the per-level override rule: a `METADATA.json` present at
+#' a level shadows any legacy file at the same level. Returns
+#' `NA_character_` when neither exists.
+#'
+#' @noRd
+.resolve_metadata_file <- function(dir, legacy_name) {
+  modern <- file.path(dir, metadata.filename)
+  if (file.exists(modern)) return(modern)
+  legacy <- file.path(dir, paste0(legacy_name, ".meta_json"))
+  if (file.exists(legacy)) return(legacy)
+  NA_character_
+}
+
+#' Collect the mtime of every metadata file under a corpus
 #'
 #' Returns a data.frame with `rel_path` (relative to `basePath`) and the
 #' file's current `mtime` as a numeric POSIX seconds value, for every
-#' database / session / bundle metadata file that exists on disk.
+#' database / session / bundle metadata file that exists on disk —
+#' `METADATA.json` or, where absent at a level, the legacy `.meta_json`.
 #'
 #' @noRd
 .metadata_files_mtime <- function(con, basePath, db_uuid) {
   files <- character(0)
 
-  db_meta_file <- file.path(basePath, metadata.filename)
-  if (file.exists(db_meta_file)) files <- c(files, db_meta_file)
+  db_name <- sub("_emuDB$", "", basename(basePath))
+  db_meta_file <- .resolve_metadata_file(basePath, db_name)
+  if (!is.na(db_meta_file)) files <- c(files, db_meta_file)
 
   sessions <- list_sessions_from_cache(con, db_uuid)
   if (nrow(sessions) > 0) {
-    sess_files <- file.path(basePath, paste0(sessions$name, "_ses"),
-                            metadata.filename)
-    files <- c(files, sess_files[file.exists(sess_files)])
+    sess_files <- mapply(.resolve_metadata_file,
+                         file.path(basePath, paste0(sessions$name, "_ses")),
+                         sessions$name, USE.NAMES = FALSE)
+    files <- c(files, sess_files[!is.na(sess_files)])
   }
 
   bundles <- list_bundles_from_cache(con, db_uuid)
   if (nrow(bundles) > 0) {
-    bndl_files <- file.path(basePath, paste0(bundles$session, "_ses"),
-                            paste0(bundles$name, "_bndl"),
-                            metadata.filename)
-    files <- c(files, bndl_files[file.exists(bndl_files)])
+    bndl_files <- mapply(.resolve_metadata_file,
+                         file.path(basePath, paste0(bundles$session, "_ses"),
+                                   paste0(bundles$name, "_bndl")),
+                         bundles$name, USE.NAMES = FALSE)
+    files <- c(files, bndl_files[!is.na(bndl_files)])
   }
 
   if (length(files) == 0L) {
@@ -205,7 +226,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   }
   
   if (verbose) {
-    cli::cli_h2("Gathering metadata from .meta_json files")
+    cli::cli_h2("Gathering metadata from METADATA.json (legacy .meta_json where absent)")
   }
   
   basePath <- corpus_obj@basePath
@@ -221,7 +242,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   # (and across sessions when files haven't moved) become near-free.
   if (!.metadata_needs_refresh(con, basePath, db_uuid)) {
     if (verbose) {
-      cli::cli_alert_success("Metadata cache up-to-date (no METADATA.json changes detected)")
+      cli::cli_alert_success("Metadata cache up-to-date (no metadata file changes detected)")
     }
     return(invisible(corpus_obj))
   }
@@ -231,12 +252,12 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?", params = list(db_uuid))
   DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?", params = list(db_uuid))
   
-  # 1. Database-level metadata (from METADATA.json in database root)
+  # 1. Database-level metadata (METADATA.json, or legacy <db>.meta_json)
   db_name <- basename(basePath)
   db_name <- sub("_emuDB$", "", db_name)
-  db_meta_file <- file.path(basePath, metadata.filename)
-  
-  if (file.exists(db_meta_file)) {
+  db_meta_file <- .resolve_metadata_file(basePath, db_name)
+
+  if (!is.na(db_meta_file)) {
     if (verbose) cli::cli_alert_info("Processing database-level defaults")
     db_meta <- read_json_fast(db_meta_file, simplifyVector = TRUE)
     if (length(db_meta) > 0) {
@@ -252,10 +273,10 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   
   for (i in seq_len(nrow(sessions))) {
     session_name <- sessions$name[i]
-    session_meta_file <- file.path(basePath, paste0(session_name, "_ses"),
-                                   metadata.filename)
-    
-    if (file.exists(session_meta_file)) {
+    session_meta_file <- .resolve_metadata_file(
+      file.path(basePath, paste0(session_name, "_ses")), session_name)
+
+    if (!is.na(session_meta_file)) {
       meta_data <- read_json_fast(session_meta_file, simplifyVector = TRUE)
       if (length(meta_data) > 0) {
         process_metadata_list(con, db_uuid, session_name, NULL, meta_data, "session")
@@ -275,16 +296,16 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     cli::cli_progress_bar("Processing bundle metadata", total = nrow(bundles))
   }
   
-  # Prepare file paths
-  bundle_files <- file.path(
-    basePath,
-    paste0(bundles$session, "_ses"),
-    paste0(bundles$name, "_bndl"),
-    metadata.filename
+  # Prepare file paths (METADATA.json, or legacy <bundle>.meta_json where absent)
+  bundle_files <- mapply(
+    .resolve_metadata_file,
+    file.path(basePath, paste0(bundles$session, "_ses"),
+              paste0(bundles$name, "_bndl")),
+    bundles$name, USE.NAMES = FALSE
   )
-  
+
   # Filter to existing files
-  exists_idx <- file.exists(bundle_files)
+  exists_idx <- !is.na(bundle_files)
   existing_files <- bundle_files[exists_idx]
   existing_bundles <- bundles[exists_idx, ]
   

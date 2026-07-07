@@ -314,7 +314,7 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
   # Add resource proxies for each recording
   proxy_id <- 1
   if (!is.null(db_metadata$bundle_list)) {
-    for (i in 1:min(nrow(db_metadata$bundle_list), 10)) {  # Limit to first 10 as example
+    for (i in seq_len(nrow(db_metadata$bundle_list))) {  # every bundle, no truncation
       bundle_name <- db_metadata$bundle_list$name[i]
       resource_proxy <- xml2::xml_add_child(resource_proxy_list, "cmd:ResourceProxy",
                                            id = paste0("rp", proxy_id))

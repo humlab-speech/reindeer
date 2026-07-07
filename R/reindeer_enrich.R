@@ -156,16 +156,36 @@ S7::method(enrich, extended_segment_list) <- function(object, corpus_obj = NULL,
   biographize(object, corpus_obj)
 }
 
-#' Enrich method for lazy_segment_list
+#' Enrich method for lazy_segment_list — stay lazy until collect()
 #'
-#' Materialises via [collect()] then dispatches to the segment_list method.
+#' Defers rather than materialising: the DSP path reuses the deferring
+#' [quantify()] lazy method, and the metadata path defers via
+#' [biographize()]. Either way the chain remains a `lazy_segment_list`
+#' until [collect()] is called.
 #'
 #' @param object A lazy_segment_list.
-#' @param ... Forwarded to the segment_list method.
-#' @return A segment_list or extended_segment_list.
+#' @param corpus_obj Corpus to pull metadata from (metadata path).
+#' @param ... Forwarded to [quantify()] on the DSP path.
+#' @param with One of `"metadata"` (default) or `NULL`.
+#' @param .using Optional DSP function; delegates to [quantify()].
+#' @return The same `lazy_segment_list` with a deferred step appended.
 #' @name enrich.lazy_segment_list
-S7::method(enrich, lazy_segment_list) <- function(object, ...) {
-  enrich(collect(object), ...)
+S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...,
+                                                  with = "metadata",
+                                                  .using = NULL) {
+  if (!is.null(.using)) {
+    return(quantify(object, .using, ...))
+  }
+  if (!identical(with, "metadata")) {
+    cli::cli_abort(c(
+      "Cannot enrich a lazy_segment_list without {.arg with = \"metadata\"}",
+      "i" = "For DSP enrichment pass {.arg .using}."
+    ))
+  }
+  if (is.null(corpus_obj)) {
+    cli::cli_abort("{.arg corpus_obj} is required when {.code with = \"metadata\"}.")
+  }
+  biographize(object, corpus_obj)
 }
 
 # Internal implementation of corpus-level DSP enrichment.
@@ -386,63 +406,59 @@ S7::method(enrich, lazy_segment_list) <- function(object, ...) {
 #' kept exported for companion packages (`erodex`) that share the
 #' age/gender derivation logic.
 #'
+#' Age/Gender are resolved to literature-derived, LOESS-smoothed norms
+#' from the internal `DSPP` table (via [dspp_metadataParameters_dt()]),
+#' matched to the DSP function's formal arguments. This is the same
+#' lookup [dsp_parameters()] previews, so the preview equals what is
+#' actually applied.
+#'
 #' @keywords internal
 #' @noRd
 #' @export
 derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_params) {
-  
+
   # Get formal arguments of DSP function
   fun_formals <- names(formals(dsp_fun))
-  
+
   # Start with empty parameter list
   params <- list()
-  
+
   # Extract metadata values
   meta_list <- as.list(metadata)
-  
-  # Map Gender and Age to formant parameters if applicable
+
+  # Age/Gender -> literature-derived DSP norms from the DSPP table.
+  # dsp_parameters() previews exactly this; both route through the same
+  # .lookup_dspp_row()/.normalize_gender() helpers so they cannot diverge.
   if ("Gender" %in% names(meta_list) && "Age" %in% names(meta_list)) {
-    gender <- meta_list$Gender
-    age <- as.numeric(meta_list$Age)
-    
-    if (!is.na(gender) && !is.na(age)) {
-      # Estimate nominal F1 based on age and gender
-      # These are rough estimates based on typical values
-      if (tolower(gender) %in% c("male", "m")) {
-        if (age < 12) {
-          nominal_f1 <- 1000  # Child
-        } else {
-          nominal_f1 <- 500   # Adult male
-        }
-      } else if (tolower(gender) %in% c("female", "f")) {
-        if (age < 12) {
-          nominal_f1 <- 1000  # Child
-        } else {
-          nominal_f1 <- 560   # Adult female
+    age    <- suppressWarnings(as.numeric(meta_list$Age))
+    gender <- .normalize_gender(meta_list$Gender)
+
+    if (!is.na(age) && !is.na(gender)) {
+      dspp <- tibble::as_tibble(dspp_metadataParameters_dt())
+      row  <- .lookup_dspp_row(dspp, age, gender)
+
+      if (nrow(row) == 1L) {
+        # Pull every DSPP norm column the DSP function actually accepts.
+        norm_cols <- setdiff(intersect(names(row), fun_formals), c("Age", "Gender"))
+        for (col in norm_cols) {
+          if (!is.na(row[[col]])) params[[col]] <- row[[col]]
         }
       } else {
-        nominal_f1 <- 530  # Default/neutral
-      }
-      
-      # Set nominalF1 if function accepts it
-      if ("nominalF1" %in% fun_formals) {
-        params$nominalF1 <- nominal_f1
-      }
-      
-      # Set maxFormantHz if function accepts it
-      if ("maxFormantHz" %in% fun_formals) {
-        params$maxFormantHz <- nominal_f1 * 10  # Rough estimate
+        cli::cli_warn(
+          c("No DSPP norm row for Age {age}, Gender {gender}; using DSP defaults.",
+            i = 'Preview with {.code dsp_parameters(age = {age}, gender = "{gender}")}.'),
+          class = c("reindeer_metadata_warning", "reindeer_warning"))
       }
     }
   }
-  
-  # Map other metadata fields directly to parameters
+
+  # Any remaining requested metadata fields map straight onto matching formals.
   for (field in metadata_fields) {
     if (field %in% names(meta_list) && field %in% fun_formals) {
       params[[field]] <- meta_list[[field]]
     }
   }
-  
+
   # Merge with user params (user params override)
   utils::modifyList(params, user_params)
 }

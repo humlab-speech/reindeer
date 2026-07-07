@@ -38,6 +38,7 @@ get_metadata(corp, session_pattern = "0000")
 \code{\link[=set_metadata]{set_metadata()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=enrich]{enrich()}}
 
 Other metadata: 
-\code{\link{add_metadata}()}
+\code{\link{add_metadata}()},
+\code{\link{biographize}()}
 }
 \concept{metadata}

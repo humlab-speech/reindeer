@@ -157,6 +157,12 @@ import_metadata <- function(corpus_obj, Excelfile) {
     db_meta <<- data.frame()
   })
   
+  # Bulk import: suppress per-row FAIR regeneration, then regenerate once at
+  # the end so hundreds of add_metadata() calls don't each rewrite artifacts.
+  old_suppress <- getOption("reindeer._auto_cmdi_suppress", FALSE)
+  options(reindeer._auto_cmdi_suppress = TRUE)
+  on.exit(options(reindeer._auto_cmdi_suppress = old_suppress), add = TRUE)
+
   # Process bundle metadata
   for (i in seq_len(nrow(bundle_meta))) {
     session <- bundle_meta$session[i]
@@ -195,9 +201,13 @@ import_metadata <- function(corpus_obj, Excelfile) {
   # Rebuild cache
   cli::cli_alert_info("Rebuilding metadata cache...")
   gather_metadata(corpus_obj, verbose = FALSE)
-  
+
+  # Restore auto-regeneration and emit FAIR artifacts once for the whole batch.
+  options(reindeer._auto_cmdi_suppress = old_suppress)
+  .auto_describe(corpus_obj)
+
   cli::cli_alert_success("Metadata imported from {.path {Excelfile}}")
-  
+
   invisible(corpus_obj)
 }
 
@@ -256,6 +266,10 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
   # FAIR artifacts (CMDI XML, DataCite). Cheap: zero-byte sentinel file.
   .mark_metadata_dirty(corpus_obj)
 
+  # Keep standard-compliant artifacts in sync automatically as the user works
+  # (drift-guarded; no-op when suppressed during bulk edits).
+  .auto_describe(corpus_obj)
+
   invisible(corpus_obj)
 }
 
@@ -288,6 +302,37 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
   flag <- file.path(corpus_obj@basePath, ".cmdi_dirty")
   if (file.exists(flag)) unlink(flag)
   invisible(NULL)
+}
+
+#' Hash of the metadata state that feeds the FAIR artifacts
+#'
+#' Used by [describe_corpus()]'s drift guard to skip regeneration when the
+#' resolved metadata is unchanged since the last emission.
+#' @keywords internal
+#' @noRd
+.metadata_state_hash <- function(corpus_obj) {
+  state <- tryCatch(
+    list(name = corpus_obj@dbName, metadata = get_metadata(corpus_obj)),
+    error = function(e) list(name = corpus_obj@dbName))
+  digest::digest(state)
+}
+
+#' Automatically regenerate FAIR artifacts after a metadata change
+#'
+#' The mechanism that makes standard-compliant corpus metadata "created
+#' automatically while the user works". Gated by
+#' `getOption("reindeer.auto_cmdi", TRUE)` (default on) and suppressible
+#' during bulk edits via `getOption("reindeer._auto_cmdi_suppress", FALSE)`.
+#' A failure to emit FAIR artifacts must never break the metadata write, so
+#' errors are swallowed. The drift guard in [describe_corpus()] keeps this
+#' cheap and idempotent.
+#' @keywords internal
+#' @noRd
+.auto_describe <- function(corpus_obj) {
+  if (!isTRUE(getOption("reindeer.auto_cmdi", TRUE))) return(invisible(FALSE))
+  if (isTRUE(getOption("reindeer._auto_cmdi_suppress", FALSE))) return(invisible(FALSE))
+  tryCatch(describe_corpus(corpus_obj, verbose = FALSE), error = function(e) NULL)
+  invisible(TRUE)
 }
 
 #' Clear metadata at a specific level
@@ -329,23 +374,39 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #' Enrich query results with metadata
 #'
 #' Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
-#' containing session and bundle columns.
+#' containing session and bundle columns. This is the metadata half of
+#' [enrich()]; call it directly when you want only the metadata join, or
+#' pass a `lazy_segment_list` to defer the join until [collect()].
 #'
-#' @param segs_tbl A segment_list or data.frame with session and bundle columns
+#' @param segs_tbl A `segment_list`, `lazy_segment_list`, or data.frame with
+#'   session and bundle columns. A lazy input defers the join until `collect()`.
 #' @param corpus_obj A corpus object
 #' @param compute_digests Compute file checksums before joining (default: FALSE)
 #' @param algorithm Hash algorithm for digests (default: "sha1")
-#' @return An \code{extended_segment_list} with metadata columns appended
+#' @return An \code{extended_segment_list} with metadata columns appended (or
+#'   the same `lazy_segment_list` with a deferred step appended).
+#' @seealso [enrich()] for the combined metadata + DSP entry point.
+#' @family metadata
 #'
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' segs <- query(corp, "Phonetic == t")
-#' enriched <- enrich(segs, corp, with = "metadata")
+#' enriched <- biographize(segs, corp)
 #'
-#' @keywords internal
-#' @noRd
+#' @export
 biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm = "sha1") {
-  
+
+  # Lazy input: defer the metadata join until collect(), keeping the chain
+  # lazy (query |> quantify |> biographize |> collect). The collect() loop
+  # replays this spec against the materialized segment_list.
+  if (S7::S7_inherits(segs_tbl, lazy_segment_list)) {
+    spec <- list(type = "biographize", corpus_obj = corpus_obj,
+                 args = list(compute_digests = compute_digests, algorithm = algorithm))
+    segs_tbl@query_parts$post_transforms <- c(
+      segs_tbl@query_parts$post_transforms, list(spec))
+    return(invisible(segs_tbl))
+  }
+
   if (!is.data.frame(segs_tbl) || !all(c("session", "bundle") %in% names(segs_tbl))) {
     cli::cli_abort("Input must be a data.frame with 'session' and 'bundle' columns")
   }

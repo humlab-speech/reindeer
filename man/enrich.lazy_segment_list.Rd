@@ -2,15 +2,24 @@
 % Please edit documentation in R/reindeer_enrich.R
 \name{enrich.lazy_segment_list}
 \alias{enrich.lazy_segment_list}
-\title{Enrich method for lazy_segment_list}
+\title{Enrich method for lazy_segment_list — stay lazy until collect()}
 \arguments{
 \item{object}{A lazy_segment_list.}
 
-\item{...}{Forwarded to the segment_list method.}
+\item{corpus_obj}{Corpus to pull metadata from (metadata path).}
+
+\item{...}{Forwarded to \code{\link[=quantify]{quantify()}} on the DSP path.}
+
+\item{with}{One of \code{"metadata"} (default) or \code{NULL}.}
+
+\item{.using}{Optional DSP function; delegates to \code{\link[=quantify]{quantify()}}.}
 }
 \value{
-A segment_list or extended_segment_list.
+The same \code{lazy_segment_list} with a deferred step appended.
 }
 \description{
-Materialises via \code{\link[=collect]{collect()}} then dispatches to the segment_list method.
+Defers rather than materialising: the DSP path reuses the deferring
+\code{\link[=quantify]{quantify()}} lazy method, and the metadata path defers via
+\code{\link[=biographize]{biographize()}}. Either way the chain remains a \code{lazy_segment_list}
+until \code{\link[=collect]{collect()}} is called.
 }

@@ -85,6 +85,7 @@ set_metadata(corp, list(Quality = "Good"),
 for bulk import.
 
 Other metadata: 
+\code{\link{biographize}()},
 \code{\link{get_metadata}()}
 }
 \concept{metadata}
