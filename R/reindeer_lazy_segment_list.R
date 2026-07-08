@@ -572,6 +572,10 @@ needs_collect <- function(x) {
 # dplyr verbs on lazy_segment_list: collect, then delegate. The collected
 # segment_list inherits tbl_df so dplyr's default methods apply; the
 # dplyr_reconstruct hook in segment_list_dplyr.R preserves class + props.
+# dplyr verbs collect-and-delegate: they materialize so the segment_list's own
+# dplyr methods record provenance / loss immediately (Aim 5). Deferring them was
+# tried and reverted -- it moved loss accounting to collect() time, which broke
+# the "filter records a dropped step now" contract; the lazy win was marginal.
 .lazy_dplyr_filter    <- function(.data, ...)        dplyr::filter(collect(.data), ...)
 .lazy_dplyr_mutate    <- function(.data, ...)        dplyr::mutate(collect(.data), ...)
 .lazy_dplyr_select    <- function(.data, ...)        dplyr::select(collect(.data), ...)
