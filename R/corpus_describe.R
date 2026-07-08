@@ -25,7 +25,7 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   db_config <- load_DBconfig(db_handle)
 
   db <- collect_database_metadata(db_handle, db_config, verbose = verbose)
-  participants <- collect_participant_metadata(db_handle, verbose = verbose)
+  participants <- collect_participant_metadata(corpus_obj, verbose = verbose)
 
   # Project / funding / team metadata, if present at database level
   proj <- list(name = NULL, description = NULL, funder = NULL,
@@ -47,6 +47,20 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
       proj$grantNumber <- db_meta$funding$grantNumber %||% NULL
     }
     if (!is.null(db_meta$team)) proj$team <- db_meta$team
+  }
+
+  # Also honour flat database-level fields set via add_metadata() — the metadata
+  # API writes flat keys (Project, Funder, ...), not the nested project/funding
+  # objects read above, so without this user-set metadata never reaches the
+  # generated artifacts.
+  md <- tryCatch(get_metadata(corpus_obj), error = function(e) NULL)
+  if (!is.null(md) && nrow(md) > 0) {
+    flat <- as.list(md[1, ])  # db-level defaults are inherited into every row
+    if (is.null(proj$name)        && .nz(flat$Project))     proj$name        <- as.character(flat$Project)
+    if (is.null(proj$description) && .nz(flat$Description)) proj$description <- as.character(flat$Description)
+    if (is.null(proj$funder)      && .nz(flat$Funder))     proj$funder      <- as.character(flat$Funder)
+    if (is.null(proj$grantNumber) && .nz(flat$GrantNumber)) proj$grantNumber <- as.character(flat$GrantNumber)
+    if (is.null(proj$website)     && .nz(flat$Website))    proj$website     <- as.character(flat$Website)
   }
 
   list(

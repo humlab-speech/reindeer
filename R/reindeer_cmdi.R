@@ -101,7 +101,7 @@ create_cmdi_metadata <- function(corpus,
   db_metadata <- collect_database_metadata(db_handle, db_config, verbose)
   
   # Collect metadata from .meta_json files
-  participant_metadata <- collect_participant_metadata(db_handle, verbose)
+  participant_metadata <- collect_participant_metadata(corpus, verbose)
   
   # Create CMDI XML based on profile
   if (verbose) cat("Generating CMDI XML...\n")
@@ -209,11 +209,82 @@ collect_database_metadata <- function(db_handle, db_config, verbose = TRUE) {
 }
 
 
-#' Collect participant metadata from .meta_json files
+#' Collect participant metadata for FAIR artifacts
+#'
+#' Sources from the canonical resolved metadata (flat `METADATA.json` fields via
+#' [get_metadata()]) so metadata set with [add_metadata()] actually reaches the
+#' generated CMDI/DataCite/JSON-LD. Falls back to legacy nested `participant`
+#' objects in `.meta_json` files when no resolved metadata is available.
+#'
+#' @param corpus_or_handle A reindeer `corpus` (preferred) or emuDB handle.
+#' @param verbose Logical; print progress.
+#' @return Named list of participant records with lowercase field keys.
 #' @keywords internal
 #' @noRd
-collect_participant_metadata <- function(db_handle, verbose = TRUE) {
-  
+collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
+  if (S7::S7_inherits(corpus_or_handle, corpus)) {
+    md <- tryCatch(get_metadata(corpus_or_handle), error = function(e) NULL)
+    if (!is.null(md) && nrow(md) > 0) {
+      participants <- .participants_from_metadata(md)
+      if (length(participants) > 0) {
+        if (verbose) {
+          cat("  Found metadata for", length(participants), "participant(s)\n")
+        }
+        return(participants)
+      }
+    }
+  }
+  handle <- if (S7::S7_inherits(corpus_or_handle, corpus)) {
+    get_handle(corpus_or_handle)
+  } else {
+    corpus_or_handle
+  }
+  .collect_participant_metadata_legacy(handle, verbose)
+}
+
+#' TRUE for a length-1, non-NA, non-empty scalar
+#' @keywords internal
+#' @noRd
+.nz <- function(v) length(v) == 1L && !is.na(v) && nzchar(as.character(v))
+
+#' Build participant records from a resolved metadata tibble
+#'
+#' One record per distinct speaker (keyed by a Speaker/Participant field if
+#' present, else by session). Field names are lowercased so downstream emitters
+#' that read `age`/`gender`/`language` pick up `Age`/`Gender`/`Language`.
+#' @keywords internal
+#' @noRd
+.participants_from_metadata <- function(md) {
+  key <- c("session", "bundle", "db_uuid")
+  id_candidates <- c("Speaker", "SpeakerID", "Participant", "ParticipantID",
+                     "speaker", "participant")
+  id_col <- intersect(id_candidates, names(md))
+  id_col <- if (length(id_col)) id_col[[1]] else NA_character_
+  fields <- setdiff(names(md), c(key, id_col))
+
+  participants <- list()
+  for (i in seq_len(nrow(md))) {
+    row <- as.list(md[i, ])
+    pid <- if (!is.na(id_col) && .nz(row[[id_col]])) {
+      as.character(row[[id_col]])
+    } else {
+      as.character(row$session)
+    }
+    if (!is.null(participants[[pid]])) next
+    rec <- list(id = pid)
+    for (f in fields) {
+      if (.nz(row[[f]])) rec[[tolower(f)]] <- as.character(row[[f]])
+    }
+    participants[[pid]] <- rec
+  }
+  participants
+}
+
+#' Legacy: collect participant metadata from nested `.meta_json` files
+#' @keywords internal
+#' @noRd
+.collect_participant_metadata_legacy <- function(db_handle, verbose = TRUE) {
+
   if (verbose) cat("Collecting participant metadata...\n")
   
   participants <- list()
