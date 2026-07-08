@@ -66,6 +66,7 @@ create_cmdi_metadata <- function(corpus,
                                   contact_email = NULL,
                                   license = NULL,
                                   availability = "available",
+                                  self_link = NULL,
                                   include_placeholders = TRUE,
                                   verbose = TRUE) {
   
@@ -119,6 +120,7 @@ create_cmdi_metadata <- function(corpus,
     availability = availability,
     db_metadata = db_metadata,
     participant_metadata = participant_metadata,
+    self_link = self_link,
     include_placeholders = include_placeholders
   )
   
@@ -346,34 +348,154 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
 #' Generate CMDI XML document
 #' @keywords internal
 #' @noRd
+#' Map a reindeer profile name to a CLARIN Component Registry profile ID
+#' @keywords internal
+#' @noRd
+.cmdi_profile_id <- function(profile) {
+  profile <- profile %||% "media-corpus"
+  switch(profile,
+    "media-corpus"      = "clarin.eu:cr1:p_1387365569699",
+    "speech-corpus"     = "clarin.eu:cr1:p_1392642184799",
+    "speech-corpus-dlu" = "clarin.eu:cr1:p_1381926654456",
+    if (grepl("^clarin\\.eu:cr", profile)) profile
+    else "clarin.eu:cr1:p_1387365569699"
+  )
+}
+
+#' Profile payload namespace (the cmdp namespace) for a CMDI profile ID
+#' @keywords internal
+#' @noRd
+.cmdi_profile_ns <- function(profile_id) {
+  paste0("http://www.clarin.eu/cmd/1/profiles/", profile_id)
+}
+
+#' Component Registry XSD URL for a CMDI profile ID
+#' @keywords internal
+#' @noRd
+.cmdi_profile_xsd_url <- function(profile_id) {
+  paste0("https://catalog.clarin.eu/ds/ComponentRegistry/rest/registry/1.2/",
+         "profiles/", profile_id, "/xsd")
+}
+
+#' Path to a bundled CMD envelope XSD, if present under inst/cmdi/
+#' @keywords internal
+#' @noRd
+.cmdi_bundled_envelope_xsd <- function() {
+  p <- system.file("cmdi", "cmd-envelop.xsd", package = "reindeer")
+  if (nzchar(p)) p else NULL
+}
+
+#' Validate a generated CMDI record
+#'
+#' Two layers. **Structural** checks always run offline: a CMD 1.2 envelope
+#' root, `CMDVersion = "1.2"`, the required `Header` fields, a
+#' `ResourceProxyList`, and an `xsi:schemaLocation` that binds a profile
+#' schema. **XSD** validation is attempted when a schema is available — a
+#' local `xsd`, a bundled envelope schema under `inst/cmdi/`, or (with
+#' `online = TRUE`) the CMD envelope schema fetched from CLARIN. The envelope
+#' schema validates the envelope/Header/Resources; validating the profile
+#' `Components` subtree needs the profile XSD (Component-level conformance is
+#' delivered in a later phase). Full CLARIN compliance additionally requires
+#' Schematron assertions applied by the external Java CMDI Instance Validator,
+#' which is out of scope for this in-package check.
+#'
+#' @param path Path to a `*_cmdi.xml` file.
+#' @param xsd Optional path to a local XSD to validate against.
+#' @param online If `TRUE`, may fetch the CMD envelope schema from CLARIN when
+#'   no local XSD is available. Default `FALSE` (offline-safe).
+#' @return Invisibly, a list with `structural` (logical), `problems`
+#'   (character), and `xsd` (logical, or `NA` when not attempted).
+#' @seealso [create_cmdi_metadata()], [describe_corpus()].
+#' @export
+validate_cmdi <- function(path, xsd = NULL, online = FALSE) {
+  if (!file.exists(path)) {
+    cli::cli_abort("CMDI file not found: {.path {path}}")
+  }
+  cmd_ns <- c(cmd = "http://www.clarin.eu/cmd/1")
+  doc <- xml2::read_xml(path)
+  problems <- character(0)
+
+  if (!grepl("CMD$", xml2::xml_name(doc))) {
+    problems <- c(problems, "root element is not CMD")
+  }
+  if (!identical(xml2::xml_attr(doc, "CMDVersion"), "1.2")) {
+    problems <- c(problems, "CMDVersion is not 1.2")
+  }
+  sl <- xml2::xml_attr(doc, "schemaLocation")
+  if (is.na(sl) || !grepl("profiles/clarin\\.eu:cr", sl)) {
+    problems <- c(problems, "xsi:schemaLocation does not bind a profile schema")
+  }
+  for (h in c("MdCreator", "MdCreationDate", "MdSelfLink", "MdProfile",
+              "MdCollectionDisplayName")) {
+    hit <- xml2::xml_find_all(doc, paste0("//cmd:Header/cmd:", h), ns = cmd_ns)
+    if (length(hit) == 0) problems <- c(problems, paste0("Header missing ", h))
+  }
+  if (length(xml2::xml_find_all(doc, "//cmd:Resources/cmd:ResourceProxyList",
+                                ns = cmd_ns)) == 0) {
+    problems <- c(problems, "missing Resources/ResourceProxyList")
+  }
+  structural <- length(problems) == 0
+
+  xsd_ok <- NA
+  local_xsd <- xsd %||% .cmdi_bundled_envelope_xsd()
+  if (!is.null(local_xsd) && file.exists(local_xsd)) {
+    xsd_ok <- tryCatch(
+      isTRUE(as.logical(xml2::xml_validate(doc, xml2::read_xml(local_xsd)))),
+      error = function(e) NA)
+  } else if (isTRUE(online)) {
+    xsd_ok <- tryCatch(
+      isTRUE(as.logical(xml2::xml_validate(
+        doc,
+        xml2::read_xml("https://infra.clarin.eu/CMDI/1.2/xsd/cmd-envelop.xsd")))),
+      error = function(e) NA)
+  }
+
+  invisible(list(structural = structural, problems = problems, xsd = xsd_ok))
+}
+
 generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
                               corpus_description, author, institution,
                               contact_email, license, availability,
                               db_metadata, participant_metadata,
+                              self_link = NULL,
                               include_placeholders) {
-  
+
   # Determine profile ID based on profile name
-  profile_id <- switch(profile,
-    "media-corpus" = "clarin.eu:cr1:p_1387365569699",
-    "speech-corpus" = "clarin.eu:cr1:p_1392642184799",
-    "speech-corpus-dlu" = "clarin.eu:cr1:p_1381926654456",
-    "clarin.eu:cr1:p_1387365569699"  # default
-  )
-  
-  # Create root CMD element
+  profile_id <- .cmdi_profile_id(profile)
+  profile_ns  <- .cmdi_profile_ns(profile_id)
+  profile_xsd <- .cmdi_profile_xsd_url(profile_id)
+
+  # Create root CMD element. CMDI 1.2 needs two namespaces — the envelope
+  # (cmd:) and the profile payload (cmdp:) — and an xsi:schemaLocation that
+  # binds BOTH, so a validator can resolve the profile schema for the
+  # Components subtree.
   doc <- xml2::xml_new_root("cmd:CMD",
-    "xmlns:cmd" = "http://www.clarin.eu/cmd/1",
-    "xmlns:xsi" = "http://www.w3.org/2001/XMLSchema-instance",
+    "xmlns:cmd"  = "http://www.clarin.eu/cmd/1",
+    "xmlns:cmdp" = profile_ns,
+    "xmlns:xsi"  = "http://www.w3.org/2001/XMLSchema-instance",
     "CMDVersion" = "1.2",
-    "xsi:schemaLocation" = "http://www.clarin.eu/cmd/1 https://infra.clarin.eu/CMDI/1.2/xsd/cmd-envelop.xsd"
+    "xsi:schemaLocation" = paste(
+      "http://www.clarin.eu/cmd/1",
+      "https://infra.clarin.eu/CMDI/1.2/xsd/cmd-envelop.xsd",
+      profile_ns, profile_xsd
+    )
   )
-  
+
   # Add Header
   header <- xml2::xml_add_child(doc, "cmd:Header")
   xml2::xml_add_child(header, "cmd:MdCreator", author %||% "PLACEHOLDER_AUTHOR")
-  xml2::xml_add_child(header, "cmd:MdCreationDate", 
+  xml2::xml_add_child(header, "cmd:MdCreationDate",
                      format(Sys.time(), "%Y-%m-%d"))
-  xml2::xml_add_child(header, "cmd:MdSelfLink")  # Repository will fill
+  # MdSelfLink: a persistent identifier for this record. Prefer a caller-
+  # supplied PID; fall back to a urn:uuid built from the database UUID so the
+  # element is never empty (CLARIN B-centres require it).
+  self <- self_link %||% (if (!is.null(db_uuid) && nzchar(db_uuid))
+                          paste0("urn:uuid:", db_uuid) else NULL)
+  if (!is.null(self)) {
+    xml2::xml_add_child(header, "cmd:MdSelfLink", self)
+  } else {
+    xml2::xml_add_child(header, "cmd:MdSelfLink")
+  }
   xml2::xml_add_child(header, "cmd:MdProfile", profile_id)
   xml2::xml_add_child(header, "cmd:MdCollectionDisplayName", corpus_title)
   

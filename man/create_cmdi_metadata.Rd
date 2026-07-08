@@ -15,6 +15,7 @@ create_cmdi_metadata(
   contact_email = NULL,
   license = NULL,
   availability = "available",
+  self_link = NULL,
   include_placeholders = TRUE,
   verbose = TRUE
 )
