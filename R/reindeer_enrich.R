@@ -51,6 +51,11 @@ NULL
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #' enrich(segs, corp)                              # metadata join
 #' enrich(segs, .using = superassp::forest)        # delegates to quantify()
+#' @usage
+#' enrich(object, .using = NULL, ..., .metadata_fields = NULL, .force = FALSE,
+#'   .parallel = TRUE, .workers = NULL, .use_cache = FALSE, .cache_dir = NULL,
+#'   .cache_format = c("auto", "qs", "rds"), .signal_extension = NULL,
+#'   .verbose = FALSE)
 #' @export
 enrich <- S7::new_generic("enrich", "object")
 
@@ -407,13 +412,19 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
 #' age/gender derivation logic.
 #'
 #' Age/Gender are resolved to literature-derived, LOESS-smoothed norms
-#' from the internal `DSPP` table (via [dspp_metadataParameters_dt()]),
+#' from the internal `DSPP` table (via `dspp_metadataParameters_dt()`),
 #' matched to the DSP function's formal arguments. This is the same
 #' lookup [dsp_parameters()] previews, so the preview equals what is
 #' actually applied.
 #'
+#' @param dsp_fun A DSP function whose formal arguments are matched against
+#'   the resolved norms.
+#' @param metadata Named list of bundle metadata (expects `Age`, `Gender`).
+#' @param metadata_fields Character vector of extra metadata field names to
+#'   map straight onto matching formals of `dsp_fun`.
+#' @param user_params Named list of user overrides (win over derived norms).
+#' @return A named list of DSP parameters to pass to `dsp_fun`.
 #' @keywords internal
-#' @noRd
 #' @export
 derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_params) {
 

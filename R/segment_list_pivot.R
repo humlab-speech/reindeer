@@ -53,8 +53,8 @@
 #' @param names_to Name of the column receiving the track family (e.g.
 #'   `"F1"`).
 #' @param values_to Name of the column receiving the measurement value.
-#' @param time_to Name of the column receiving the relative time (in [0, 1]
-#'   for wide-form columns; positional index normalised to [0, 1] for
+#' @param time_to Name of the column receiving the relative time (in `[0, 1]`
+#'   for wide-form columns; positional index normalised to `[0, 1]` for
 #'   list-column tracks).
 #' @param .keep_metadata If `TRUE` (default), metadata columns
 #'   (see [metadata_cols()]) are carried through.

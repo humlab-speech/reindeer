@@ -53,6 +53,10 @@
 #'
 #' # Override metadata-derived parameters
 #' quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
+#' @usage
+#' quantify(object, dsp_function, ..., .at = NULL, .use_metadata = TRUE,
+#'   .use_cache = FALSE, .cache_dir = NULL, .cache_format = c("auto", "qs", "rds"),
+#'   .parallel = TRUE, .workers = NULL, .verbose = FALSE, .optimize = TRUE)
 #' @name quantify
 #' @export
 quantify <- S7::new_generic("quantify", "object")

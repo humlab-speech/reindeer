@@ -24,8 +24,8 @@ to \code{\link[=track_cols]{track_cols()}}.}
 
 \item{values_to}{Name of the column receiving the measurement value.}
 
-\item{time_to}{Name of the column receiving the relative time (in \link{0, 1}
-for wide-form columns; positional index normalised to \link{0, 1} for
+\item{time_to}{Name of the column receiving the relative time (in \verb{[0, 1]}
+for wide-form columns; positional index normalised to \verb{[0, 1]} for
 list-column tracks).}
 
 \item{.keep_metadata}{If \code{TRUE} (default), metadata columns

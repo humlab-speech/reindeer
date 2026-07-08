@@ -40,6 +40,10 @@ NULL
 #'   not yet preserve every derived column (labels, attribute,
 #'   start_item_id, ...), so eager evaluation is the safe default
 #'   until full SQL parity lands.
+#' @usage
+#' scout(.segments, steps_forward, count_from = "START", capture = 1,
+#'   ignore_bundle_boundaries = FALSE, calculate_times = TRUE,
+#'   times_from = NULL, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")
@@ -344,6 +348,8 @@ retreat <- function(.segments, steps_backward, ...) {
 #' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
 #'   into the lazy plan (see note in [scout()] about partial SQL
 #'   coverage).
+#' @usage
+#' ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")
@@ -529,6 +535,8 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
 #'   into the lazy plan (see note in [scout()] about partial SQL
 #'   coverage).
+#' @usage
+#' descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' words  <- query(corp, "Word =~ .*")

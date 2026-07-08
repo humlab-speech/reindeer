@@ -13,8 +13,11 @@
 #' reconstruct the backing corpus from a `segment_list`. Not a user verb;
 #' end users start from a `corpus()` object directly.
 #'
+#' @param .segments A `segment_list` (or `lazy_segment_list`) to recover the
+#'   backing corpus from.
+#' @param .from Optional `corpus` to use directly instead of reconstructing.
+#' @return A `corpus` object.
 #' @keywords internal
-#' @noRd
 #' @export
 get_corpus_cached <- function(.segments, .from = NULL) {
   # If .from is provided and is a corpus, use it directly

@@ -22,6 +22,12 @@
 #' print(lazy_segs)  # Shows preview
 #' }
 #'
+#' @param corpus A `reindeer::corpus` object, or `NULL`.
+#' @param query_parts List of query components (base query plus transforms).
+#' @param db_path Path to the corpus database directory.
+#' @param db_uuid Database UUID (single string).
+#' @param materialized Logical; whether the query chain has been executed.
+#' @param cache The cached materialized `segment_list`, or `NULL`.
 #' @name lazy_segment_list
 #' @export
 lazy_segment_list <- S7::new_class(

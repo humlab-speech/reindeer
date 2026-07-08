@@ -6,7 +6,7 @@
 \alias{descend_to.lazy_segment_list}
 \title{Move down the annotation hierarchy}
 \usage{
-descend_to(.segments, ...)
+descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 }
 \arguments{
 \item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}

@@ -5,7 +5,9 @@
 \alias{quantify.segment_list}
 \title{Extract acoustic measurements from segments}
 \usage{
-quantify(object, ...)
+quantify(object, dsp_function, ..., .at = NULL, .use_metadata = TRUE,
+  .use_cache = FALSE, .cache_dir = NULL, .cache_format = c("auto", "qs", "rds"),
+  .parallel = TRUE, .workers = NULL, .verbose = FALSE, .optimize = TRUE)
 }
 \arguments{
 \item{object}{A \code{segment_list} (eager) or \code{lazy_segment_list}.}

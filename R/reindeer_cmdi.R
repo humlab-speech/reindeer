@@ -55,7 +55,6 @@
 #' ingested into CLARIN repositories.
 #'
 #' @keywords internal
-#' @noRd
 #' @export
 create_cmdi_metadata <- function(corpus,
                                   output_file = NULL,

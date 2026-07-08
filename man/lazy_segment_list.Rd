@@ -13,6 +13,19 @@ lazy_segment_list(
   cache = NULL
 )
 }
+\arguments{
+\item{corpus}{A \code{reindeer::corpus} object, or \code{NULL}.}
+
+\item{query_parts}{List of query components (base query plus transforms).}
+
+\item{db_path}{Path to the corpus database directory.}
+
+\item{db_uuid}{Database UUID (single string).}
+
+\item{materialized}{Logical; whether the query chain has been executed.}
+
+\item{cache}{The cached materialized \code{segment_list}, or \code{NULL}.}
+}
 \description{
 Implements lazy evaluation for EMU query operations. Query chains are built
 up without executing SQL until \code{collect()} is called or the data is needed.
