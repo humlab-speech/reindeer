@@ -434,6 +434,13 @@ validate_cmdi <- function(path, xsd = NULL, online = FALSE) {
                                 ns = cmd_ns)) == 0) {
     problems <- c(problems, "missing Resources/ResourceProxyList")
   }
+  # CMDI requires the Components wrapper to hold exactly one profile root
+  # component (in the profile payload namespace).
+  comp_children <- xml2::xml_find_all(doc, "//cmd:Components/*", ns = cmd_ns)
+  if (length(comp_children) != 1) {
+    problems <- c(problems,
+                  "Components must contain exactly one profile root component")
+  }
   structural <- length(problems) == 0
 
   xsd_ok <- NA
@@ -523,26 +530,24 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
   xml2::xml_add_child(resources, "cmd:JournalFileProxyList")
   xml2::xml_add_child(resources, "cmd:ResourceRelationList")
   
-  # Add Components (metadata content)
+  # Add Components (metadata content). Emit the profile-conformant payload in
+  # the cmdp: namespace. media-corpus (and the default) get a schema-valid tree
+  # generated to match the profile XSD; other named profiles fall back to the
+  # legacy structure until their profiles are mapped.
   components <- xml2::xml_add_child(doc, "cmd:Components")
-  
-  # Add profile-specific component
-  if (profile == "speech-corpus") {
+
+  if (identical(profile_id, "clarin.eu:cr1:p_1387365569699")) {
+    .add_media_corpus_components(components, corpus_title, corpus_description,
+                                 author, institution, db_metadata,
+                                 participant_metadata)
+  } else if (profile == "speech-corpus") {
     corpus_comp <- xml2::xml_add_child(components, "cmd:SpeechCorpusWithParticipants")
     add_speech_corpus_components(corpus_comp, db_name, db_uuid, corpus_title,
                                  corpus_description, author, institution,
                                  contact_email, license, availability,
                                  db_metadata, participant_metadata,
                                  include_placeholders)
-  } else if (profile == "media-corpus") {
-    corpus_comp <- xml2::xml_add_child(components, "cmd:media-corpus-profile")
-    add_media_corpus_components(corpus_comp, db_name, db_uuid, corpus_title,
-                               corpus_description, author, institution,
-                               contact_email, license, availability,
-                               db_metadata, participant_metadata,
-                               include_placeholders)
   } else {
-    # Generic component structure
     corpus_comp <- xml2::xml_add_child(components, "cmd:SpeechCorpus")
     add_speech_corpus_components(corpus_comp, db_name, db_uuid, corpus_title,
                                  corpus_description, author, institution,
@@ -550,8 +555,56 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
                                  db_metadata, participant_metadata,
                                  include_placeholders)
   }
-  
+
   return(doc)
+}
+
+#' Build the profile-conformant Components subtree for the media-corpus profile
+#'
+#' Emits `cmdp:media-corpus-profile` matching profile
+#' `clarin.eu:cr1:p_1387365569699`: the required tree
+#' (`Collection > GeneralInfo > Name`, `Collection > OriginLocation > Location`,
+#' and `Corpus`) plus the safe optional fields we hold, respecting the
+#' profile's element order and content models (verified against the profile
+#' XSD). Elements go in the profile payload namespace (`cmdp:`), declared on
+#' the CMD root.
+#' @keywords internal
+#' @noRd
+.add_media_corpus_components <- function(components, corpus_title,
+                                         corpus_description, author,
+                                         institution, db_metadata,
+                                         participant_metadata) {
+  root <- xml2::xml_add_child(components, "cmdp:media-corpus-profile")
+
+  # -- Collection (required). Sequence order: GeneralInfo, OriginLocation, ...
+  coll <- xml2::xml_add_child(root, "cmdp:Collection")
+
+  gi <- xml2::xml_add_child(coll, "cmdp:GeneralInfo")               # required
+  # GeneralInfo sequence order: Name, Title, ID, Version, Owner, PublicationYear
+  xml2::xml_add_child(gi, "cmdp:Name", corpus_title %||% "Unnamed corpus")  # required (text)
+  if (.nz(corpus_title)) xml2::xml_add_child(gi, "cmdp:Title", corpus_title)
+  owner <- author %||% institution
+  if (.nz(owner)) xml2::xml_add_child(gi, "cmdp:Owner", owner)
+  # PublicationYear is xs:gYear -> only a bare 4-digit year is valid.
+  yr <- db_metadata$publication_year %||% format(Sys.Date(), "%Y")
+  if (grepl("^[0-9]{4}$", as.character(yr))) {
+    xml2::xml_add_child(gi, "cmdp:PublicationYear", as.character(yr))
+  }
+
+  ol <- xml2::xml_add_child(coll, "cmdp:OriginLocation")           # required
+  xml2::xml_add_child(ol, "cmdp:Location")   # required; empty valid (all children optional)
+
+  # -- Corpus (required; empty is valid) --
+  xml2::xml_add_child(root, "cmdp:Corpus")
+
+  # -- SpeechCorpus (optional): carry the speaker count when we have it --
+  n_spk <- length(participant_metadata)
+  if (n_spk > 0) {
+    sc <- xml2::xml_add_child(root, "cmdp:SpeechCorpus")
+    xml2::xml_add_child(sc, "cmdp:NumberOfSpeakers", as.character(n_spk))
+  }
+
+  invisible(root)
 }
 
 
@@ -703,25 +756,6 @@ add_speech_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
     xml2::xml_add_child(ethics, "cmd:ApprovalNumber", "PLACEHOLDER_ETHICS_NUMBER")
     xml2::xml_add_child(ethics, "cmd:Institution", "PLACEHOLDER_ETHICS_INSTITUTION")
   }
-}
-
-
-#' Add media corpus components to CMDI
-#' @keywords internal
-#' @noRd
-add_media_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
-                                       corpus_description, author, institution,
-                                       contact_email, license, availability,
-                                       db_metadata, participant_metadata,
-                                       include_placeholders) {
-  
-  # Similar structure but adapted for media-corpus profile
-  xml2::xml_add_child(parent, "cmd:Name", corpus_title)
-  xml2::xml_add_child(parent, "cmd:Description", 
-                     corpus_description %||% "PLACEHOLDER_CORPUS_DESCRIPTION")
-  
-  # Add other components following media-corpus profile structure
-  # (Similar to speech corpus but with profile-specific elements)
 }
 
 

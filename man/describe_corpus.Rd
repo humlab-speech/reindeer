@@ -8,7 +8,7 @@ describe_corpus(
   corpus_obj,
   output_dir = NULL,
   formats = c("readme", "cmdi", "datacite", "cff", "jsonld"),
-  profile = "speech-corpus",
+  profile = "media-corpus",
   force = FALSE,
   verbose = TRUE
 )

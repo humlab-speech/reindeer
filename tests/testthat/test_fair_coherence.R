@@ -21,7 +21,10 @@ test_that("flat database-level metadata reaches the rendered README", {
   expect_match(readme, "CoherenceFunder", fixed = TRUE)
 })
 
-test_that("flat participant metadata (Age/Gender) reaches the CMDI XML", {
+test_that("participant metadata reaches the CMDI as a speaker count", {
+  # The media-corpus profile carries a corpus-level speaker count
+  # (NumberOfSpeakers), not per-speaker Age/Gender (those belong to a
+  # media-session profile). Field-level values reach the README instead.
   withr::local_options(reindeer.auto_cmdi = FALSE)
   ae <- create_isolated_ae_corpus()
   add_metadata(ae, list(Age = 33, Gender = "Female"), session = "0000")
@@ -31,9 +34,11 @@ test_that("flat participant metadata (Age/Gender) reaches the CMDI XML", {
 
   cmdi <- list.files(outdir, pattern = "_cmdi\\.xml$", full.names = TRUE)
   expect_gt(length(cmdi), 0)
-  xml <- paste(readLines(cmdi[[1]], warn = FALSE), collapse = "\n")
-  expect_match(xml, "Female")
-  expect_match(xml, "33")
+  doc <- xml2::read_xml(cmdi[[1]])
+  cmdp <- "http://www.clarin.eu/cmd/1/profiles/clarin.eu:cr1:p_1387365569699"
+  spk <- xml2::xml_text(xml2::xml_find_first(
+    doc, "//cmdp:NumberOfSpeakers", ns = c(cmdp = cmdp)))
+  expect_match(spk, "^[0-9]+$")
 })
 
 test_that("README stamps provenance (generator + state hash)", {
