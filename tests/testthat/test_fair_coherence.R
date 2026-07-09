@@ -35,7 +35,7 @@ test_that("participant metadata reaches the CMDI as a speaker count", {
   cmdi <- list.files(outdir, pattern = "_cmdi\\.xml$", full.names = TRUE)
   expect_gt(length(cmdi), 0)
   doc <- xml2::read_xml(cmdi[[1]])
-  cmdp <- "http://www.clarin.eu/cmd/1/profiles/clarin.eu:cr1:p_1387365569699"
+  cmdp <- "http://www.clarin.eu/cmd/1/profiles/clarin.eu:cr1:p_1392642184799"
   spk <- xml2::xml_text(xml2::xml_find_first(
     doc, "//cmdp:NumberOfSpeakers", ns = c(cmdp = cmdp)))
   expect_match(spk, "^[0-9]+$")

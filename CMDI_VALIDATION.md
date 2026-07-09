@@ -19,15 +19,24 @@ documents how to run the third externally.
   (`cmdp:`) and a dual `xsi:schemaLocation` binding both the CMD envelope schema
   and the profile XSD, so any CMDI validator can resolve the schema. `MdSelfLink`
   is populated (pass a PID via `create_cmdi_metadata(self_link = ...)`).
-- **Components (Phase 2):** for the default `media-corpus` profile
-  (`clarin.eu:cr1:p_1387365569699`) the `Components` subtree is generated to
-  match the profile XSD — verified element names, sequence order, cardinality,
-  and content models. Corpus-level fields map to `Collection > GeneralInfo`
-  (`Name`, `Title`, `Owner`, `PublicationYear`) and the speaker count to
-  `SpeechCorpus > NumberOfSpeakers`. Per-speaker attributes (Age, Gender, …)
-  are **not** in the CMDI — the media-corpus profile has no collection-level
-  slot for them; they belong to a media-session profile and remain available in
-  the README and DataCite outputs.
+- **Components:** the default profile is **speech-corpus-with-participants**
+  (`clarin.eu:cr1:p_1392642184799`), generated to match the profile XSD
+  (verified element names, sequence order, cardinality, content models,
+  closed-vocabulary values). It is **fully populated** from reindeer data:
+  - `GeneralInfo` (name/title/class/location), `Access` (Availability, Licence,
+    Contact), `Creation` (Creators), `Project` (name/funder/url/institution),
+    `SubjectLanguages` (with ISO 639-3 codes), `SpeechCorpusSpecific`
+    (Modalities, MediaType, `NumberOfSpeakers`, Multilinguality, `Size`),
+    `TechnicalInfo` (LanguageScripts).
+  - `AnnotationTypes` are mapped from the database's annotation tiers.
+  - Per-bundle Age/Gender are **aggregated** into `Participants`
+    (`AgeDistribution` mean/range, sex breakdown) — all three candidate
+    profiles are corpus-level, so per-speaker records are aggregate by design.
+  - Any user metadata field without a matching component is folded into
+    `GeneralInfo/Descriptions` as `"field: value"`, so nothing is dropped.
+
+  `media-corpus` (`clarin.eu:cr1:p_1387365569699`) remains available via
+  `profile = "media-corpus"` with its own conformant (but sparser) tree.
 
 ```r
 res <- validate_cmdi("mycorpus_cmdi.xml")
@@ -77,7 +86,9 @@ complete for every profile you emit:
 
 ## Extending to other profiles
 
-Only `media-corpus` is currently generated conformantly. To add another profile
-(e.g. `speech-corpus`), fetch its XSD from the Component Registry, read its root
-component tree (names, order, cardinality, content models), and add a builder
-mirroring `.add_media_corpus_components()`.
+`speech-corpus` (default) and `media-corpus` are generated conformantly. To add
+another profile (e.g. `speech-recordings-DLU`), fetch its XSD from the Component
+Registry, read its root component tree (names, order, cardinality, content
+models, and any closed-vocabulary enumerations), and add a builder mirroring
+`.add_speech_corpus_participants_components()`, then route it in
+`generate_cmdi_xml()` by profile id.

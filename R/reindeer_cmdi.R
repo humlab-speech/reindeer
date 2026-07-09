@@ -58,7 +58,7 @@
 #' @export
 create_cmdi_metadata <- function(corpus,
                                   output_file = NULL,
-                                  profile = "media-corpus",
+                                  profile = "speech-corpus",
                                   corpus_title = NULL,
                                   corpus_description = NULL,
                                   author = NULL,
@@ -100,7 +100,32 @@ create_cmdi_metadata <- function(corpus,
   
   # Collect metadata from database structure
   db_metadata <- collect_database_metadata(db_handle, db_config, verbose)
-  
+
+  # Annotation tier names (for AnnotationTypes) and corpus size (for Size),
+  # sourced from the loaded DB config and the bundle listing.
+  db_metadata$annotation_levels <- {
+    lv <- vapply(db_config$levelDefinitions %||% list(),
+                 function(l) l$name %||% NA_character_, character(1))
+    lv[!is.na(lv) & nzchar(lv)]
+  }
+  db_metadata$n_bundles <- tryCatch(nrow(.list_bundles(corpus)),
+                                    error = function(e) NA_integer_)
+
+  # Flat database-level fields set via add_metadata() (Project/Funder/...), so
+  # the CMDI builder can populate Project/Location like the other artifacts.
+  md0 <- tryCatch(get_metadata(corpus), error = function(e) NULL)
+  if (!is.null(md0) && nrow(md0) > 0) {
+    flat <- as.list(md0[1, ])
+    pick <- function(x) if (.nz(x)) as.character(x) else NULL
+    db_metadata$project      <- db_metadata$project      %||% pick(flat$Project)
+    db_metadata$funder       <- db_metadata$funder       %||% pick(flat$Funder)
+    db_metadata$website      <- db_metadata$website      %||% pick(flat$Website)
+    db_metadata$country      <- db_metadata$country      %||% pick(flat$Country)
+    db_metadata$country_code <- db_metadata$country_code %||% pick(flat$CountryCode)
+    db_metadata$licence      <- db_metadata$licence      %||% pick(flat$Licence) %||% pick(flat$License)
+    db_metadata$availability <- db_metadata$availability %||% pick(flat$Availability)
+  }
+
   # Collect metadata from .meta_json files
   participant_metadata <- collect_participant_metadata(corpus, verbose)
   
@@ -348,6 +373,63 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
 #' Generate CMDI XML document
 #' @keywords internal
 #' @noRd
+#' Aggregate participant demographics for the CMDI Participants component
+#'
+#' From the per-speaker records built by [collect_participant_metadata()]
+#' (lowercased fields), compute the aggregate statistics the corpus-level
+#' profile expects: speaker count, mean age, age range, and a sex breakdown.
+#' @keywords internal
+#' @noRd
+.aggregate_demographics <- function(participants) {
+  n <- length(participants)
+  ages <- suppressWarnings(as.numeric(unlist(lapply(participants, function(p) p$age))))
+  ages <- ages[!is.na(ages)]
+  sexes <- tolower(unlist(lapply(participants, function(p) p$gender %||% p$sex)))
+  sexes <- sexes[nzchar(sexes)]
+  sex_tab <- if (length(sexes)) table(sexes) else integer(0)
+  list(
+    n_speakers  = n,
+    mean_age    = if (length(ages)) round(mean(ages), 1) else NA_real_,
+    age_range   = if (length(ages)) paste0(min(ages), "-", max(ages)) else NA_character_,
+    sex_summary = if (length(sex_tab))
+      paste(names(sex_tab), as.integer(sex_tab), sep = ": ", collapse = ", ")
+      else NA_character_
+  )
+}
+
+#' Map a reindeer annotation level name to a profile AnnotationType enum value
+#'
+#' The profile's `AnnotationType` is a closed vocabulary; map common EMU level
+#' names onto it, defaulting to "Unspecified".
+#' @keywords internal
+#' @noRd
+.map_annotation_type <- function(level_name) {
+  ln <- tolower(level_name %||% "")
+  if (grepl("phonetic", ln)) "Phonetics"
+  else if (grepl("phonem|phonolog", ln)) "Phonology"
+  else if (grepl("lemma", ln)) "Lemma"
+  else if (grepl("\\bword\\b|token", ln)) "Word form"
+  else if (grepl("morph", ln)) "Morphosyntax"
+  else if (grepl("syll|tone|prosod|accent|foot|intonation|intermediate", ln)) "Prosody"
+  else if (grepl("orth|utter|sentence|text|chunk", ln)) "Orthography"
+  else "Unspecified"
+}
+
+#' Best-effort ISO 639-3 code for a language name (defaults to "und")
+#' @keywords internal
+#' @noRd
+.iso639_3 <- function(language) {
+  if (is.null(language) || !nzchar(language)) return("und")
+  m <- c(english = "eng", swedish = "swe", norwegian = "nor", danish = "dan",
+         finnish = "fin", german = "deu", french = "fra", spanish = "spa",
+         italian = "ita", dutch = "nld", icelandic = "isl",
+         "northern sami" = "sme", sami = "smi")
+  key <- tolower(language)
+  if (!is.null(m[[key]])) m[[key]]
+  else if (grepl("^[a-z]{3}$", key)) key
+  else "und"
+}
+
 #' Map a reindeer profile name to a CLARIN Component Registry profile ID
 #' @keywords internal
 #' @noRd
@@ -532,22 +614,19 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
   xml2::xml_add_child(resources, "cmd:ResourceRelationList")
   
   # Add Components (metadata content). Emit the profile-conformant payload in
-  # the cmdp: namespace. media-corpus (and the default) get a schema-valid tree
-  # generated to match the profile XSD; other named profiles fall back to the
-  # legacy structure until their profiles are mapped.
+  # the cmdp: namespace, generated to match the profile XSD. speech-corpus
+  # (default) and media-corpus are fully conformant; anything else falls back to
+  # the legacy structure until its profile is mapped.
   components <- xml2::xml_add_child(doc, "cmd:Components")
 
-  if (identical(profile_id, "clarin.eu:cr1:p_1387365569699")) {
+  if (identical(profile_id, "clarin.eu:cr1:p_1392642184799")) {
+    .add_speech_corpus_participants_components(
+      components, corpus_title, corpus_description, author, institution,
+      contact_email, license, availability, db_metadata, participant_metadata)
+  } else if (identical(profile_id, "clarin.eu:cr1:p_1387365569699")) {
     .add_media_corpus_components(components, corpus_title, corpus_description,
                                  author, institution, db_metadata,
                                  participant_metadata)
-  } else if (profile == "speech-corpus") {
-    corpus_comp <- xml2::xml_add_child(components, "cmd:SpeechCorpusWithParticipants")
-    add_speech_corpus_components(corpus_comp, db_name, db_uuid, corpus_title,
-                                 corpus_description, author, institution,
-                                 contact_email, license, availability,
-                                 db_metadata, participant_metadata,
-                                 include_placeholders)
   } else {
     corpus_comp <- xml2::xml_add_child(components, "cmd:SpeechCorpus")
     add_speech_corpus_components(corpus_comp, db_name, db_uuid, corpus_title,
@@ -558,6 +637,147 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
   }
 
   return(doc)
+}
+
+#' Build the fully-populated Components subtree for speech-corpus-with-participants
+#'
+#' Emits `cmdp:SpeechCorpusWithParticipants` matching profile
+#' `clarin.eu:cr1:p_1392642184799`, in schema order, mapping every reindeer
+#' field with a matching component. Closed-vocabulary leaves use valid enum
+#' values; per-bundle Age/Gender are aggregated into the Participants component;
+#' annotation tiers map to AnnotationTypes; unmapped user fields are folded into
+#' `GeneralInfo/Descriptions` so nothing is silently dropped.
+#' @keywords internal
+#' @noRd
+.add_speech_corpus_participants_components <- function(components, corpus_title,
+                                                       corpus_description, author,
+                                                       institution, contact_email,
+                                                       license, availability,
+                                                       db_metadata,
+                                                       participant_metadata) {
+  A <- function(parent, name, text = NULL) {
+    if (is.null(text)) xml2::xml_add_child(parent, paste0("cmdp:", name))
+    else xml2::xml_add_child(parent, paste0("cmdp:", name), as.character(text))
+  }
+  title <- corpus_title %||% "Unnamed speech corpus"
+  demo  <- .aggregate_demographics(participant_metadata)
+
+  # Distinct subject languages from participants (else undetermined).
+  langs <- unique(tolower(stats::na.omit(
+    unlist(lapply(participant_metadata, function(p) p$language)))))
+  langs <- langs[nzchar(langs)]
+  if (length(langs) == 0) langs <- ""
+  n_lang <- max(1L, length(langs))
+  multiling <- if (n_lang == 1L) "Monolingual"
+               else if (n_lang == 2L) "Bilingual" else "Multilingual"
+
+  # Unmapped participant fields -> folded into Descriptions. Corpus-level fields
+  # that map to their own components are excluded so they are not emitted twice.
+  mapped <- c("id", "age", "gender", "sex", "language",
+              "project", "funder", "website", "country", "countrycode",
+              "licence", "license", "availability", "creator", "author",
+              "contact", "institution", "grantnumber")
+  extra <- list()
+  for (p in participant_metadata) for (k in setdiff(names(p), mapped)) {
+    if (.nz(p[[k]])) extra[[k]] <- unique(c(extra[[k]], as.character(p[[k]])))
+  }
+
+  root <- A(components, "SpeechCorpusWithParticipants")
+
+  ## GeneralInfo (required) -------------------------------------------------
+  gi <- A(root, "GeneralInfo")
+  A(gi, "ResourceName", title)
+  A(gi, "ResourceTitle", title)
+  A(gi, "ResourceClass", "SpeechCorpus")                       # enum
+  loc <- A(gi, "Location")
+  ctry <- A(loc, "Country")
+  A(ctry, "CountryName", db_metadata$country %||% "Unspecified")
+  A(ctry, "CountryCoding", db_metadata$country_code %||% "SE") # ISO-3166 enum
+  A(gi, "ModalityInfo")                                        # empty valid
+  gi_desc <- A(gi, "Descriptions")
+  A(gi_desc, "Description", corpus_description %||% "Speech corpus.")
+  for (k in names(extra)) {
+    A(gi_desc, "Description", paste0(k, ": ", paste(extra[[k]], collapse = "; ")))
+  }
+
+  ## Access (required) ------------------------------------------------------
+  ac <- A(root, "Access")
+  A(ac, "Availability", availability %||% db_metadata$availability %||% "Unspecified")
+  A(ac, "DistributionMedium", "download")
+  A(ac, "Licence", license %||% db_metadata$licence %||% "Unspecified")
+  acc <- A(ac, "Contact")
+  if (.nz(author)) A(acc, "Person", author)
+  if (.nz(contact_email)) A(acc, "Email", contact_email)
+  if (.nz(institution)) A(acc, "Organisation", institution)
+
+  ## Creation (required) ----------------------------------------------------
+  cr <- A(root, "Creation")
+  crs <- A(cr, "Creators")
+  crt <- A(crs, "Creator")
+  crc <- A(crt, "Contact")
+  if (.nz(author)) A(crc, "Person", author)
+  if (.nz(institution)) A(crc, "Organisation", institution)
+
+  ## Project (optional) -----------------------------------------------------
+  proj_name <- db_metadata$project %||% NULL
+  if (.nz(proj_name) || .nz(db_metadata$funder) || .nz(db_metadata$website)) {
+    pj <- A(root, "Project")
+    A(pj, "ProjectName", proj_name %||% "Unspecified")
+    A(pj, "ProjectTitle", proj_name %||% "Unspecified")
+    if (.nz(db_metadata$funder)) A(pj, "Funder", db_metadata$funder)
+    A(pj, "Url", db_metadata$website %||% "http://example.org")
+    A(pj, "Institution", institution %||% "Unspecified")
+  }
+
+  ## SubjectLanguages (required) -------------------------------------------
+  sl <- A(root, "SubjectLanguages")
+  A(sl, "NumberOfLanguages", n_lang)
+  for (lg in langs) {
+    sll <- A(sl, "SubjectLanguage")
+    lang <- A(sll, "Language")
+    A(lang, "LanguageName", if (nzchar(lg)) tools::toTitleCase(lg) else "Undetermined")
+    iso <- A(lang, "ISO639")
+    A(iso, "iso-639-3-code", .iso639_3(lg))                   # enum
+  }
+
+  ## SpeechCorpusSpecific (required) ---------------------------------------
+  scs <- A(root, "SpeechCorpusSpecific")
+  A(scs, "Modalities", "spoken")                              # enum
+  A(scs, "MediaType", "audio/wav")
+  sc <- A(scs, "SpeechCorpus")
+  if (!is.na(demo$n_speakers) && demo$n_speakers > 0) {
+    A(sc, "NumberOfSpeakers", demo$n_speakers)
+  }
+  ml <- A(scs, "Multilinguality"); A(ml, "Multilinguality", multiling)  # enum
+  at_wrap <- A(scs, "AnnotationTypes")
+  levels <- db_metadata$annotation_levels
+  if (length(levels) == 0) levels <- "Unspecified"
+  for (lv in unique(vapply(levels, .map_annotation_type, character(1)))) {
+    at <- A(at_wrap, "AnnotationType"); A(at, "AnnotationType", lv)      # enum leaf
+  }
+  sz <- A(scs, "Size"); tsz <- A(sz, "TotalSize")
+  A(tsz, "Number", db_metadata$n_bundles %||% length(participant_metadata) %||% 0)
+  A(tsz, "SizeUnit", "bundles")
+
+  ## Participants (required) -----------------------------------------------
+  pt <- A(root, "Participants")
+  if (!is.na(demo$sex_summary)) {
+    sx <- A(pt, "SexDistribution"); sxi <- A(sx, "SexDistributionInfo")
+    sxd <- A(sxi, "Descriptions"); A(sxd, "Description", demo$sex_summary)
+  }
+  if (!is.na(demo$mean_age) || !is.na(demo$age_range)) {
+    ad <- A(pt, "AgeDistribution")
+    if (!is.na(demo$mean_age))  A(ad, "ParticipantMeanAge", demo$mean_age)
+    if (!is.na(demo$age_range)) A(ad, "ParticipantAgeRange", demo$age_range)
+  }
+
+  ## TechnicalInfo (required) ----------------------------------------------
+  ti <- A(root, "TechnicalInfo")
+  lscr <- A(ti, "LanguageScripts"); lsg <- A(lscr, "LanguageScriptGrp")
+  A(lsg, "ScriptName", "Latin")
+  A(lsg, "LanguageScript", if (nzchar(langs[[1]])) tools::toTitleCase(langs[[1]]) else "Undetermined")
+
+  invisible(root)
 }
 
 #' Build the profile-conformant Components subtree for the media-corpus profile

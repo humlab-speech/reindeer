@@ -7,7 +7,7 @@
 create_cmdi_metadata(
   corpus,
   output_file = NULL,
-  profile = "media-corpus",
+  profile = "speech-corpus",
   corpus_title = NULL,
   corpus_description = NULL,
   author = NULL,

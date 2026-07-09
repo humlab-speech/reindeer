@@ -464,7 +464,7 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
 describe_corpus <- function(corpus_obj,
                      output_dir = NULL,
                      formats = c("readme", "cmdi", "datacite", "cff", "jsonld"),
-                     profile = "media-corpus",
+                     profile = "speech-corpus",
                      force = FALSE,
                      verbose = TRUE) {
   if (!S7::S7_inherits(corpus_obj, corpus)) {
