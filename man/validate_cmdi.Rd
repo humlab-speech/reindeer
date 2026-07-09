@@ -29,7 +29,8 @@ schema validates the envelope/Header/Resources; validating the profile
 \code{Components} subtree needs the profile XSD (Component-level conformance is
 delivered in a later phase). Full CLARIN compliance additionally requires
 Schematron assertions applied by the external Java CMDI Instance Validator,
-which is out of scope for this in-package check.
+which is out of scope for this in-package check. See \code{CMDI_VALIDATION.md}
+in the package sources for how to run full XSD + Schematron validation.
 }
 \seealso{
 \code{\link[=create_cmdi_metadata]{create_cmdi_metadata()}}, \code{\link[=describe_corpus]{describe_corpus()}}.

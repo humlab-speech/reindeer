@@ -397,7 +397,8 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
 #' `Components` subtree needs the profile XSD (Component-level conformance is
 #' delivered in a later phase). Full CLARIN compliance additionally requires
 #' Schematron assertions applied by the external Java CMDI Instance Validator,
-#' which is out of scope for this in-package check.
+#' which is out of scope for this in-package check. See `CMDI_VALIDATION.md`
+#' in the package sources for how to run full XSD + Schematron validation.
 #'
 #' @param path Path to a `*_cmdi.xml` file.
 #' @param xsd Optional path to a local XSD to validate against.
