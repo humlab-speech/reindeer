@@ -20,7 +20,10 @@ describe_corpus(
 corpus base path.}
 
 \item{formats}{Character vector of formats to emit. Any subset of
-\code{c("readme", "cmdi", "datacite", "cff", "jsonld")}.}
+\code{c("readme", "cmdi", "session-cmdi", "datacite", "cff", "jsonld")}.
+\code{"session-cmdi"} additionally writes a media-session CMDI record per
+session and per bundle (into the session/bundle directories) and links
+them to the corpus record as a collection hierarchy.}
 
 \item{profile}{CMDI profile (\code{"speech-corpus"}, \code{"media-corpus"},
 \code{"speech-corpus-dlu"}).}

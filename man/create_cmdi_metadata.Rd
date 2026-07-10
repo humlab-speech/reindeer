@@ -16,6 +16,7 @@ create_cmdi_metadata(
   license = NULL,
   availability = "available",
   self_link = NULL,
+  child_metadata = NULL,
   include_placeholders = TRUE,
   verbose = TRUE
 )

@@ -67,6 +67,7 @@ create_cmdi_metadata <- function(corpus,
                                   license = NULL,
                                   availability = "available",
                                   self_link = NULL,
+                                  child_metadata = NULL,
                                   include_placeholders = TRUE,
                                   verbose = TRUE) {
   
@@ -146,6 +147,7 @@ create_cmdi_metadata <- function(corpus,
     db_metadata = db_metadata,
     participant_metadata = participant_metadata,
     self_link = self_link,
+    child_metadata = child_metadata,
     include_placeholders = include_placeholders
   )
   
@@ -415,6 +417,210 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
   else "Unspecified"
 }
 
+#' Create a bare CMDI 1.2 document (envelope + header + empty Resources/Components)
+#'
+#' Shared skeleton for the per-session/per-bundle records: the CMD root with the
+#' cmdp payload namespace and dual schemaLocation, a populated Header, and empty
+#' `Resources/ResourceProxyList` and `Components` to fill in.
+#' @keywords internal
+#' @noRd
+.cmdi_new_doc <- function(profile_id, self_link, creator, display_name) {
+  profile_ns  <- .cmdi_profile_ns(profile_id)
+  profile_xsd <- .cmdi_profile_xsd_url(profile_id)
+  doc <- xml2::xml_new_root("cmd:CMD",
+    "xmlns:cmd"  = "http://www.clarin.eu/cmd/1",
+    "xmlns:cmdp" = profile_ns,
+    "xmlns:xsi"  = "http://www.w3.org/2001/XMLSchema-instance",
+    "CMDVersion" = "1.2",
+    "xsi:schemaLocation" = paste(
+      "http://www.clarin.eu/cmd/1",
+      "https://infra.clarin.eu/CMDI/1.2/xsd/cmd-envelop.xsd",
+      profile_ns, profile_xsd))
+  h <- xml2::xml_add_child(doc, "cmd:Header")
+  xml2::xml_add_child(h, "cmd:MdCreator", creator %||% "reindeer")
+  xml2::xml_add_child(h, "cmd:MdCreationDate", format(Sys.time(), "%Y-%m-%d"))
+  xml2::xml_add_child(h, "cmd:MdSelfLink", self_link %||% "")
+  xml2::xml_add_child(h, "cmd:MdProfile", profile_id)
+  xml2::xml_add_child(h, "cmd:MdCollectionDisplayName", display_name %||% "")
+  res <- xml2::xml_add_child(doc, "cmd:Resources")
+  rpl <- xml2::xml_add_child(res, "cmd:ResourceProxyList")
+  xml2::xml_add_child(res, "cmd:JournalFileProxyList")
+  xml2::xml_add_child(res, "cmd:ResourceRelationList")
+  comp <- xml2::xml_add_child(doc, "cmd:Components")
+  list(doc = doc, rpl = rpl, components = comp)
+}
+
+#' Append a ResourceProxy entry
+#' @keywords internal
+#' @noRd
+.add_resource_proxy <- function(rpl, id, ref, type = "Resource", mimetype = NULL) {
+  rp <- xml2::xml_add_child(rpl, "cmd:ResourceProxy", id = id)
+  rt <- xml2::xml_add_child(rp, "cmd:ResourceType", type)
+  if (!is.null(mimetype)) xml2::xml_set_attr(rt, "mimetype", mimetype)
+  xml2::xml_add_child(rp, "cmd:ResourceRef", ref)
+  invisible(rp)
+}
+
+#' Generate a media-session CMDI record for a session (or a single bundle)
+#'
+#' Emits a `media-session-profile` record describing one EMU session (all its
+#' bundles) or one bundle, with an actor per distinct speaker and a
+#' media-annotation-bundle per recording (its audio + EAF). Speaker metadata
+#' comes from [get_metadata()]; EAFs are the `.eaf` files written next to the
+#' audio by the ELAN autosync.
+#'
+#' @param corpus A reindeer `corpus`.
+#' @param session Session name.
+#' @param bundle Optional bundle name; `NULL` = whole-session record.
+#' @param output_file Path to write the `.cmdi.xml` to.
+#' @param child_metadata Optional character vector of child CMDI paths to link
+#'   as `Metadata` resources (collection hierarchy).
+#' @param self_link Optional PID for `MdSelfLink`.
+#' @return `output_file`, invisibly.
+#' @keywords internal
+#' @noRd
+create_media_session_cmdi <- function(corpus, session, bundle = NULL,
+                                      output_file, child_metadata = NULL,
+                                      self_link = NULL) {
+  profile_id   <- .cmdi_profile_id("media-session")
+  basePath     <- corpus@basePath
+  db_name      <- sub("_emuDB$", "", basename(basePath))
+  corpus_title <- paste0(db_name, " Speech Corpus")
+
+  bl <- .list_bundles(corpus, session = session)
+  if (!is.null(bundle)) bl <- bl[bl$name == bundle, , drop = FALSE]
+
+  md <- tryCatch(get_metadata(corpus), error = function(e) NULL)
+  scope_md <- if (!is.null(md) && nrow(md) > 0) {
+    keep <- md$session == session & (is.null(bundle) | md$bundle %in% bl$name)
+    md[keep, , drop = FALSE]
+  } else NULL
+  actors <- if (!is.null(scope_md) && nrow(scope_md) > 0) {
+    unname(.participants_from_metadata(scope_md))
+  } else list(list(id = bundle %||% session))
+
+  recording_units <- lapply(seq_len(nrow(bl)), function(i) {
+    bn   <- bl$name[i]
+    bdir <- file.path(basePath, paste0(session, "_ses"), paste0(bn, "_bndl"))
+    eaf  <- file.path(bdir, paste0(bn, ".eaf"))
+    list(name = bn,
+         wav = file.path(bdir, paste0(bn, ".wav")),
+         eaf = if (file.exists(eaf)) eaf else NULL)
+  })
+
+  display <- if (is.null(bundle)) session else paste0(session, "/", bundle)
+  skel <- .cmdi_new_doc(profile_id,
+                        self_link %||% paste0("urn:uuid:", db_name, ":", display),
+                        "reindeer", display)
+
+  # Resources: audio + EAF per recording, plus any child metadata records.
+  k <- 0L
+  for (ru in recording_units) {
+    k <- k + 1L
+    .add_resource_proxy(skel$rpl, paste0("wav", k), basename(ru$wav),
+                        "Resource", "audio/wav")
+    if (!is.null(ru$eaf)) {
+      k <- k + 1L
+      .add_resource_proxy(skel$rpl, paste0("eaf", k), basename(ru$eaf),
+                          "Resource", "text/x-eaf+xml")
+    }
+  }
+  for (cm in child_metadata %||% character(0)) {
+    k <- k + 1L
+    .add_resource_proxy(skel$rpl, paste0("md", k), basename(cm), "Metadata")
+  }
+
+  .add_media_session_components(skel$components, display, corpus_title,
+                                actors, recording_units)
+
+  if (!dir.exists(dirname(output_file))) {
+    dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
+  }
+  xml2::write_xml(skel$doc, output_file)
+  invisible(output_file)
+}
+
+#' Map a reindeer gender value to the media-session Sex vocabulary
+#' @keywords internal
+#' @noRd
+.map_sex <- function(gender) {
+  g <- tolower(gender %||% "")
+  if (g %in% c("male", "m")) "Male"
+  else if (g %in% c("female", "f")) "Female"
+  else "Unknown"
+}
+
+#' Build the media-session-profile Components subtree
+#'
+#' Emits `cmdp:media-session-profile > media-session` matching profile
+#' `clarin.eu:cr1:p_1336550377513`, in schema order: one
+#' `media-session-actor` per speaker (Age/Sex/Education/Dialect/Profession from
+#' resolved metadata) and one `media-annotation-bundle` per recording
+#' (media-file + WrittenResource for the EAF). Closed vocabularies use valid
+#' enum values.
+#'
+#' @param actor_rows list of named lists (lowercased resolved-metadata fields),
+#'   one per speaker.
+#' @param recording_units list of `list(name=, wav=, eaf=)` per bundle.
+#' @keywords internal
+#' @noRd
+.add_media_session_components <- function(components, session_display,
+                                          corpus_title, actor_rows,
+                                          recording_units) {
+  A <- function(parent, name, text = NULL) {
+    if (is.null(text)) xml2::xml_add_child(parent, paste0("cmdp:", name))
+    else xml2::xml_add_child(parent, paste0("cmdp:", name), as.character(text))
+  }
+  langs <- unique(tolower(stats::na.omit(
+    unlist(lapply(actor_rows, function(a) a$language)))))
+  langs <- langs[nzchar(langs)]
+  if (length(langs) == 0) langs <- ""
+
+  root <- A(components, "media-session-profile")
+  ms <- A(root, "media-session")
+
+  A(ms, "Name", session_display)
+  A(ms, "NumberOfSpeakers", max(1L, length(actor_rows)))
+  A(ms, "Corpus", corpus_title %||% "Corpus")          # names the parent corpus
+  A(ms, "Environment", "unknown")                      # enum
+  A(ms, "RecordingDate", format(Sys.Date(), "%Y-%m-%d"))
+
+  sl <- A(ms, "SubjectLanguages")
+  sll <- A(sl, "SubjectLanguage"); lang <- A(sll, "Language")
+  A(lang, "LanguageName", if (nzchar(langs[[1]])) tools::toTitleCase(langs[[1]]) else "Undetermined")
+  iso <- A(lang, "ISO639"); A(iso, "iso-639-3-code", .iso639_3(langs[[1]]))
+
+  ## Actors -----------------------------------------------------------------
+  acts <- A(ms, "media-session-actors")
+  for (a in actor_rows) {
+    act <- A(acts, "media-session-actor")               # actor fields, in order
+    A(act, "Role", "speaker")
+    if (.nz(a$id))         A(act, "Name", a$id)
+    age <- suppressWarnings(as.numeric(a$age))
+    if (!is.na(age))       A(act, "Age", age)            # xs:decimal
+    A(act, "Sex", .map_sex(a$gender %||% a$sex))         # enum
+    if (.nz(a$education))  A(act, "Education", a$education)
+    if (.nz(a$profession)) A(act, "Profession", a$profession)
+    if (.nz(a$dialect))    A(act, "Dialect", a$dialect)
+  }
+
+  A(ms, "Content")                                       # empty valid
+
+  ## One media-annotation-bundle per recording -----------------------------
+  for (ru in recording_units) {
+    mab <- A(ms, "media-annotation-bundle")
+    if (.nz(ru$name)) A(mab, "Identifier", ru$name)
+    mf <- A(mab, "media-file"); A(mf, "Type", "audio")   # enum
+    if (.nz(ru$eaf)) {
+      wr <- A(mab, "WrittenResource")
+      A(wr, "AnnotationType", "Unspecified")
+      A(wr, "Name", basename(ru$eaf))
+    }
+  }
+
+  invisible(root)
+}
+
 #' Best-effort ISO 639-3 code for a language name (defaults to "und")
 #' @keywords internal
 #' @noRd
@@ -439,6 +645,7 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
     "media-corpus"      = "clarin.eu:cr1:p_1387365569699",
     "speech-corpus"     = "clarin.eu:cr1:p_1392642184799",
     "speech-corpus-dlu" = "clarin.eu:cr1:p_1381926654456",
+    "media-session"     = "clarin.eu:cr1:p_1336550377513",
     if (grepl("^clarin\\.eu:cr", profile)) profile
     else "clarin.eu:cr1:p_1387365569699"
   )
@@ -548,6 +755,7 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
                               contact_email, license, availability,
                               db_metadata, participant_metadata,
                               self_link = NULL,
+                              child_metadata = NULL,
                               include_placeholders) {
 
   # Determine profile ID based on profile name
@@ -603,12 +811,22 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
       xml2::xml_add_child(resource_proxy, "cmd:ResourceType", 
                          mimetype = paste0("audio/", db_metadata$media_extension), 
                          "Resource")
-      xml2::xml_add_child(resource_proxy, "cmd:ResourceRef", 
+      xml2::xml_add_child(resource_proxy, "cmd:ResourceRef",
                          paste0(bundle_name, ".", db_metadata$media_extension))
       proxy_id <- proxy_id + 1
     }
   }
-  
+
+  # Metadata proxies for child records (session CMDIs) form the collection
+  # hierarchy that a repository harvester follows corpus -> session -> bundle.
+  for (cm in child_metadata %||% character(0)) {
+    rp <- xml2::xml_add_child(resource_proxy_list, "cmd:ResourceProxy",
+                              id = paste0("rp", proxy_id))
+    xml2::xml_add_child(rp, "cmd:ResourceType", "Metadata")
+    xml2::xml_add_child(rp, "cmd:ResourceRef", basename(cm))
+    proxy_id <- proxy_id + 1
+  }
+
   # Journal file references (not used in this context)
   xml2::xml_add_child(resources, "cmd:JournalFileProxyList")
   xml2::xml_add_child(resources, "cmd:ResourceRelationList")

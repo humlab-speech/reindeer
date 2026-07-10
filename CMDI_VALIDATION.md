@@ -45,6 +45,27 @@ res$problems     # character(0)
 res$xsd          # NA offline; TRUE/FALSE when a schema is available
 ```
 
+## Collection hierarchy: corpus → session → bundle
+
+`describe_corpus(..., formats = c("cmdi", "session-cmdi"))` emits, in addition to
+the single corpus record, a **media-session-profile**
+(`clarin.eu:cr1:p_1336550377513`) record per EMU session and per bundle:
+
+```
+<db>_cmdi.xml                                    speech-corpus (corpus)
+  └─ Metadata proxy →  0000_ses/0000.cmdi.xml    media-session (session)
+        └─ Metadata proxy →  0000_ses/msajcXXX_bndl/msajcXXX.cmdi.xml   (bundle)
+              └─ Resource → msajcXXX.wav + msajcXXX.eaf
+```
+
+Each session/bundle record carries an actor per speaker with **Age, Sex,
+Education, Dialect** (from resolved metadata) and a `media-annotation-bundle`
+per recording pointing at its audio and its **EAF** (as a `WrittenResource`).
+This gives the metadata-less ELAN `.eaf` exports a proper, per-session CMDI
+description, and lets a repository harvest the whole tree from the corpus record
+down. Records are written into the session/bundle directories next to the media
+and EAF files.
+
 ## Running full XSD + Schematron validation (Layer 2 + 3)
 
 Full validation needs the CLARIN schema set (the profile XSD imports the CMD

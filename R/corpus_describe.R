@@ -448,7 +448,10 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
 #' @param output_dir Directory to write outputs into. Defaults to the
 #'   corpus base path.
 #' @param formats Character vector of formats to emit. Any subset of
-#'   `c("readme", "cmdi", "datacite", "cff", "jsonld")`.
+#'   `c("readme", "cmdi", "session-cmdi", "datacite", "cff", "jsonld")`.
+#'   `"session-cmdi"` additionally writes a media-session CMDI record per
+#'   session and per bundle (into the session/bundle directories) and links
+#'   them to the corpus record as a collection hierarchy.
 #' @param profile CMDI profile (`"speech-corpus"`, `"media-corpus"`,
 #'   `"speech-corpus-dlu"`).
 #' @param force Logical; overwrite existing files.
@@ -470,7 +473,7 @@ describe_corpus <- function(corpus_obj,
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("Input must be a {.cls corpus} object")
   }
-  valid <- c("readme", "cmdi", "datacite", "cff", "jsonld")
+  valid <- c("readme", "cmdi", "session-cmdi", "datacite", "cff", "jsonld")
   formats <- match.arg(formats, choices = valid, several.ok = TRUE)
   if (is.null(output_dir)) output_dir <- corpus_obj@basePath
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
@@ -519,13 +522,44 @@ describe_corpus <- function(corpus_obj,
     written <- c(written, readme = target)
     if (verbose) cli::cli_alert_success("Wrote {.path {target}}")
   }
+  # Per-session and per-bundle media-session records (generated first so the
+  # corpus record can link to them, forming a corpus -> session -> bundle
+  # collection hierarchy). Written into the session/bundle directories.
+  session_cmdi_paths <- character(0)
+  if ("session-cmdi" %in% formats) {
+    sessions <- .list_sessions(corpus_obj)
+    for (sn in sessions$name) {
+      ses_dir <- file.path(output_dir, paste0(sn, "_ses"))
+      bl <- .list_bundles(corpus_obj, session = sn)
+      bundle_paths <- character(0)
+      for (bn in bl$name) {
+        bpath <- file.path(ses_dir, paste0(bn, "_bndl"), paste0(bn, ".cmdi.xml"))
+        create_media_session_cmdi(corpus_obj, session = sn, bundle = bn,
+                                  output_file = bpath)
+        bundle_paths <- c(bundle_paths, bpath)
+      }
+      spath <- file.path(ses_dir, paste0(sn, ".cmdi.xml"))
+      create_media_session_cmdi(corpus_obj, session = sn, output_file = spath,
+                                child_metadata = bundle_paths)
+      session_cmdi_paths <- c(session_cmdi_paths, spath)
+    }
+    written <- c(written,
+                 stats::setNames(session_cmdi_paths,
+                                 paste0("session_cmdi_", seq_along(session_cmdi_paths))))
+    if (verbose) {
+      cli::cli_alert_success(
+        "Wrote {length(session_cmdi_paths)} session record(s) + bundle records")
+    }
+  }
+
   if ("cmdi" %in% formats) {
     target <- file.path(output_dir, paste0(summary$name, "_cmdi.xml"))
     if (file.exists(target) && !force) {
       target <- file.path(output_dir, paste0(summary$name, "_cmdi-generated.xml"))
     }
     create_cmdi_metadata(corpus_obj, output_file = target,
-                         profile = profile, verbose = verbose)
+                         profile = profile, child_metadata = session_cmdi_paths,
+                         verbose = verbose)
     written <- c(written, cmdi = target)
   }
   if ("datacite" %in% formats) {
