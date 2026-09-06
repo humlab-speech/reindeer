@@ -1,5 +1,12 @@
 # reindeer (development version)
 
+- Completed the pkgdown reference index: added the ~25 exported topics
+  that were missing (interop, tidy reshaping/column helpers, FAIR/CMDI,
+  companion-package glue, gadgets, `derive_dsp_parameters`,
+  `biographize`, `demo_corpus`), grouped into new sections, and registered
+  the `end_to_end_pipeline` vignette in the navbar and articles. Removed
+  the stale `cache_utils` topic.
+
 - Removed superseded internal code: the dead `R/cache_utils.R` (duplicate
   SQLite cache helpers with a wrong `tempdir()` default), the unused
   in-memory quantify cache (`.get_quantify_cache`/`.set_quantify_cache`),

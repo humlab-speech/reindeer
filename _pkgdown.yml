@@ -31,7 +31,7 @@ authors:
 
 navbar:
   structure:
-    left:  [home, reference, articles, news]
+    left: [home, reference, articles, news]
     right: [search, github]
   components:
     home:
@@ -44,16 +44,18 @@ navbar:
     articles:
       text: Articles
       menu:
-      - text: Getting Started
-        href: articles/getting_started.html
-      - text: Metadata Management
-        href: articles/metadata_management.html
-      - text: Cache Management
-        href: articles/cache_management.html
-      - text: Lazy Pipelines and Pipe-Loss Debugging
-        href: articles/lazy_and_provenance.html
-      - text: Interactive Annotation
-        href: articles/interactive_annotation.html
+        - text: Getting Started
+          href: articles/getting_started.html
+        - text: Metadata Management
+          href: articles/metadata_management.html
+        - text: Cache Management
+          href: articles/cache_management.html
+        - text: Lazy Pipelines and Pipe-Loss Debugging
+          href: articles/lazy_and_provenance.html
+        - text: Interactive Annotation
+          href: articles/interactive_annotation.html
+        - text: End-to-end pipeline
+          href: articles/end_to_end_pipeline.html
     news:
       text: News
       href: news/index.html
@@ -63,114 +65,154 @@ navbar:
       aria-label: GitHub repository
 
 reference:
-- title: "Corpus"
-  desc: "Open, describe, and validate an EMU-SDMS corpus."
-  contents:
-  - corpus
-  - describe_corpus
-  - validate_corpus
-  - peek_signals
-  - glimpse
+  - title: "Corpus"
+    desc: "Open, describe, and validate an EMU-SDMS corpus."
+    contents:
+      - corpus
+      - describe_corpus
+      - validate_corpus
+      - peek_signals
+      - glimpse
+      - demo_corpus
+      - get_corpus_cached
 
-- title: "Query"
-  desc: "EMU Query Language and segment-list classes."
-  contents:
-  - query
-  - segment_list
-  - extended_segment_list
-  - lazy_segment_list
-  - is_segment_list
-  - as_segment_list
-  - collect
+  - title: "Query"
+    desc: "EMU Query Language and segment-list classes."
+    contents:
+      - query
+      - segment_list
+      - extended_segment_list
+      - lazy_segment_list
+      - is_segment_list
+      - as_segment_list
+      - collect
 
-- title: "Measurement"
-  desc: "DSP measurement with speaker-aware parameters."
-  contents:
-  - quantify
-  - enrich
-  - dsp_parameters
+  - title: "Measurement"
+    desc: "DSP measurement with speaker-aware parameters."
+    contents:
+      - quantify
+      - enrich
+      - dsp_parameters
+      - derive_dsp_parameters
 
-- title: "Metadata"
-  desc: "Three-level speaker metadata: write, read, round-trip."
-  contents:
-  - set_metadata
-  - get_metadata
-  - load_metadata
-  - export_metadata
+  - title: "Metadata"
+    desc: "Three-level speaker metadata: write, read, round-trip."
+    contents:
+      - set_metadata
+      - get_metadata
+      - load_metadata
+      - export_metadata
+      - biographize
 
-- title: "Navigation"
-  desc: "Move through the annotation hierarchy."
-  contents:
-  - scout
-  - ascend_to
-  - descend_to
+  - title: "Navigation"
+    desc: "Move through the annotation hierarchy."
+    contents:
+      - scout
+      - ascend_to
+      - descend_to
 
-- title: "Cache"
-  desc: "Inspect and prune the persistent measurement cache."
-  contents:
-  - inspect_cache
-  - manage_cache
-  - check_cache_size
+  - title: "Cache"
+    desc: "Inspect and prune the persistent measurement cache."
+    contents:
+      - inspect_cache
+      - manage_cache
+      - check_cache_size
 
-- title: "Provenance"
-  desc: "Per-step row accounting for pipe-loss debugging."
-  contents:
-  - provenance
-  - dropped
-  - dropped_rows
+  - title: "Provenance"
+    desc: "Per-step row accounting for pipe-loss debugging."
+    contents:
+      - provenance
+      - dropped
+      - dropped_rows
 
-- title: "Psychoacoustic helpers"
-  desc: "Frequency-scale conversions used in DSP."
-  contents:
-  - semitones
-  - erb
+  - title: "Tidy reshaping and column helpers"
+    desc: "Pivot tracks, nest segments, and select column groups."
+    contents:
+      - pivot_tracks_longer
+      - pivot_tracks_wider
+      - nest_by_session
+      - nest_by_bundle
+      - nest_by_speaker
+      - segment_cols
+      - metadata_cols
+      - track_cols
+      - signal_cols
 
-- title: "Visualization"
-  desc: "ggplot2 layers and autoplot methods for segment lists."
-  contents:
-  - geom_formant_trajectory
-  - geom_pitch_track
-  - geom_label_tier
+  - title: "Interoperability"
+    desc: "Read and write ELAN and Praat TextGrid annotations."
+    contents:
+      - read_eaf
+      - write_eaf
+      - read_textgrid
+      - write_textgrid
 
-- title: "Interactive annotation"
-  desc: "Launch the EMU-webApp from R."
-  contents:
-  - serve_app
+  - title: "FAIR / CMDI artifacts"
+    desc: "Standards-compliant archival metadata."
+    contents:
+      - create_cmdi_metadata
+      - validate_cmdi
 
-- title: internal
-  contents:
-  - reindeer
-  - add_metadata
-  - gather_metadata
-  - import_metadata
-  - serve
-  - st
-  - DSPP
-  - cache_utils
-  - enrich.corpus
-  - enrich.extended_segment_list
-  - enrich.lazy_segment_list
-  - enrich.segment_list
-  - quantify.lazy_segment_list
-  - print.bundle_list
-  - print.extended_segment_list
-  - print.lazy_segment_list
-  - print.segment_list
-  - summary.extended_segment_list
-  - summary.lazy_segment_list
-  - summary.segment_list
-  - "[<-.corpus"
+  - title: "Companion packages"
+    desc: "Glue for protoscribe, eggstract, and erodex."
+    contents:
+      - propose_annotations
+      - quantify_egg
+      - enrich_egg
+
+  - title: "Psychoacoustic helpers"
+    desc: "Frequency-scale conversions used in DSP."
+    contents:
+      - semitones
+      - erb
+
+  - title: "Visualization"
+    desc: "ggplot2 layers and autoplot methods for segment lists."
+    contents:
+      - geom_formant_trajectory
+      - geom_pitch_track
+      - geom_label_tier
+
+  - title: "Interactive annotation"
+    desc: "Launch the EMU-webApp from R."
+    contents:
+      - serve_app
+      - browse_corpus_gadget
+      - edit_metadata_gadget
+
+  - title: internal
+    contents:
+      - reindeer
+      - add_metadata
+      - gather_metadata
+      - import_metadata
+      - serve
+      - st
+      - DSPP
+      - deprecated-moved-functions
+      - enrich.corpus
+      - enrich.extended_segment_list
+      - enrich.lazy_segment_list
+      - enrich.segment_list
+      - quantify.lazy_segment_list
+      - print.bundle_list
+      - print.extended_segment_list
+      - print.lazy_segment_list
+      - print.segment_list
+      - summary.extended_segment_list
+      - summary.lazy_segment_list
+      - summary.segment_list
+      - "[<-.corpus"
 
 articles:
-- title: "Getting started"
-  navbar: ~
-  contents:
-  - getting_started
+  - title: "Getting started"
+    navbar: ~
+    contents:
+      - getting_started
 
-- title: "Workflows"
-  navbar: ~
-  contents:
-  - metadata_management
-  - cache_management
-  - lazy_and_provenance
-  - interactive_annotation
+  - title: "Workflows"
+    contents:
+      - metadata_management
+      - cache_management
+      - lazy_and_provenance
+      - interactive_annotation
+      - end_to_end_pipeline
