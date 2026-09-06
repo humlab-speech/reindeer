@@ -69,5 +69,5 @@ jobs:
           # ignoring the REINDEER_EVAL_VIGNETTES gate; chunks need superassp /
           # real corpora and cannot run in this interim check. Vignette knitting
           # is still validated at R CMD build.
-          args: 'c("--no-vignettes")'
+          args: 'c("--no-vignettes", "--no-manual")'
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
