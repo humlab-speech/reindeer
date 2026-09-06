@@ -17,10 +17,11 @@
 #'   sync with the corpus on each annotation or metadata change.
 #'   Off by default.
 #' @param verbose Print progress while loading. Default `FALSE`.
-#' @param quick Skip the cache rebuild on open. Use this only when you
-#'   know the cache is current (e.g. immediately after the previous
-#'   session closed cleanly). After any manual edit to a `METADATA.json`
-#'   or annotation file, leave it `FALSE` so reindeer can re-sync.
+#' @param quick Reuse the existing cache when present (default `TRUE`).
+#'   Set `FALSE` to force a full cache + metadata rebuild on open, for
+#'   example after manually editing a `METADATA.json` or annotation file.
+#'   To re-sync metadata selectively without reopening, use
+#'   [load_metadata()] / [gather_metadata()].
 #' @param cache_dir Override the quantify/enrich cache directory.
 #'   Default `<basePath>/.quantify_cache`.
 #' @return A `corpus` object. The S7 class exposes the following
@@ -60,7 +61,7 @@ corpus <- S7::new_class(
   ),
   constructor = function(path, verbose = FALSE, create = FALSE,
                          sync_eaf = FALSE, sync_cmdi = FALSE,
-                         cache_dir = NULL, quick = FALSE) {
+                         cache_dir = NULL, quick = TRUE) {
     # Input validation with assertthat
     assertthat::assert_that(
       !is.null(path),

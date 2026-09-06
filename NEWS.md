@@ -1,3 +1,10 @@
+# reindeer (development version)
+
+- `corpus()` now defaults to `quick = TRUE`: the SQLite cache and
+  metadata cache are reused when present instead of being rebuilt on
+  every open. Set `quick = FALSE` to force a full re-sync after manual
+  edits to `METADATA.json` or annotation files.
+
 # reindeer 1.0.1 (2026-05-15)
 
 Test-only patch — no production code changes.
