@@ -178,14 +178,16 @@ scout_dt <- function(.segments,
 
   # Query all items on the same levels
   levels <- unique(dt$level)
-  level_filter <- paste0("'", levels, "'", collapse = ", ")
+  level_placeholders <- paste(rep("?", length(levels)), collapse = ", ")
   
   items_query <- sprintf(
-    "SELECT * FROM items WHERE db_uuid = '%s' AND level IN (%s)",
-    db_uuid, level_filter
+    "SELECT * FROM items WHERE db_uuid = ? AND level IN (%s)",
+    level_placeholders
   )
   
-  all_items_dt <- data.table::setDT(DBI::dbGetQuery(conn, items_query))
+  all_items_dt <- data.table::setDT(DBI::dbGetQuery(
+    conn, items_query, params = c(list(db_uuid), as.list(levels))
+  ))
 
   # Compute sample_end from sample_start + sample_dur (emuR stores duration, not end)
   all_items_dt[, sample_end := data.table::fifelse(
@@ -195,13 +197,10 @@ scout_dt <- function(.segments,
   )]
 
   # Query labels
-  labels_query <- sprintf(
-    "SELECT db_uuid, session, bundle, item_id, label 
-     FROM labels 
-     WHERE db_uuid = '%s'",
-    db_uuid
-  )
-  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query))
+  labels_query <- "SELECT db_uuid, session, bundle, item_id, label
+     FROM labels
+     WHERE db_uuid = ?"
+  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query, params = list(db_uuid)))
   
   # Set keys for fast joins
   data.table::setkey(all_items_dt, db_uuid, session, bundle, level, seq_idx)
@@ -425,27 +424,24 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 
   # Query for upward links
   # We need to find items at the target level that link down to our segments
-  links_query <- sprintf(
-    "SELECT l.*, i.level as from_level
+  links_query <- "
+    SELECT l.*, i.level as from_level
      FROM links l
      INNER JOIN items i ON 
        l.db_uuid = i.db_uuid AND 
        l.session = i.session AND 
        l.bundle = i.bundle AND 
        l.to_id = i.item_id
-     WHERE l.db_uuid = '%s'",
-    db_uuid
-  )
+     WHERE l.db_uuid = ?"
   
-  links_dt <- data.table::setDT(DBI::dbGetQuery(conn, links_query))
+  links_dt <- data.table::setDT(DBI::dbGetQuery(conn, links_query, params = list(db_uuid)))
   
   # Query target level items
-  items_query <- sprintf(
-    "SELECT * FROM items WHERE db_uuid = '%s' AND level = '%s'",
-    db_uuid, level
-  )
+  items_query <- "SELECT * FROM items WHERE db_uuid = ? AND level = ?"
   
-  target_items_dt <- data.table::setDT(DBI::dbGetQuery(conn, items_query))
+  target_items_dt <- data.table::setDT(DBI::dbGetQuery(
+    conn, items_query, params = list(db_uuid, level)
+  ))
 
   # Compute sample_end from sample_start + sample_dur
   target_items_dt[, sample_end := data.table::fifelse(
@@ -455,14 +451,11 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   )]
 
   # Query labels for target level
-  labels_query <- sprintf(
-    "SELECT db_uuid, session, bundle, item_id, label
+  labels_query <- "SELECT db_uuid, session, bundle, item_id, label
      FROM labels
-     WHERE db_uuid = '%s'",
-    db_uuid
-  )
+     WHERE db_uuid = ?"
 
-  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query))
+  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query, params = list(db_uuid)))
 
   # Set keys
   data.table::setkey(links_dt, db_uuid, session, bundle, to_id)
@@ -610,20 +603,16 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   conn <- get_or_create_connection(corp)
 
   # Query for downward links (from our segments to target level)
-  links_query <- sprintf(
-    "SELECT * FROM links WHERE db_uuid = '%s'",
-    db_uuid
-  )
+  links_query <- "SELECT * FROM links WHERE db_uuid = ?"
   
-  links_dt <- data.table::setDT(DBI::dbGetQuery(conn, links_query))
+  links_dt <- data.table::setDT(DBI::dbGetQuery(conn, links_query, params = list(db_uuid)))
   
   # Query target level items
-  items_query <- sprintf(
-    "SELECT * FROM items WHERE db_uuid = '%s' AND level = '%s'",
-    db_uuid, level
-  )
+  items_query <- "SELECT * FROM items WHERE db_uuid = ? AND level = ?"
   
-  target_items_dt <- data.table::setDT(DBI::dbGetQuery(conn, items_query))
+  target_items_dt <- data.table::setDT(DBI::dbGetQuery(
+    conn, items_query, params = list(db_uuid, level)
+  ))
 
   # Compute sample_end from sample_start + sample_dur
   target_items_dt[, sample_end := data.table::fifelse(
@@ -633,14 +622,11 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   )]
 
   # Query labels
-  labels_query <- sprintf(
-    "SELECT db_uuid, session, bundle, item_id, label
+  labels_query <- "SELECT db_uuid, session, bundle, item_id, label
      FROM labels
-     WHERE db_uuid = '%s'",
-    db_uuid
-  )
+     WHERE db_uuid = ?"
 
-  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query))
+  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query, params = list(db_uuid)))
 
   # Set keys
   data.table::setkey(links_dt, db_uuid, session, bundle, from_id)

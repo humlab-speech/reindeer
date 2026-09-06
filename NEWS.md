@@ -1,5 +1,11 @@
 # reindeer (development version)
 
+- Parameterized all SQL in the eager navigation verbs (`scout()`,
+  `ascend_to()`, `descend_to()`). User-supplied `level` and `db_uuid`
+  values are now bound via `?` placeholders instead of being
+  `sprintf`-interpolated into the query string, closing a SQL-injection
+  vector.
+
 - Quantify/enrich DSP calls now build the per-file invariant argument
   list (file path, resolved params, `toFile`/`verbose`) once per file
   group instead of re-splicing it for every segment. Full single-decode-
