@@ -6,6 +6,12 @@
 \alias{ascend_to.lazy_segment_list}
 \title{Move up the annotation hierarchy}
 \usage{
+ascend_to(.segments, ...)
+
+## S7 method for class <reindeer::segment_list>
+ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
+
+## S7 method for class <reindeer::lazy_segment_list>
 ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 }
 \arguments{

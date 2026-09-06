@@ -9,6 +9,34 @@
 scout(.segments, steps_forward, count_from = "START", capture = 1,
   ignore_bundle_boundaries = FALSE, calculate_times = TRUE,
   times_from = NULL, .from = NULL, .quiet = TRUE, collect = TRUE)
+
+## S7 method for class <reindeer::segment_list>
+scout(
+  .segments,
+  steps_forward,
+  count_from = "START",
+  capture = 1,
+  ignore_bundle_boundaries = FALSE,
+  calculate_times = TRUE,
+  times_from = NULL,
+  .from = NULL,
+  .quiet = TRUE,
+  collect = TRUE
+)
+
+## S7 method for class <reindeer::lazy_segment_list>
+scout(
+  .segments,
+  steps_forward,
+  count_from = "START",
+  capture = 1,
+  ignore_bundle_boundaries = FALSE,
+  calculate_times = TRUE,
+  times_from = NULL,
+  .from = NULL,
+  .quiet = TRUE,
+  collect = TRUE
+)
 }
 \arguments{
 \item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}

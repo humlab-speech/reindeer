@@ -77,28 +77,38 @@ export(write_eaf)
 export(write_textgrid)
 importFrom(Rcpp,sourceCpp)
 importFrom(Rdpack,reprompt)
-importFrom(S7,"method<-")
-importFrom(S7,method)
-importFrom(data.table,":=")
-importFrom(data.table,.GRP)
-importFrom(data.table,.I)
-importFrom(data.table,.N)
-importFrom(data.table,.SD)
-importFrom(data.table,data.table)
-importFrom(data.table,dcast)
-importFrom(data.table,rbindlist)
-importFrom(data.table,setDT)
-importFrom(data.table,setcolorder)
-importFrom(data.table,setkey)
-importFrom(data.table,setkeyv)
-importFrom(data.table,setnames)
-importFrom(httpuv,startServer)
-importFrom(httpuv,stopAllServers)
-importFrom(stats,end)
-importFrom(stats,setNames)
-importFrom(stats,start)
-importFrom(utils,data)
-importFrom(utils,head)
-importFrom(utils,modifyList)
-importFrom(utils,object.size)
+importFrom(S7,
+  "method<-",
+  method
+)
+importFrom(data.table,
+  ":=",
+  .GRP,
+  .I,
+  .N,
+  .SD,
+  data.table,
+  dcast,
+  rbindlist,
+  setDT,
+  setcolorder,
+  setkey,
+  setkeyv,
+  setnames
+)
+importFrom(httpuv,
+  startServer,
+  stopAllServers
+)
+importFrom(stats,
+  end,
+  setNames,
+  start
+)
+importFrom(utils,
+  data,
+  head,
+  modifyList,
+  object.size
+)
 useDynLib(reindeer, .registration = TRUE)

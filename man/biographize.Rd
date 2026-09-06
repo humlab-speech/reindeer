@@ -36,8 +36,8 @@ enriched <- biographize(segs, corp)
 \seealso{
 \code{\link[=enrich]{enrich()}} for the combined metadata + DSP entry point.
 
-Other metadata: 
-\code{\link{add_metadata}()},
-\code{\link{get_metadata}()}
+Other metadata:
+\code{\link[=add_metadata]{add_metadata()}},
+\code{\link[=get_metadata]{get_metadata()}}
 }
 \concept{metadata}

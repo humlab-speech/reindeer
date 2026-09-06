@@ -3,6 +3,23 @@
 \name{enrich.corpus}
 \alias{enrich.corpus}
 \title{Enrich corpus method - corpus-level DSP processing}
+\usage{
+## S7 method for class <reindeer::corpus>
+enrich(
+  object,
+  .using,
+  ...,
+  .metadata_fields = c("Gender", "Age"),
+  .signal_extension = NULL,
+  .force = FALSE,
+  .verbose = TRUE,
+  .parallel = TRUE,
+  .workers = NULL,
+  .use_cache = TRUE,
+  .cache_dir = NULL,
+  .cache_format = c("auto", "qs", "rds")
+)
+}
 \arguments{
 \item{object}{A corpus object.}
 
@@ -14,7 +31,7 @@
 
 \item{.signal_extension}{Override the corpus' mediafileExtension.}
 
-\item{.force}{Force recomputation when track files already exist.}
+\item{.force}{Force recomputation, bypassing the persistent cache.}
 
 \item{.verbose, .parallel, .workers, .use_cache, .cache_dir, .cache_format}{See \code{?enrich}.}
 }

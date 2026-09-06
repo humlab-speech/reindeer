@@ -11,7 +11,7 @@ corpus(
   sync_eaf = FALSE,
   sync_cmdi = FALSE,
   cache_dir = NULL,
-  quick = FALSE
+  quick = TRUE
 )
 }
 \arguments{
@@ -30,10 +30,11 @@ Off by default.}
 \item{cache_dir}{Override the quantify/enrich cache directory.
 Default \verb{<basePath>/.quantify_cache}.}
 
-\item{quick}{Skip the cache rebuild on open. Use this only when you
-know the cache is current (e.g. immediately after the previous
-session closed cleanly). After any manual edit to a \code{METADATA.json}
-or annotation file, leave it \code{FALSE} so reindeer can re-sync.}
+\item{quick}{Reuse the existing cache when present (default \code{TRUE}).
+Set \code{FALSE} to force a full cache + metadata rebuild on open, for
+example after manually editing a \code{METADATA.json} or annotation file.
+To re-sync metadata selectively without reopening, use
+\code{\link[=load_metadata]{load_metadata()}} / \code{\link[=gather_metadata]{gather_metadata()}}.}
 }
 \value{
 A \code{corpus} object. The S7 class exposes the following

@@ -3,6 +3,10 @@
 \name{enrich.lazy_segment_list}
 \alias{enrich.lazy_segment_list}
 \title{Enrich method for lazy_segment_list — stay lazy until collect()}
+\usage{
+## S7 method for class <reindeer::lazy_segment_list>
+enrich(object, corpus_obj = NULL, ..., with = "metadata", .using = NULL)
+}
 \arguments{
 \item{object}{A lazy_segment_list.}
 

@@ -8,6 +8,22 @@
 quantify(object, dsp_function, ..., .at = NULL, .use_metadata = TRUE,
   .use_cache = FALSE, .cache_dir = NULL, .cache_format = c("auto", "qs", "rds"),
   .parallel = TRUE, .workers = NULL, .verbose = FALSE, .optimize = TRUE)
+
+## S7 method for class <reindeer::segment_list>
+quantify(
+  object,
+  dsp_function,
+  ...,
+  .at = NULL,
+  .use_metadata = TRUE,
+  .verbose = FALSE,
+  .parallel = TRUE,
+  .workers = NULL,
+  .use_cache = FALSE,
+  .cache_dir = NULL,
+  .cache_format = c("auto", "qs", "rds"),
+  .optimize = TRUE
+)
 }
 \arguments{
 \item{object}{A \code{segment_list} (eager) or \code{lazy_segment_list}.}
@@ -26,6 +42,11 @@ multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}).}
 \item{.use_metadata}{Look up DSP parameters from speaker metadata.
 Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
 
+\item{.verbose}{Print a per-step progress summary.}
+
+\item{.parallel, .workers}{Run segments concurrently via a
+multi-session future plan. Default: on, with \code{detectCores() - 1}.}
+
 \item{.use_cache}{Reuse persistent results when the cache key
 matches. Default \code{FALSE}. See \code{\link[=inspect_cache]{inspect_cache()}} for what's stored.
 When enabled, the returned tibble gains a \code{.cache_status} column
@@ -33,11 +54,6 @@ When enabled, the returned tibble gains a \code{.cache_status} column
 
 \item{.cache_dir, .cache_format}{Where and how to persist cached
 results.}
-
-\item{.parallel, .workers}{Run segments concurrently via a
-multi-session future plan. Default: on, with \code{detectCores() - 1}.}
-
-\item{.verbose}{Print a per-step progress summary.}
 
 \item{.optimize}{Use optimized computation (default \code{TRUE}; turn off
 only for debugging).}
@@ -80,7 +96,7 @@ quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
 \seealso{
 \code{\link[=enrich]{enrich()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
 
-Other signal: 
-\code{\link{enrich}()}
+Other signal:
+\code{\link[=enrich]{enrich()}}
 }
 \concept{signal}

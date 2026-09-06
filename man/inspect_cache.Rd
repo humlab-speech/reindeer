@@ -17,7 +17,7 @@ invisibly when \code{verbose = TRUE}.
 }
 \description{
 Single user-facing entry point that combines \code{\link[=check_cache_size]{check_cache_size()}}
-(size + threshold warnings) and \code{\link[protoscribe:list_cache_files]{protoscribe::list_cache_files()}} (per-file
+(size + threshold warnings) and \code{\link[=list_cache_files]{list_cache_files()}} (per-file
 inventory) into one tidy report. Prefer this over the older
 \code{check_cache_size()} / \code{manage_cache()} pair when you just want to
 see "what's in the cache and how big is it".

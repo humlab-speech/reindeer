@@ -3,6 +3,23 @@
 \name{enrich.extended_segment_list}
 \alias{enrich.extended_segment_list}
 \title{Enrich method for extended_segment_list}
+\usage{
+## S7 method for class <reindeer::extended_segment_list>
+enrich(object, corpus_obj = NULL, ..., with = "metadata", .using = NULL)
+}
+\arguments{
+\item{object}{A segment_list (or extended_segment_list).}
+
+\item{corpus_obj}{The corpus to pull metadata from (required when
+\code{with = "metadata"}).}
+
+\item{...}{Forwarded to \code{\link[=quantify]{quantify()}} when \code{.using} is supplied.}
+
+\item{with}{One of \code{"metadata"} (default) or \code{NULL}. Set to \code{NULL} when
+only running DSP via \code{.using}.}
+
+\item{.using}{Optional DSP function; if supplied, delegates to \code{\link[=quantify]{quantify()}}.}
+}
 \value{
 A segment_list or extended_segment_list.
 }

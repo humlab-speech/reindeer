@@ -347,8 +347,6 @@ retreat <- function(.segments, steps_backward, ...) {
 #' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
 #'   into the lazy plan (see note in [scout()] about partial SQL
 #'   coverage).
-#' @usage
-#' ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")

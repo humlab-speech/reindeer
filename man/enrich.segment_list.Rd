@@ -3,6 +3,10 @@
 \name{enrich.segment_list}
 \alias{enrich.segment_list}
 \title{Enrich segment_list method - join metadata or delegate DSP to quantify}
+\usage{
+## S7 method for class <reindeer::segment_list>
+enrich(object, corpus_obj = NULL, ..., with = "metadata", .using = NULL)
+}
 \arguments{
 \item{object}{A segment_list (or extended_segment_list).}
 

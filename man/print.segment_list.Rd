@@ -3,6 +3,10 @@
 \name{print.segment_list}
 \alias{print.segment_list}
 \title{Print method for segment_list with pillar formatting}
+\usage{
+## S7 method for class <reindeer::segment_list>
+print(x, ..., n = NULL, width = NULL)
+}
 \arguments{
 \item{x}{The segment_list object}
 

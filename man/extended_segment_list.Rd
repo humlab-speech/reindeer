@@ -47,7 +47,7 @@ work transparently.
 \section{Structure}{
 
 An \code{extended_segment_list} contains every column of the originating
-\link[=segment_list]{segment_list} (see its \code{Structure}
+\link{segment_list} (see its \code{Structure}
 section), plus one column per DSP output (the names depend on
 \code{dsp_function} — look at \verb{@dsp_columns} to see them). When
 \code{\link[=quantify]{quantify()}} was called with a vector \code{.at}, an extra \code{.time_point}

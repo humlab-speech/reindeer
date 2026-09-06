@@ -3,6 +3,10 @@
 \name{summary.segment_list}
 \alias{summary.segment_list}
 \title{Summary method for segment_list}
+\usage{
+## S7 method for class <reindeer::segment_list>
+summary(object, ...)
+}
 \arguments{
 \item{object}{The segment_list object}
 

@@ -64,4 +64,10 @@ jobs:
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
+          error-on: error
+          # --no-vignettes: the vignette-code tangle step sources every chunk,
+          # ignoring the REINDEER_EVAL_VIGNETTES gate; chunks need superassp /
+          # real corpora and cannot run in this interim check. Vignette knitting
+          # is still validated at R CMD build.
+          check_args: 'c("--no-vignettes")'
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'

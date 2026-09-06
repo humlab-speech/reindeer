@@ -19,8 +19,9 @@ serve(corpus, ...)
 }
 \value{
 Invisibly \code{TRUE}. The server keeps running until you press
-the \emph{clear} button in the webApp, close the tab, or run
-\code{httpuv::stopAllServers()}.
+the \emph{clear} button in the webApp, close the tab, or stop it with
+\code{httpuv::stopServer(getOption("reindeer.serve_handle"))} (or
+\code{httpuv::stopAllServers()}).
 }
 \description{
 Launches a local web server and opens the EMU-webApp pointed at the

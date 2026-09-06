@@ -44,9 +44,12 @@ tibble-like \code{segment_list} ready for \code{\link[=enrich]{enrich()}} / \cod
 }
 \details{
 Since v0.7 the query is \strong{deferred by default}: a \link{lazy_segment_list}
-is returned and the SQL fires only when you access the rows
-(\code{nrow()}, \code{head()}, \code{$}, dplyr verbs, \code{\link[=collect]{collect()}} etc.). Pass
-\code{lazy = FALSE} to force immediate execution.
+is returned and the main result SQL fires when you access the rows
+(\code{nrow()}, \code{head()}, \code{$}, dplyr verbs, \code{\link[=collect]{collect()}} etc.). Deferral is
+partial: plan-time work still resolves level/attribute names and
+materialises compound sub-queries (sequences, dominance), so the query
+string is fully built at call time. Pass \code{lazy = FALSE} to force
+immediate execution.
 }
 \section{Supported EQL features}{
 

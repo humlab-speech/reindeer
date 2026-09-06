@@ -3,6 +3,10 @@
 \name{quantify.lazy_segment_list}
 \alias{quantify.lazy_segment_list}
 \title{Quantify method for lazy_segment_list — defer DSP until collect()}
+\usage{
+## S7 method for class <reindeer::lazy_segment_list>
+quantify(object, dsp_function, ...)
+}
 \arguments{
 \item{object}{A \code{lazy_segment_list} (from \code{query(corp, query, lazy = TRUE)}).}
 

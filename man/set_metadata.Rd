@@ -84,8 +84,8 @@ set_metadata(corp, list(Quality = "Good"),
 \code{\link[=get_metadata]{get_metadata()}} for the matching reader, \code{\link[=load_metadata]{load_metadata()}}
 for bulk import.
 
-Other metadata: 
-\code{\link{biographize}()},
-\code{\link{get_metadata}()}
+Other metadata:
+\code{\link[=biographize]{biographize()}},
+\code{\link[=get_metadata]{get_metadata()}}
 }
 \concept{metadata}

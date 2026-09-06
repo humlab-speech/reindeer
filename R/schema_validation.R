@@ -94,8 +94,7 @@
   ok <- tryCatch(
     v(json_text, verbose = TRUE, greedy = TRUE),
     error = function(e) {
-      attr(FALSE, "errors") <- conditionMessage(e)
-      FALSE
+      structure(FALSE, errors = conditionMessage(e))
     }
   )
   if (isTRUE(ok)) return(invisible(TRUE))

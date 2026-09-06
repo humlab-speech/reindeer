@@ -5,7 +5,7 @@
 \title{Add DSP tracks or metadata to a corpus or segment list}
 \usage{
 enrich(object, .using = NULL, ..., .metadata_fields = NULL, .force = FALSE,
-  .parallel = TRUE, .workers = NULL, .use_cache = FALSE, .cache_dir = NULL,
+  .parallel = TRUE, .workers = NULL, .use_cache = TRUE, .cache_dir = NULL,
   .cache_format = c("auto", "qs", "rds"), .signal_extension = NULL,
   .verbose = FALSE)
 }
@@ -24,13 +24,15 @@ metadata-derived defaults.}
 \item{.metadata_fields}{Metadata fields fed to \code{\link[=dsp_parameters]{dsp_parameters()}}.
 Default \code{c("Gender", "Age")}.}
 
-\item{.force}{Recompute even if track files already exist.}
+\item{.force}{Recompute every signal file, bypassing the persistent
+cache, even when a cached result exists.}
 
 \item{.parallel, .workers}{Use a multi-session future plan with this
 many workers. Default: parallel, \code{detectCores() - 1}.}
 
-\item{.use_cache, .cache_dir, .cache_format}{Skip work that's already
-in the persistent cache. See \code{\link[=inspect_cache]{inspect_cache()}}.}
+\item{.use_cache, .cache_dir, .cache_format}{Skip signal files whose
+cached result (keyed on file mtime + DSP params) already exists.
+Default \code{TRUE}. See \code{\link[=inspect_cache]{inspect_cache()}}.}
 
 \item{.signal_extension}{Override the corpus' \code{mediafileExtension}.}
 
@@ -76,7 +78,7 @@ enrich(segs, .using = superassp::forest)        # delegates to quantify()
 \code{\link[=quantify]{quantify()}}, \code{\link[=get_metadata]{get_metadata()}}, \code{\link[=dsp_parameters]{dsp_parameters()}},
 \code{\link[=inspect_cache]{inspect_cache()}}
 
-Other signal: 
-\code{\link{quantify}()}
+Other signal:
+\code{\link[=quantify]{quantify()}}
 }
 \concept{signal}

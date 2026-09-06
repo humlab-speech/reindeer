@@ -3,6 +3,10 @@
 \name{print.lazy_segment_list}
 \alias{print.lazy_segment_list}
 \title{Print method for lazy_segment_list}
+\usage{
+## S7 method for class <reindeer::lazy_segment_list>
+print(x, ..., preview = TRUE)
+}
 \arguments{
 \item{x}{lazy_segment_list object}
 

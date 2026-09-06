@@ -49,8 +49,8 @@ lazy_segs <- query(corpus, "Phonetic == t") |>
 # Force execution
 segs <- collect(lazy_segs)
 
-# Or implicitly via print/summary
-print(lazy_segs)  # Shows preview
+# Or inspect via print/summary (runs a COUNT(*) + LIMIT 3 preview)
+print(lazy_segs)
 }
 
 }
