@@ -321,7 +321,7 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 #'
 #' The mechanism that makes standard-compliant corpus metadata "created
 #' automatically while the user works". Gated by
-#' `getOption("reindeer.auto_cmdi", TRUE)` (default on) and suppressible
+#' `getOption("reindeer.auto_cmdi", FALSE)` (default off) and suppressible
 #' during bulk edits via `getOption("reindeer._auto_cmdi_suppress", FALSE)`.
 #' A failure to emit FAIR artifacts must never break the metadata write, so
 #' errors are swallowed. The drift guard in [describe_corpus()] keeps this
@@ -329,7 +329,7 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 #' @keywords internal
 #' @noRd
 .auto_describe <- function(corpus_obj) {
-  if (!isTRUE(getOption("reindeer.auto_cmdi", TRUE))) return(invisible(FALSE))
+  if (!isTRUE(getOption("reindeer.auto_cmdi", FALSE))) return(invisible(FALSE))
   if (isTRUE(getOption("reindeer._auto_cmdi_suppress", FALSE))) return(invisible(FALSE))
   tryCatch(describe_corpus(corpus_obj, verbose = FALSE), error = function(e) NULL)
   invisible(TRUE)

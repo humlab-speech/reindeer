@@ -1,5 +1,9 @@
 # reindeer (development version)
 
+- Unified the `reindeer.auto_cmdi` default to `FALSE` on both the metadata
+  write path and the constructor (previously the write path defaulted to
+  `TRUE`, regenerating all FAIR artifacts on every `add_metadata()` call).
+
 - `inspect_cache()` / `manage_cache()` / `clean_*_cache()` now read the
   quantify/enrich SQLite cache (`quantify_cache.sqlite`) directly instead
   of scanning a per-item `.rds`/`.qs` layout that no longer exists, so
