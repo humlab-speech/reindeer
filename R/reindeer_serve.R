@@ -19,8 +19,9 @@
 #'   `useViewer` (default `TRUE` in RStudio),
 #'   `autoOpenURL` (set `""` to skip browser launch).
 #' @return Invisibly `TRUE`. The server keeps running until you press
-#'   the *clear* button in the webApp, close the tab, or run
-#'   `httpuv::stopAllServers()`.
+#'   the *clear* button in the webApp, close the tab, or stop it with
+#'   `httpuv::stopServer(getOption("reindeer.serve_handle"))` (or
+#'   `httpuv::stopAllServers()`).
 #' @section EMU-webApp location:
 #' On first use, point reindeer at your EMU-webApp install:
 #' \preformatted{
@@ -156,6 +157,10 @@ S7::method(serve, corpus) <- function(corpus,
     bundlesDf <- bundlesDf[bsl, ]
   }
 
+  # Resolve the EMU-webApp directory once per serve() call (the fallback
+  # ladder does filesystem checks, so it should not run per request).
+  webAppDir <- get_webapp_dir()
+
   # Define HTTP request handler
   httpRequest <- function(req) {
     if (req$REQUEST_METHOD == "GET") {
@@ -170,18 +175,9 @@ S7::method(serve, corpus) <- function(corpus,
           paste0(queryStr$bundle, ".", queryStr$fileExtension)
         )
 
-        audioFile <- file(mediaFilePath, "rb")
-        audioFileData <- readBin(audioFile, raw(), n = file.info(mediaFilePath)$size)
-        close(audioFile)
-
-        res <- list(
-          status = 200L,
-          headers = list(
-            `Content-Type` = "audio/x-wav",
-            `Access-Control-Allow-Origin` = "*"
-          ),
-          body = audioFileData
-        )
+        audioFileData <- NULL
+        res <- .serve_file_response(mediaFilePath, "audio/x-wav", req$HTTP_RANGE)
+        res$headers$`Access-Control-Allow-Origin` <- "*"
         return(res)
       } else {
         # Handle static file requests from EMU-webApp
@@ -199,8 +195,7 @@ S7::method(serve, corpus) <- function(corpus,
 
         status <- 200L
 
-        # Use revised EMU-webApp directory
-        webAppDir <- get_webapp_dir()
+        # Use revised EMU-webApp directory (resolved once per serve() call)
         path <- file.path(webAppDir, path)
 
         # Additional validation: ensure resolved path is within webAppDir
@@ -692,8 +687,12 @@ S7::method(serve, corpus) <- function(corpus,
     ws$onClose(serverClosed)
   }
 
-  # Stop any existing servers
-  httpuv::stopAllServers()
+  # Stop a previously-started reindeer server (scoped to this package) so a
+  # restart binds cleanly, without killing unrelated httpuv servers.
+  prev_handle <- getOption("reindeer.serve_handle")
+  if (!is.null(prev_handle)) {
+    try(httpuv::stopServer(prev_handle), silent = TRUE)
+  }
 
   # Print server info
   cli::cli_h2("Starting reindeer EMU-webApp server")
@@ -703,7 +702,7 @@ S7::method(serve, corpus) <- function(corpus,
   cli::cli_ul(c(
     "Press the 'clear' button in the EMU-webApp",
     "Close/reload the webApp in your browser",
-    "Call {.code httpuv::stopAllServers()} in R"
+    "Call {.code httpuv::stopServer(getOption('reindeer.serve_handle'))} in R"
   ))
 
   # Create server app
@@ -713,8 +712,9 @@ S7::method(serve, corpus) <- function(corpus,
     onWSOpen = serverEstablished
   )
 
-  # Start server
-  httpuv::startServer(host = host, port = port, app = app)
+  # Start server and retain the handle so it can be stopped scoped later.
+  server <- httpuv::startServer(host = host, port = port, app = app)
+  options(reindeer.serve_handle = server)
 
   # Auto-open browser
   if (length(autoOpenURL) != 0 && autoOpenURL != "") {
@@ -827,6 +827,63 @@ get_webapp_dir <- function() {
   }
 
   return(webapp_path)
+}
+
+# Read a file for an HTTP response, honouring an optional byte-range header.
+# Returns list(status, headers, body). Serves full content (200) when no
+# range or an open-ended "bytes=0-" is requested, 416 on malformed ranges,
+# and 206 partial content otherwise. Keeps large media files out of memory.
+.serve_file_response <- function(path, content_type, range = NULL) {
+  if (!file.exists(path)) {
+    return(list(
+      status = 404L,
+      headers = list(`Content-Type` = "text/plain"),
+      body = "Not found\r\n"
+    ))
+  }
+  file_size <- file.info(path)$size
+  if (is.null(range) || identical(range, "bytes=0-")) {
+    return(list(
+      status = 200L,
+      headers = list(`Content-Type` = content_type),
+      body = readBin(path, "raw", file_size)
+    ))
+  }
+
+  rng <- strsplit(range, split = "(=|-)")[[1]]
+  if (length(rng) < 2 || rng[1] != "bytes") {
+    return(.serve_range_unsatisfiable())
+  }
+  b2 <- suppressWarnings(as.numeric(rng[2]))
+  b3 <- if (length(rng) >= 3 && nzchar(rng[3])) {
+    suppressWarnings(as.numeric(rng[3]))
+  } else {
+    file_size - 1L
+  }
+  if (is.na(b2) || is.na(b3) || b2 < 0 || b3 < b2 || b2 >= file_size) {
+    return(.serve_range_unsatisfiable())
+  }
+  b3 <- min(b3, file_size - 1L)
+
+  con <- file(path, "rb")
+  on.exit(close(con), add = TRUE)
+  seek(con, where = b2, origin = "start")
+  list(
+    status = 206L,
+    headers = list(
+      `Content-Type` = content_type,
+      `Content-Range` = sprintf("bytes %d-%d/%d", b2, b3, file_size)
+    ),
+    body = readBin(con, "raw", b3 - b2 + 1L)
+  )
+}
+
+.serve_range_unsatisfiable <- function() {
+  list(
+    status = 416L,
+    headers = list(`Content-Type` = "text/plain"),
+    body = "Requested range not satisfiable\r\n"
+  )
 }
 
 # ==============================================================================

@@ -1,5 +1,12 @@
 # reindeer (development version)
 
+- `serve()` media responses now honour HTTP byte-range requests (206
+  partial content) instead of reading the whole audio file into memory,
+  return 404 for missing media, and no longer kill unrelated httpuv
+  servers: it stops only the previous reindeer server handle and retains
+  the new one via `reindeer.serve_handle`. The EMU-webApp directory is
+  resolved once per `serve()` call instead of per request.
+
 - Unified the `reindeer.auto_cmdi` default to `FALSE` on both the metadata
   write path and the constructor (previously the write path defaulted to
   `TRUE`, regenerating all FAIR artifacts on every `add_metadata()` call).
