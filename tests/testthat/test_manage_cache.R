@@ -131,7 +131,7 @@ test_that("manage_cache clean action works with dry_run", {
   }
 
   dummy_file <- file.path(cache_dir, "test_cache.qs")
-  qs::qsave(list(test = "data"), dummy_file)
+  qs2::qs_save(list(test = "data"), dummy_file)
 
   # Make it old by modifying timestamp
   old_time <- Sys.time() - (60 * 60 * 24 * 35)  # 35 days ago

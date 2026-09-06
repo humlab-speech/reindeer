@@ -298,12 +298,12 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   
   # Determine format to use
   if (format == "auto") {
-    format <- if (requireNamespace("qs", quietly = TRUE)) "qs" else "rds"
+    format <- if (requireNamespace("qs2", quietly = TRUE)) "qs" else "rds"
   }
   
   # Serialize result based on format
-  result_blob <- if (format == "qs" && requireNamespace("qs", quietly = TRUE)) {
-    qs::qserialize(result, preset = "fast")
+  result_blob <- if (format == "qs" && requireNamespace("qs2", quietly = TRUE)) {
+    qs2::qs_serialize(result)
   } else {
     serialize(result, NULL)
   }
@@ -343,8 +343,8 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 .deserialize_cache_blob <- function(blob, format) {
   if (is.null(format) || is.na(format)) format <- "rds"
   tryCatch({
-    if (format == "qs" && requireNamespace("qs", quietly = TRUE)) {
-      qs::qdeserialize(blob)
+    if (format == "qs" && requireNamespace("qs2", quietly = TRUE)) {
+      qs2::qs_deserialize(blob)
     } else {
       unserialize(blob)
     }
@@ -352,8 +352,8 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     tryCatch({
       if (format == "qs") {
         unserialize(blob)
-      } else if (requireNamespace("qs", quietly = TRUE)) {
-        qs::qdeserialize(blob)
+      } else if (requireNamespace("qs2", quietly = TRUE)) {
+        qs2::qs_deserialize(blob)
       } else {
         NULL
       }
@@ -415,12 +415,12 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   if (length(entries) == 0L) return(invisible(NULL))
   format <- match.arg(format)
   if (format == "auto") {
-    format <- if (requireNamespace("qs", quietly = TRUE)) "qs" else "rds"
+    format <- if (requireNamespace("qs2", quietly = TRUE)) "qs" else "rds"
   }
 
-  use_qs <- format == "qs" && requireNamespace("qs", quietly = TRUE)
+  use_qs <- format == "qs" && requireNamespace("qs2", quietly = TRUE)
   blobs <- lapply(entries, function(e) {
-    if (use_qs) qs::qserialize(e$result, preset = "fast") else serialize(e$result, NULL)
+    if (use_qs) qs2::qs_serialize(e$result) else serialize(e$result, NULL)
   })
   sizes <- vapply(blobs, length, integer(1))
   now <- as.integer(Sys.time())

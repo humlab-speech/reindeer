@@ -1,7 +1,7 @@
 # Tests for cache serialization functionality
 
 test_that("qs serialization preserves data integrity", {
-  skip_if_not_installed("qs")
+  skip_if_not_installed("qs2")
   
   # Create test data similar to quantify results
   test_data <- data.frame(
@@ -14,10 +14,10 @@ test_that("qs serialization preserves data integrity", {
   )
   
   # Serialize with qs
-  blob <- qs::qserialize(test_data, preset = "fast")
+  blob <- qs2::qs_serialize(test_data)
   
   # Deserialize
-  result <- qs::qdeserialize(blob)
+  result <- qs2::qs_deserialize(blob)
   
   # Check integrity
   expect_equal(result, test_data)
@@ -26,7 +26,7 @@ test_that("qs serialization preserves data integrity", {
 })
 
 test_that("qs provides better compression than serialize", {
-  skip_if_not_installed("qs")
+  skip_if_not_installed("qs2")
   
   # Create larger test data
   test_data <- data.frame(
@@ -38,7 +38,7 @@ test_that("qs provides better compression than serialize", {
   
   # Compare sizes
   blob_base <- serialize(test_data, NULL)
-  blob_qs <- qs::qserialize(test_data, preset = "fast")
+  blob_qs <- qs2::qs_serialize(test_data)
   
   # qs should be smaller (typically 20-40% smaller)
   expect_lt(length(blob_qs), length(blob_base))
@@ -66,7 +66,7 @@ test_that("cache schema includes format column", {
 })
 
 test_that("cache stores and retrieves qs format correctly", {
-  skip_if_not_installed("qs")
+  skip_if_not_installed("qs2")
   
   # Create temporary cache
   temp_dir <- tempfile()
@@ -128,7 +128,7 @@ test_that("cache stores and retrieves rds format correctly", {
 })
 
 test_that("cache handles mixed formats (backward compatibility)", {
-  skip_if_not_installed("qs")
+  skip_if_not_installed("qs2")
   
   # Create temporary cache
   temp_dir <- tempfile()
@@ -183,7 +183,7 @@ test_that("auto format selection works correctly", {
     "SELECT format FROM cache WHERE cache_key = ?",
     params = list(cache_key))
   
-  if (requireNamespace("qs", quietly = TRUE)) {
+  if (requireNamespace("qs2", quietly = TRUE)) {
     expect_equal(format_check$format, "qs")
   } else {
     expect_equal(format_check$format, "rds")
@@ -222,7 +222,7 @@ test_that("cache migration adds format column to existing cache", {
 })
 
 test_that("cache fallback works when deserialization fails", {
-  skip_if_not_installed("qs")
+  skip_if_not_installed("qs2")
   
   # Create temporary cache
   temp_dir <- tempfile()

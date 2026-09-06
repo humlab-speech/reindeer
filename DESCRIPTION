@@ -43,15 +43,12 @@ Imports:
 Suggests:
     testthat (>= 3.0.0),
     emuR,
-    qs (>= 0.25.0),
+    qs2,
     knitr,
     rmarkdown,
     yardstick,
     bigstatsr,
-    protoscribe,
     superassp,
-    erodex,
-    eggstract,
     openxlsx,
     av,
     readr,
@@ -69,7 +66,6 @@ Remotes:
   github::humlab-speech/av
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Depends: 
     R (>= 4.1.0)
 VignetteBuilder: knitr
@@ -129,3 +125,4 @@ Collate:
     'segment_list_tidyselect.R'
     'tidy_trackdata_helpers.R'
     'zzz.R'
+Config/roxygen2/version: 8.1.0

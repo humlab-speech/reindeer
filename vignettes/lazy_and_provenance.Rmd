@@ -116,12 +116,12 @@ front.
 
 ## Provenance survives serialisation
 
-If you save a segment_list with `saveRDS()` or `qs::qsave()`, its
+If you save a segment_list with `saveRDS()` or `qs2::qs_save()`, its
 provenance survives the round trip:
 
 ```{r}
-qs::qsave(plan_done, "plan.qs")
-plan_back <- qs::qread("plan.qs")
+qs2::qs_save(plan_done, "plan.qs2")
+plan_back <- qs2::qs_read("plan.qs2")
 provenance(plan_back)        # same tibble as before
 ```
 
