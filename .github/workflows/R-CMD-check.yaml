@@ -27,6 +27,12 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # Interim: superassp (GitHub Remotes, git-submodule vendoring) does not
+      # build from source on R >= 4.6 or via GitHub source installs. Until it is
+      # fixed upstream, check without Suggests and silence the missing-Suggests
+      # NOTE. The Suggests needed to run tests/vignettes are installed explicitly
+      # below. Revert when humlab-speech/superassp installs cleanly again.
+      _R_CHECK_FORCE_SUGGESTS_: "false"
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +47,18 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck
+          dependencies: '"hard"'
+          extra-packages: |
+            any::rcmdcheck
+            any::testthat
+            any::withr
+            any::emuR
+            any::dplyr
+            any::qs2
+            any::ggplot2
+            any::openxlsx
+            any::knitr
+            any::rmarkdown
           needs: check
 
       - uses: r-lib/actions/check-r-package@v2
