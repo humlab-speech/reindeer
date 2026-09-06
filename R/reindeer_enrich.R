@@ -21,11 +21,13 @@ NULL
 #'   metadata-derived defaults.
 #' @param .metadata_fields Metadata fields fed to [dsp_parameters()].
 #'   Default `c("Gender", "Age")`.
-#' @param .force Recompute even if track files already exist.
+#' @param .force Recompute every signal file, bypassing the persistent
+#'   cache, even when a cached result exists.
 #' @param .parallel,.workers Use a multi-session future plan with this
 #'   many workers. Default: parallel, `detectCores() - 1`.
-#' @param .use_cache,.cache_dir,.cache_format Skip work that's already
-#'   in the persistent cache. See [inspect_cache()].
+#' @param .use_cache,.cache_dir,.cache_format Skip signal files whose
+#'   cached result (keyed on file mtime + DSP params) already exists.
+#'   Default `TRUE`. See [inspect_cache()].
 #' @param .signal_extension Override the corpus' `mediafileExtension`.
 #' @param .verbose Print progress. Default `TRUE`.
 #' @return The corpus invisibly (corpus method), or for the segment
@@ -53,7 +55,7 @@ NULL
 #' enrich(segs, .using = superassp::forest)        # delegates to quantify()
 #' @usage
 #' enrich(object, .using = NULL, ..., .metadata_fields = NULL, .force = FALSE,
-#'   .parallel = TRUE, .workers = NULL, .use_cache = FALSE, .cache_dir = NULL,
+#'   .parallel = TRUE, .workers = NULL, .use_cache = TRUE, .cache_dir = NULL,
 #'   .cache_format = c("auto", "qs", "rds"), .signal_extension = NULL,
 #'   .verbose = FALSE)
 #' @export
@@ -69,7 +71,7 @@ enrich <- S7::new_generic("enrich", "object")
 #' @param ... Forwarded to the DSP function as user-supplied parameters.
 #' @param .metadata_fields Metadata fields fed to [derive_dsp_parameters()].
 #' @param .signal_extension Override the corpus' mediafileExtension.
-#' @param .force Force recomputation when track files already exist.
+#' @param .force Force recomputation, bypassing the persistent cache.
 #' @param .verbose,.parallel,.workers,.use_cache,.cache_dir,.cache_format See `?enrich`.
 #' @return The corpus, invisibly.
 #' @name enrich.corpus
@@ -80,7 +82,7 @@ S7::method(enrich, corpus) <- function(object, .using, ...,
                                        .verbose = TRUE,
                                        .parallel = TRUE,
                                        .workers = NULL,
-                                       .use_cache = FALSE,
+                                       .use_cache = TRUE,
                                        .cache_dir = NULL,
                                        .cache_format = c("auto", "qs", "rds")) {
   dsp_fun_name <- deparse(substitute(.using))
@@ -324,17 +326,20 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
       user_params = user_params
     )
 
-    # Check cache if enabled
+    # Check cache if enabled. `.force` bypasses the read so every bundle is
+    # recomputed; the recomputed result still overwrites the cached entry.
     if (!is.null(cache_conn)) {
       cache_key <- digest::digest(list(
         bundle_row$full_path,
         file.info(bundle_row$full_path)$mtime,
         dsp_params
       ))
-      cached <- .get_persistent_cache(cache_conn, cache_key)
-      if (!is.null(cached)) {
-        return(list(success = TRUE, bundle = bundle_row$bundle,
-                    session = bundle_row$session, cached = TRUE))
+      if (!.force) {
+        cached <- .get_persistent_cache(cache_conn, cache_key)
+        if (!is.null(cached)) {
+          return(list(success = TRUE, bundle = bundle_row$bundle,
+                      session = bundle_row$session, cached = TRUE))
+        }
       }
     }
 

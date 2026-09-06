@@ -1,5 +1,12 @@
 # reindeer (development version)
 
+- `enrich(corpus, ...)` now defaults to `.use_cache = TRUE`, so signal
+  files whose cached result (keyed on file mtime + DSP params) already
+  exists are skipped instead of re-running DSP corpus-wide. `.force =
+  TRUE` bypasses the cache read and recomputes (still overwriting the
+  cached entry), which makes the previously-ignored `.force` argument
+  effective.
+
 - Fixed `quantify()` age/gender DSP-norm derivation: parameters are now
   resolved per bundle (the single-row contract) instead of passing the
   whole metadata table to `derive_dsp_parameters()`, which recycled
