@@ -229,19 +229,25 @@ clear_tidy_cache <- function() {
   results <- lapply(file_groups, function(file_segs) {
     signal_file <- unique(file_segs$signal_file)[1]
     
-    # Process all segments from this file
+    # Process all segments from this file. The DSP call's invariant
+    # arguments (file path, params, toFile/verbose) are built once per file;
+    # only the per-segment time window is re-supplied. Decoding the signal
+    # once and slicing is deliberately not done: the windowed superassp API
+    # ties analysis context to the requested window, so a whole-file pass
+    # would change boundary-adjacent results.
+    params_file <- file_segs$seg_params[[1]] %||% dsp_params
+    dsp_call_base <- c(
+      list(listOfFiles = signal_file),
+      params_file,
+      list(toFile = FALSE, verbose = FALSE)
+    )
     segment_results <- lapply(seq_len(nrow(file_segs)), function(i) {
       seg <- file_segs[i, , drop = FALSE]
       
       tryCatch({
         result <- do.call(dsp_function, c(
-          list(
-            listOfFiles = signal_file,
-            beginTime = seg$start / 1000,
-            endTime = seg$end / 1000
-          ),
-          seg$seg_params[[1]] %||% dsp_params,
-          list(toFile = FALSE, verbose = FALSE)
+          dsp_call_base,
+          list(beginTime = seg$start / 1000, endTime = seg$end / 1000)
         ))
         
         # Handle different result types
@@ -625,17 +631,20 @@ clear_tidy_cache <- function() {
       results_list <- dt_uncached[, {
         file <- unique(signal_file)[1]
         
-        # Process all segments from this file at once
+        # Process all segments from this file at once. Rows in a file group
+        # share one bundle, hence one params list; build the invariant call
+        # args once and only re-supply the per-segment window.
+        params_file <- seg_params[[1]]
+        dsp_call_base <- c(
+          list(listOfFiles = file),
+          params_file,
+          list(toFile = FALSE, verbose = FALSE)
+        )
         segment_results <- lapply(seq_len(.N), function(i) {
           tryCatch({
             result <- do.call(dsp_function, c(
-              list(
-                listOfFiles = file,
-                beginTime = start[i] / 1000,
-                endTime = end[i] / 1000
-              ),
-              seg_params[[i]],
-              list(toFile = FALSE, verbose = FALSE)
+              dsp_call_base,
+              list(beginTime = start[i] / 1000, endTime = end[i] / 1000)
             ))
             
             result
@@ -775,19 +784,21 @@ clear_tidy_cache <- function() {
       return(NULL)
     }
     
-    # Process segments from this file
+    # Process segments from this file. Invariant call args built once per
+    # file (single-bundle file group); only the per-segment window varies.
+    params_file <- file_segs$seg_params[[1]] %||% dsp_params
+    dsp_call_base <- c(
+      list(listOfFiles = signal_file),
+      params_file,
+      list(toFile = FALSE, verbose = FALSE)
+    )
     lapply(seq_len(nrow(file_segs)), function(i) {
       seg <- file_segs[i, , drop = FALSE]
       
       tryCatch({
         result <- do.call(dsp_function, c(
-          list(
-            listOfFiles = signal_file,
-            beginTime = seg$start / 1000,
-            endTime = seg$end / 1000
-          ),
-          seg$seg_params[[1]] %||% dsp_params,
-          list(toFile = FALSE, verbose = FALSE)
+          dsp_call_base,
+          list(beginTime = seg$start / 1000, endTime = seg$end / 1000)
         ))
         
         # Handle result formatting

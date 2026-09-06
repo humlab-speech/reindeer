@@ -1,5 +1,12 @@
 # reindeer (development version)
 
+- Quantify/enrich DSP calls now build the per-file invariant argument
+  list (file path, resolved params, `toFile`/`verbose`) once per file
+  group instead of re-splicing it for every segment. Full single-decode-
+  and-slice is deliberately not done: the windowed superassp API ties
+  analysis context to the requested window, so decoding a whole file once
+  would change boundary-adjacent results.
+
 - Quantify cache I/O is now batched: cache reads use chunked `IN`
   queries (with a single `accessed_at` touch per chunk) and misses are
   written in one transaction, replacing the per-row SELECT + UPDATE and
