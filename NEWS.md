@@ -1,5 +1,11 @@
 # reindeer (development version)
 
+- `inspect_cache()` / `manage_cache()` / `clean_*_cache()` now read the
+  quantify/enrich SQLite cache (`quantify_cache.sqlite`) directly instead
+  of scanning a per-item `.rds`/`.qs` layout that no longer exists, so
+  they report the real cache and can prune entries by age. Legacy
+  per-item files are still surfaced and swept.
+
 - Sequence/dominance queries now match pre-executed sub-query results via
   a deduplicated composite-key `IN` list instead of a per-row 4-column OR
   list, shrinking the generated SQL for compound queries over large

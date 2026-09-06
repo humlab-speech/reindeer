@@ -396,8 +396,12 @@ clean_quantify_cache <- function(corpus_obj,
     cli::cli_h3("Cleaning quantify/enrich cache")
   }
 
-  remove_old_cache_files(cache_dir, days_old, pattern = "\\.rds$|\\.qs$",
-                          dry_run = dry_run, verbose = verbose)
+  deleted <- .clean_quantify_cache_sqlite(corpus_obj, days_old, dry_run, verbose)
+  # Sweep any legacy per-item .rds/.qs files from the pre-SQLite layout.
+  deleted + remove_old_cache_files(
+    cache_dir, days_old, pattern = "\\.rds$|\\.qs$",
+    dry_run = dry_run, verbose = verbose
+  )
 }
 
 #' Clean all caches for a corpus
@@ -465,6 +469,81 @@ get_quantify_cache_dir <- function(corpus_obj) {
   file.path(corpus_obj@basePath, ".quantify_cache")
 }
 
+.quantify_cache_sqlite_file <- function(corpus_obj) {
+  file.path(get_quantify_cache_dir(corpus_obj), "quantify_cache.sqlite")
+}
+
+# Per-entry inventory of the quantify/enrich SQLite cache. Returns the same
+# column shape as get_cache_dir_summary() so list_cache_files() can merge the
+# two without special-casing.
+.quantify_cache_summary <- function(corpus_obj) {
+  empty <- data.frame(
+    file = character(0), path = character(0),
+    size_bytes = numeric(0), size_formatted = character(0),
+    modified = character(0), stringsAsFactors = FALSE
+  )
+  cache_file <- .quantify_cache_sqlite_file(corpus_obj)
+  if (!file.exists(cache_file)) return(empty)
+  con <- tryCatch(DBI::dbConnect(RSQLite::SQLite(), cache_file), error = function(e) NULL)
+  if (is.null(con)) return(empty)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  if (!"cache" %in% DBI::dbListTables(con)) return(empty)
+  rows <- DBI::dbGetQuery(
+    con,
+    "SELECT cache_key, size_bytes, accessed_at FROM cache ORDER BY size_bytes DESC"
+  )
+  if (nrow(rows) == 0) return(empty)
+  data.frame(
+    file = rows$cache_key,
+    path = cache_file,
+    size_bytes = rows$size_bytes,
+    size_formatted = vapply(rows$size_bytes, format_bytes, character(1)),
+    modified = as.character(as.POSIXct(rows$accessed_at, origin = "1970-01-01")),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Prune quantify/enrich SQLite cache entries older than `days_old` (by
+# accessed_at). Returns the number of entries deleted.
+.clean_quantify_cache_sqlite <- function(corpus_obj, days_old, dry_run, verbose) {
+  cache_file <- .quantify_cache_sqlite_file(corpus_obj)
+  if (!file.exists(cache_file)) {
+    if (verbose) cli::cli_alert_info("No quantify/enrich cache found")
+    return(0)
+  }
+  con <- tryCatch(DBI::dbConnect(RSQLite::SQLite(), cache_file), error = function(e) NULL)
+  if (is.null(con)) return(0)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  if (!"cache" %in% DBI::dbListTables(con)) return(0)
+
+  cutoff <- as.integer(as.POSIXct(Sys.time() - days_old * 86400))
+  old <- DBI::dbGetQuery(
+    con, "SELECT cache_key, size_bytes FROM cache WHERE accessed_at < ?",
+    params = list(cutoff)
+  )
+  if (nrow(old) == 0) {
+    if (verbose) cli::cli_alert_info("No cache entries older than {days_old} day{?s}")
+    return(0)
+  }
+  old_size <- sum(old$size_bytes, na.rm = TRUE)
+  if (verbose) {
+    if (dry_run) {
+      cli::cli_alert_info(
+        "Would delete {nrow(old)} cache entr{?y/ies} ({format_bytes(old_size)})"
+      )
+    } else {
+      cli::cli_alert_warning(
+        "Deleting {nrow(old)} cache entr{?y/ies} older than {days_old} day{?s} ({format_bytes(old_size)})"
+      )
+    }
+  }
+  if (!dry_run) {
+    DBI::dbExecute(con, "DELETE FROM cache WHERE accessed_at < ?", params = list(cutoff))
+    if (verbose) cli::cli_alert_success("Deleted {nrow(old)} cache entr{?y/ies}")
+  }
+  nrow(old)
+}
+
 #' List cache files with size information
 #'
 #' Lists quantify/enrich cache files. For draft annotation cache files,
@@ -488,7 +567,11 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 
   # Only quantify caches are managed by reindeer
   quantify_dir <- get_quantify_cache_dir(corpus_obj)
-  quantify_files <- get_cache_dir_summary(quantify_dir, pattern = "\\.rds$|\\.qs$")
+  # Primary storage is the SQLite cache table; also surface any legacy
+  # per-item .rds/.qs files left over from the pre-SQLite layout.
+  quantify_files <- .quantify_cache_summary(corpus_obj)
+  legacy_files <- get_cache_dir_summary(quantify_dir, pattern = "\\.rds$|\\.qs$")
+  quantify_files <- rbind(quantify_files, legacy_files)
   if (nrow(quantify_files) > 0) {
     quantify_files$type <- "quantify"
     results$quantify <- quantify_files
