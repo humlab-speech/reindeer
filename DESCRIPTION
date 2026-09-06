@@ -81,7 +81,6 @@ Collate:
     'addin_edit_metadata.R'
     'annotation_io.R'
     'cache_size_management.R'
-    'cache_utils.R'
     'companion_eggstract.R'
     'companion_protoscribe.R'
     'conditions.R'

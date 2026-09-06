@@ -1,5 +1,13 @@
 # reindeer (development version)
 
+- Removed superseded internal code: the dead `R/cache_utils.R` (duplicate
+  SQLite cache helpers with a wrong `tempdir()` default), the unused
+  in-memory quantify cache (`.get_quantify_cache`/`.set_quantify_cache`),
+  `.make_quantify_cache_key()`, `.read_ssff_mmap()` (a TODO stub), and the
+  unused batch/convert helpers. The exported `deprecated_stubs.R` redirects
+  (`draft_*`, `quantify_simulate`, ...) are retained: they are public API
+  and removal is a breaking change for a future major release.
+
 - `serve()` media responses now honour HTTP byte-range requests (206
   partial content) instead of reading the whole audio file into memory,
   return 404 for missing media, and no longer kill unrelated httpuv

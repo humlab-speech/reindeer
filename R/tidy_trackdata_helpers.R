@@ -4,9 +4,6 @@
 # Environment for caching corpus and handle objects
 .tidy_cache <- new.env(parent = emptyenv())
 
-# Environment for caching quantify results
-.quantify_cache <- new.env(parent = emptyenv())
-
 #' Get or create corpus from a segment list (companion-package contract)
 #'
 #' Internal helper exposed for companion packages (`erodex`) that need to
@@ -72,60 +69,11 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   assign(cache_key, handle, envir = .tidy_cache)
   return(handle)
 }
-
-#' Clear the tidy trackdata cache
-#' @keywords internal
-#' @noRd
-clear_tidy_cache <- function() {
-  # Close any database connections
-  for (obj_name in ls(envir = .tidy_cache)) {
-    obj <- get(obj_name, envir = .tidy_cache)
-    if (inherits(obj, "emuDBhandle") && !is.null(obj$connection)) {
-      try(DBI::dbDisconnect(obj$connection), silent = TRUE)
-    }
-  }
-  
-  # Clear environment
-  rm(list = ls(envir = .tidy_cache), envir = .tidy_cache)
-  rm(list = ls(envir = .quantify_cache), envir = .quantify_cache)
-  invisible(NULL)
-}
-
-#' Generate cache key for quantify results
-#'
-#' Includes the segment scope (session/bundle/start/end), the DSP
-#' function name, every parameter that affects the DSP output, AND
-#' the `.at` extraction points. Without `.at` in the key, two calls
-#' with different time-point requests share a cache entry and return
-#' the wrong timepoints. Bundle metadata (Age/Gender) is folded in
-#' automatically because `derive_dsp_parameters()` bakes those
-#' fields into `params` before the key is produced.
-#'
-#' @noRd
-.make_quantify_cache_key <- function(segment_info, dsp_function, params,
-                                     .at = NULL,
-                                     .precomputed = NULL) {
-  # `.precomputed` is the list returned by `.precompute_cache_key_parts()`:
-  # call sites that loop over many segments should compute it ONCE outside
-  # the loop instead of paying digest cost per row.
-  pre <- .precomputed %||% .precompute_cache_key_parts(dsp_function, params, .at)
-  key_parts <- c(
-    segment_info$session,
-    segment_info$bundle,
-    as.character(segment_info$start),
-    as.character(segment_info$end),
-    pre$dsp_name,
-    pre$params_digest,
-    pre$at_digest
-  )
-  paste(key_parts, collapse = "_")
-}
-
 #' Precompute the loop-invariant parts of a quantify cache key.
 #'
-#' The DSP function name + params digest + .at digest don't change across
-#' segments in a single quantify() call, but `.make_quantify_cache_key()`
-#' was recomputing them for every row. Hoist them out and reuse.
+#' The DSP function name and .at digest don't change across segments in a
+#' single quantify() call; hoist them out and reuse. The params digest is
+#' computed per row (effective params vary by bundle), so it is not hoisted.
 #'
 #' @param dsp_function The DSP function symbol the caller passed in. The
 #'   caller must wrap with `substitute()` so we can recover its source name.
@@ -137,64 +85,6 @@ clear_tidy_cache <- function() {
     at_digest = if (is.null(.at)) "NA" else digest::digest(.at, algo = "xxhash64")
   )
 }
-
-#' Get cached quantify result
-#' @noRd
-.get_quantify_cache <- function(cache_key) {
-  if (exists(cache_key, envir = .quantify_cache)) {
-    get(cache_key, envir = .quantify_cache)
-  } else {
-    NULL
-  }
-}
-
-#' Set quantify result in cache
-#' @noRd
-.set_quantify_cache <- function(cache_key, result, max_cache_size_mb = 500) {
-  # Check cache size and clear if too large
-  cache_size_bytes <- sum(vapply(ls(envir = .quantify_cache), function(x) {
-    object.size(get(x, envir = .quantify_cache))
-  }, numeric(1)))
-  
-  if (cache_size_bytes > max_cache_size_mb * 1024^2) {
-    # Remove oldest 50% of cache entries
-    cache_keys <- ls(envir = .quantify_cache)
-    to_remove <- cache_keys[1:max(1, length(cache_keys) %/% 2)]
-    rm(list = to_remove, envir = .quantify_cache)
-  }
-  
-  assign(cache_key, result, envir = .quantify_cache)
-  invisible(NULL)
-}
-
-#' Convert segment_list to data.frame efficiently
-#' @noRd
-.seglist_to_df <- function(.segments) {
-  # Handle lazy evaluation first - explicitly check class
-  if (S7::S7_inherits(.segments, lazy_segment_list)) {
-    # Force collection
-    .segments <- collect(.segments)
-  }
-  
-  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
-    as.data.frame(S7::S7_data(.segments))
-  } else {
-    as.data.frame(.segments)
-  }
-}
-
-#' Batch process segments by session (for parallel processing)
-#' @noRd
-.batch_by_session <- function(seglist_df) {
-  split(seglist_df, seglist_df$session)
-}
-
-#' Batch process segments by bundle (for parallel processing)
-#' @noRd
-.batch_by_bundle <- function(seglist_df) {
-  split(seglist_df, interaction(seglist_df$session, seglist_df$bundle, drop = TRUE))
-}
-
 #' Optimized batch processor for large segment lists
 #' Groups segments by audio file to minimize I/O operations
 #' @noRd
@@ -724,26 +614,6 @@ clear_tidy_cache <- function() {
     # Return list of tibbles
     result_list[!vapply(result_list$V1, is.null, logical(1))]$V1
 }
-
-#' Memory-mapped SSFF file reader for large files
-#' @noRd
-.read_ssff_mmap <- function(file_path, beginTime = 0, endTime = NULL, field = NULL) {
-  # For very large files, consider memory mapping
-  # This is a placeholder for more sophisticated memory-mapped I/O
-  
-  # Check file size
-  file_size <- file.info(file_path)$size
-  
-  # Use memory mapping for files > 100 MB
-  if (file_size > 100 * 1024^2 && requireNamespace("bigstatsr", quietly = TRUE)) {
-    # TODO: Implement true memory mapping for SSFF files
-    # For now, fall back to standard reading
-    wrassp::read.AsspDataObj(file_path, begin = beginTime, end = endTime)
-  } else {
-    wrassp::read.AsspDataObj(file_path, begin = beginTime, end = endTime)
-  }
-}
-
 #' Parallel audio file processing with true parallel I/O
 #' @noRd
 .process_parallel_io <- function(seg_df, corpus_obj, dsp_function, dsp_params,
