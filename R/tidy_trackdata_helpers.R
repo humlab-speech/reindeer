@@ -240,7 +240,7 @@ clear_tidy_cache <- function() {
             beginTime = seg$start / 1000,
             endTime = seg$end / 1000
           ),
-          dsp_params,
+          seg$seg_params[[1]] %||% dsp_params,
           list(toFile = FALSE, verbose = FALSE)
         ))
         
@@ -495,23 +495,19 @@ clear_tidy_cache <- function() {
       return(list())
     }
     
-    # Generate cache keys if caching enabled.
-    # Precompute the loop-invariant key parts ONCE — params/.at digests don't
-    # change across segments and digesting per-row was visible at 10k+ rows.
+    # Generate cache keys if caching enabled. The params digest is computed
+    # per row: effective DSP params now vary by bundle (Age/Gender), so it is
+    # no longer loop-invariant. Everything else (dsp name, .at) is hoisted.
     if (use_cache && !is.null(cache_conn)) {
-      key_pre <- .precompute_cache_key_parts(dsp_function, dsp_params, .at)
-      dt_valid[, cache_key := {
-        vapply(seq_len(.N), function(i) {
-          .make_quantify_cache_key(
-            list(session = session[i], bundle = bundle[i],
-                 start = start[i], end = end[i]),
-            dsp_function,
-            dsp_params,
-            .at = .at,
-            .precomputed = key_pre
-          )
-        }, character(1))
-      }]
+      key_pre <- .precompute_cache_key_parts(dsp_function, list(), .at)
+      dt_valid[, seg_params_digest := vapply(seg_params, function(p) {
+        digest::digest(p, algo = "xxhash64")
+      }, character(1))]
+      dt_valid[, cache_key := paste(
+        session, bundle, as.character(start), as.character(end),
+        key_pre$dsp_name, seg_params_digest, key_pre$at_digest,
+        sep = "_"
+      )]
       
       # Check cache for existing results
       dt_valid[, cached_result := lapply(cache_key, function(k) {
@@ -554,7 +550,7 @@ clear_tidy_cache <- function() {
                 beginTime = start[i] / 1000,
                 endTime = end[i] / 1000
               ),
-              dsp_params,
+              seg_params[[i]],
               list(toFile = FALSE, verbose = FALSE)
             ))
             
@@ -698,7 +694,7 @@ clear_tidy_cache <- function() {
             beginTime = seg$start / 1000,
             endTime = seg$end / 1000
           ),
-          dsp_params,
+          seg$seg_params[[1]] %||% dsp_params,
           list(toFile = FALSE, verbose = FALSE)
         ))
         

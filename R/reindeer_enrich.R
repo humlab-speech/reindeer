@@ -474,3 +474,36 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
   utils::modifyList(params, user_params)
 }
 
+#' Derive DSP params per bundle
+#'
+#' Applies [derive_dsp_parameters()] one bundle at a time. The underlying
+#' function has a single-row contract; passing a whole metadata table
+#' recycles vectorised `Age`/`Gender` against the DSPP table and returns
+#' an arbitrary row. This wrapper resolves one params list per
+#' (session, bundle) and returns a tibble with a `dsp_params` list-column.
+#'
+#' @param metadata A tibble with `session`, `bundle`, `Age`, `Gender`
+#'   columns (one row per bundle).
+#' @return Tibble with `session`, `bundle`, and a `dsp_params` list-column
+#'   whose entries are the fully merged parameter lists (user overrides
+#'   already applied).
+#' @noRd
+.derive_dsp_params_per_bundle <- function(dsp_fun, metadata, metadata_fields,
+                                          user_params) {
+  n <- nrow(metadata)
+  out <- vector("list", n)
+  for (i in seq_len(n)) {
+    out[[i]] <- derive_dsp_parameters(
+      dsp_fun = dsp_fun,
+      metadata = metadata[i, , drop = FALSE],
+      metadata_fields = metadata_fields,
+      user_params = user_params
+    )
+  }
+  tibble::tibble(
+    session = metadata$session,
+    bundle = metadata$bundle,
+    dsp_params = out
+  )
+}
+

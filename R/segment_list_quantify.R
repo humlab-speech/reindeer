@@ -172,17 +172,30 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   # Join with metadata if available
   if (!is.null(metadata_by_bundle)) {
     seg_df <- merge(seg_df, metadata_by_bundle, by = c("session", "bundle"), all.x = TRUE)
+  }
 
-    # Derive DSP parameters from metadata where applicable
-    if (.use_metadata && nrow(metadata_by_bundle) > 0) {
-      # This happens once for all segments sharing metadata
-      dsp_params_base <- derive_dsp_parameters(
-        dsp_fun = dsp_function,
-        metadata = metadata_by_bundle,
-        metadata_fields = c("Gender", "Age"),
-        user_params = dsp_params_base
-      )
-    }
+  # Resolve effective DSP params per segment (list-column). Metadata-derived
+  # norms are computed per bundle (single-row contract) and merged under any
+  # user-supplied overrides; segments whose bundle has no norm row fall back
+  # to the user params alone.
+  if (.use_metadata && !is.null(metadata_by_bundle) && nrow(metadata_by_bundle) > 0) {
+    per_bundle <- .derive_dsp_params_per_bundle(
+      dsp_fun = dsp_function,
+      metadata = metadata_by_bundle,
+      metadata_fields = c("Gender", "Age"),
+      user_params = dsp_params_base
+    )
+    lookup <- stats::setNames(
+      per_bundle$dsp_params,
+      paste(per_bundle$session, per_bundle$bundle, sep = "\x01")
+    )
+    seg_key <- paste(seg_df$session, seg_df$bundle, sep = "\x01")
+    seg_df$seg_params <- lapply(seg_key, function(k) {
+      p <- lookup[[k]]
+      if (is.null(p)) dsp_params_base else p
+    })
+  } else {
+    seg_df$seg_params <- rep(list(dsp_params_base), nrow(seg_df))
   }
 
   # PHASE 2: Choose processing strategy based on optimize flag and available packages
@@ -272,6 +285,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     "start_item_seq_idx", "end_item_seq_idx", "type",
     "sample_start", "sample_end", "sample_rate", "signal_file",
     "file_exists", "cache_key", "cached_result", "file_group_id",
+    "seg_params", "seg_params_digest",
     "result"
   )
 

@@ -1,5 +1,12 @@
 # reindeer (development version)
 
+- Fixed `quantify()` age/gender DSP-norm derivation: parameters are now
+  resolved per bundle (the single-row contract) instead of passing the
+  whole metadata table to `derive_dsp_parameters()`, which recycled
+  vectorised `Age`/`Gender` and returned an arbitrary norm row for
+  heterogeneous corpora. Quantify cache keys now digest the effective
+  per-segment parameters, preventing cross-speaker cache collisions.
+
 - `corpus()` now defaults to `quick = TRUE`: the SQLite cache and
   metadata cache are reused when present instead of being rebuilt on
   every open. Set `quick = FALSE` to force a full re-sync after manual
