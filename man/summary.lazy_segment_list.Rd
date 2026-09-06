@@ -2,10 +2,10 @@
 % Please edit documentation in R/reindeer_lazy_segment_list.R
 \name{summary.lazy_segment_list}
 \alias{summary.lazy_segment_list}
+\alias{.summary_lazy_segment_list}
 \title{Summary method for lazy_segment_list}
 \usage{
-## S7 method for class <reindeer::lazy_segment_list>
-summary(object, ...)
+.summary_lazy_segment_list(object, ...)
 }
 \arguments{
 \item{object}{lazy_segment_list object}

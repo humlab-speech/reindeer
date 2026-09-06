@@ -375,7 +375,7 @@ apply_descend_transform <- function(query, level) {
 #' @param x lazy_segment_list object
 #' @param ... Additional arguments (unused)
 #' @name print.lazy_segment_list
-S7::method(print, lazy_segment_list) <- function(x, ..., preview = TRUE) {
+.print_lazy_segment_list <- function(x, ..., preview = TRUE) {
   cli::cli_rule(
     left = cli::style_bold("lazy_segment_list"),
     right = if (x@.state$materialized) "{cli::col_green('\u2713 materialized')}" else "{cli::col_silver('\u29d7 lazy')}"
@@ -464,7 +464,7 @@ S7::method(print, lazy_segment_list) <- function(x, ..., preview = TRUE) {
 #' @param object lazy_segment_list object
 #' @param ... Additional arguments (unused)
 #' @name summary.lazy_segment_list
-S7::method(summary, lazy_segment_list) <- function(object, ...) {
+.summary_lazy_segment_list <- function(object, ...) {
   if (object@.state$materialized && !is.null(object@.state$cache)) {
     cli::cli_h1("Lazy Segment List (Materialized)")
     summary(object@.state$cache, ...)
@@ -525,7 +525,7 @@ glimpse_lazy_segment_list_impl <- function(x, ...) {
 # S7 namespaces the class as "reindeer::lazy_segment_list", so the S3
 # method as.data.frame.lazy_segment_list never dispatches. We register an
 # S7 method on as.data.frame instead.
-S7::method(as.data.frame, lazy_segment_list) <- function(x, ...) {
+.as_data_frame_lazy_segment_list <- function(x, ...) {
   seg_list <- collect(x)
   as.data.frame(seg_list)
 }

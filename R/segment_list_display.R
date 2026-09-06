@@ -8,7 +8,7 @@
 #' @param n Number of rows to show
 #' @param width Width of the printed table
 #' @name print.segment_list
-S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
+.print_segment_list <- function(x, ..., n = NULL, width = NULL) {
   # Determine number of rows to show
   if (is.null(n)) {
     n <- getOption("pillar.print_max", 10)
@@ -69,7 +69,7 @@ S7::method(print, segment_list) <- function(x, ..., n = NULL, width = NULL) {
 #' @param object The segment_list object
 #' @param ... Additional arguments (unused)
 #' @name summary.segment_list
-S7::method(summary, segment_list) <- function(object, ...) {
+.summary_segment_list <- function(object, ...) {
   cli::cli_h1("Segment List Summary")
 
   # Database info
@@ -197,7 +197,7 @@ glimpse_segment_list_impl <- function(x, width = NULL, ...) {
 #' @param width The width of the printed table.
 #' @name print.extended_segment_list
 #'
-S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = NULL) {
+.print_extended_segment_list <- function(x, ..., n = NULL, width = NULL) {
   # Determine number of rows to show
   if (is.null(n)) {
     n <- getOption("pillar.print_max", 10)
@@ -268,7 +268,7 @@ S7::method(print, extended_segment_list) <- function(x, ..., n = NULL, width = N
 #' @param object The extended_segment_list object
 #' @param ... Additional arguments (unused)
 #' @name summary.extended_segment_list
-S7::method(summary, extended_segment_list) <- function(object, ...) {
+.summary_extended_segment_list <- function(object, ...) {
   cli::cli_h1("Extended Segment List Summary")
 
   # Database info

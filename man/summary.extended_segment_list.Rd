@@ -2,10 +2,10 @@
 % Please edit documentation in R/segment_list_display.R
 \name{summary.extended_segment_list}
 \alias{summary.extended_segment_list}
+\alias{.summary_extended_segment_list}
 \title{Summary method for extended_segment_list}
 \usage{
-## S7 method for class <reindeer::extended_segment_list>
-summary(object, ...)
+.summary_extended_segment_list(object, ...)
 }
 \arguments{
 \item{object}{The extended_segment_list object}

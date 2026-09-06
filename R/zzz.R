@@ -11,6 +11,20 @@
   S7::method(summary, corpus) <- .summary_corpus
   S7::method(`[`, corpus) <- .subset_corpus
 
+  # Display methods for the segment-list family and bundle_list are registered
+  # here, not at top level: S7 methods on S3 generics (print/summary/...) only
+  # reach S3 dispatch when registered at package load time. Top-level S7::method
+  # calls run once at install and are lost, leaving print/summary to fall through
+  # to the data.frame/tibble methods in installed packages.
+  S7::method(print, segment_list) <- .print_segment_list
+  S7::method(summary, segment_list) <- .summary_segment_list
+  S7::method(print, extended_segment_list) <- .print_extended_segment_list
+  S7::method(summary, extended_segment_list) <- .summary_extended_segment_list
+  S7::method(print, lazy_segment_list) <- .print_lazy_segment_list
+  S7::method(summary, lazy_segment_list) <- .summary_lazy_segment_list
+  S7::method(print, bundle_list) <- .print_bundle_list
+  S7::method(as.data.frame, lazy_segment_list) <- .as_data_frame_lazy_segment_list
+
   # Simulation S3 methods moved to the erodex companion package; no registration here.
 
   # vctrs hooks — needed so vec_slice/dplyr operations don't reject S7 objects

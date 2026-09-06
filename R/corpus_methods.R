@@ -352,7 +352,7 @@ glimpse_corpus_impl <- function(x, ...) {
 #' @param ... Additional arguments (unused)
 #' @param n Number of rows to show
 #' @name print.bundle_list
-S7::method(print, bundle_list) <- function(x, ..., n = NULL) {
+.print_bundle_list <- function(x, ..., n = NULL) {
   if (is.null(n)) {
     n <- getOption("pillar.print_max", 10)
   }

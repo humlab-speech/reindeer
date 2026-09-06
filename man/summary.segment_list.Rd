@@ -2,10 +2,10 @@
 % Please edit documentation in R/segment_list_display.R
 \name{summary.segment_list}
 \alias{summary.segment_list}
+\alias{.summary_segment_list}
 \title{Summary method for segment_list}
 \usage{
-## S7 method for class <reindeer::segment_list>
-summary(object, ...)
+.summary_segment_list(object, ...)
 }
 \arguments{
 \item{object}{The segment_list object}

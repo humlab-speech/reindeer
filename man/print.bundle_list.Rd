@@ -2,10 +2,10 @@
 % Please edit documentation in R/corpus_methods.R
 \name{print.bundle_list}
 \alias{print.bundle_list}
+\alias{.print_bundle_list}
 \title{Print method for bundle_list with tidyverse-style formatting}
 \usage{
-## S7 method for class <reindeer::bundle_list>
-print(x, ..., n = NULL)
+.print_bundle_list(x, ..., n = NULL)
 }
 \arguments{
 \item{x}{bundle_list object}

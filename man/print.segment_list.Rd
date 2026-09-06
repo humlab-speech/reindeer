@@ -2,10 +2,10 @@
 % Please edit documentation in R/segment_list_display.R
 \name{print.segment_list}
 \alias{print.segment_list}
+\alias{.print_segment_list}
 \title{Print method for segment_list with pillar formatting}
 \usage{
-## S7 method for class <reindeer::segment_list>
-print(x, ..., n = NULL, width = NULL)
+.print_segment_list(x, ..., n = NULL, width = NULL)
 }
 \arguments{
 \item{x}{The segment_list object}
