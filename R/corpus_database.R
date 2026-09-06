@@ -557,17 +557,23 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   
   basePath <- corpus_obj@basePath
   db_uuid <- corpus_obj@.uuid
+  db_name <- sub("_emuDB$", "", basename(basePath))
   con <- get_corpus_connection(corpus_obj)
   
-  # Clear existing metadata
-  DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?", params = list(db_uuid))
-  DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?", params = list(db_uuid))
-  DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?", params = list(db_uuid))
+  # Clear existing metadata atomically (all three tables or none).
+  DBI::dbWithTransaction(con, {
+    DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?",
+                   params = list(db_uuid))
+    DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?",
+                   params = list(db_uuid))
+    DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?",
+                   params = list(db_uuid))
+  })
   
-  # 1. Database-level metadata
-  db_meta_file <- file.path(basePath, metadata.filename)
+  # 1. Database-level metadata (METADATA.json, or legacy .meta_json fallback)
+  db_meta_file <- .resolve_metadata_file(basePath, db_name)
   
-  if (file.exists(db_meta_file)) {
+  if (!is.na(db_meta_file)) {
     if (verbose) cli::cli_alert_info("Loading database defaults")
     db_meta <- jsonlite::read_json(db_meta_file, simplifyVector = TRUE)
     if (length(db_meta) > 0) {
@@ -588,10 +594,11 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   
   for (i in seq_len(nrow(sessions))) {
     session_name <- sessions$name[i]
-    session_meta_file <- file.path(basePath, paste0(session_name, "_ses"),
-                                   metadata.filename)
+    session_meta_file <- .resolve_metadata_file(
+      file.path(basePath, paste0(session_name, "_ses")), session_name
+    )
     
-    if (file.exists(session_meta_file)) {
+    if (!is.na(session_meta_file)) {
       meta_data <- jsonlite::read_json(session_meta_file, simplifyVector = TRUE)
       if (length(meta_data) > 0) {
         process_metadata_list(con, db_uuid, session_name, NULL, meta_data, "session")
@@ -622,14 +629,13 @@ gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
     session_name <- bundles$session[i]
     bundle_name <- bundles$name[i]
     
-    bundle_meta_file <- file.path(
-      basePath,
-      paste0(session_name, "_ses"),
-      paste0(bundle_name, "_bndl"),
-      metadata.filename
+    bundle_meta_file <- .resolve_metadata_file(
+      file.path(basePath, paste0(session_name, "_ses"),
+                paste0(bundle_name, "_bndl")),
+      bundle_name
     )
     
-    if (file.exists(bundle_meta_file)) {
+    if (!is.na(bundle_meta_file)) {
       meta_data <- jsonlite::read_json(bundle_meta_file, simplifyVector = TRUE)
       if (length(meta_data) > 0) {
         process_metadata_list(con, db_uuid, session_name, bundle_name, meta_data, "bundle")

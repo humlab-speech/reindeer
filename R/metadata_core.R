@@ -247,10 +247,15 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     return(invisible(corpus_obj))
   }
 
-  # Clear existing metadata (we're rebuilding from ground truth)
-  DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?", params = list(db_uuid))
-  DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?", params = list(db_uuid))
-  DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?", params = list(db_uuid))
+  # Clear existing metadata atomically (we're rebuilding from ground truth).
+  DBI::dbWithTransaction(con, {
+    DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?",
+                   params = list(db_uuid))
+    DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?",
+                   params = list(db_uuid))
+    DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?",
+                   params = list(db_uuid))
+  })
   
   # 1. Database-level metadata (METADATA.json, or legacy <db>.meta_json)
   db_name <- basename(basePath)

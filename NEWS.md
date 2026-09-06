@@ -1,5 +1,12 @@
 # reindeer (development version)
 
+- The corpus constructor's metadata gather now honours the legacy
+  `<name>.meta_json` fallback (via `.resolve_metadata_file()`) at the
+  database, session, and bundle levels, instead of only reading
+  `METADATA.json`. The metadata table-clearing DELETEs in both gather
+  paths are now wrapped in a single transaction so a rebuild never leaves
+  a partially cleared cache.
+
 - Vignettes now use conditional evaluation (`eval =
   identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true")`), so they
   still build without the heavy DSP companions in CI but can render real
