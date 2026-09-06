@@ -156,9 +156,15 @@ detect_annot_changes <- function(db_handle) {
   
   changed <- list()
   
+  # Normalize to forward slashes: on Windows, list.files()/basePath may mix
+  # "\" and "/", which made the prefix strip below fail and no bundle was
+  # ever reported as changed (so no EAF was generated).
+  annot_files <- normalizePath(annot_files, winslash = "/", mustWork = FALSE)
+  base_norm <- normalizePath(db_handle$basePath, winslash = "/", mustWork = FALSE)
+  
   for (annot_path in annot_files) {
     # Extract session and bundle names
-    rel_path <- sub(paste0(db_handle$basePath, "/"), "", annot_path)
+    rel_path <- sub(paste0(base_norm, "/"), "", annot_path)
     parts <- strsplit(rel_path, "/")[[1]]
     
     if (length(parts) < 2) next
@@ -224,11 +230,13 @@ detect_metadata_changes <- function(db_handle) {
   
   changed <- FALSE
   
-  for (meta_path in meta_files) {
+  base_norm <- normalizePath(db_handle$basePath, winslash = "/", mustWork = FALSE)
+  
+  for (meta_path in normalizePath(meta_files, winslash = "/", mustWork = FALSE)) {
     checksum <- as.character(tools::md5sum(meta_path))
     
     # Use relative path as key
-    rel_path <- sub(paste0(db_handle$basePath, "/"), "", meta_path)
+    rel_path <- sub(paste0(base_norm, "/"), "", meta_path)
     old_checksum <- state$metadata_checksums[[rel_path]]
     
     if (is.null(old_checksum) || old_checksum != checksum) {
