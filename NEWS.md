@@ -1,5 +1,11 @@
 # reindeer (development version)
 
+- Vignettes now use conditional evaluation (`eval =
+  identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true")`), so they
+  still build without the heavy DSP companions in CI but can render real
+  output when the environment variable is set. Fixed stale `.meta_json` /
+  `serve()` references in the interactive-annotation vignette.
+
 - Corrected documentation that overstated lazy deferral (`query()` now
   states that plan-time level/attribute resolution and compound sub-query
   materialisation happen at call time; the lazy print/summary docs note

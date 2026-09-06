@@ -11,7 +11,7 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = FALSE
+  eval = identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true")
 )
 ```
 
@@ -365,7 +365,7 @@ serve_app(corp, bundleListName = "Annotator_A")
 bundles_A <- emuR::read_bundleList(get_emuDBhandle(corp), "Annotator_A")
 
 # Check which have been annotated
-# (Look for .meta_json or specific annotation levels)
+# (Look for METADATA.json or specific annotation levels)
 ```
 
 ## Troubleshooting
@@ -416,7 +416,7 @@ httpuv::stopAllServers()
 
 ```{r help}
 # Function documentation
-?serve
+?serve_app
 
 # Check server status
 # (No built-in status check, but server will error if already running)
@@ -521,7 +521,7 @@ cat(sprintf("Found %d bundles needing phonetic annotation\n",
             nrow(bundles_needing_annotation)))
 
 # === ANNOTATE ===
-# Convert to segment_list format for serve()
+# Convert to segment_list format for serve_app()
 work_segments <- words %>%
   semi_join(bundles_needing_annotation, by = c("session", "bundle"))
 
