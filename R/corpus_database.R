@@ -546,12 +546,13 @@ insert_batch_results <- function(con, results, db_uuid) {
     DBI::dbRollback(con)
     cli::cli_abort("Cache build failed: {conditionMessage(e)}", parent = e)
   })
-}#' Gather all metadata from .meta_json files (internal, called during construction)
+}#' Gather all metadata from METADATA.json / legacy .meta_json files
+#' (internal, called during construction)
 #' @keywords internal
 #' @noRd
 gather_metadata_internal <- function(corpus_obj, verbose = FALSE) {
   if (verbose) {
-    cli::cli_alert_info("Scanning .meta_json files...")
+    cli::cli_alert_info("Scanning metadata files...")
   }
   
   basePath <- corpus_obj@basePath

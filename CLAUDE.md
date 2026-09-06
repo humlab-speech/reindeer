@@ -46,16 +46,13 @@ Rscript -e "devtools::document()"
 # Run benchmarks from benchmarking/ directory
 Rscript benchmarking/benchmark_dspp.R
 Rscript benchmarking/benchmark_serialization.R
-
-# Verify implementation correctness
-Rscript verify_implementation.R
 ```
 
 ### Building Vignettes
 
 ```bash
 # Render a specific vignette
-Rscript render_vignette.R
+Rscript -e 'rmarkdown::render("vignettes/getting_started.Rmd")'
 
 # Build all vignettes
 Rscript -e "devtools::build_vignettes()"
@@ -94,7 +91,7 @@ SQLite Cache (_emuDBcache.sqlite) ← built by build_emuDB_cache()
     ↓
 segment_list (S7 object)
     ↓
-quantify() / enrich() [R/reindeeR_signalextensions_dt.R]
+quantify() / enrich() [R/reindeer_signal_extensions_dt.R]
     ↓
 Signal Processing + Persistent Cache
     ↓
@@ -143,7 +140,7 @@ query(corp, "Phonetic == t") -> segments
 
 ### Signal Processing & Caching
 
-**Age/Gender-Specific Parameters** (`R/reindeeR_signalextensions_dt.R`):
+**Age/Gender-Specific Parameters** (`R/reindeer_signal_extensions_dt.R`):
 - `dspp_metadataParameters_dt()`: Returns processing params based on Age/Gender
 - Uses LOESS smoothing over empirical defaults from literature
 - Optimized with data.table (3-4x faster than original dplyr version)
@@ -206,10 +203,11 @@ See `SERVE_FUNCTION_SUMMARY.md` for detailed documentation.
 Many functions have optimized versions:
 - `reindeeR_metadata_optimized.R` vs `reindeeR_metadata.R` (deprecated)
 - `R/query_executor.R` (`query`) vs `emuR::query()`
-- `reindeeR_signalextensions_dt.R` (data.table) vs `reindeeR_signalextensions.R` (dplyr, deprecated)
+- `reindeer_signal_extensions_dt.R` (data.table; the old dplyr
+  `reindeeR_signalextensions.R` was removed)
 - `reindeer_transcription_system_optimized.R` vs `reindeer_transcription_system.R` (deprecated)
 
-See DEPRECATED_FUNCTIONS.md for complete list of files marked for deletion.
+See NEWS.md (deprecation ledger) for complete list of files marked for deletion.
 
 ### 3. Lazy Evaluation (Future)
 
@@ -420,7 +418,7 @@ The repository contains extensive markdown documentation (these are implementati
 - **SERIALIZATION_QUICK_REF.md**: Cache optimization guide (qs vs base R)
 
 **Development Notes**:
-- **DEPRECATED_FUNCTIONS.md**: Files/functions marked for deletion
+- **NEWS.md (deprecation ledger)**: Files/functions marked for deletion
 - **CI_CD_SETUP_SUMMARY.md**: GitHub Actions, pkgdown, codecov setup
 - Multiple `*_IMPLEMENTATION_SUMMARY.md` files documenting major features
 
@@ -442,8 +440,7 @@ Key dependencies:
 
 ## Working with Git
 
-Current branch: `v0.7-breaking` (feature branch for v0.7 API minimization)
-Main branch: `main`
+Current branch: `main`
 
 Recent focus areas (based on commit history):
 - Cache serialization optimization (qs package)
@@ -485,7 +482,7 @@ simulations/                     # Simulation caches (user-specified location)
 ## Notes for Claude Code
 
 1. **Always prefer optimized versions**: Use `*_optimized.R` and `*_dt.R` implementations
-2. **Don't edit deprecated files**: See DEPRECATED_FUNCTIONS.md for files to avoid
+2. **Don't edit deprecated files**: See NEWS.md (deprecation ledger) for files to avoid
 3. **Maintain ground truth**: Always update JSON files, not just SQLite cache
 4. **Test with ae database**: Use `reindeer:::create_ae_db()` for testing
 5. **Check benchmarks**: Run relevant benchmarks after performance-related changes

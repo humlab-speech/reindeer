@@ -6,9 +6,12 @@
 #' tibble-like `segment_list` ready for [enrich()] / [quantify()] / dplyr.
 #'
 #' Since v0.7 the query is **deferred by default**: a [lazy_segment_list]
-#' is returned and the SQL fires only when you access the rows
-#' (`nrow()`, `head()`, `$`, dplyr verbs, [collect()] etc.). Pass
-#' `lazy = FALSE` to force immediate execution.
+#' is returned and the main result SQL fires when you access the rows
+#' (`nrow()`, `head()`, `$`, dplyr verbs, [collect()] etc.). Deferral is
+#' partial: plan-time work still resolves level/attribute names and
+#' materialises compound sub-queries (sequences, dominance), so the query
+#' string is fully built at call time. Pass `lazy = FALSE` to force
+#' immediate execution.
 #'
 #' @param emuDB A `corpus` (preferred), a path to an `_emuDB` directory,
 #'   or an existing `emuDBhandle`.

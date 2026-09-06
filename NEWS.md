@@ -1,5 +1,13 @@
 # reindeer (development version)
 
+- Corrected documentation that overstated lazy deferral (`query()` now
+  states that plan-time level/attribute resolution and compound sub-query
+  materialisation happen at call time; the lazy print/summary docs note
+  they run a `COUNT(*)` + preview query) and refreshed stale references
+  (`.meta_json` ground-truth comments, CLAUDE.md dev commands, removed
+  `DEPRECATED_FUNCTIONS.md` / `render_vignette.R` / `verify_implementation.R`
+  links).
+
 - Completed the pkgdown reference index: added the ~25 exported topics
   that were missing (interop, tidy reshaping/column helpers, FAIR/CMDI,
   companion-package glue, gadgets, `derive_dsp_parameters`,
