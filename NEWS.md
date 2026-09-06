@@ -1,5 +1,15 @@
 # reindeer (development version)
 
+- Quantify cache I/O is now batched: cache reads use chunked `IN`
+  queries (with a single `accessed_at` touch per chunk) and misses are
+  written in one transaction, replacing the per-row SELECT + UPDATE and
+  per-miss SELECT-SUM + INSERT pattern.
+
+- Fixed swapped argument order in `enrich(corpus)`'s persistent-cache
+  calls (`.get_persistent_cache`/`.set_persistent_cache` were invoked as
+  `(conn, key)`), which made the enrich cache path error whenever
+  `.use_cache` was enabled.
+
 - `enrich(corpus, ...)` now defaults to `.use_cache = TRUE`, so signal
   files whose cached result (keyed on file mtime + DSP params) already
   exists are skipped instead of re-running DSP corpus-wide. `.force =

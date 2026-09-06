@@ -335,7 +335,7 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
         dsp_params
       ))
       if (!.force) {
-        cached <- .get_persistent_cache(cache_conn, cache_key)
+        cached <- .get_persistent_cache(cache_key, cache_conn)
         if (!is.null(cached)) {
           return(list(success = TRUE, bundle = bundle_row$bundle,
                       session = bundle_row$session, cached = TRUE))
@@ -353,7 +353,7 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
 
       # Store in cache if enabled
       if (!is.null(cache_conn)) {
-        .set_persistent_cache(cache_conn, cache_key, TRUE, format = cache_format)
+        .set_persistent_cache(cache_key, TRUE, cache_conn, format = cache_format)
       }
 
       list(success = TRUE, bundle = bundle_row$bundle, session = bundle_row$session)

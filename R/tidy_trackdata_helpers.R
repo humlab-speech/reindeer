@@ -387,36 +387,8 @@ clear_tidy_cache <- function() {
       format <- "rds"
     }
     
-    # Deserialize based on format
-    blob <- result$result_blob[[1]]
-    
-    data <- tryCatch({
-      if (format == "qs" && requireNamespace("qs", quietly = TRUE)) {
-        qs::qdeserialize(blob)
-      } else {
-        unserialize(blob)
-      }
-    }, error = function(e) {
-      # If deserialization fails, try the other method as fallback
-      tryCatch({
-        if (format == "qs") {
-          # qs failed, try base unserialize
-          unserialize(blob)
-        } else {
-          # base failed, try qs if available
-          if (requireNamespace("qs", quietly = TRUE)) {
-            qs::qdeserialize(blob)
-          } else {
-            cli::cli_abort("Deserialization failed: {conditionMessage(e)}", parent = e)
-          }
-        }
-      }, error = function(e2) {
-        # Both failed - return NULL to trigger recomputation
-        NULL
-      })
-    })
-    
-    return(data)
+    # Deserialize based on format (with cross-format fallback)
+    return(.deserialize_cache_blob(result$result_blob[[1]], format))
   } else {
     NULL
   }
@@ -469,6 +441,118 @@ clear_tidy_cache <- function() {
   invisible(NULL)
 }
 
+#' Deserialize a cache blob, trying the recorded format first and falling
+#' back to the other serialization format on failure.
+#' @noRd
+.deserialize_cache_blob <- function(blob, format) {
+  if (is.null(format) || is.na(format)) format <- "rds"
+  tryCatch({
+    if (format == "qs" && requireNamespace("qs", quietly = TRUE)) {
+      qs::qdeserialize(blob)
+    } else {
+      unserialize(blob)
+    }
+  }, error = function(e) {
+    tryCatch({
+      if (format == "qs") {
+        unserialize(blob)
+      } else if (requireNamespace("qs", quietly = TRUE)) {
+        qs::qdeserialize(blob)
+      } else {
+        NULL
+      }
+    }, error = function(e2) NULL)
+  })
+}
+
+#' Batch read from the persistent cache.
+#'
+#' Fetches all keys with a small number of chunked `IN` queries (chunked to
+#' stay under SQLite's bind-parameter limit) and touches `accessed_at` once
+#' per chunk, instead of one SELECT + UPDATE per key. Returns a named list of
+#' deserialized results keyed by `cache_key`; keys absent from the cache are
+#' omitted.
+#' @noRd
+.get_persistent_cache_batch <- function(cache_keys, conn) {
+  cache_keys <- unique(cache_keys)
+  if (length(cache_keys) == 0L) return(stats::setNames(list(), character()))
+
+  out_keys <- character()
+  out_vals <- list()
+  chunk_size <- 500L
+  starts <- seq.int(1L, length(cache_keys), by = chunk_size)
+  now <- as.integer(Sys.time())
+
+  for (s in starts) {
+    ch <- cache_keys[s:min(s + chunk_size - 1L, length(cache_keys))]
+    ph <- paste(rep("?", length(ch)), collapse = ", ")
+    rows <- DBI::dbGetQuery(
+      conn,
+      sprintf("SELECT cache_key, result_blob, format FROM cache WHERE cache_key IN (%s)", ph),
+      params = as.list(ch)
+    )
+    if (nrow(rows) > 0L) {
+      out_keys <- c(out_keys, rows$cache_key)
+      out_vals <- c(out_vals, lapply(seq_len(nrow(rows)), function(i) {
+        .deserialize_cache_blob(rows$result_blob[[i]], rows$format[i])
+      }))
+      # One batched access-time touch per chunk.
+      hph <- paste(rep("?", nrow(rows)), collapse = ", ")
+      DBI::dbExecute(
+        conn,
+        sprintf("UPDATE cache SET accessed_at = ? WHERE cache_key IN (%s)", hph),
+        params = c(list(now), as.list(rows$cache_key))
+      )
+    }
+  }
+  stats::setNames(out_vals, out_keys)
+}
+
+#' Batch write to the persistent cache.
+#'
+#' Serializes every entry once, evicts once if over budget, then inserts all
+#' rows inside a single transaction — replacing the per-row SELECT-SUM +
+#' INSERT pattern that ran two statements per miss.
+#' @noRd
+.set_persistent_cache_batch <- function(entries, conn, max_cache_size_mb = 1000,
+                                        format = c("auto", "qs", "rds")) {
+  if (length(entries) == 0L) return(invisible(NULL))
+  format <- match.arg(format)
+  if (format == "auto") {
+    format <- if (requireNamespace("qs", quietly = TRUE)) "qs" else "rds"
+  }
+
+  use_qs <- format == "qs" && requireNamespace("qs", quietly = TRUE)
+  blobs <- lapply(entries, function(e) {
+    if (use_qs) qs::qserialize(e$result, preset = "fast") else serialize(e$result, NULL)
+  })
+  sizes <- vapply(blobs, length, integer(1))
+  now <- as.integer(Sys.time())
+
+  # Evict oldest 25% when over budget (once per batch, not per insert).
+  total <- DBI::dbGetQuery(conn, "SELECT SUM(size_bytes) AS total FROM cache")$total
+  if (isTRUE(total > max_cache_size_mb * 1024^2)) {
+    DBI::dbExecute(conn, "
+      DELETE FROM cache
+      WHERE cache_key IN (
+        SELECT cache_key FROM cache
+        ORDER BY accessed_at ASC
+        LIMIT (SELECT COUNT(*) / 4 FROM cache)
+      )
+    ")
+  }
+
+  DBI::dbWithTransaction(conn, {
+    for (i in seq_along(entries)) {
+      DBI::dbExecute(conn, "
+        INSERT OR REPLACE INTO cache (cache_key, result_blob, format, created_at, accessed_at, size_bytes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      ", params = list(entries[[i]]$cache_key, list(blobs[[i]]), format, now, now, sizes[i]))
+    }
+  })
+  invisible(NULL)
+}
+
 #' Vectorized segment processing using data.table
 #' @noRd
 .process_segments_vectorized <- function(seg_df, corpus_obj, dsp_function, dsp_params,
@@ -509,10 +593,10 @@ clear_tidy_cache <- function() {
         sep = "_"
       )]
       
-      # Check cache for existing results
-      dt_valid[, cached_result := lapply(cache_key, function(k) {
-        .get_persistent_cache(k, cache_conn)
-      })]
+      # Batch cache lookup — a handful of chunked IN queries instead of one
+      # SELECT + UPDATE per row.
+      cached_map <- .get_persistent_cache_batch(dt_valid$cache_key, cache_conn)
+      dt_valid[, cached_result := lapply(cache_key, function(k) cached_map[[k]])]
       
       # Separate cached and uncached
       dt_cached <- dt_valid[!vapply(cached_result, is.null, logical(1))]
@@ -554,11 +638,6 @@ clear_tidy_cache <- function() {
               list(toFile = FALSE, verbose = FALSE)
             ))
             
-            # Store in cache if enabled
-            if (use_cache && !is.null(cache_conn)) {
-              .set_persistent_cache(cache_key[i], result, cache_conn, format = cache_format)
-            }
-            
             result
           }, error = function(e) {
             if (.verbose) {
@@ -573,6 +652,19 @@ clear_tidy_cache <- function() {
       
       # Combine results with segment info
       dt_uncached[, result := unlist(results_list$results, recursive = FALSE)]
+
+      # Batch-write all misses in one transaction instead of per row.
+      if (use_cache && !is.null(cache_conn) && nrow(dt_uncached) > 0L) {
+        non_null <- !vapply(dt_uncached$result, is.null, logical(1))
+        if (any(non_null)) {
+          entries <- Map(
+            function(k, r) list(cache_key = k, result = r),
+            dt_uncached$cache_key[non_null],
+            dt_uncached$result[non_null]
+          )
+          .set_persistent_cache_batch(entries, cache_conn, format = cache_format)
+        }
+      }
     } else {
       dt_uncached[, result := list()]
     }
