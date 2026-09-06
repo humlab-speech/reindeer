@@ -2,7 +2,7 @@
 
 ## Summary
 
-We have created an optimized version of `dspp_metadataParameters()` using data.table that provides substantial performance improvements.
+We have created an optimized version of `dspp_metadataParameters()` using data.table.
 
 ## Performance Gains
 

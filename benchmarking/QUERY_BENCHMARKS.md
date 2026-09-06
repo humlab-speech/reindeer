@@ -20,11 +20,11 @@ execute:
 
 ## Overview
 
-This vignette presents comprehensive performance benchmarks for two major optimizations in the reindeer package:
+This vignette presents performance benchmarks for two optimizations in the reindeer package:
 
 1. **Optimized EQL Queries**: SQL-based query implementation (`query()`) vs standard `emuR::query()`
 
-The optimized implementation prioritizes performance and maintainability while ensuring fidelity to original behavior.
+The optimized implementation favors performance and maintainability and reproduces the original behavior.
 
 ## EQL Query Optimization
 
@@ -311,7 +311,7 @@ The test suite validates:
 
 The optimized query implementation successfully handles:
 
-✅ **Fully Supported:**
+**Fully supported:**
 - Simple queries: `==`, `!=` operators with literal values
 - Regex queries: `=~`, `!~` operators with regex patterns
 - Sequence queries: `->` operator for temporal sequences
@@ -324,7 +324,7 @@ The optimized query implementation successfully handles:
 - Attributes: `Level:Attribute` syntax for non-default attributes
 - Multi-level hierarchies: Deep query nesting and combinations
 
-⚠️ **Known Limitations:**
+**Known limitations:**
 
 1. **Parser Differences**: Some disjunction queries that emuR's parser rejects are handled by our implementation, creating slight behavioral differences in edge cases.
 
@@ -332,7 +332,7 @@ The optimized query implementation successfully handles:
 
 3. **Result Ordering**: While results contain identical rows to emuR::query(), the exact ordering may differ in some cases. This does not affect functional equivalence.
 
-📊 **Test Suite:** 99 tests covering all major query types, with 97 passing and 2 skipped due to emuR parser limitations (not implementation issues).
+**Test suite:** 99 tests covering all major query types, with 97 passing and 2 skipped due to emuR parser limitations (not implementation issues).
 
 ```
 
@@ -714,7 +714,7 @@ For detailed test results, run `devtools::test(filter = 'query_optimized')`.
 
 ### Known Limitations
 
-**⚠️ Minor Differences:**
+**Minor differences:**
 
 1. **Disjunction Queries**: Our implementation handles disjunction queries (`|` operator) correctly, but emuR's parser has known issues with certain patterns. The 2 skipped tests are due to emuR parser limitations, not our implementation.
 

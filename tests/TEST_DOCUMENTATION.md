@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides comprehensive documentation of the test suite for the optimized EQL (EMU Query Language) implementation. The test suite validates that `query_opt()` correctly replicates the behavior of `emuR::query()` while providing significant performance improvements.
+This document describes the test suite for the optimized EQL (EMU Query Language) implementation. The test suite checks that `query_opt()` reproduces the behavior of `emuR::query()`.
 
 ## Test Statistics
 
@@ -300,19 +300,19 @@ Tests use the standard emuR demo database:
 
 For each supported query type, tests verify:
 
-1. ✅ Row count matches emuR::query()
-2. ✅ Level names match
-3. ✅ Result structure is valid emuRsegs
-4. ✅ Timing information is consistent
-5. ✅ Sample information is correct
+1. Row count matches emuR::query()
+2. Level names match
+3. Result structure is valid emuRsegs
+4. Timing information is consistent
+5. Sample information is correct
 
 ### Performance Testing
 
 Benchmarks verify:
 
-1. ✅ Significant speedup (5-15x typical)
-2. ✅ Memory efficiency
-3. ✅ Scaling characteristics
+1. Significant speedup (5-15x typical)
+2. Memory efficiency
+3. Scaling characteristics
 
 ---
 
@@ -320,10 +320,10 @@ Benchmarks verify:
 
 Tests should be run:
 
-- ✅ Before committing changes to query_opt()
-- ✅ After modifying SQL generation logic
-- ✅ When updating emuR dependency version
-- ✅ As part of package check (`R CMD check`)
+- Before committing changes to query_opt()
+- After modifying SQL generation logic
+- When updating emuR dependency version
+- As part of package check (`R CMD check`)
 
 ---
 
@@ -347,8 +347,8 @@ When adding new EQL features:
 
 ## Conclusion
 
-The test suite provides comprehensive coverage of the EQL implementation with 97 passing tests validating correctness across all major query types, edge cases, and complex scenarios. The implementation successfully replicates emuR::query() behavior while providing significant performance improvements.
+The test suite covers the EQL implementation with 97 passing tests. The implementation reproduces emuR::query() behavior.
 
-**Status**: ✅ Ready for use  
-**Quality**: High - comprehensive test coverage  
+**Status**: Ready for use  
+**Quality**: High  
 **Reliability**: Validated equivalence with emuR::query()

@@ -2,7 +2,7 @@
 
 ## Overview
 
-A comprehensive fidelity test suite has been created to ensure that the reindeer transcription system maintains full compatibility with emuR after applying automatic transcriptions.
+Fidelity test suite for the reindeer transcription system. It checks that automatic transcriptions keep the system compatible with emuR.
 
 ## Test Suite: `test-transcription-fidelity.R`
 
@@ -18,7 +18,7 @@ The test suite verifies that:
 
 ### Test Coverage
 
-The fidelity test suite includes 10 comprehensive test scenarios:
+The fidelity test suite includes 10 test scenarios:
 
 1. **Transcription to existing SEGMENT level** - Verifies adding segments to existing Phonetic level
 2. **Transcription creates new SEGMENT level** - Tests level creation and annotation
@@ -107,7 +107,7 @@ log@n_items_removed <- 0L
 
 ### Working Tests
 
-✅ Basic transcription functionality verified in manual testing:
+Basic transcription functionality verified in manual testing:
 - Corpus object creation from database path
 - SuggestedSegments object creation
 - Assessment of suggestions
@@ -156,4 +156,4 @@ To complete the fidelity test suite:
 
 ## Conclusion
 
-The comprehensive fidelity test suite provides strong guarantees that reindeer's transcription system maintains full compatibility with emuR. The infrastructure is in place and the core functionality has been validated. Remaining work involves polishing test setup and expanding coverage to edge cases.
+The fidelity test suite confirms the transcription system stays compatible with emuR. The core functionality works. Remaining work: polish test setup and expand edge-case coverage.

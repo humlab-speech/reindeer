@@ -766,7 +766,7 @@ Updated cache management documentation to clarify that:
 
 # reindeer 0.3.0 (BREAKING CHANGES - 2026-02-05)
 
-## Major Changes: Draft Annotation Migration
+## Draft Annotation Migration
 
 All draft annotation functionality has been **removed** from reindeer and is now exclusively in the **protoscribe** package. This creates a clean separation of concerns:
 
@@ -824,11 +824,11 @@ library(protoscribe) # Draft annotations
 ```
 
 **Key Benefits:**
-- ✅ Cleaner package boundaries
-- ✅ No Python dependencies in reindeer
-- ✅ Faster installation of reindeer
-- ✅ protoscribe can be developed independently
-- ✅ Better code maintainability
+- Cleaner package boundaries
+- No Python dependencies in reindeer
+- Faster installation of reindeer
+- protoscribe can be developed independently
+- Better code maintainability
 
 ### Cache Management Changes
 
@@ -865,7 +865,7 @@ protoscribe::clean_draft_cache(corp, days_old = 30)
 
 # reindeer 0.2.5 (Development)
 
-## Major New Features 🎉
+## New Features
 
 ### Corpus Creation from Scratch
 
@@ -889,7 +889,7 @@ protoscribe::clean_draft_cache(corp, days_old = 30)
 * Prevents path separators and problematic characters
 * Provides clear validation error messages
 
-## Bug Fixes 🐛
+## Bug Fixes
 
 ### Bracket Assignment Operator
 
@@ -909,7 +909,7 @@ protoscribe::clean_draft_cache(corp, days_old = 30)
 
 ### Error Messages
 
-* Significantly improved error messages throughout
+* Improved error messages throughout
 * Helpful suggestions when database path doesn't exist
 * Clear guidance for name validation failures
 * Better context in all error conditions
@@ -956,10 +956,10 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 
 <hr/>
 
-## Code Quality Improvements 🧹
+## Code Quality Improvements
 
 ### Repository Cleanup
-* **Major cleanup**: Removed 5,942 lines of deprecated code (-28.5% of codebase)
+* **Cleanup**: Removed 5,942 lines of deprecated code (-28.5% of codebase)
   - Deleted 7 deprecated files marked with `_DELETE_` prefix
   - All deprecated code was internal, non-exported (no breaking changes)
   - Reduces maintenance burden and improves code clarity
@@ -998,10 +998,10 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 <hr/>
 # reindeer 0.2.4
 
-## Major Performance Improvements ⚡
+## Performance Improvements
 
 * **RcppSimdJson Integration** - 2-10x faster JSON parsing
-  - All JSON reading operations now use RcppSimdJson for massive speedups
+  - All JSON reading operations now use RcppSimdJson
   - Hybrid strategy: RcppSimdJson for reading, jsonlite for writing
   - Automatic fallback to jsonlite ensures 100% compatibility
   - Database loading: 2.5x faster
@@ -1016,7 +1016,7 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
   - Simulation caches optimized
   - Draft annotation caches optimized
 
-## Bug Fixes 🐛
+## Bug Fixes
 
 * **Fixed Critical Test Failures** - All 47 tests now passing
   - Fixed infinite recursion in `build_emuDB_cache()` for empty databases
@@ -1028,7 +1028,7 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 ## New Features
 
 * **Cache Management System**
-  - `manage_cache()`: User-friendly cache management interface
+  - `manage_cache()`: Cache management interface
   - Actions: status, list, clean (with dry-run support)
   - Works across all cache types (quantify, draft, simulation)
   - Automatic size monitoring with warnings
@@ -1044,7 +1044,7 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 
 ## Input Validation
 
-* **Comprehensive assertthat Integration**
+* **assertthat Integration**
   - 30+ validation checks across core functions
   - `corpus()` constructor: 4 validation checks
   - `quantify()`: 5 validation blocks
@@ -1053,19 +1053,18 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
   - `manage_cache()`: Full input validation
   - Clear, informative error messages
 
-## Documentation 📚
+## Documentation
 
 * **New Vignettes**
-  - `getting_started.Rmd`: Comprehensive beginner's guide (634 lines)
+  - `getting_started.Rmd`: Beginner's guide (634 lines)
   - `cache_management.Rmd`: Cache optimization guide (287 lines)
 
 * **Enhanced pkgdown Site**
   - New "Cache Management" reference section
   - Reorganized article navigation
   - Better function discoverability
-  - Ready for deployment
 
-## Testing 🧪
+## Testing
 
 * **Expanded Test Coverage** - 15% increase
   - New test file: `test_manage_cache.R` (12 scenarios, 30+ assertions)
@@ -1085,7 +1084,7 @@ create_session_and_bundle(VISP, "Svenska", "Annie")
 
 ## Code Quality
 
-* **Major Cleanup**
+* **Cleanup**
   - Removed 1,843 lines of deprecated code
   - Net reduction: 521 lines (after adding features)
   - Improved documentation formatting

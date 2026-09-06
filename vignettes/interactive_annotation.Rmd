@@ -17,17 +17,11 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-The **reindeer** package provides `serve_app()`, a function that launches the EMU-webApp annotation interface directly from R. This allows you to:
-
-- **Visualize** your speech data with interactive spectrograms
-- **Annotate** segments, events, and hierarchical structures
-- **Play audio** synchronized with annotations
-- **Edit** annotations in real-time
-- **Save** changes directly back to your database
+The **reindeer** package provides `serve_app()`, a function that launches the EMU-webApp annotation interface directly from R. This lets you view speech data as interactive spectrograms, annotate segments and events, play audio synchronized with annotations, edit annotations in real time, and save changes back to the database.
 
 This vignette shows you how to use `serve_app()` for interactive annotation workflows.
 
-## Quick Start
+## Quick start
 
 ```{r quick-start}
 library(reindeer)
@@ -39,11 +33,11 @@ corp <- corpus("path/to/database_emuDB")
 serve_app(corp)
 ```
 
-That's it! The EMU-webApp will open in your browser (or RStudio Viewer pane) and you can start annotating.
+The EMU-webApp opens in your browser (or the RStudio Viewer pane) and you can start annotating.
 
-## Setup and Configuration
+## Setup and configuration
 
-### First-Time Setup
+### First-time setup
 
 The `serve_app()` function looks for the EMU-webApp in several locations:
 
@@ -60,7 +54,7 @@ Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
 serve_app(corp)  # Will use auto-detected path
 ```
 
-### Verifying Setup
+### Verifying setup
 
 ```{r verify}
 # The function will show an informative error if webapp not found
@@ -70,9 +64,9 @@ serve_app(corp)
 # ℹ Set a custom path via options(reindeer.emuWebApp.dir = '/path/to/EMU-webApp/dist')
 ```
 
-## Basic Annotation Workflows
+## Basic annotation workflows
 
-### Annotate Entire Corpus
+### Annotate entire corpus
 
 ```{r annotate-all}
 corp <- corpus("path/to/database_emuDB")
@@ -86,7 +80,7 @@ serve_app(corp)
 # - Navigate with arrow keys or bundle list
 ```
 
-### Annotate Specific Sessions
+### Annotate specific sessions
 
 ```{r annotate-sessions}
 # Serve only specific sessions using regex patterns
@@ -96,7 +90,7 @@ serve_app(corp, sessionPattern = "Session0[12]")
 serve_app(corp, sessionPattern = "^(pilot|main)_")
 ```
 
-### Annotate Specific Bundles
+### Annotate specific bundles
 
 ```{r annotate-bundles}
 # Serve only bundles matching a pattern
@@ -108,9 +102,9 @@ serve_app(corp,
       bundlePattern = "msajc.*")
 ```
 
-### Annotate Query Results
+### Annotate query results
 
-This is particularly powerful - navigate directly to segments of interest:
+You can navigate directly to the segments you care about:
 
 ```{r annotate-query}
 # Find all /t/ phonemes
@@ -125,7 +119,7 @@ serve_app(corp, seglist = t_segments)
 # 3. Highlight the segment boundaries
 ```
 
-### Workflow Example: Annotate Vowels
+### Workflow example: annotate vowels
 
 ```{r vowel-workflow}
 # 1. Query for vowels
@@ -146,9 +140,9 @@ serve_app(corp, seglist = vowels)
 # 5. Changes are saved automatically to the database
 ```
 
-## Advanced Usage
+## Advanced usage
 
-### Custom Server Settings
+### Custom server settings
 
 ```{r custom-server}
 # Use a different port (useful if default is busy)
@@ -164,7 +158,7 @@ serve_app(corp, autoOpenURL = "")
 serve_app(corp, useViewer = FALSE)
 ```
 
-### Debug Mode
+### Debug mode
 
 ```{r debug}
 # Enable debug output
@@ -177,7 +171,7 @@ serve_app(corp, debug = TRUE, debugLevel = 2)
 # 8 = maximum verbosity
 ```
 
-### Working with Bundle Lists
+### Working with bundle lists
 
 If your database has predefined bundle lists:
 
@@ -191,7 +185,7 @@ serve_app(corp, bundleListName = "AnnotationQueue")
 # - Collaborative annotation (different annotators get different lists)
 ```
 
-## Annotation Interface Features
+## Annotation interface features
 
 ### Navigation
 
@@ -209,7 +203,7 @@ Once the webApp opens:
 - Click segment boundary - Adjust boundary
 - Right-click segment - Edit label or delete
 
-### Editing Annotations
+### Editing annotations
 
 **Add Segments:**
 1. Select the target level in the level panel
@@ -227,7 +221,7 @@ Once the webApp opens:
 - Drag to link items across levels
 - Edit link types in the context menu
 
-### Signal Tracks
+### Signal tracks
 
 View multiple signal representations:
 
@@ -244,7 +238,7 @@ View multiple signal representations:
 # Then it will appear in the webApp automatically
 ```
 
-## Stopping the Server
+## Stopping the server
 
 **Method 1: Clear button in webApp**
 - Click the "clear" button in the EMU-webApp interface
@@ -261,7 +255,7 @@ httpuv::stopAllServers()
 .rs.restartR()  # In RStudio
 ```
 
-## Quality Control Workflow
+## Quality control workflow
 
 Here's a complete workflow for annotation QC:
 
@@ -300,9 +294,9 @@ short_segments_updated <- all_segments_updated %>%
 cat(sprintf("Now %d short segments remain\n", nrow(short_segments_updated)))
 ```
 
-## Integration with Analysis Pipeline
+## Integration with analysis pipeline
 
-The `serve_app()` function integrates seamlessly with analysis:
+`serve_app()` integrates with an analysis pipeline:
 
 ```{r integration}
 # Analysis → Annotation → Re-analysis cycle
@@ -346,7 +340,7 @@ cat("\nAfter correction:\n")
 summary(formants_corrected$F1)
 ```
 
-## Collaborative Annotation
+## Collaborative annotation
 
 For team annotation projects:
 
@@ -370,7 +364,7 @@ bundles_A <- emuR::read_bundleList(get_emuDBhandle(corp), "Annotator_A")
 
 ## Troubleshooting
 
-### Common Issues
+### Common issues
 
 **Problem:** WebApp doesn't open
 
@@ -412,7 +406,7 @@ httpuv::stopAllServers()
 .rs.restartR()  # RStudio only
 ```
 
-### Getting Help
+### Getting help
 
 ```{r help}
 # Function documentation
@@ -425,9 +419,9 @@ httpuv::stopAllServers()
 # Open browser developer tools (F12)
 ```
 
-## Tips and Best Practices
+## Tips and best practices
 
-### 1. Start Small
+### 1. Start small
 
 ```{r tip-small}
 # Don't serve the entire corpus at once
@@ -437,7 +431,7 @@ serve_app(corp, sessionPattern = "pilot_session")
 # Then scale up as needed
 ```
 
-### 2. Use Query Results for Targeted Annotation
+### 2. Use query results for targeted annotation
 
 ```{r tip-query}
 # Much more efficient than browsing all bundles
@@ -445,7 +439,7 @@ vowels <- query(corp, "Phonetic =~ [aeiou]")
 serve_app(corp, seglist = vowels)
 ```
 
-### 3. Save Regularly
+### 3. Save regularly
 
 ```{r tip-save}
 # The webApp auto-saves, but:
@@ -454,7 +448,7 @@ serve_app(corp, seglist = vowels)
 # - Consider git commits for version control
 ```
 
-### 4. Use RStudio Viewer
+### 4. Use the RStudio viewer
 
 ```{r tip-viewer}
 # Default behavior in RStudio
@@ -466,7 +460,7 @@ serve_app(corp, useViewer = TRUE)
 # - Switch between code and annotation
 ```
 
-### 5. Keyboard Shortcuts
+### 5. Keyboard shortcuts
 
 Learn the keyboard shortcuts - they dramatically speed up annotation:
 - Space: Play/pause
@@ -474,7 +468,7 @@ Learn the keyboard shortcuts - they dramatically speed up annotation:
 - Enter: Confirm edit
 - Esc: Cancel edit
 
-### 6. Check Configuration
+### 6. Check configuration
 
 ```{r tip-config}
 # Before a long annotation session:
@@ -488,7 +482,7 @@ corp@config$labelDefinitions
 corp@config$linkDefinitions
 ```
 
-## Example: Complete Annotation Session
+## Example: complete annotation session
 
 ```{r complete-example}
 library(reindeer)
@@ -560,17 +554,9 @@ formants <- quantify(phonemes_final, superassp::forest)
 
 ## Summary
 
-The `serve_app()` function provides:
+`serve_app()` launches with one call, filters to the sessions, bundles, or segments you pass it, works directly with query results, and saves changes back to the database automatically.
 
-- **Easy launch** - One function call to start annotating
-- **Flexible filtering** - Serve exactly what you need to annotate
-- **Query integration** - Jump directly to segments of interest
-- **Seamless workflow** - Integrate annotation with analysis pipelines
-- **Auto-save** - Changes persist to database automatically
-
-This makes interactive annotation a natural part of your reindeer workflow, not a separate step with external tools.
-
-## See Also
+## See also
 
 - `?serve_app` - Complete function documentation
 - `vignette("getting_started")` - Reindeer basics

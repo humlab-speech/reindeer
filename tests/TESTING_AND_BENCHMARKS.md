@@ -1,10 +1,10 @@
 # Testing and Benchmarking the Optimized EQL Implementation
 
-This document describes the comprehensive testing and benchmarking infrastructure for the optimized SQL-based EQL query implementation.
+This document describes the testing and benchmarking infrastructure for the optimized SQL-based EQL query implementation.
 
 ## Overview
 
-The optimized query implementation (`query_opt()`) provides significant performance improvements over the standard `emuR::query()` function by directly accessing the SQLite cache database. This infrastructure ensures correctness and quantifies performance gains.
+The optimized query implementation (`query_opt()`) queries the SQLite cache directly instead of going through `emuR::query()`. This infrastructure checks correctness and measures performance.
 
 ## Test Suite
 
@@ -99,7 +99,7 @@ Or from command line:
 Rscript inst/benchmarks/run_benchmarks.R 30
 ```
 
-#### Comprehensive Benchmark (100 iterations)
+#### Benchmark (100 iterations)
 
 ```r
 source("inst/benchmarks/benchmark_queries.R")
