@@ -1,5 +1,12 @@
 # reindeer (development version)
 
+- Sequence/dominance queries now match pre-executed sub-query results via
+  a deduplicated composite-key `IN` list instead of a per-row 4-column OR
+  list, shrinking the generated SQL for compound queries over large
+  corpora. (A connection-scoped temp table was considered but rejected:
+  the deferred/lazy plan must stay self-contained so it can run at
+  `collect()` time.)
+
 - Parameterized all SQL in the eager navigation verbs (`scout()`,
   `ascend_to()`, `descend_to()`). User-supplied `level` and `db_uuid`
   values are now bound via `?` placeholders instead of being

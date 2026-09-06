@@ -472,6 +472,21 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
   )
 }
 
+# Build a self-contained WHERE fragment matching items against a set of
+# (db_uuid, session, bundle, item_id) tuples. Uses a control-char-separated
+# composite key in a single deduplicated IN list instead of a per-row
+# 4-column OR list, keeping the SQL compact and still self-contained so the
+# lazy path can defer it. Values are bound via dbQuoteLiteral (no injection).
+.match_items_condition <- function(con, db_uuid, session, bundle, item_id) {
+  sep <- "\x1f"
+  sep_lit <- DBI::dbQuoteLiteral(con, sep)
+  lhs <- paste(c("i.db_uuid", "i.session", "i.bundle", "i.item_id"),
+               collapse = paste0(" || ", sep_lit, " || "))
+  keys <- unique(paste(db_uuid, session, bundle, item_id, sep = sep))
+  sprintf("(%s) IN (%s)", lhs,
+          paste(DBI::dbQuoteLiteral(con, keys), collapse = ", "))
+}
+
 # Build SQL for a sequence query. Returns list(sql, params) ready for
 # DBI::dbGetQuery, or NULL if a non-simple sub-query was pre-executed and
 # returned no rows (caller should treat as empty result).
@@ -567,17 +582,14 @@ build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = 
   # Returns list(sql = "...", params = list(...))
   build_match_where <- function(level, cond, preexec) {
     if (!is.null(preexec)) {
-      # Pre-executed: use compound key match — these are internal IDs from prior queries
-      # Use dbQuoteLiteral for safe interpolation (too many rows for ? placeholders)
+      # Pre-executed: match items against the materialised IDs via a compact
+      # composite-key IN (deduplicated) instead of a per-row OR list.
       id_col <- if ("item_id" %in% names(preexec)) "item_id" else names(preexec)[grep("item_id", names(preexec))[1]]
-      keys <- paste0(
-        "(i.db_uuid=", DBI::dbQuoteLiteral(con, preexec$db_uuid),
-        " AND i.session=", DBI::dbQuoteLiteral(con, preexec$session),
-        " AND i.bundle=", DBI::dbQuoteLiteral(con, preexec$bundle),
-        " AND i.item_id=", DBI::dbQuoteLiteral(con, preexec[[id_col]]), ")"
+      match_sql <- .match_items_condition(
+        con, preexec$db_uuid, preexec$session, preexec$bundle, preexec[[id_col]]
       )
       return(list(
-        sql = paste0("i.level = ? AND (", paste(keys, collapse = " OR "), ")"),
+        sql = paste0("i.level = ? AND ", match_sql),
         params = list(level)
       ))
     } else {
@@ -1024,25 +1036,25 @@ build_corrected_dominance_sql <- function(con, left_query, right_query, left_lev
   if (is.null(left_item_ids)) {
     left_cond <- extract_condition_from_query(left_query)
   } else {
-    # Pre-executed: internal IDs — use dbQuoteLiteral for safe interpolation
-    ids <- unique(paste0(
-      "(i.db_uuid=", DBI::dbQuoteLiteral(con, left_item_ids$db_uuid),
-      " AND i.session=", DBI::dbQuoteLiteral(con, left_item_ids$session),
-      " AND i.bundle=", DBI::dbQuoteLiteral(con, left_item_ids$bundle),
-      " AND i.item_id=", DBI::dbQuoteLiteral(con, left_item_ids$item_id), ")"
-    ))
-    left_cond <- list(sql = paste0("(", paste(ids, collapse = " OR "), ")"), params = list())
+    # Pre-executed: match items via a compact composite-key IN.
+    left_cond <- list(
+      sql = .match_items_condition(con, left_item_ids$db_uuid,
+                                   left_item_ids$session,
+                                   left_item_ids$bundle,
+                                   left_item_ids$item_id),
+      params = list()
+    )
   }
   if (is.null(right_item_ids)) {
     right_cond <- extract_condition_from_query(right_query)
   } else {
-    ids <- unique(paste0(
-      "(i.db_uuid=", DBI::dbQuoteLiteral(con, right_item_ids$db_uuid),
-      " AND i.session=", DBI::dbQuoteLiteral(con, right_item_ids$session),
-      " AND i.bundle=", DBI::dbQuoteLiteral(con, right_item_ids$bundle),
-      " AND i.item_id=", DBI::dbQuoteLiteral(con, right_item_ids$item_id), ")"
-    ))
-    right_cond <- list(sql = paste0("(", paste(ids, collapse = " OR "), ")"), params = list())
+    right_cond <- list(
+      sql = .match_items_condition(con, right_item_ids$db_uuid,
+                                   right_item_ids$session,
+                                   right_item_ids$bundle,
+                                   right_item_ids$item_id),
+      params = list()
+    )
   }
 
   # Get attribute for final label display — use result_level to pick side,
