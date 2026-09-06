@@ -13,7 +13,7 @@
 #' @importFrom Rdpack reprompt
 #' @importFrom Rcpp sourceCpp
 #' @importFrom stats end setNames start
-#' @importFrom utils data head modifyList object.size
+#' @importFrom utils data head modifyList object.size tail
 #' @useDynLib reindeer, .registration = TRUE
 
 NULL
