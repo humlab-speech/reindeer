@@ -63,10 +63,18 @@ test_that("validator rejects non-environment .state", {
     db_path = "/tmp/f.sqlite",
     db_uuid = "u"
   )
-  expect_error(
-    lsl@.state <- "not_an_env",
-    regexp = "environment|.state"
+  # Capture with base tryCatch rather than expect_error: testthat's error
+  # reporting formats the caught condition, which dispatches `$` on the
+  # half-assigned (invalid) object and crashes in .lazy_dollar -> collect().
+  err <- tryCatch(
+    {
+      lsl@.state <- "not_an_env"
+      NULL
+    },
+    error = function(e) e
   )
+  expect_true(inherits(err, "error"))
+  expect_match(conditionMessage(err), "environment")
 })
 
 test_that("validator rejects non-list query_parts", {

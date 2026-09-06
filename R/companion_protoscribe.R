@@ -47,10 +47,10 @@
 propose_annotations <- function(corpus, type = c("vad", "vot", "periods", "momel",
                                                  "slam", "slam_plus", "slamp3"),
                                   .review = TRUE, .commit = FALSE, ...) {
+  type <- match.arg(type)
   if (!requireNamespace("protoscribe", quietly = TRUE)) {
     .companion_abort("protoscribe", purpose = "draft annotation generation")
   }
-  type <- match.arg(type)
   fn_name <- .protoscribe_dispatch[[type]]
   fn <- tryCatch(
     get(fn_name, envir = asNamespace("protoscribe")),
