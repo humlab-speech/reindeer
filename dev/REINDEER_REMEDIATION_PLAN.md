@@ -30,7 +30,7 @@ protoscribe, eggstract, erodex, or superassp.
 |---|---|---|
 | 0 Baseline and safety net | done | `09592e3` |
 | 1 Correctness | done | `83b1f34` |
-| 2 Energy | done | see the commit that follows |
+| 2 Energy | done | `3a7936e` |
 | 3 Performance | not started | |
 | 4 Standards | not started | |
 | 5 Documentation, vignettes, site | not started | |
