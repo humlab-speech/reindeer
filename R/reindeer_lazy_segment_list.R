@@ -374,6 +374,8 @@ apply_descend_transform <- function(query, level) {
 #' Print method for lazy_segment_list
 #' @param x lazy_segment_list object
 #' @param ... Additional arguments (unused)
+#' @param preview Show a preview of the queued pipeline without materialising
+#'   it. Default `TRUE`; set to `FALSE` to print only the plan summary.
 #' @name print.lazy_segment_list
 .print_lazy_segment_list <- function(x, ..., preview = TRUE) {
   cli::cli_rule(

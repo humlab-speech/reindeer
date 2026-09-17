@@ -11,6 +11,9 @@
 \item{x}{lazy_segment_list object}
 
 \item{...}{Additional arguments (unused)}
+
+\item{preview}{Show a preview of the queued pipeline without materialising
+it. Default \code{TRUE}; set to \code{FALSE} to print only the plan summary.}
 }
 \description{
 Print method for lazy_segment_list
