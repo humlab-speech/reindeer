@@ -174,3 +174,122 @@ vignette and in neither of my hand-runs.
 All six vignettes rebuild under `R CMD build`. The two defects they exposed
 remain open, both build-only, both with their error text and the
 hand-runs that failed to reproduce them recorded above.
+
+
+# Round 2 - the clean build log, and the plan that amends what is left
+
+The new `build.log` is a **successful** build:
+
+    * creating vignettes ... OK
+    * building 'reindeer_1.1.1.tar.gz'
+
+No errors, no warnings. Round 1's failure chain is gone. What remains in the
+log is one class of informational line, and behind it the two workarounds
+that are still carrying this build.
+
+## A. "Removed empty directory" x4 - informational, decide rather than fix
+
+`.qodo`, `R/deprecated`, `images`, `tests/testthat/_snaps` are all empty and
+**untracked** (`git ls-files` returns nothing for each), so they exist only
+in this working copy and cannot reach the tarball. `R CMD build` deleting
+them is it doing the right thing, not a defect.
+
+Amendment, pick one and move on - neither affects the built package:
+
+1. **Delete `.qodo`** (editor/tool residue) and leave `images` and
+   `tests/testthat/_snaps`, which testthat and pkgdown recreate on demand;
+   `R/deprecated` can go too if no placeholder is wanted.
+2. Leave all four; the lines stay in the log and stay harmless.
+
+Acceptance: the log's lines 11-14 disappear (option 1) or are documented as
+expected (option 2). No `R/`, `man/` or `tests/` change either way.
+
+## B. The two gated vignette chunks are the real open work (Issues 1 and 4)
+
+Both are build-only failures that pass when the same calls are run by hand.
+They are the reason two chunks in `metadata_management.Rmd` are
+non-evaluated, so this plan is not finished until they are fixed and
+un-gated.
+
+**Order matters.** Issue 1 (`corp[session, bundle]`) hides Issue 4
+(`export_metadata()`): clearing the first is what exposed the second.
+
+### B1. Diagnose against the installed package, not the working tree
+
+Both defects fire under `R CMD build`, which renders vignettes against the
+**installed** package. Run exactly that:
+
+```r
+R CMD INSTALL .
+rmarkdown::render("vignettes/metadata_management.Rmd")
+```
+
+If it reproduces, the difference is the install-and-render path; if it does
+not, the difference is `R CMD build`'s environment (temporary library, no
+`NOT_CRAN`, working directory). Whichever it is, that difference is the
+diagnosis - the code paths themselves already pass by hand.
+
+### B2. Issue 1 - bracket read
+
+Reproduction to run, with the prior writes from the vignette in place:
+
+```r
+corp <- demo_corpus(); md <- get_metadata(corp)
+set_metadata(corp, list(Project = "P", Year = 2026, Institution = "H"))
+set_metadata(corp, list(Speaker = "P001", Age = 25, Gender = "Female"), session = md$session[1])
+set_metadata(corp, list(Quality = "Excellent", Microphone = "SM58"), session = md$session[1], bundle = md$bundle[1])
+corp[md$session[1], md$bundle[1]] <- list(SamplingRate = 44100)
+corp[md$session[1], md$bundle[1]]                      # <- the failure
+```
+
+Fix direction: at `R/corpus_methods.R:522-528`, assert
+`length(field_values) == nrow(result)` before `result[[field_name]] <-`
+and derive both index vectors from the frame being filled in the same
+expression, so they cannot drift.
+
+Regression test: the bracket read returns one value per field with
+inheritance applied, for a corpus carrying fields at all three levels.
+
+Acceptance: the chunk's `eval = FALSE` comes off, `R CMD build` still
+passes, and the test above is green.
+
+### B3. Issue 4 - export_metadata() and openxlsx column names
+
+Failure: `colNames must be a unique vector (case sensitive)` from
+`openxlsx:::assert_unique()` inside `export_metadata()`.
+
+The combination present in the vignette but in neither hand-run: a nested
+`project = list(name = ..., description = ...)` field **and** a scalar
+`Project` field. Reproduce with both set, then either:
+
+- de-duplicate in `export_metadata()` before the write, or
+- qualify flattened nested names by their parent (`project_name`,
+  `project_description`) and check the result against the scalar field
+  case-insensitively.
+
+Regression test: export a corpus carrying nested `project` plus scalar
+`Project` to a temp workbook and assert it writes and round-trips.
+
+Acceptance: the chunk's `eval = FALSE` comes off and the test is green.
+
+## C. Environment blockers, unchanged (Issues 2 and 3)
+
+Not amendable from this repository:
+
+- **superassp >= 3.0.0** - GitHub build stops on missing SPTK headers
+  (`SPTK/analysis/pitch_extraction_by_rapt.h`). Provide SPTK, reinstall, then
+  D6, the erodex sweep and the gated simulation section close together and
+  `superassp (>= 3.0.0)` can be pinned.
+- **protoscribe** - its DESCRIPTION declares the retired `qs`; installation
+  stops there. Needs the `qs2` migration upstream.
+
+## D. Order of work
+
+1. A - delete the residue directories (minutes, no risk).
+2. B1 - render against the installed package to localise both defects.
+3. B2 - fix the bracket read, un-gate, rebuild.
+4. B3 - fix the export, un-gate, rebuild.
+5. C - environment, when SPTK is available and protoscribe is updated.
+
+Each step's acceptance is a passing `R CMD build` plus the named test; no
+step requires touching another.
