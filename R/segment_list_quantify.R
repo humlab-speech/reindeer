@@ -340,6 +340,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 #' @param ... Additional arguments passed to the DSP function at `collect()` time.
 #' @return The same `lazy_segment_list` with a deferred quantify step.
 #' @name quantify.lazy_segment_list
+#' @usage NULL
 S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
   if (!is.function(dsp_function) && !is.character(dsp_function)) {
     cli::cli_abort("{.arg dsp_function} must be a function or character string")
