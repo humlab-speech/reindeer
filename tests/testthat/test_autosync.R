@@ -631,3 +631,41 @@ test_that("CMDI files contain expected metadata", {
                 grepl("ResourceProxyList", cmdi_text))
   }
 })
+
+test_that("metadata changes are detected from METADATA.json", {
+  # PENDING WP1.2/WP1.3 - red until detect_metadata_changes() scans the
+  # mandated filename instead of the legacy `.meta_json` one, and stops
+  # rewriting the state file when nothing changed.
+
+  skip("PENDING WP1.2 - see dev/REINDEER_REMEDIATION_PLAN.md")
+  skip_if_no_emuR()
+  skip_on_cran()
+
+  db_path <- create_isolated_ae_db()
+  withr::defer(unlink(dirname(db_path), recursive = TRUE))
+  db <- emuR::load_emuDB(db_path, verbose = FALSE)
+
+  enable_auto_sync(db, enable = TRUE, sync_eaf = FALSE, sync_cmdi = TRUE,
+                   verbose = FALSE)
+  state_path <- file.path(db$basePath, ".sync_state.json")
+  expect_true(file.exists(state_path))
+
+  # Nothing edited yet.
+  expect_false(isTRUE(reindeer:::detect_metadata_changes(db)))
+
+  # A database-level METADATA.json is the documented place for metadata.
+  jsonlite::write_json(
+    list(project = list(name = "SyncTest")),
+    file.path(db$basePath, "METADATA.json"),
+    auto_unbox = TRUE, pretty = TRUE
+  )
+  expect_true(isTRUE(reindeer:::detect_metadata_changes(db)))
+
+  # Recording the new checksum must be idempotent: a second scan sees no
+  # change and must not rewrite the state file.
+  expect_false(isTRUE(reindeer:::detect_metadata_changes(db)))
+  mtime_before <- file.info(state_path)$mtime
+  Sys.sleep(1.1)
+  invisible(reindeer:::detect_metadata_changes(db))
+  expect_identical(file.info(state_path)$mtime, mtime_before)
+})

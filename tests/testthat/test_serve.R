@@ -24,3 +24,37 @@ test_that("get_handle creates proper emuDBhandle from corpus", {
   expect_true(!is.null(handle$basePath))
   expect_true(!is.null(handle$dbName))
 })
+
+test_that("serve() accepts the lazy segment list that query() returns", {
+  # PENDING WP1.1 - red until serve() collects a lazy_segment_list instead of
+  # rejecting it. The contract is documented in R/reindeer_serve.R:38, the
+  # README, and three vignette blocks, none of which execute in CI.
+
+  skip("PENDING WP1.1 - see dev/REINDEER_REMEDIATION_PLAN.md")
+  skip_if_not_installed("emuR")
+  skip_if_not_installed("httpuv")
+
+  corp <- create_isolated_ae_corpus()
+  lazy <- query(corp, "Phoneme =~ .+")
+  expect_s7_class(lazy, reindeer::lazy_segment_list)
+
+  withr::defer(httpuv::stopAllServers())
+
+  expect_no_error(
+    serve(corp, seglist = lazy, port = httpuv::randomPort(),
+          autoOpenURL = "", useViewer = FALSE)
+  )
+  expect_false(is.null(getOption("reindeer.serve_handle")))
+})
+
+test_that("serve() still rejects inputs that are not segment lists", {
+  skip_if_not_installed("emuR")
+  skip_if_not_installed("httpuv")
+
+  corp <- create_isolated_ae_corpus()
+  expect_error(
+    serve(corp, seglist = list(session = "0000"), port = httpuv::randomPort(),
+          autoOpenURL = "", useViewer = FALSE),
+    "segment_list"
+  )
+})

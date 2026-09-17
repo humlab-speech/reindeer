@@ -94,3 +94,14 @@ skip_if_no_emuR <- function() {
 skip_if_no_superassp <- function() {
   skip_if_not_installed("superassp")
 }
+
+#' Can a `future::multisession` worker load reindeer?
+#'
+#' Workers start fresh R sessions and load packages from `.libPaths()`. During
+#' `devtools::test()` the package is only *loaded*, not installed, so worker-based
+#' code paths cannot run. Tests that exercise them must check this first.
+#'
+#' @return Logical
+workers_can_load_reindeer <- function() {
+  any(file.exists(file.path(.libPaths(), "reindeer", "DESCRIPTION")))
+}
