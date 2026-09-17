@@ -5,7 +5,16 @@
 #   * documented `pkg::fun` references that do not exist (T7), and
 #   * documented columns that the returned object does not have (T8).
 
-pkg_root <- function() testthat::test_path("..", "..")
+# The contracts below are about the *source* tree: the Rd pages under man/ and
+# the vignette sources. Under R CMD check only the installed package is present
+# (help/ rather than man/), so these tests skip there instead of erroring.
+pkg_root <- function() {
+  root <- testthat::test_path("..", "..")
+  if (!dir.exists(file.path(root, "man"))) {
+    testthat::skip("source tree not available (running from an installed package)")
+  }
+  root
+}
 
 #' Extract `pkg::fun` references from a character vector
 pkg_fun_refs <- function(lines) {

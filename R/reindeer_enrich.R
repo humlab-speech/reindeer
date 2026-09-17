@@ -408,7 +408,7 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
     if (length(miss_keys) > 0) {
       .set_persistent_cache_batch(
         lapply(miss_keys, function(k) list(cache_key = k, result = TRUE)),
-        cache_conn, format = cache_format)
+        cache_conn, format = .cache_format)
     }
   }
 

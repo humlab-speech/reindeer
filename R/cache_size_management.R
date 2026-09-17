@@ -602,7 +602,7 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #' Inspect the quantify/enrich cache
 #'
 #' Single user-facing entry point that combines [check_cache_size()]
-#' (size + threshold warnings) and [list_cache_files()] (per-file
+#' (size + threshold warnings) and `list_cache_files()` (per-file
 #' inventory) into one tidy report. Prefer this over the older
 #' `check_cache_size()` / `manage_cache()` pair when you just want to
 #' see "what's in the cache and how big is it".
