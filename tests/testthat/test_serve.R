@@ -61,3 +61,30 @@ test_that("serve() still rejects inputs that are not segment lists", {
     "segment_list"
   )
 })
+
+test_that(".serve_file_response streams exactly the requested range", {
+  f <- withr::local_tempfile(fileext = ".wav")
+  writeBin(as.raw(1:100), f)
+
+  full <- .serve_file_response(f, "audio/x-wav", NULL)
+  expect_equal(full$status, 200L)
+  expect_length(full$body, 100)
+
+  # Open-ended ranges are what browsers send when seeking in a media element.
+  head_range <- .serve_file_response(f, "audio/x-wav", "bytes=10-")
+  expect_equal(head_range$status, 206L)
+  expect_length(head_range$body, 90)
+  expect_equal(as.integer(head_range$body[1]), 11L)
+
+  mid <- .serve_file_response(f, "audio/x-wav", "bytes=5-9")
+  expect_equal(mid$status, 206L)
+  expect_length(mid$body, 5)
+
+  # The whole file requested as a range is served whole.
+  whole <- .serve_file_response(f, "audio/x-wav", "bytes=0-")
+  expect_equal(whole$status, 200L)
+  expect_length(whole$body, 100)
+
+  expect_equal(.serve_file_response(f, "audio/x-wav", "bytes=500-600")$status, 416L)
+  expect_equal(.serve_file_response(f, "audio/x-wav", "garbage")$status, 416L)
+})

@@ -151,12 +151,18 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     # Get unique bundles from segment list
     unique_bundles <- unique(as.data.frame(object)[, c("session", "bundle")])
 
-    # Fetch only needed metadata from correct table (metadata_bundle)
+    # Fetch only needed metadata from correct table (metadata_bundle).
+    # Filtering in SQL keeps the transfer proportional to the query result
+    # rather than to the whole corpus; the composite key matches the expression
+    # used by enrich().
     db_uuid <- corpus_obj@.uuid
-    all_bundle_meta <- DBI::dbGetQuery(con,
+    ub_keys <- unique(paste(unique_bundles$session, unique_bundles$bundle, sep = "||"))
+    placeholders <- paste(rep("?", length(ub_keys)), collapse = ", ")
+    all_bundle_meta <- DBI::dbGetQuery(con, paste0(
       "SELECT session, bundle, field_name AS key, field_value AS value, field_type AS value_type
-       FROM metadata_bundle WHERE db_uuid = ?",
-      params = list(db_uuid))
+       FROM metadata_bundle
+       WHERE db_uuid = ? AND (session || '||' || bundle) IN (", placeholders, ")"),
+      params = c(list(db_uuid), as.list(ub_keys)))
     # Semi-join: keep only rows matching unique_bundles
     meta_keys <- paste(all_bundle_meta$session, all_bundle_meta$bundle, sep = "\x01")
     ub_keys <- paste(unique_bundles$session, unique_bundles$bundle, sep = "\x01")

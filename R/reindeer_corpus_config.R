@@ -616,32 +616,6 @@ batch_db_operations <- function(corpusObj, operations) {
 # Parallel processing support for large databases
 
 # Process bundles in parallel
-process_bundles <- function(corpusObj, func,
-                                     n_cores = parallel::detectCores() - 1) {
-  if(requireNamespace("parallel", quietly = TRUE)) {
-    bundles <- list_bundles(corpusObj)
-
-    # Create cluster
-    cl <- parallel::makeCluster(n_cores)
-    on.exit(parallel::stopCluster(cl))
-
-    # Export necessary objects
-    parallel::clusterExport(cl, c("corpusObj", "func"),
-                            envir = environment())
-
-    # Process in parallel
-    results <- parallel::parLapply(cl, seq_len(nrow(bundles)),
-                                   function(i) {
-                                     func(bundles[i,])
-                                   })
-
-    return(results)
-  } else {
-    cli::cli_warn("{.pkg parallel} package not available, using sequential processing")
-    bundles <- list_bundles(corpusObj)
-    lapply(seq_len(nrow(bundles)), function(i) func(bundles[i,]))
-  }
-}
 
 #####################################################
 # Memory management utilities

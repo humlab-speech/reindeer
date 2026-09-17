@@ -46,7 +46,7 @@ Rplots.pdf
 benchmarking/*.rds
 benchmarking/*.png
 benchmarking/*.csv
-!benchmarking/core_baseline.csv
+!benchmarking/core_*.csv
 benchmarking/*.txt
 /doc/
 /Meta/

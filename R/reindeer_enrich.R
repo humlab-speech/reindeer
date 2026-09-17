@@ -285,10 +285,8 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
   signal_files_with_meta <- merge(signal_files, bundle_metadata, by = c("session", "bundle"), all.x = TRUE)
   
   # Determine number of workers
-  if (.parallel) {
-    if (is.null(.workers)) {
-      .workers <- max(1, parallel::detectCores() - 1)
-    }
+  if (.parallel && .use_parallel_workers(nrow(signal_files_with_meta), .workers)) {
+    .workers <- .reindeer_workers(nrow(signal_files_with_meta), .workers)
     
     if (.verbose) {
       cli::cli_alert_info("Using parallel processing with {.workers} worker{?s}")
@@ -326,6 +324,8 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
       user_params = user_params
     )
 
+    cache_key <- NA_character_
+
     # Check cache if enabled. `.force` bypasses the read so every bundle is
     # recomputed; the recomputed result still overwrites the cached entry.
     if (!is.null(cache_conn)) {
@@ -354,12 +354,11 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
         list(toFile = TRUE, verbose = FALSE)
       ))
 
-      # Store in cache if enabled
-      if (!is.null(cache_conn)) {
-        .set_persistent_cache(cache_key, TRUE, cache_conn, format = cache_format)
-      }
-
-      list(success = TRUE, bundle = bundle_row$bundle, session = bundle_row$session)
+      # The cache write is batched by the caller: one transaction for the whole
+      # corpus instead of an untransacted INSERT plus a full-table size scan per
+      # bundle. The key travels back with the result.
+      list(success = TRUE, bundle = bundle_row$bundle, session = bundle_row$session,
+           cache_key = cache_key)
     }, error = function(e) {
       list(success = FALSE, bundle = bundle_row$bundle, session = bundle_row$session,
            error = e$message)
@@ -397,16 +396,33 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
   
   if (.verbose) {
     cli::cli_progress_done()
-    
-    # Report any errors
-    errors <- Filter(function(x) !x$success, results)
-    if (length(errors) > 0) {
-      cli::cli_alert_warning("{length(errors)} bundle{?s} failed processing")
-      for (err in errors) {
-        cli::cli_alert_info("{err$session}/{err$bundle}: {err$error}")
-      }
+  }
+
+  # One transaction for every miss: the alternative was an untransacted
+  # INSERT plus a full-table SUM(size_bytes) scan per bundle.
+  if (!is.null(cache_conn)) {
+    miss_keys <- unique(vapply(
+      Filter(function(x) isTRUE(x$success) && !isTRUE(x$cached), results),
+      function(x) x$cache_key %||% NA_character_, character(1)))
+    miss_keys <- miss_keys[!is.na(miss_keys)]
+    if (length(miss_keys) > 0) {
+      .set_persistent_cache_batch(
+        lapply(miss_keys, function(k) list(cache_key = k, result = TRUE)),
+        cache_conn, format = cache_format)
     }
-    
+  }
+
+  # Report failures whatever the verbosity: a silent enrich() hides real
+  # problems (missing media, a DSP routine that refuses the input).
+  errors <- Filter(function(x) !isTRUE(x$success), results)
+  if (length(errors) > 0) {
+    cli::cli_alert_warning("{length(errors)} bundle{?s} failed processing")
+    for (err in errors) {
+      cli::cli_alert_info("{err$session}/{err$bundle}: {err$error}")
+    }
+  }
+
+  if (.verbose) {
     cli::cli_alert_success("Enrichment complete")
   }
   

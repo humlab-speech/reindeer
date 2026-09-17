@@ -107,6 +107,7 @@ Collate:
     'metadata_core.R'
     'metadata_import_export.R'
     'metadata_unified.R'
+    'parallel_utils.R'
     'query_executor.R'
     'query_parser.R'
     'reindeer.R'

@@ -219,15 +219,14 @@ S7::method(serve, corpus) <- function(corpus,
           ))
         }
 
-        body <- if (utils::file_test("-d", path)) {
-          type <- "text/html"
+        if (utils::file_test("-d", path)) {
+          # Directory listing for the webApp root
           if (file.exists(idx <- file.path(path, "index.html"))) {
-            readLines(idx, warn = FALSE)
+            body <- readLines(idx, warn = FALSE)
           } else {
-            # Directory listing
             d <- file.info(list.files(path, all.files = TRUE, full.names = TRUE))
             title <- utils::URLencode(path, reserved = TRUE)
-            c("<!DOCTYPE html>", "<html>", "<head>",
+            body <- c("<!DOCTYPE html>", "<html>", "<head>",
               sprintf("<title>%s</title>", title), "</head>",
               "<body>",
               c(sprintf("<h1>Index of %s</h1>", title),
@@ -235,51 +234,21 @@ S7::method(serve, corpus) <- function(corpus,
                 paste0("<ul>", paste0("<li>", names(d), "</li>", collapse = ""), "</ul>")),
               "</body>", "</html>")
           }
-        } else {
-          type <- guess_mime_type(path)
-          range <- req$HTTP_RANGE
-
-          if (is.null(range) || identical(range, "bytes=0-")) {
-            readBin(path, "raw", file.info(path)[, "size"])
-          } else {
-            # Handle range requests for large media files
-            range <- strsplit(range, split = "(=|-)")[[1]]
-            b2 <- as.numeric(range[2])
-            b3 <- as.numeric(range[3])
-
-            if (length(range) < 3 || (range[1] != "bytes") || (b2 >= b3) || (b3 == 0)) {
-              return(list(
-                status = 416L,
-                headers = list(`Content-Type` = "text/plain"),
-                body = "Requested range not satisfiable\r\n"
-              ))
-            }
-
-            status <- 206L
-            con <- file(path, open = "rb", raw = TRUE)
-            on.exit(close(con))
-            seek(con, where = b2, origin = "start")
-            readBin(con, "raw", b3 - b2 + 1)
+          if (is.character(body) && length(body) > 1) {
+            body <- paste(body, collapse = "\n")
           }
+          return(list(
+            status = 200L,
+            body = body,
+            headers = list(`Content-Type` = "text/html")
+          ))
         }
 
-        if (is.character(body) && length(body) > 1) {
-          body <- paste(body, collapse = "\n")
-        }
-
-        res <- list(
-          status = status,
-          body = body,
-          headers = c(
-            list(`Content-Type` = type),
-            if (status == 206L) list(`Content-Range` = paste(
-              sub("=", " ", req$HTTP_RANGE),
-              file.info(path)[, "size"],
-              sep = "/"
-            ))
-          )
-        )
-        return(res)
+        # Files go through the one range-aware implementation. The inlined copy
+        # that used to live here mis-parsed open-ended ranges (`bytes=100-` made
+        # `b3 == 0` evaluate to NA, an error inside `if`), and it duplicated
+        # .serve_file_response().
+        return(.serve_file_response(path, guess_mime_type(path), req$HTTP_RANGE))
       }
     }
   }

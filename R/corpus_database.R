@@ -84,7 +84,8 @@ build_emuDB_cache <- function(database_dir,
   }
 
   # Setup parallel processing if requested
-  if (parallel && nrow(sessions_bundles) > 10) {
+  if (parallel && .use_parallel_workers(nrow(sessions_bundles), workers)) {
+    workers <- .reindeer_workers(nrow(sessions_bundles), workers)
     oplan <- future::plan(future::multisession, workers = workers)
     on.exit(future::plan(oplan), add = TRUE)
   } else {

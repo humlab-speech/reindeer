@@ -24,6 +24,60 @@ Non-goals for this program: no new features, no interface redesign beyond the
 items below, no emuR parity regressions, no changes to the behaviour of
 protoscribe, eggstract, erodex, or superassp.
 
+## 0a. Status
+
+| Phase | State | Commit |
+|---|---|---|
+| 0 Baseline and safety net | done | `09592e3` |
+| 1 Correctness | done | `83b1f34` |
+| 2 Energy | done | see the commit that follows |
+| 3 Performance | not started | |
+| 4 Standards | not started | |
+| 5 Documentation, vignettes, site | not started | |
+| 6 Deletions and closure | partially done (dead PSOCK helper removed in phase 2) | |
+
+### Findings that changed the plan
+
+Several assessment claims did not survive inspection. Recorded here so nobody
+re-litigates them.
+
+- **quantify() was in worse shape than the assessment said.** The failure
+  covered everything above 20 segments: 21-100 aborted in `rbindlist()`, and
+  above 100 the executor flattened `AsspDataObj` tracks into matrices and then
+  returned nothing, so `quantify()` silently handed back the input segments
+  with no measurements. Both are fixed in phase 1.
+- **superassp API generation (B6).** The installed 2.9.5 build exposes `trk_*`
+  wrappers whose only formals are `(listOfFiles, ...)`, so no age/gender norms
+  reach the DSP; the 3.0.0 source checkout exposes the wrapped routine's
+  formals. reindeer now warns once when a routine exposes no parameters.
+  Decision D6 stands: pin superassp >= 3.0.0.
+- **WP2.4: four of six items do not hold.** The TextGrid BOM path reads the
+  whole file *because the raw buffer feeds the encoding conversion*;
+  `load_DBconfig()` is memoised by path + mtime, so the query path is not
+  re-parsing JSON; `check_cache_size()` costs one `file.info()` for a file path
+  (the directory walk only happens in `inspect_cache()`);
+  hashing the in-memory JSON in the SAVEBUNDLE handler cannot reproduce the
+  bytes on disk (`writeLines()` appends a newline), which would desynchronise
+  the stored md5 from autosync's checksums. Memoising the DSPP table would hand
+  callers a shared mutable data.table. Only the unfiltered metadata fetch in
+  `quantify()` was a real cost, and it is fixed.
+- **WP2.3 as specified was not justified.** A response body has to materialise
+  the bytes, so the `bytes=0-` branch is not more expensive than the range
+  branch. What *was* real: the inline webapp handler mis-parsed open-ended
+  ranges (`bytes=100-` produced an `NA` inside `if`) and duplicated the
+  range-aware helper. It now delegates to the helper, and a test pins the range
+  behaviour.
+- **WP2.5 (incremental cache rebuild) is deferred.** It needs `build_emuDB_cache()`
+  restructured plus eviction of rows for bundles deleted from disk, and a
+  stale-cache bug there costs far more than the energy it saves. Prerequisite:
+  the rebuild-equivalence test (build twice → identical tables; delete a bundle
+  → its rows are pruned) must exist first. The double read of each annotation
+  file (`fromJSON()` + `md5sum()`) goes with it.
+- **Collate matters.** Adding `R/parallel_utils.R` broke `R CMD INSTALL`
+  ("files missing from Collate field") while `devtools::test()` stayed green,
+  because `load_all()` ignores Collate. Run `devtools::document()` whenever a
+  file is added.
+
 ## 1. Invariants and baseline
 
 These hold after every commit, not just at phase gates:

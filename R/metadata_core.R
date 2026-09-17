@@ -323,12 +323,15 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   }
   
   # OPTIMIZATION: Use parallel processing for large databases
-  use_parallel <- parallel && length(existing_files) > 50 && requireNamespace("future.apply", quietly = TRUE)
+  use_parallel <- parallel && length(existing_files) > 50 &&
+    requireNamespace("future.apply", quietly = TRUE) &&
+    .use_parallel_workers(length(existing_files), 4)
   
   if (use_parallel) {
     # Set up parallel processing
     orig_plan <- future::plan()
-    future::plan(future::multisession, workers = min(4, parallel::detectCores() - 1))
+    future::plan(future::multisession,
+                 workers = .reindeer_workers(length(existing_files), 4))
     on.exit(future::plan(orig_plan), add = TRUE)
     
     # Read all files in parallel
