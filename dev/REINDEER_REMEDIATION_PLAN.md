@@ -763,3 +763,31 @@ defaults, and the caller was not told.
 `Gender`. That is the defect; the warning that would report it exists and
 works when called directly, which is what makes the silence a bug rather
 than a limitation.
+
+### scout() dead end: the validator is not the culprit
+
+Read `R/segment_list_classes.R:53-75`. The `segment_list` validator does
+one thing - it compares `required_cols` against `names(self)` and reports
+the difference:
+
+```r
+missing_cols <- setdiff(required_cols, names(self))
+if (length(missing_cols) > 0) { return(paste0("segment_list missing required columns: ", ...)) }
+```
+
+A zero-row tibble that carries every required column therefore passes
+validation. So `scout(steps_forward = 99)` is not being rejected for being
+empty: the frame produced on the zero-match path must be missing at least
+one required column, and the error surfaces through `S7::validate()` at
+construction time (`:116`) rather than as a navigation warning.
+
+That changes the fix. It is not "let the validator accept empty data" -
+it is "make the zero-match path return the same column set as every other
+path", which belongs in the navigation code, not in the class.
+
+Next step, cheap: print the column names the nav helpers build on the
+zero-match path and diff them against `required_cols` (`:62-67`). The
+difference names the missing column, and the fix is to select it through
+consistently. Reproduce with
+`query(corp, "Phoneme =~ .+") |> scout(steps_forward = 99)` on the demo
+corpus.
