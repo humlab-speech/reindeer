@@ -928,3 +928,33 @@ Nothing to fix here. The vignette paragraph that stated the false
 behaviour has been corrected in the same commit as this note. The lesson
 worth keeping: a warning handler scoped around `collect()` alone is not
 evidence about a lazy pipeline.
+
+### Phase 5, last two vignettes: blocked on uninstalled companions
+
+Measured on this machine:
+
+    erodex        FALSE
+    protoscribe   FALSE
+    eggstract     FALSE
+    extract       FALSE
+    superassp     TRUE
+    openxlsx      TRUE
+    qs2           TRUE
+
+`vignettes/end_to_end_pipeline.Rmd` has ten chunks behind the global
+`REINDEER_EVAL_VIGNETTES` gate (`:11`) and one placeholder corpus path
+(`:37`); its later sections demonstrate the erodex simulation store and
+the protoscribe draft-annotation workflow, neither of which can run
+without those packages. `interactive_annotation` needs the EMU-webApp
+stub that the serve test already uses.
+
+So these two are not blocked on a missing pattern - the recipe that
+converted the other four applies unchanged - but on dependencies that are
+not installed here. Unblocking them means installing the companions
+(`remotes::install_github("humlab-speech/erodex")` and
+`.../protoscribe`) and then following the same four steps: per-chunk
+capability gates, `demo_corpus()` for the reindeer-only sections, render
+in-process after `load_all()`, and inspect the HTML for real output.
+
+The four vignettes that could be converted without those packages are
+done and rendering.
