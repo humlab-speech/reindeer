@@ -207,6 +207,24 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     seg_df$seg_params <- rep(list(dsp_params_base), nrow(seg_df))
   }
 
+  # On older superassp builds the trk_* wrappers expose no tunable formals, so
+  # nothing can be derived and the DSP runs on its own defaults. Say so, rather
+  # than letting a metadata-driven pipeline report parameters that were never
+  # applied. Once per session.
+  if (.use_metadata &&
+      !is.null(metadata_by_bundle) && nrow(metadata_by_bundle) > 0 &&
+      all(c("Age", "Gender") %in% names(metadata_by_bundle)) &&
+      all(lengths(seg_df$seg_params) == 0L) &&
+      !isTRUE(getOption("reindeer.norm_warning_shown", FALSE))) {
+    options(reindeer.norm_warning_shown = TRUE)
+    cli::cli_warn(
+      c("Age/Gender metadata is present but no DSP parameters could be derived.",
+        i = "This DSP routine exposes no tunable formals, so its defaults are used.",
+        i = "superassp >= 3.0.0 exposes them; older builds do not.",
+        i = "Reinstall it from GitHub: {.run remotes::install_github(\"humlab-speech/superassp\")}."),
+      class = c("reindeer_metadata_warning", "reindeer_warning"))
+  }
+
   # PHASE 2: Choose processing strategy based on optimize flag and available packages
   # The vectorized executor is the only one that reads and writes the persistent
   # cache, so a cache-enabled call routes there whatever its size. Previously a
