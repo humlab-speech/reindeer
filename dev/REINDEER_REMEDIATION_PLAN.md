@@ -703,3 +703,32 @@ Phase 4  [ ] check warnings to zero  [ ] examples execute  [ ] error reporting  
 Phase 5  [ ] vignettes execute  [ ] stale claims  [ ] vignette re-cut  [ ] reference pages  [ ] site hygiene
 Phase 6  [ ] dead helpers  [ ] autosync wrappers  [ ] Praat assets  [ ] leftovers  [ ] repo hygiene  [ ] close-out
 ```
+
+
+## D6 — CONFIRMED, and sharper than first stated (2026-09-17)
+
+Evidence, in order:
+
+1. `formals(superassp::trk_formant_forest)` on the installed 2.9.5 is
+   `(listOfFiles, ...)` — the wrapper carries no tunable parameters.
+2. `reindeer:::derive_dsp_parameters(superassp::trk_formant_forest,
+   list(Age = 8, Gender = "Male"), character(), list())` **warns**
+   ("DSP routine exposes no parameters, so Age/Gender norms are not
+   applied") and returns a list of length 0. So the branch at
+   `R/reindeer_enrich.R:502` is reachable, `fun_formals` is the
+   wrapper's, and the norms genuinely do not flow on 2.9.5.
+3. The same call through the user-facing path — `quantify()` on the demo
+   corpus with `Age`/`Gender` set — produces **no warning at all**.
+
+So the defect is not "the warning is noisy" but "the warning is correct
+and the main entry point never reaches it": `quantify()` on superassp
+2.9.5 silently applies default DSP parameters where age/gender-aware ones
+are expected. The probe that established this is the third of the three
+runs above; it is cheap to repeat.
+
+Fixing it means tracing `quantify()` (`R/segment_list_quantify.R`) to see
+whether it calls `derive_dsp_parameters()` with the wrapper or with an
+unwrapped inner routine, and raising the warning at the point where the
+two differ. The version floor remains unpinnable while 2.9.5 is installed
+(`Remotes:` has no constraint; pinning breaks install), so surfacing the
+warning is the fix that is available today.
