@@ -877,3 +877,36 @@ Deciding what it should do - warn unconditionally when a step yields
 nothing, or stay silent as now - is a judgement call about navigation
 semantics, and the vignette now states the current behaviour rather than
 the old abort.
+
+### Total-loss warning: where to look next (probe, not guess)
+
+`.maybe_warn_loss()` in `R/segment_list_provenance.R:118` ends in
+
+```r
+if (lost / rows_in > thr) { cli::cli_warn(...) }
+```
+
+With `rows_in > 0` and `rows_out = 0` that is `1.0 > 0.25`, so the warning
+should have fired on the dead-end step and did not. The three lines at the
+head of the function - the threshold lookup and whatever guard precedes
+the comparison - were not read, and one of them is the likely explanation:
+either a guard that returns early when a count is `NA`, or `.nrow_or_na()`
+returning `NA` for the `from` argument.
+
+That second possibility has a specific suspect. `.record_step()` is called
+as `.record_step(result, .segments, "scout", ...)`, and `.segments` may
+still be a `lazy_segment_list` at that point, whose row count is not known
+until collected. `NA` there would silence the warning while still
+producing a provenance row - which is exactly what was observed: the step
+appears in the table and nothing warns.
+
+One-line probe, decisive either way:
+
+```r
+p <- query(corp, "Phoneme =~ .+") |> scout(steps_forward = 99)
+reindeer::dropped_rows(reindeer::collect(p))   # inspect rows_in / rows_out
+```
+
+If `rows_in` is `NA`, the fix is to carry the input's real count into the
+step (or seed it when the plan is built); if it is a number, the guard at
+the head of `.maybe_warn_loss()` is the thing to change.
