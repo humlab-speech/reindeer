@@ -1300,3 +1300,31 @@ environment blockers:
 Until step 1 happens, the reindeer-side mitigations stand: `quantify()`
 warns that Age/Gender norms were not applied instead of silently using
 defaults, and the vignette states why its simulation section is gated.
+
+### Installing from the CRAN archive: attempted, nothing landed
+
+protoscribe needs `qs`, which is off CRAN, so I tried building it from the
+archive with a correctly-formed URL:
+
+    https://cran.r-project.org/src/contrib/Archive/qs/qs_0.27.3.tar.gz
+    install.packages(u, repos = NULL, type = "source", quiet = TRUE)
+    -> returned; requireNamespace("qs") -> FALSE
+
+The whole run took under two seconds, so no build happened; a source
+install that fails prints a **warning** ("installation of package ... had
+non-zero exit status") that `quiet = TRUE` hides, which is the same trap
+the protoscribe and superassp attempts fell into.
+
+**The pattern worth keeping**, now seen three times in this session:
+`install.packages()` and `remotes::install_github()` return without
+raising an R condition when the underlying build fails, so the only
+reliable check is `requireNamespace()` afterwards - and the only way to
+see the reason is `quiet = FALSE`. Any future attempt on this machine
+should do both, as the superassp diagnosis eventually did (which is how
+the missing SPTK headers surfaced).
+
+With that, all three environment blockers are documented in the same
+shape: protoscribe <- `qs` retired, superassp <- SPTK headers missing,
+qs itself <- source build not completing. None of them is a reindeer
+defect; all of them want a `quiet = FALSE` rerun to be sure of the cause
+before anyone spends time on a fix.
