@@ -161,15 +161,10 @@ cat("eggstract is not installed here, so this section is not run.\n")
 long_formants <- audio_measures |> pivot_tracks_longer()
 dim(long_formants)
 
-# NB autoplot(type = "formants") looks for columns named F1..F5, while
-# quantify() names them F1_Hz.. on the tracks it returns, so it is shown
-# here against the long form instead.
-head(long_formants, 3)
+ggplot2::autoplot(audio_measures, type = "formants")
 ```
 
-```{r primitives, fig.width = 6, fig.height = 4, eval = FALSE}
-# geom_formant_trajectory() expects a `rel_time` column on its input; the
-# long form above does not carry one, so this stays illustrative.
+```{r primitives, fig.width = 6, fig.height = 4}
 library(ggplot2)
 ggplot(long_formants) + geom_formant_trajectory()
 ```
