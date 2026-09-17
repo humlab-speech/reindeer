@@ -46,3 +46,11 @@
 ^inst/pymomelintsint/\.idea$
 ^doc$
 ^Meta$
+# Vendored third-party assets and stale test data: kept in the repo for
+# reference, excluded from the build so they neither ship nor trip the
+# non-portable-filename check.
+^inst/praat$
+^inst/pymomelintsint$
+^tests/signalfiles$
+^tests/[A-Z_]*\.md$
+^CMDI_VALIDATION\.md$

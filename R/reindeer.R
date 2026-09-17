@@ -12,7 +12,7 @@
 #'
 #' @importFrom Rdpack reprompt
 #' @importFrom Rcpp sourceCpp
-#' @importFrom stats end setNames start
+#' @importFrom stats end median setNames start
 #' @importFrom utils data head modifyList object.size tail
 #' @useDynLib reindeer, .registration = TRUE
 
@@ -20,7 +20,8 @@ NULL
 
 # Suppress R CMD check NOTEs for data.table/NSE variables
 utils::globalVariables(c(
-  ".", "..dsp_param_names", "..dsp_params", "..prep_param_names",
+  ".", ".cache_status", ".data", "seg_params", "seg_params_digest",
+  "..dsp_param_names", "..dsp_params", "..prep_param_names",
   "..prep_params", "..result_cols",
   "Age", "Age_lower", "Age_upper", "Gender", "Parameter", "Setting",
   "Study", "Study identifier", "identifier", "Study participants",

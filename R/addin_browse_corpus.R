@@ -87,7 +87,7 @@ browse_corpus_gadget <- function(corpus = NULL, height = 600) {
     output$bundle_info <- shiny::renderPrint({
       shiny::req(input$session, input$bundle)
       meta <- tryCatch(
-        get_metadata(corp, session = input$session, bundle = input$bundle),
+        get_metadata(corp, session_pattern = input$session, bundle_pattern = input$bundle),
         error = function(e) list()
       )
       if (length(meta) == 0L) {

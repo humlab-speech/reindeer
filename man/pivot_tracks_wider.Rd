@@ -29,7 +29,7 @@ anything with \code{track}, \code{rel_time}, \code{value} columns plus segment-i
 columns) and reconstructs wide-form columns named \verb{<track>_<rel_time>}.
 }
 \details{
-The result is a tibble, not a \code{segment_list} — pivoting back doesn't
+The result is a tibble, not a \code{segment_list} -- pivoting back doesn't
 recover the validator's required columns unless they were preserved on the
 way in. When the input has all required segment columns plus a \code{db_uuid}
 attribute, the result is upgraded to a \code{segment_list}.

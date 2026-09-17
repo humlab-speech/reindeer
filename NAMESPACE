@@ -102,6 +102,7 @@ importFrom(httpuv,
 )
 importFrom(stats,
   end,
+  median,
   setNames,
   start
 )

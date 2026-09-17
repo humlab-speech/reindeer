@@ -113,7 +113,7 @@ pivot_tracks_longer <- function(seg,
     parsed <- lapply(wide_cols, .parse_track_name)
     valid <- !vapply(parsed, is.null, logical(1))
     if (!all(valid)) {
-      # Drop unparseable wide cols silently — they may be scalar measurements
+      # Drop unparseable wide cols silently -- they may be scalar measurements
       # without a time suffix (e.g. mean F1).
       wide_cols <- wide_cols[valid]
       parsed <- parsed[valid]
@@ -188,7 +188,7 @@ pivot_tracks_longer <- function(seg,
 #' anything with `track`, `rel_time`, `value` columns plus segment-identifying
 #' columns) and reconstructs wide-form columns named `<track>_<rel_time>`.
 #'
-#' The result is a tibble, not a `segment_list` — pivoting back doesn't
+#' The result is a tibble, not a `segment_list` -- pivoting back doesn't
 #' recover the validator's required columns unless they were preserved on the
 #' way in. When the input has all required segment columns plus a `db_uuid`
 #' attribute, the result is upgraded to a `segment_list`.
@@ -229,7 +229,7 @@ pivot_tracks_wider <- function(long,
     timevar = ".col",
     direction = "wide"
   )
-  # reshape prepends "<values_from>." — strip it.
+  # reshape prepends "<values_from>." -- strip it.
   prefix <- paste0(values_from, ".")
   names(wide) <- sub(paste0("^", prefix), "", names(wide))
 
@@ -261,6 +261,6 @@ pivot_tracks_wider <- function(long,
 print.track_long <- function(x, ...) {
   cli::cli_h2("Track-long table")
   n_tracks <- length(unique(x[["track"]]))
-  cli::cli_alert_info("{nrow(x)} row{?s} × {ncol(x)} col{?s}; {n_tracks} track{?s}")
+  cli::cli_alert_info("{nrow(x)} row{?s} x {ncol(x)} col{?s}; {n_tracks} track{?s}")
   NextMethod()
 }
