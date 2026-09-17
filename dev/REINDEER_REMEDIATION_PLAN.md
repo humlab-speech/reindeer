@@ -1274,3 +1274,29 @@ Worth stating plainly, since two package installs have now failed here in
 different ways: the environment, not the package, is what stands between
 this repository and the remaining fixes. The reindeer side of every one of
 them is either done or written down with a reproduction.
+
+### superassp upgrade: the real reason is a missing system library
+
+`quiet = FALSE` answers it in one run:
+
+    sptk_pitch.cpp:9:10: fatal error: 'SPTK/analysis/pitch_extraction_by_rapt.h' file not found
+    1 error generated.
+    make: *** [sptk_pitch.o] Error 1
+    ERROR: compilation failed for package 'superassp'
+
+So it is not an R dependency and not a network problem: superassp's C++
+sources need the **SPTK** headers, which are not on this machine. That is
+an installable prerequisite, which makes this the most actionable of the
+environment blockers:
+
+1. provide SPTK (Homebrew formula if present, otherwise build from
+   https://github.com/r9y9/SPTK or the upstream distribution) so that
+   `SPTK/analysis/pitch_extraction_by_rapt.h` resolves on the include path;
+2. `remotes::install_github("humlab-speech/superassp")`;
+3. then D6 closes, `erodex::quantify_simulate()` works, the vignette's
+   simulation section can be un-gated, and `superassp (>= 3.0.0)` becomes
+   safe to pin in DESCRIPTION.
+
+Until step 1 happens, the reindeer-side mitigations stand: `quantify()`
+warns that Age/Gender norms were not applied instead of silently using
+defaults, and the vignette states why its simulation section is gated.
