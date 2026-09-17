@@ -136,6 +136,29 @@ S7::method(scout, lazy_segment_list) <- function(.segments,
 #'
 #' @keywords internal
 #' @noRd
+#' SQL scope for a navigation read
+#'
+#' Navigation verbs only ever look at the bundles they were handed, but their
+#' queries used to scan every item, link and label in the database. Scoping the
+#' read keeps the cost proportional to the query rather than to the corpus.
+#'
+#' @param dt A data.table with `session` and `bundle` columns.
+#' @return List with `sep`, `in_list` (the placeholder list), `sql` (the
+#'   composite-key expression for unqualified columns) and `params` (the key
+#'   list, appended after the caller's own parameters).
+#' @noRd
+.scope_to_segments <- function(dt) {
+  sep <- "\u001f"
+  keys <- unique(paste(dt$session, dt$bundle, sep = sep))
+  in_list <- paste(rep("?", length(keys)), collapse = ", ")
+  list(
+    sep = sep,
+    in_list = in_list,
+    sql = sprintf("(session || '%s' || bundle) IN (%s)", sep, in_list),
+    params = as.list(keys)
+  )
+}
+
 scout_dt <- function(.segments, 
                      steps_forward,
                      count_from = "START",
@@ -180,13 +203,15 @@ scout_dt <- function(.segments,
   levels <- unique(dt$level)
   level_placeholders <- paste(rep("?", length(levels)), collapse = ", ")
   
+  scope <- .scope_to_segments(dt)
   items_query <- sprintf(
-    "SELECT * FROM items WHERE db_uuid = ? AND level IN (%s)",
-    level_placeholders
+    "SELECT * FROM items WHERE db_uuid = ? AND level IN (%s) AND %s",
+    level_placeholders, scope$sql
   )
-  
+
   all_items_dt <- data.table::setDT(DBI::dbGetQuery(
-    conn, items_query, params = c(list(db_uuid), as.list(levels))
+    conn, items_query,
+    params = c(list(db_uuid), as.list(levels), scope$params)
   ))
 
   # Compute sample_end from sample_start + sample_dur (emuR stores duration, not end)
@@ -197,10 +222,11 @@ scout_dt <- function(.segments,
   )]
 
   # Query labels
-  labels_query <- "SELECT db_uuid, session, bundle, item_id, label
+  labels_query <- sprintf("SELECT db_uuid, session, bundle, item_id, label
      FROM labels
-     WHERE db_uuid = ?"
-  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query, params = list(db_uuid)))
+     WHERE db_uuid = ? AND %s", scope$sql)
+  labels_dt <- data.table::setDT(DBI::dbGetQuery(
+    conn, labels_query, params = c(list(db_uuid), scope$params)))
   
   # Set keys for fast joins
   data.table::setkey(all_items_dt, db_uuid, session, bundle, level, seq_idx)
@@ -422,23 +448,27 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 
   # Query for upward links
   # We need to find items at the target level that link down to our segments
-  links_query <- "
-    SELECT l.*, i.level as from_level
-     FROM links l
-     INNER JOIN items i ON 
-       l.db_uuid = i.db_uuid AND 
-       l.session = i.session AND 
-       l.bundle = i.bundle AND 
-       l.to_id = i.item_id
-     WHERE l.db_uuid = ?"
-  
-  links_dt <- data.table::setDT(DBI::dbGetQuery(conn, links_query, params = list(db_uuid)))
+  scope <- .scope_to_segments(dt)
+  links_query <- sprintf("
+   SELECT l.*, i.level as from_level
+    FROM links l
+    INNER JOIN items i ON
+      l.db_uuid = i.db_uuid AND
+      l.session = i.session AND
+      l.bundle = i.bundle AND
+      l.to_id = i.item_id
+    WHERE l.db_uuid = ? AND (l.session || '%s' || l.bundle) IN (%s)",
+    scope$sep, scope$in_list)
+
+  links_dt <- data.table::setDT(DBI::dbGetQuery(
+    conn, links_query, params = c(list(db_uuid), scope$params)))
   
   # Query target level items
-  items_query <- "SELECT * FROM items WHERE db_uuid = ? AND level = ?"
-  
+  items_query <- sprintf(
+    "SELECT * FROM items WHERE db_uuid = ? AND level = ? AND %s", scope$sql)
+
   target_items_dt <- data.table::setDT(DBI::dbGetQuery(
-    conn, items_query, params = list(db_uuid, level)
+    conn, items_query, params = c(list(db_uuid, level), scope$params)
   ))
 
   # Compute sample_end from sample_start + sample_dur
@@ -601,15 +631,18 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   conn <- get_or_create_connection(corp)
 
   # Query for downward links (from our segments to target level)
-  links_query <- "SELECT * FROM links WHERE db_uuid = ?"
-  
-  links_dt <- data.table::setDT(DBI::dbGetQuery(conn, links_query, params = list(db_uuid)))
+  scope <- .scope_to_segments(dt)
+  links_query <- sprintf("SELECT * FROM links WHERE db_uuid = ? AND %s", scope$sql)
+
+  links_dt <- data.table::setDT(DBI::dbGetQuery(
+    conn, links_query, params = c(list(db_uuid), scope$params)))
   
   # Query target level items
-  items_query <- "SELECT * FROM items WHERE db_uuid = ? AND level = ?"
-  
+  items_query <- sprintf(
+    "SELECT * FROM items WHERE db_uuid = ? AND level = ? AND %s", scope$sql)
+
   target_items_dt <- data.table::setDT(DBI::dbGetQuery(
-    conn, items_query, params = list(db_uuid, level)
+    conn, items_query, params = c(list(db_uuid, level), scope$params)
   ))
 
   # Compute sample_end from sample_start + sample_dur
@@ -620,11 +653,12 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   )]
 
   # Query labels
-  labels_query <- "SELECT db_uuid, session, bundle, item_id, label
+  labels_query <- sprintf("SELECT db_uuid, session, bundle, item_id, label
      FROM labels
-     WHERE db_uuid = ?"
+     WHERE db_uuid = ? AND %s", scope$sql)
 
-  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query, params = list(db_uuid)))
+  labels_dt <- data.table::setDT(DBI::dbGetQuery(
+    conn, labels_query, params = c(list(db_uuid), scope$params)))
 
   # Set keys
   data.table::setkey(links_dt, db_uuid, session, bundle, from_id)

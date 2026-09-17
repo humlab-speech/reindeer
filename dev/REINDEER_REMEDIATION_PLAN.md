@@ -31,7 +31,7 @@ protoscribe, eggstract, erodex, or superassp.
 | 0 Baseline and safety net | done | `09592e3` |
 | 1 Correctness | done | `83b1f34` |
 | 2 Energy | done | `3a7936e` |
-| 3 Performance | not started | |
+| 3 Performance | in progress (WP3.1 read scoping done; the join rewrite, connection reuse, eager SQL and assembly vectorisation remain) | see the commit that follows |
 | 4 Standards | not started | |
 | 5 Documentation, vignettes, site | not started | |
 | 6 Deletions and closure | partially done (dead PSOCK helper removed in phase 2) | |
@@ -73,6 +73,22 @@ re-litigates them.
   the rebuild-equivalence test (build twice → identical tables; delete a bundle
   → its rows are pruned) must exist first. The double read of each annotation
   file (`fromJSON()` + `md5sum()`) goes with it.
+- **WP3.1 is half done, deliberately.** The navigation verbs no longer read
+  whole tables: `scout`, `ascend_to` and `descend_to` scope their `items`,
+  `links` and `labels` queries to the (session, bundle) pairs in the input, so
+  the read is proportional to the query rather than to the corpus. Verified by
+  comparing old and new results across eight navigation cases on the demo
+  corpus - byte-identical, including the pre-existing 0-row `ascend_to("Word")`
+  and `descend_to("Syllable")` outcomes on that corpus.
+  The per-segment loop itself is untouched: replacing it with a non-equi join is
+  a bigger change and needs the same equivalence harness, which now exists as a
+  script (`/tmp/nav_equiv.R` pattern) and should be promoted into
+  `tests/testthat/` before the rewrite.
+- **WP3.2-WP3.4 remain.** Threading one connection through the query path,
+  moving eager conjunction/disjunction onto the SQL builders, and vectorising
+  result assembly are all still open, each with its existing gate
+  (`test_query_optimized.R` parity for the first two, the quantify/pivot tests
+  for the third).
 - **Collate matters.** Adding `R/parallel_utils.R` broke `R CMD INSTALL`
   ("files missing from Collate field") while `devtools::test()` stayed green,
   because `load_all()` ignores Collate. Run `devtools::document()` whenever a
