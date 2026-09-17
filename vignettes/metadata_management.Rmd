@@ -7,18 +7,29 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true"))
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
 ## Why metadata matters in reindeer
 
-Speaker metadata is what lets `quantify()` and `enrich()` pick the
-right DSP parameters for each recording — child versus adult, female
-versus male, fast versus slow speech. Set the metadata once, then
-every downstream analysis automatically uses age- and gender-aware
-windows, formant ranges, and pitch limits. This vignette covers how
-to write, read, and round-trip that metadata.
+Speaker metadata is what lets `quantify()` and `enrich()` pick the right
+DSP parameters for each recording — child versus adult, female versus
+male, fast versus slow speech. Set the metadata once, then every
+downstream analysis uses age- and gender-aware windows, formant ranges
+and pitch limits. This vignette covers how to write, read and round-trip
+that metadata.
+
+Everything below runs against the demo corpus that ships with the
+package.
+
+```{r open}
+library(reindeer)
+library(dplyr, warn.conflicts = FALSE)
+
+corp <- demo_corpus()
+get_metadata(corp) |> head(3)
+```
 
 ## Three levels, one rule
 
@@ -28,20 +39,16 @@ Metadata can live at three levels:
 2. **Session** — overrides for one session.
 3. **Bundle** — overrides for one recording.
 
-When you ask for a value, **bundle wins over session, session wins
-over database**. This lets you set `Project = "MyStudy"` once at the
-database level and only override what differs.
+When you ask for a value, **bundle wins over session, session wins over
+database**. This lets you set `Project = "MyStudy"` once at the database
+level and override only what differs.
 
 ## Writing metadata
 
-`set_metadata()` is the canonical writer. It writes to
-`METADATA.json` on disk (the ground truth) and refreshes the cache.
+`set_metadata()` is the canonical writer. It writes to `METADATA.json` on
+disk (the ground truth) and refreshes the cache.
 
-```{r}
-library(reindeer)
-
-corp <- corpus("path/to/ae_emuDB")
-
+```{r write}
 # Database-wide defaults
 set_metadata(corp, list(
   Project = "Vowel Perception Study",
@@ -49,54 +56,61 @@ set_metadata(corp, list(
   Institution = "Humlab"
 ))
 
-# Session-level: one speaker for all that session's bundles
-set_metadata(corp,
-             list(Speaker = "P001", Age = 25, Gender = "Female"),
-             session = "Session1")
+# Session-level
+set_metadata(corp, list(Speaker = "P001", Age = 25, Gender = "Female"),
+             session = "0000")
 
 # Bundle-level: details for one recording
-set_metadata(corp,
-             list(Quality = "Excellent", Microphone = "SM58"),
-             session = "Session1", bundle = "Recording001")
+set_metadata(corp, list(Quality = "Excellent", Microphone = "SM58"),
+             session = "0000", bundle = "msajc003")
+```
+
+Inheritance in action — the database default shows up everywhere, the
+session and bundle values only where they were set:
+
+```{r inherit}
+get_metadata(corp) |>
+  dplyr::select(session, bundle, Project, Speaker, Age, Gender,
+                Quality, Microphone) |>
+  utils::head(4)
 ```
 
 A bracket shortcut writes at the bundle level:
 
-```{r}
-corp["Session1", "Recording001"] <- list(SamplingRate = 44100)
+```{r bracket}
+md <- get_metadata(corp)
+corp[md$session[1], md$bundle[1]] <- list(SamplingRate = 44100)
 ```
 
-The same bracket also reads — `corp[session, bundle]` returns the
-bundle's resolved metadata as a list, and you can pass regex on either
-side to scan a slice of the corpus:
+The same bracket reads. `corp[session, bundle]` returns the bundle's
+resolved metadata as a list, and you can pass regex on either side to
+scan a slice of the corpus:
 
-```{r}
-corp["Session1", "Recording001"]    # all metadata for one bundle
-corp["Session1", ]                  # every bundle in Session1
-corp["Sess.*", "Recording0[1-3].*"] # regex on both axes
+```{r bracket-read}
+corp[md$session[1], md$bundle[1]]    # all metadata for one bundle
+get_metadata(corp, session_pattern = "0000") |> nrow()
 ```
 
 Assigning a character path imports a media file at the bundle scope:
 
-```{r}
-corp["Session1", "Recording001"] <- "audio/take1.wav"
+```{r bracket-path, eval = FALSE}
+corp["0000", "msajc003"] <- "audio/take1.wav"
 ```
 
-`add_metadata()` is a deprecated alias of `set_metadata()`; existing
-scripts keep working, but new code should use `set_metadata()`.
+`add_metadata()` is an older spelling of `set_metadata()`; both write the
+same way. New code should use `set_metadata()`.
 
 ## Reading metadata
 
 `get_metadata()` returns one row per bundle with inheritance already
 resolved.
 
-```{r}
-get_metadata(corp)                              # everything
-get_metadata(corp, session_pattern = "Session1")
-get_metadata(corp, bundle_pattern = "Recording0[1-3].*")
+```{r read}
+get_metadata(corp) |> nrow()
+get_metadata(corp, session_pattern = "0000") |> nrow()
 ```
 
-For most pipelines you don't need to call this directly — use
+For most pipelines you do not need to call this directly — use
 `enrich(segs, corp)` and reindeer joins the metadata for you.
 
 ## Round-tripping through a spreadsheet
@@ -104,12 +118,13 @@ For most pipelines you don't need to call this directly — use
 For batch editing, export everything to Excel, edit there, and load it
 back:
 
-```{r}
-export_metadata(corp, "ae_metadata.xlsx")
+```{r excel, eval = requireNamespace("openxlsx", quietly = TRUE)}
+xlsx <- tempfile(fileext = ".xlsx")
+export_metadata(corp, xlsx)
 
 # ... edit in Excel: rows are bundles, columns are fields ...
 
-load_metadata(corp, source = "excel", path = "ae_metadata.xlsx")
+load_metadata(corp, source = "excel", path = xlsx)
 ```
 
 The workbook has three sheets — `bundles`, `sessions`, `database` —
@@ -121,42 +136,43 @@ clear cells to drop them.
 If you (or a collaborator) edited the `METADATA.json` files outside R,
 tell reindeer to rescan:
 
-```{r}
+```{r refresh}
 load_metadata(corp)            # source = "files" is the default
 ```
 
-`gather_metadata(corp)` is a deprecated alias and does the same thing.
+`gather_metadata(corp)` does the same thing and is kept for older code.
 
 ## Sanity-checking metadata
 
-After a big edit, look at what's there and what `quantify()` will pick:
+After a big edit, look at what is there and what `quantify()` will pick:
 
-```{r}
-get_metadata(corp) |> dplyr::glimpse()        # column overview
+```{r sanity}
+get_metadata(corp) |> glimpse()
 
 dsp_parameters(age = 8,  gender = "Male")     # what params for a kid?
 dsp_parameters(age = 45, gender = "Female")   # …for an adult?
-dsp_parameters(corpus_obj = corp)             # one row per bundle
 ```
 
-If the corpus has Age/Gender on every bundle, `dsp_parameters(corp)`
-gives you a per-bundle parameter table — a quick check that no
-recording will be analysed with the wrong settings.
+If the corpus has `Age`/`Gender` on every bundle, `dsp_parameters(corp)`
+gives you a per-bundle parameter table — a quick check that no recording
+will be analysed with the wrong settings.
 
 ## FAIR / CMDI export
 
-`describe_corpus()` writes README.md, a CMDI XML file, and DataCite
-JSON next to the corpus. With `options(reindeer.auto_cmdi = TRUE)` it
-runs automatically the next time you open the corpus after any
-metadata change.
+`describe_corpus()` writes the archival artefacts next to the corpus:
+`README.md`, a CMDI XML file, DataCite JSON, `CITATION.cff` and a
+schema.org JSON-LD descriptor. With `options(reindeer.auto_cmdi = TRUE)`
+it runs automatically the next time you open the corpus after a metadata
+change.
 
-```{r}
+```{r fair}
 describe_corpus(corp)
-options(reindeer.auto_cmdi = TRUE)
+list.files(corp@basePath, pattern = "README|cmdi|datacite|CITATION|jsonld")
 ```
 
 ## Where next
 
 - `vignette("getting_started")` — the five-minute pipeline.
-- `?set_metadata`, `?get_metadata`, `?load_metadata`,
-  `?dsp_parameters` — function reference.
+- `vignette("end_to_end_pipeline")` — metadata through to archival output.
+- `?set_metadata`, `?get_metadata`, `?load_metadata`, `?dsp_parameters` —
+  function reference.
