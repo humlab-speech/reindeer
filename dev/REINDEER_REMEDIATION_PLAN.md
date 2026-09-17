@@ -958,3 +958,33 @@ in-process after `load_all()`, and inspect the HTML for real output.
 
 The four vignettes that could be converted without those packages are
 done and rendering.
+
+### protoscribe does not install: the GitHub URL 404s
+
+The companion install run finished with `erodex OK`, `protoscribe FAILED`.
+Diagnosing:
+
+    curl -sI https://github.com/humlab-speech/protoscribe   ->  HTTP 404
+    remotes::install_github("humlab-speech/protoscribe")     ->  error
+
+Caveat that matters before anyone "fixes" a URL: GitHub returns 404 to
+unauthenticated requests for **private** repositories as well as for
+non-existent ones. So this is either a repo that was renamed/removed or
+one this machine has no access to - and the two call for different
+actions (update the URL vs. supply credentials).
+
+It does matter, because `https://github.com/humlab-speech/protoscribe` is
+cited as the home of the draft-annotation workflow in `CLAUDE.md`, in
+`R/companion_protoscribe.R` (the redirect that tells users where the moved
+draft functions went), and in the remaining vignette. If the repo is
+private, every one of those pointers is a dead end for anyone without
+access, and the draft-annotation path cannot be exercised at all on a
+machine like this one.
+
+Next step: confirm with the maintainer whether the repository exists
+publicly. If it does, the URL needs correcting everywhere it is cited; if
+it is private, the docs should say so rather than presenting it as an
+installable companion.
+
+`erodex` did install, so `end_to_end_pipeline` is now blocked only on
+protoscribe - and its erodex sections can be converted meanwhile.
