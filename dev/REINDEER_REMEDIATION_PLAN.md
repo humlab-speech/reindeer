@@ -1070,3 +1070,32 @@ Worth deciding which shape is intended and making both paths agree;
 `vignettes/end_to_end_pipeline.Rmd` now uses the lazy-then-collect order
 that demonstrably carries the columns. Regression worth writing: assert
 that both orders yield the measurement columns.
+
+### quantify() eager path: two returns, one of them bare
+
+`R/segment_list_quantify.R` has two exits on the eager path:
+
+```r
+294    return(extended_segment_list(data = as.data.frame(object)))   # no DSP columns
+...
+327    dsp_cols <- setdiff(names(combined), c(segment_cols, ...))
+336    result <- extended_segment_list(data = combined, ...)          # with them
+```
+
+The measuring run (`collect() |> quantify()` on the demo corpus) came back
+with 16 columns and no `F1_Hz`, which matches the `:294` shape exactly -
+so that branch was taken, not the combining one at `:336`. What guards it
+is at `:285-295` and I have not read it.
+
+One probe settles it:
+
+```r
+eager <- reindeer::collect(query(corp, "Phonetic =~ [aeiou]"))
+q <- quantify(eager, superassp::trk_formant_forest, .at = 0.5)
+c(ncol = ncol(q), "F1_Hz" %in% names(q), dsp_columns = length(q@dsp_columns))
+```
+
+If `dsp_columns` is empty the DSP never produced anything and the guard is
+about the input; if it is populated while `names(q)` lacks `F1_Hz`, the
+columns are being dropped between `:327` and `:340`. Read `:285-295` next
+either way - that condition is the whole question.
