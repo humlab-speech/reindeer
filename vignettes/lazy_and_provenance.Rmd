@@ -7,146 +7,147 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true"))
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+
+# Saving a pipeline with qs2 is shown when the package is available.
+eval_qs2 <- requireNamespace("qs2", quietly = TRUE)
 ```
 
 ## Why this vignette exists
 
 Reindeer pipelines are lazy by default: `query()` builds a plan, you
-attach `filter()`, `scout()`, `ascend_to()`, and so on, and nothing
-actually runs until you ask for data. That's fast — but it means a
-filter that silently drops 80% of your rows can sit unnoticed in the
-middle of a long pipe. Reindeer addresses this by recording per-step
-provenance and warning when a step drops too many rows.
+attach `filter()`, `scout()`, `ascend_to()` and so on, and nothing runs
+until you ask for data. That is fast — but it also means a filter that
+silently drops 80% of your rows can sit unnoticed in the middle of a
+long pipe. Reindeer records per-step provenance and warns when a step
+drops too many rows.
 
-This vignette shows three things:
-
-1. Building and collecting a lazy pipeline.
-2. Reading the provenance trail to find where rows disappeared.
-3. Tuning the loss warning to your tolerance.
+This vignette shows three things: building and collecting a lazy
+pipeline, reading the provenance trail to find where rows disappeared,
+and tuning the loss warning to your tolerance.
 
 ## A lazy pipeline
 
-```{r}
+```{r plan}
 library(reindeer)
-library(dplyr)
+library(dplyr, warn.conflicts = FALSE)
 
-corp <- corpus("path/to/ae_emuDB")
+corp <- demo_corpus()
 
-plan <- query(corp, "Phonetic =~ [aeiou]") |>
-  filter(label != "@") |>
+plan <- query(corp, "Phoneme =~ .+") |>
+  filter(labels != "n") |>
   scout(steps_forward = 1) |>
-  ascend_to("Word")
+  ascend_to("Syllable")
 
 class(plan)
-#> "reindeer::lazy_segment_list"
 ```
 
-Nothing has run yet. Print the plan and you'll see the queued
-transforms with a rough row estimate.
+Nothing has run yet. Printing the plan shows the queued transforms:
+
+```{r print-plan}
+plan
+```
 
 To materialise, ask for data:
 
-```{r}
-collect(plan)        # explicit
-nrow(plan)           # also triggers
-head(plan)           # ditto
-plan$labels          # ditto
+```{r collect}
+result <- reindeer::collect(plan)
+nrow(result)
+head(result) |> select(session, bundle, labels, start, end)
 ```
 
 dplyr verbs auto-collect, so this works too:
 
-```{r}
+```{r dplyr}
 plan |> filter(end - start > 100) |> summarise(n = n())
 ```
 
 ## Reading the provenance trail
 
-Every navigation verb and every dplyr verb appends a row to a
-provenance log on the result. Open it with `provenance()`:
+Every navigation verb and every dplyr verb appends a row to a provenance
+log on the result. Open it with `provenance()`:
 
-```{r}
-plan_done <- collect(plan)
-provenance(plan_done)
-# # A tibble: 4 x 7
-#    step verb       call                rows_in rows_out rows_lost ts
-#       1 query      query(corp, "...")        NA      812        NA …
-#       2 filter     filter(label != "@")     812      798        14 …
-#       3 scout      scout(steps_forward=1)   798      798         0 …
-#       4 ascend_to  ascend_to("Word")        798      624       174 …
+```{r provenance}
+provenance(result)
 ```
 
 The same information in row-loss form, friendlier for picking out the
 culprit step:
 
-```{r}
-dropped_rows(plan_done)
-# step verb       rows_lost pct_lost
-#    2 filter            14      1.7
-#    4 ascend_to        174     21.8
+```{r dropped-rows}
+dropped_rows(result)
 ```
 
-`dropped(plan_done)` returns the cumulative count
-(`14 + 174 = 188`). `dropped(plan_done, 4)` returns the loss at a
-specific step.
+`dropped(result)` returns the cumulative count and
+`dropped(result, 3)` the loss at a specific step:
+
+```{r dropped}
+dropped(result)
+```
 
 ## The 25 % loss warning
 
-If any navigation verb (`scout()`, `ascend_to()`, `descend_to()`)
-drops more than 25 % of its input, reindeer warns by default:
+If a navigation verb (`scout()`, `ascend_to()`, `descend_to()`) drops more
+than 25 % of its input, reindeer warns by default. Stepping far past the
+end of the annotation is the usual cause:
 
-```{r}
-plan |> scout(steps_forward = 99)
-#> Warning: scout dropped 612 rows (76.7%) — most segments hit a
-#> bundle boundary at this offset.
+```{r loss-warning}
+far <- query(corp, "Phoneme =~ .+") |> scout(steps_forward = 3)
+nrow(reindeer::collect(far))
+
+# The warning names the step and the share of rows it lost.
+suppressWarnings(provenance(reindeer::collect(far)))
 ```
 
 dplyr verbs are silent — losing rows there is usually intentional. To
 change the threshold:
 
-```{r}
+```{r threshold}
 options(reindeer.loss_warn = 0.10)   # warn over 10%
 options(reindeer.loss_warn = 1.0)    # never warn
+options(reindeer.loss_warn = NULL)   # back to the 25% default
 ```
 
-The cap on log size is governed by `options(reindeer.provenance_max =
-1000)` (default 1000 rows). Very long pipelines truncate from the
-front.
+The provenance log is capped by `options(reindeer.provenance_max = 1000)`
+rows; very long pipelines truncate from the front.
+
+Stepping so far past the end that *nothing* matches is the one case that
+still misbehaves: `scout(steps_forward = 99)` aborts inside the
+`segment_list` validator instead of returning an empty result. It is
+recorded in `dev/REINDEER_REMEDIATION_PLAN.md`.
 
 ## Provenance survives serialisation
 
-If you save a segment_list with `saveRDS()` or `qs2::qs_save()`, its
-provenance survives the round trip:
+Save a segment list and its provenance travels with it:
 
-```{r}
-qs2::qs_save(plan_done, "plan.qs2")
-plan_back <- qs2::qs_read("plan.qs2")
-provenance(plan_back)        # same tibble as before
+```{r serialise, eval = eval_qs2}
+f <- tempfile(fileext = ".qs2")
+qs2::qs_save(result, f)
+back <- qs2::qs_read(f)
+provenance(back) |> nrow()
 ```
 
-So you can hand a colleague the result of your pipeline and they can
-still see exactly how it was filtered.
+So you can hand a colleague the result of a pipeline and they can still
+see how it was filtered.
 
 ## Forcing eager mode
 
-If you want immediate execution — usually for debugging — pass
-`lazy = FALSE` to `query()`:
+For immediate execution, pass `lazy = FALSE` to `query()` or collect
+early:
 
-```{r}
-query(corp, "Phonetic == t", lazy = FALSE)
+```{r eager}
+segs <- reindeer::collect(query(corp, "Phoneme =~ .+"))
+nrow(segs)
+
+eager <- query(corp, "Phoneme =~ .+", lazy = FALSE)
+class(eager)
 ```
 
-Or call `collect()` early:
-
-```{r}
-segs <- collect(query(corp, "Phonetic == t"))
-```
-
-Eager pipelines also record provenance, so the inspection workflow is
-identical.
+Eager results carry provenance too, so the inspection workflow is the
+same.
 
 ## Where next
 
-- `vignette("getting_started")` — five-minute introduction.
+- `vignette("getting_started")` — the five-minute pipeline.
 - `?query`, `?scout`, `?ascend_to`, `?provenance`, `?dropped_rows`.
