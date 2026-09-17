@@ -32,7 +32,7 @@ protoscribe, eggstract, erodex, or superassp.
 | 1 Correctness | done | `83b1f34` |
 | 2 Energy | done | `3a7936e` |
 | 3 Performance | in progress (WP3.1 read scoping done; the join rewrite, connection reuse, eager SQL and assembly vectorisation remain) | see the commit that follows |
-| 4 Standards | not started | |
+| 4 Standards | in progress: check went from 7 WARNING / 1 NOTE to 2 WARNING / 0 NOTE; the `ascend_to` Rd warnings remain | `14c0467`, `86b9f86` |
 | 5 Documentation, vignettes, site | not started | |
 | 6 Deletions and closure | partially done (dead PSOCK helper removed in phase 2) | |
 
@@ -93,6 +93,15 @@ re-litigates them.
   ("files missing from Collate field") while `devtools::test()` stayed green,
   because `load_all()` ignores Collate. Run `devtools::document()` whenever a
   file is added.
+- **The first full `R CMD check` caught two defects the suite could not.**
+  (a) The phase-2 batched cache write passed `cache_format` where the scope has
+  `.cache_format`, so a corpus-level `enrich()` with a cache miss would have
+  failed at that line - no unit test reached it. (b) The doc-contract tests read
+  `man/*.Rd` from the source tree, which does not exist under check, so they
+  errored instead of skipping. Both fixed in `86b9f86`. Check status after the
+  fixes: 2 WARNINGs (the `ascend_to` Rd usage/codoc pair), 0 NOTEs, examples OK.
+  Run the check with `_R_CHECK_FORCE_SUGGESTS_=false` as CI does, and build with
+  vignettes: `--no-build-vignettes` fabricates a "no files in inst/doc" warning.
 
 ## 1. Invariants and baseline
 
