@@ -1176,3 +1176,35 @@ its track column something else and the autoplot filter should read that;
 if it is genuinely empty, the reshape is what needs fixing. Whatever the
 answer, the regression to write is the one the vignette asked for: a
 quantified segment list must plot with `autoplot(type = "formants")`.
+
+### pivot_tracks_longer(): root cause is a naming contract the quantifier does not honour
+
+Reading `R/segment_list_pivot.R` with the 0x0 measurement in hand:
+
+- `.parse_track_name()` (`:17-26`) splits a column name into `track` and
+  `rel_time`, i.e. it expects wide columns named `<track>_<rel_time>`.
+- The wide path (`:111-137`) drops every column whose name does not parse -
+  `:116` says so: "Drop unparseable wide cols silently - they may be scalar
+  measurements without a time suffix".
+- With `wide_cols` empty the result is an empty frame, which is exactly the
+  0x0 measured above. There is no error, because the guard that would
+  complain ("No track columns detected to pivot", `:90`) tests the columns
+  the *detector* finds, not the ones that survive parsing.
+
+And what does `quantify(.at = seq(0, 1, 0.2))` actually produce? `F1_Hz`,
+`F2_Hz`, ... plus a separate `.time_point` column - not `F1_0.2`,
+`F2_0.2`. So the parser is looking for a naming contract the quantifier
+never implemented, while `pivot_tracks_longer()`'s own documentation
+(`:42`) claims the opposite ("produced by `quantify(.at = seq(0, 1,
+0.1))`").
+
+That is the defect: two halves of the package disagree about the wide
+format. Fixing it means choosing one - teach the pivot that `.time_point`
+carries the time and `F1_Hz` the track, or have `quantify(.at=)` emit
+`<track>_<time>` - and the `autoplot(type = "formants")` failure and
+`geom_formant_trajectory()`'s missing `rel_time` are both downstream of the
+same choice.
+
+Evidence to keep, all measured on the demo corpus: the pivot returns 0x0;
+`autoplot(type = "formants")` aborts on quantified data; the vignette's
+quantified frame has 28 columns including `F1_Hz` and `.time_point`.
