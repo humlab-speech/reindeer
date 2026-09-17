@@ -749,3 +749,17 @@ be confirmed by printing `seg_params` itself, or by comparing a segment
 analysed under both settings. The first observation (no warning) stands
 regardless, and together with the direct probe below it is the evidence
 that the main entry point degrades silently.
+
+### Addendum resolved: seg_params is the parameter list, and it is empty
+
+Printed it: `seg_params` holds the resolved DSP parameters as a list, and
+it was `list()` for all seven bundles — one distinct value across the
+corpus, including the 6-year-old female and the 50-year-old male bucket.
+So the caveat above is discharged and the observation stands: no
+parameters were derived on the user-facing path, the DSP ran on its own
+defaults, and the caller was not told.
+
+`quantify()` on superassp 2.9.5 therefore silently ignores `Age` and
+`Gender`. That is the defect; the warning that would report it exists and
+works when called directly, which is what makes the silence a bug rather
+than a limitation.
