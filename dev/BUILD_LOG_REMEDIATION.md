@@ -95,3 +95,35 @@ did not complete. Nothing to change in reindeer; the companion needs the
   named;
 - two environment blockers (Issues 2 and 3) unchanged, each with its
   measured cause.
+
+
+## Issue 1 follow-up: it does not reproduce outside the build (measured)
+
+Ran the reproduction by hand, twice:
+
+    corp <- demo_corpus(); md <- get_metadata(corp)
+    corp[md$session[1], md$bundle[1]]                       -> OK, 4 fields
+    # after the vignette's own set_metadata() writes, including a
+    # bundle-level SamplingRate write through the bracket form
+    corp[md$session[1], md$bundle[1]]                       -> OK, 11 fields
+
+So the read path works in an interactive session, and the failure is
+specific to how `R CMD build` runs the vignette. That points at the build
+environment rather than at the method's logic, and the leading hypothesis
+is a **stale installed copy**: `R CMD build` renders vignettes against the
+installed `reindeer`, not the working tree, so a revision installed before
+the session's fixes is what the failing chunk actually called.
+
+Next step, cheap and decisive:
+
+    R CMD INSTALL . && R CMD build .
+
+If the vignette step passes, Issue 1 was an artefact of a stale install and
+the mitigation in `metadata_management.Rmd` can be reconsidered (the
+bracket form may not need to stay non-evaluated). If it still fails, the
+traceback at `R/corpus_methods.R:522-528` is genuine and the assertion
+approach in the fix direction above applies.
+
+Until that is run, the mitigation stands: the vignette reads through
+`get_metadata()`, the bracket form is shown but not evaluated, and the
+build's vignette step passes.
