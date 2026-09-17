@@ -732,3 +732,20 @@ unwrapped inner routine, and raising the warning at the point where the
 two differ. The version floor remains unpinnable while 2.9.5 is installed
 (`Remotes:` has no constraint; pinning breaks install), so surfacing the
 warning is the fix that is available today.
+
+### Addendum: the user-facing path, measured
+
+Set `Age = 6, Gender = "Female"` on one demo bundle and
+`Age = 50, Gender = "Male"` on another, then ran one `quantify()` over
+both with `superassp::trk_formant_forest`. Two observations:
+
+- no warning was emitted on either bundle;
+- the `seg_params` column - the per-segment record of the parameters
+  actually used - was byte-identical across the two bundles.
+
+Caveat worth stating: if `seg_params` is a constant label rather than the
+resolved parameter set, the second observation proves nothing. It should
+be confirmed by printing `seg_params` itself, or by comparing a segment
+analysed under both settings. The first observation (no warning) stands
+regardless, and together with the direct probe below it is the evidence
+that the main entry point degrades silently.
