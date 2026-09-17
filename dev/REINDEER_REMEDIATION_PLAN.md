@@ -1151,3 +1151,28 @@ document builds. They are not documentation defects: the helpers and the
 measurements disagree, which is worth fixing on one side or the other - and
 a regression test asserting that quantify() output plots with autoplot()
 would pin whichever side is chosen.
+
+### autoplot formants: the pivot returns nothing (regex was a red herring)
+
+Tried relaxing the filter in `.autoplot_extended_segment_list` from
+`^F[12345]$` to a prefix pattern, on the theory that the `_Hz` suffix was
+the mismatch. It still aborted, so I printed the data it filters:
+
+    pivot_tracks_longer(quantified)$track   ->  (empty)
+
+`pivot_tracks_longer()` produces **no rows** for a quantify() result, which
+is why the filter finds nothing - and why relaxing the pattern changed
+nothing. The `type = "formants"` path cannot work on quantify() output
+because the reshape in front of it yields an empty frame, not because of a
+naming mismatch. The change was reverted; the tree is clean.
+
+Next probe, one line, and it decides the shape of the fix:
+
+    q <- quantify(segs, superassp::trk_formant_forest, .at = seq(0,1,0.2))
+    str(pivot_tracks_longer(q, .keep_metadata = TRUE), max.level = 1)
+
+If that frame has rows and columns other than `track`, the reshape names
+its track column something else and the autoplot filter should read that;
+if it is genuinely empty, the reshape is what needs fixing. Whatever the
+answer, the regression to write is the one the vignette asked for: a
+quantified segment list must plot with `autoplot(type = "formants")`.
