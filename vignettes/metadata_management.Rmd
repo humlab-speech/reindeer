@@ -86,9 +86,17 @@ The same bracket reads. `corp[session, bundle]` returns the bundle's
 resolved metadata as a list, and you can pass regex on either side to
 scan a slice of the corpus:
 
-```{r bracket-read}
+```{r bracket-read, eval = FALSE}
 corp[md$session[1], md$bundle[1]]    # all metadata for one bundle
-get_metadata(corp, session_pattern = "0000") |> nrow()
+```
+
+Reading one bundle back through the bracket form currently fails when a field
+resolves through more than one level, so the supported read path is used here;
+the defect is recorded in `dev/REINDEER_REMEDIATION_PLAN.md`.
+
+```{r bracket-read-alt}
+get_metadata(corp) |> utils::head(3)
+get_metadata(corp, session_pattern = md$session[1]) |> nrow()
 ```
 
 Assigning a character path imports a media file at the bundle scope:
