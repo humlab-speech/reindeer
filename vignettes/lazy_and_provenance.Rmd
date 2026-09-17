@@ -112,10 +112,10 @@ options(reindeer.loss_warn = NULL)   # back to the 25% default
 The provenance log is capped by `options(reindeer.provenance_max = 1000)`
 rows; very long pipelines truncate from the front.
 
-Stepping so far past the end that *nothing* matches is the one case that
-still misbehaves: `scout(steps_forward = 99)` aborts inside the
-`segment_list` validator instead of returning an empty result. It is
-recorded in `dev/REINDEER_REMEDIATION_PLAN.md`.
+Stepping so far past the end that *nothing* matches returns an empty
+result rather than an error, so a chain can continue past a dead end.
+The loss warning does not fire on a *total* loss - 0 rows out of 0 leaves
+no share to report - but the step is still in the provenance table.
 
 ## Provenance survives serialisation
 

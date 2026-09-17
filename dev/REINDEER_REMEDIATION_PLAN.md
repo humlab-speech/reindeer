@@ -844,3 +844,36 @@ and that it is eager at that point. Verify by asserting that
 `query(corp, "Phoneme =~ .+") |> scout(steps_forward = 99)` returns zero
 rows (rather than aborting), and that provenance still records the 100%
 loss.
+
+
+### scout() dead end: FIXED (three sites), one gap remains
+
+`R/reindeer_sequence_ops_optimized.R` built its result as
+`as.data.frame(result_dt)` at `:331`, `:540` and `:715`. On a zero-match
+step `result_dt` is `rbindlist()` of empty tables, which carries no
+columns, so a 0x0 frame reached the constructor and failed validation.
+
+Each site now reads:
+
+```r
+data = as.data.frame(if (ncol(result_dt) == 0L) dt[0L] else result_dt),
+```
+
+`dt` is the input frame, already in scope at all three sites (`:173`,
+`:432`, `:619` / `:177`, `:436`, `:623`).
+
+Verified:
+
+- `query(corp, "Phoneme =~ .+") |> scout(steps_forward = 99)` now
+  collects to 0 rows instead of aborting;
+- provenance still records the step (2 rows);
+- `test_navigation_contracts.R` 18 results, 0 failures;
+  `test_lazy_segment_list.R` 97 results, 0 failures.
+
+**Gap, deliberately not papered over:** the 25% loss warning does not fire
+on a total loss. With 0 rows out of 0 there is no share to compare against
+a threshold, so `dropped_rows()` reports 0% and the warning stays quiet.
+Deciding what it should do - warn unconditionally when a step yields
+nothing, or stay silent as now - is a judgement call about navigation
+semantics, and the vignette now states the current behaviour rather than
+the old abort.
