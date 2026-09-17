@@ -561,8 +561,9 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
 #'   into the lazy plan (see note in [scout()] about partial SQL
 #'   coverage).
-#' @usage
-#' descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
+#' @param ... Arguments for the level-specific method (`level`, `.from`,
+#'   `.quiet`, `collect`).
+#' @usage descend_to(.segments, ...)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' words  <- query(corp, "Word =~ .*")
@@ -573,6 +574,7 @@ descend_to <- S7::new_generic("descend_to", ".segments")
 
 #' Descend method for segment_list
 #' @rdname descend_to
+#' @usage NULL
 #' @name descend_to.segment_list
 S7::method(descend_to, segment_list) <- function(.segments, level,
                                                    .from = NULL,
@@ -586,6 +588,7 @@ S7::method(descend_to, segment_list) <- function(.segments, level,
 
 #' Descend method for lazy_segment_list
 #' @rdname descend_to
+#' @usage NULL
 #' @name descend_to.lazy_segment_list
 S7::method(descend_to, lazy_segment_list) <- function(.segments, level,
                                                         .from = NULL,

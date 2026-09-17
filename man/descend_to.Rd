@@ -6,16 +6,13 @@
 \alias{descend_to.lazy_segment_list}
 \title{Move down the annotation hierarchy}
 \usage{
-descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
-
-## S7 method for class <reindeer::segment_list>
-descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
-
-## S7 method for class <reindeer::lazy_segment_list>
-descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
+descend_to(.segments, ...)
 }
 \arguments{
 \item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
+
+\item{...}{Arguments for the level-specific method (\code{level}, \code{.from},
+\code{.quiet}, \code{collect}).}
 
 \item{level}{Name of the target level.}
 
