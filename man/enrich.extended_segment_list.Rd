@@ -3,10 +3,6 @@
 \name{enrich.extended_segment_list}
 \alias{enrich.extended_segment_list}
 \title{Enrich method for extended_segment_list}
-\usage{
-## S7 method for class <reindeer::extended_segment_list>
-enrich(object, corpus_obj = NULL, ..., with = "metadata", .using = NULL)
-}
 \arguments{
 \item{object}{A segment_list (or extended_segment_list).}
 

@@ -115,6 +115,7 @@ S7::method(enrich, corpus) <- function(object, .using, ...,
 #'   only running DSP via `.using`.
 #' @param .using Optional DSP function; if supplied, delegates to [quantify()].
 #' @return A segment_list (metadata-joined) or extended_segment_list (DSP).
+#' @usage NULL
 #' @name enrich.segment_list
 S7::method(enrich, segment_list) <- function(object, corpus_obj = NULL, ...,
                                               with = "metadata",
@@ -141,6 +142,7 @@ S7::method(enrich, segment_list) <- function(object, corpus_obj = NULL, ...,
 #'
 #' @inheritParams enrich.segment_list
 #' @return A segment_list or extended_segment_list.
+#' @usage NULL
 #' @name enrich.extended_segment_list
 S7::method(enrich, extended_segment_list) <- function(object, corpus_obj = NULL, ...,
                                                        with = "metadata",
@@ -173,6 +175,7 @@ S7::method(enrich, extended_segment_list) <- function(object, corpus_obj = NULL,
 #' @param with One of `"metadata"` (default) or `NULL`.
 #' @param .using Optional DSP function; delegates to [quantify()].
 #' @return The same `lazy_segment_list` with a deferred step appended.
+#' @usage NULL
 #' @name enrich.lazy_segment_list
 S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...,
                                                   with = "metadata",
