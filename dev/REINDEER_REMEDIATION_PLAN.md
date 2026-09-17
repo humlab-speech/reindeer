@@ -813,3 +813,34 @@ Next probe, one line: read `:53-60` for the property definitions, then
 build the zero-match frame by hand and call `S7::validate()` on it to see
 which one objects. `segment_list_classes.R:116` is where construction
 happens; the frame arriving there is what needs inspecting.
+
+### scout() dead end: CORRECTION and the actual cause
+
+The previous note is wrong. S7's message is multi-line and I had grep'd
+only the first line, so "the reason string is empty" was an artefact of my
+own filter. Flattening the newlines gives the real message:
+
+    <reindeer::segment_list> object is invalid:
+    - segment_list missing required columns: labels, start, end, db_uuid,
+      session, bundle, start_item_id, end_item_id, level, attribute,
+      start_item_seq_idx, end_item_seq_idx, type, sample_start, sample_end,
+      sample_rate
+
+Every required column is missing, which means the zero-match path hands
+the constructor a **column-less** frame, not an empty-but-well-formed one.
+`R/reindeer_sequence_ops_optimized.R` constructs results at three sites -
+`:330`, `:539`, `:714` - each as `data = as.data.frame(result_dt)`.
+When a navigation step matches nothing, `result_dt` carries no columns and
+`as.data.frame()` faithfully returns a 0x0 frame.
+
+So the fix is to make the zero-match path return the same columns as every
+other path, at those three sites. The guarded shape is:
+
+    data = if (ncol(result_dt) == 0L) <input>[0L, , drop = FALSE] else as.data.frame(result_dt)
+
+with `<input>` being whatever the function's incoming frame is called at
+each site - read `:300-335`, `:510-545` and `:690-720` to confirm the name
+and that it is eager at that point. Verify by asserting that
+`query(corp, "Phoneme =~ .+") |> scout(steps_forward = 99)` returns zero
+rows (rather than aborting), and that provenance still records the 100%
+loss.
