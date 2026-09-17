@@ -1046,3 +1046,27 @@ currently uninstallable from CRAN dependencies alone.
 Worth passing to whoever maintains the companion package. For a workaround on
 this machine: install `qs` from the CRAN archive if a source build succeeds,
 which pins protoscribe to a retired dependency - not recommended as a fix.
+
+### quantify(): the eager path returns no measurement columns (found while vignetting)
+
+Running the end-to-end vignette's pipeline two ways on the demo corpus:
+
+    # lazy, then collect
+    v |> quantify(superassp::trk_formant_forest, .at = seq(0,1,0.1)) |> collect()
+    -> 28 columns, including F1_Hz ... B4_Hz and .time_point
+
+    # collect, then quantify
+    v |> collect() |> quantify(superassp::trk_formant_forest, .at = seq(0,1,0.1))
+    -> class extended_segment_list, 16 columns, all of them the base
+       segment columns - no F1_Hz, no .time_point, no .cache_status
+
+So the two entry paths disagree: quantifying an already-eager list returns
+an object whose measurement columns are absent from `names()` (whatever
+happens to them may be in an S7 property, but nothing documents or tests
+that). Anything that does `collect() |> quantify()` silently gets no
+measurements.
+
+Worth deciding which shape is intended and making both paths agree;
+`vignettes/end_to_end_pipeline.Rmd` now uses the lazy-then-collect order
+that demonstrably carries the columns. Regression worth writing: assert
+that both orders yield the measurement columns.
