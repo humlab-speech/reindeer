@@ -910,3 +910,21 @@ reindeer::dropped_rows(reindeer::collect(p))   # inspect rows_in / rows_out
 If `rows_in` is `NA`, the fix is to carry the input's real count into the
 step (or seed it when the plan is built); if it is a number, the guard at
 the head of `.maybe_warn_loss()` is the thing to change.
+
+### CORRECTION: the total-loss warning does fire
+
+The entry above is wrong, and the mistake was in my tooling twice over.
+Wrapping only `collect()` in a warning handler missed it; wrapping the
+whole pipeline catches it:
+
+    rlang_warning :: scout: 223 of 223 rows lost (100.0%)
+
+So `lost / rows_in > thr` is evaluated as expected - 223 in, 0 out is a
+100% loss against a 25% threshold - and the earlier "the warning does not
+fire" claim came from scoping the handler to the wrong call. It is
+signalled when the step is applied rather than at collection time.
+
+Nothing to fix here. The vignette paragraph that stated the false
+behaviour has been corrected in the same commit as this note. The lesson
+worth keeping: a warning handler scoped around `collect()` alone is not
+evidence about a lazy pipeline.

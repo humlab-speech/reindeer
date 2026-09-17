@@ -114,8 +114,10 @@ rows; very long pipelines truncate from the front.
 
 Stepping so far past the end that *nothing* matches returns an empty
 result rather than an error, so a chain can continue past a dead end.
-The loss warning does not fire on a *total* loss - 0 rows out of 0 leaves
-no share to report - but the step is still in the provenance table.
+The loss warning still fires on the way - every row in and none out is a
+total loss - and it is signalled when the step is applied, not when the
+result is collected.
+
 
 ## Provenance survives serialisation
 
