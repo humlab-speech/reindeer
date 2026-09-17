@@ -7,17 +7,21 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true"))
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+
+# The DSP chunks need a signal-processing companion. Everything else here runs
+# on the bundled demo corpus, so this vignette works offline.
+eval_dsp <- requireNamespace("superassp", quietly = TRUE)
 ```
 
 ## What reindeer caches
 
 When you call `quantify(..., .use_cache = TRUE)` or
-`enrich(corpus, ..., .use_cache = TRUE)`, the results are written to a
-persistent cache in `<corpus>/.quantify_cache/`. The next time you
-run the same call with the same parameters reindeer reads the result
-from disk instead of re-running the DSP.
+`enrich(corpus, ..., .use_cache = TRUE)`, results are written to a
+persistent cache in `<corpus>/.quantify_cache/`. The next time you run
+the same call with the same parameters, reindeer reads the result from
+disk instead of re-running the DSP.
 
 Two companion packages keep their own caches and provide their own
 management tools:
@@ -28,76 +32,87 @@ management tools:
 This vignette covers only the quantify/enrich cache, which reindeer
 manages itself.
 
-## Inspect what's cached
+## Set up a corpus
+
+Everything below runs against the corpus that ships with the package:
 
 ```{r}
 library(reindeer)
 
-corp <- corpus("path/to/ae_emuDB")
+corp <- demo_corpus()
+segs <- collect(query(corp, "Phoneme =~ .+"))
+nrow(segs)
+```
+
+## Inspect what's cached
+
+```{r}
 inspect_cache(corp)
 ```
 
-`inspect_cache()` prints a one-line summary (file count and total
-size) and returns a tibble sorted by file size. It is the recommended
-entry point.
+`inspect_cache()` prints a one-line summary (file count and total size)
+and returns a tibble of cache entries. It is the recommended entry point.
 
 ## Tell hits from misses
 
-A successful cache lookup means `quantify()` didn't redo the work.
-You can see this at row level via the `.cache_status` column:
+A successful cache lookup means `quantify()` didn't redo the work. You
+can see this at row level through the `.cache_status` column:
 
-```{r}
-formants <- quantify(segs, superassp::trk_formant_forest, .use_cache = TRUE)
-
+```{r, eval = eval_dsp}
+formants <- quantify(segs, superassp::trk_rms, .at = 0.5, .use_cache = TRUE)
 table(formants$.cache_status)
-# "hit"  -> read from cache
-# "miss" -> just computed and stored
 ```
 
-On a second identical call you should see every row marked `"hit"`.
-If you don't, the cache key changed — most often because you changed
-`.at`, `nominalF1`, or the Age/Gender of the speaker.
+On a second identical call every row is served from disk:
+
+```{r, eval = eval_dsp}
+formants_again <- quantify(segs, superassp::trk_rms, .at = 0.5, .use_cache = TRUE)
+table(formants_again$.cache_status)
+```
+
+If a repeat call still reports `"miss"`, the cache key changed — most
+often because you changed `.at`, a DSP parameter passed through `...`, or
+the speaker's `Age` / `Gender`, all of which are part of the key.
 
 ## Clean up old files
 
 ```{r}
-manage_cache(corp)                                  # status
-manage_cache(corp, action = "list")                 # inventory
-manage_cache(corp, action = "clean", days_old = 30) # dry-run preview
-manage_cache(corp, action = "clean", days_old = 30, dry_run = FALSE)
+manage_cache(corp)                                   # status
+manage_cache(corp, action = "list")                  # inventory
+manage_cache(corp, action = "clean", days_old = 30)  # dry run
 ```
 
 Always preview with the default `dry_run = TRUE` before you actually
-delete.
+delete: pass `dry_run = FALSE` once you are happy with what the preview
+lists.
 
 ## Size thresholds
 
 For long-running pipelines you may want a hard cap:
 
 ```{r}
-check_cache_size(corp@.cache_dir,
+check_cache_size(file.path(corp@basePath, ".quantify_cache"),
                  warn_threshold = "500 MB",
                  max_threshold  = "2 GB")
 ```
 
-This emits a warning above `warn_threshold` and a stronger one above
-`max_threshold` — useful inside scripts where you want to bail out
-before the cache eats the disk.
+This warns above `warn_threshold` and warns more strongly above
+`max_threshold` — useful inside scripts where you want to stop before
+the cache fills the disk.
 
 ## Cache invalidation in practice
 
-Three changes will cause a re-compute on next call:
+Three changes cause a re-compute on the next call:
 
 - The signal file changed (different mtime).
-- You changed any DSP parameter passed through `...`.
-- You changed the Age/Gender metadata for that bundle (they feed
-  `dsp_parameters()`, which is part of the cache key).
+- You changed a DSP parameter passed through `...`.
+- You changed the `Age` / `Gender` metadata for that bundle; those feed
+  `dsp_parameters()`, which is part of the cache key.
 
-If you ever want a clean start, delete `<corpus>/.quantify_cache/`
-and re-run the pipeline.
+For a clean start, remove `<corpus>/.quantify_cache/` and re-run.
 
 ## Where next
 
 - `?inspect_cache`, `?manage_cache`, `?check_cache_size`.
-- `vignette("getting_started")` — where `.use_cache = TRUE` first
-  appears in the workflow.
+- `vignette("getting_started")` — where `.use_cache = TRUE` first appears
+  in the workflow.
