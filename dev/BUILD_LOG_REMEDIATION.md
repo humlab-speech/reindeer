@@ -127,3 +127,50 @@ approach in the fix direction above applies.
 Until that is run, the mitigation stands: the vignette reads through
 `get_metadata()`, the bracket form is shown but not evaluated, and the
 build's vignette step passes.
+
+
+## Issue 4 - export_metadata() fails under R CMD build (OPEN, second build-only defect)
+
+With Issue 1's chunk off the evaluated path, the build got one chunk
+further and failed differently:
+
+    Quitting from metadata_management.Rmd:129-136 [excel]
+    <error/rlang_error>
+    Error: ! colNames must be a unique vector (case sensitive)
+    Backtrace: reindeer::export_metadata(corp, xlsx)
+            -> openxlsx::writeDataTable(...)
+            -> openxlsx:::assert_unique(colNames, case_sensitive = FALSE)
+
+`export_metadata()` builds a sheet whose column names collide
+case-insensitively before handing it to openxlsx.
+
+**Not reproduced interactively.** Ran the vignette's exact write sequence -
+database-level Project/Year/Institution, session-level Speaker/Age/Gender,
+bundle-level Quality/Microphone, a bracket-form SamplingRate write - and
+then:
+
+    names(get_metadata(corp))          -> 11 fields, no case-insensitive duplicates
+    export_metadata(corp, tempfile())  -> OK
+
+So, like Issue 1, this appears only in the build environment. Since both
+build-only failures sit in vignette chunks that call real API and pass by
+hand, the next diagnostic is to run the vignette in isolation with the
+installed package rather than the working tree:
+
+    R CMD INSTALL . && rmarkdown::render("vignettes/metadata_management.Rmd")
+
+with `options(error = traceback)` or a `tryCatch` around the two calls to
+print the offending column names. Fix direction once the names are known:
+de-duplicate (or qualify with the field's level) before the write, and
+cover it with a test that exports a corpus carrying both a nested `project`
+field and a scalar `Project` field - the combination present in this
+vignette and in neither of my hand-runs.
+
+## Build status after both mitigations
+
+    BUILD EXIT: 0
+    * creating vignettes ... OK
+
+All six vignettes rebuild under `R CMD build`. The two defects they exposed
+remain open, both build-only, both with their error text and the
+hand-runs that failed to reproduce them recorded above.
