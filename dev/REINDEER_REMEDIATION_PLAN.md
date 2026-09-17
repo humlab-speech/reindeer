@@ -988,3 +988,31 @@ installable companion.
 
 `erodex` did install, so `end_to_end_pipeline` is now blocked only on
 protoscribe - and its erodex sections can be converted meanwhile.
+
+### CORRECTION on the protoscribe note above
+
+The note above says the URL 404s "which is why it will not install". The
+second run shows the mechanism is not that simple. With the error captured
+properly:
+
+    remotes::install_github("humlab-speech/protoscribe")  -> returns, no R error
+    requireNamespace("protoscribe")                        -> FALSE
+    installed.packages() matching /proto|scribe|draft/     -> "erodex" only
+    .libPaths()[1] listing, newest first                   -> erodex, reindeer, superassp, colorout
+
+So the install call does not raise an error, and it does not install a
+package either. The 404 on the repository page stands, but what it means
+is undetermined: a private or renamed repository, or a failure inside
+remotes that surfaces as a message rather than a condition. My `tryCatch`
+with `error =` would not have caught the latter.
+
+What is established, without needing to know the mechanism:
+
+- `erodex` installs and is available;
+- `protoscribe` is not available on this machine and cannot be made
+  available by the documented command;
+- therefore `end_to_end_pipeline`'s protoscribe sections cannot be
+  exercised here, while its erodex sections can.
+
+Worth noting for whoever picks this up: `quiet = TRUE` hides the reason.
+Re-running with `quiet = FALSE` will show what remotes actually did.
