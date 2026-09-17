@@ -46,7 +46,7 @@
 #' @examplesIf interactive()
 #' corp <- demo_corpus()
 #' vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
-#' formants <- quantify(vowels, superassp::forest)
+#' formants <- quantify(vowels, superassp::trk_formant_forest)
 #' @export
 corpus <- S7::new_class(
   "corpus",
@@ -191,12 +191,12 @@ corpus <- S7::new_class(
         n > 0
       }, error = function(e) FALSE)
       if (!has_metadata) {
-        gather_metadata_internal(corpus_obj, verbose = verbose)
+        gather_metadata(corpus_obj, verbose = verbose)
       } else if (verbose) {
         cli::cli_alert_info("Quick mode: reusing cached metadata")
       }
     } else {
-      gather_metadata_internal(corpus_obj, verbose = verbose)
+      gather_metadata(corpus_obj, verbose = verbose)
     }
 
     # Auto-regenerate FAIR artifacts when the dirty bit was flipped by an
@@ -215,6 +215,10 @@ corpus <- S7::new_class(
         }
       )
     }
+
+    # Nothing else closes the SQLite handle; without this the connection lives
+    # until the process exits and RSQLite's own finalizer warns about it.
+    .register_connection_finalizer(corpus_obj)
 
     corpus_obj
   },

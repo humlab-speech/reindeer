@@ -81,6 +81,8 @@ init_sync_state <- function(db_handle) {
   state <- list(
     annot_checksums = list(),
     metadata_checksums = list(),
+    annot_mtimes = list(),
+    metadata_mtimes = list(),
     last_full_scan = Sys.time(),
     db_uuid = db_handle$UUID
   )
@@ -145,7 +147,7 @@ save_sync_state <- function(db_handle, state) {
 #' @noRd
 detect_annot_changes <- function(db_handle) {
   state <- load_sync_state(db_handle)
-  
+
   # Get all _annot.json files
   annot_files <- list.files(
     db_handle$basePath,
@@ -153,33 +155,47 @@ detect_annot_changes <- function(db_handle) {
     recursive = TRUE,
     full.names = TRUE
   )
-  
+
   changed <- list()
-  
+  state_dirty <- FALSE
+
   # Normalize to forward slashes: on Windows, list.files()/basePath may mix
   # "\" and "/", which made the prefix strip below fail and no bundle was
   # ever reported as changed (so no EAF was generated).
-  annot_files <- normalizePath(annot_files, winslash = "/", mustWork = FALSE)
   base_norm <- normalizePath(db_handle$basePath, winslash = "/", mustWork = FALSE)
-  
+
   for (annot_path in annot_files) {
     # Extract session and bundle names
-    rel_path <- sub(paste0(base_norm, "/"), "", annot_path)
+    rel_path <- sub(paste0(base_norm, "/"), "",
+                    normalizePath(annot_path, winslash = "/", mustWork = FALSE))
     parts <- strsplit(rel_path, "/")[[1]]
-    
+
     if (length(parts) < 2) next
-    
+
     session <- sub("_ses$", "", parts[1])
     bundle <- sub("_bndl$", "", parts[2])
-    
-    # Calculate MD5 checksum
-    checksum <- as.character(tools::md5sum(annot_path))
-    
-    # Compare with stored checksum
+
     state_key <- paste0(session, ":", bundle)
+    mtime <- as.numeric(file.info(annot_path)$mtime)
+    old_mtime <- state$annot_mtimes[[state_key]]
     old_checksum <- state$annot_checksums[[state_key]]
-    
-    if (is.null(old_checksum) || old_checksum != checksum) {
+
+    # Hashing streams the whole file, so skip it when the file has not moved
+    # since the last scan and its checksum is already known. A file whose mtime
+    # moved is hashed even if its content is unchanged, and then compares equal.
+    if (!is.null(old_checksum) && !is.null(old_mtime) &&
+        isTRUE(abs(mtime - old_mtime) < 1e-3)) {
+      next
+    }
+
+    checksum <- as.character(tools::md5sum(annot_path))
+
+    if (is.null(old_mtime) || !isTRUE(abs(mtime - old_mtime) < 1e-3)) {
+      state$annot_mtimes[[state_key]] <- mtime
+      state_dirty <- TRUE
+    }
+
+    if (is.null(old_checksum) || !identical(old_checksum, checksum)) {
       changed[[length(changed) + 1]] <- list(
         session = session,
         bundle = bundle,
@@ -187,19 +203,23 @@ detect_annot_changes <- function(db_handle) {
         old_checksum = old_checksum,
         new_checksum = checksum
       )
-      
+
       # Update state
       state$annot_checksums[[state_key]] <- checksum
+      state_dirty <- TRUE
     }
   }
-  
-  # Save updated state
-  save_sync_state(db_handle, state)
-  
+
+  # Only rewrite the state file when this scan learned something; a no-op scan
+  # must not touch it.
+  if (state_dirty) {
+    save_sync_state(db_handle, state)
+  }
+
   if (length(changed) == 0) {
     return(NULL)
   }
-  
+
   # Convert to data frame
   do.call(rbind, lapply(changed, function(x) {
     data.frame(
@@ -219,35 +239,64 @@ detect_annot_changes <- function(db_handle) {
 #' @noRd
 detect_metadata_changes <- function(db_handle) {
   state <- load_sync_state(db_handle)
-  
-  # Get all .meta_json files
-  meta_files <- list.files(
-    db_handle$basePath,
-    pattern = "^\\.meta_json$",
-    recursive = TRUE,
-    full.names = TRUE
+
+  # METADATA.json is the mandated filename; "<name>.meta_json" is the legacy
+  # one that .resolve_metadata_file() still honours where METADATA.json is
+  # absent. Both are watched so a corpus mid-migration still syncs.
+  meta_pattern <- paste0("^", gsub("\\.", "\\\\.", metadata.filename), "$")
+  meta_files <- c(
+    list.files(
+      db_handle$basePath,
+      pattern = meta_pattern,
+      recursive = TRUE,
+      full.names = TRUE
+    ),
+    list.files(
+      db_handle$basePath,
+      pattern = "\\.meta_json$",
+      recursive = TRUE,
+      full.names = TRUE
+    )
   )
-  
+
   changed <- FALSE
-  
+  state_dirty <- FALSE
+
   base_norm <- normalizePath(db_handle$basePath, winslash = "/", mustWork = FALSE)
-  
+
   for (meta_path in normalizePath(meta_files, winslash = "/", mustWork = FALSE)) {
-    checksum <- as.character(tools::md5sum(meta_path))
-    
     # Use relative path as key
     rel_path <- sub(paste0(base_norm, "/"), "", meta_path)
+
+    mtime <- as.numeric(file.info(meta_path)$mtime)
+    old_mtime <- state$metadata_mtimes[[rel_path]]
     old_checksum <- state$metadata_checksums[[rel_path]]
-    
-    if (is.null(old_checksum) || old_checksum != checksum) {
+
+    # See detect_annot_changes(): hash only when the file moved or its
+    # checksum is unknown.
+    if (!is.null(old_checksum) && !is.null(old_mtime) &&
+        isTRUE(abs(mtime - old_mtime) < 1e-3)) {
+      next
+    }
+
+    checksum <- as.character(tools::md5sum(meta_path))
+
+    if (is.null(old_mtime) || !isTRUE(abs(mtime - old_mtime) < 1e-3)) {
+      state$metadata_mtimes[[rel_path]] <- mtime
+      state_dirty <- TRUE
+    }
+
+    if (is.null(old_checksum) || !identical(old_checksum, checksum)) {
       changed <- TRUE
       state$metadata_checksums[[rel_path]] <- checksum
+      state_dirty <- TRUE
     }
   }
-  
-  # Save updated state
-  save_sync_state(db_handle, state)
-  
+
+  if (state_dirty) {
+    save_sync_state(db_handle, state)
+  }
+
   changed
 }
 

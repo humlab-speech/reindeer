@@ -95,3 +95,24 @@ test_that("METADATA.json shadows legacy .meta_json at the same level", {
   expect_true("Source" %in% names(meta))
   expect_true(all(meta$Source == "modern"))
 })
+
+test_that("a DSP wrapper with no parameters warns that norms cannot apply", {
+  # superassp >= 3.0.0 exposes the wrapped routine's formals (nominalF1,
+  # windowSize, ...); older builds expose only (listOfFiles, ...), so age/gender
+  # norms cannot reach the DSP. That degraded silently before this warning.
+  withr::defer(options(reindeer.norm_warning_shown = NULL))
+  options(reindeer.norm_warning_shown = FALSE)
+
+  dots_only <- function(listOfFiles, ...) NULL
+  expect_warning(
+    reindeer::derive_dsp_parameters(dots_only, list(Age = 30, Gender = "Female"),
+                                    c("Gender", "Age"), list()),
+    class = "reindeer_metadata_warning"
+  )
+
+  # Once per session, not once per bundle.
+  expect_no_warning(
+    reindeer::derive_dsp_parameters(dots_only, list(Age = 30, Gender = "Female"),
+                                    c("Gender", "Age"), list())
+  )
+})

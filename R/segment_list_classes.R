@@ -159,7 +159,7 @@ is_segment_list <- function(x) {
 #' @return An \code{extended_segment_list} object (inherits from segment_list).
 #'   Adds two read-only S7 properties on top of `segment_list`:
 #'   * `@dsp_function` — character; the name of the DSP function whose
-#'     output extended this list (e.g. `"superassp::forest"`).
+#'     output extended this list (e.g. `"superassp::trk_formant_forest"`).
 #'   * `@dsp_columns` — character vector; the columns the DSP function
 #'     added (e.g. `c("F1", "F2", "F3", "B1", "B2", "B3")`). Use this
 #'     to programmatically discover the new measurement columns.
@@ -178,7 +178,7 @@ is_segment_list <- function(x) {
 #' @examplesIf interactive()
 #' corp <- demo_corpus()
 #' segs <- query(corp, "Phonetic == t", lazy = FALSE)
-#' extended <- quantify(segs, superassp::forest)
+#' extended <- quantify(segs, superassp::trk_formant_forest)
 #'
 #' extended@dsp_function     # which DSP fn produced the new columns
 #' extended@dsp_columns      # which columns it added

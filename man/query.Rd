@@ -25,7 +25,7 @@ following columns:
 \itemize{
 \item \code{session}, \code{bundle} — corpus location.
 \item \code{start}, \code{end} — segment times in ms (start == end for events).
-\item \code{label} — the annotation label that matched.
+\item \code{labels} — the annotation label that matched.
 \item \code{level}, \code{attribute}, \code{type} — annotation level and the matched
 attribute name, plus the level type (\code{SEGMENT} / \code{EVENT} /
 \code{ITEM}).

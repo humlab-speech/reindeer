@@ -26,7 +26,7 @@
 #'   following columns:
 #'   * `session`, `bundle` — corpus location.
 #'   * `start`, `end` — segment times in ms (start == end for events).
-#'   * `label` — the annotation label that matched.
+#'   * `labels` — the annotation label that matched.
 #'   * `level`, `attribute`, `type` — annotation level and the matched
 #'     attribute name, plus the level type (`SEGMENT` / `EVENT` /
 #'     `ITEM`).

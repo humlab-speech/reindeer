@@ -434,6 +434,15 @@ process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, leve
   # Serialize all values at once
   for (i in seq_along(field_names)) {
     field_info <- serialize_metadata_value(meta_list[[field_names[i]]])
+    # One field, one value: a longer vector here means the serializer failed to
+    # preserve structure, and recycling would silently keep only the first
+    # element (see serialize_metadata_value()).
+    if (length(field_info$value) != 1L || length(field_info$type) != 1L) {
+      cli::cli_abort(c(
+        "Metadata field {.field {field_names[i]}} serialized to length {length(field_info$value)}.",
+        "i" = "This is a bug in {.fn serialize_metadata_value}; please report it."
+      ))
+    }
     field_values[i] <- field_info$value
     field_types[i] <- field_info$type
   }
@@ -483,7 +492,19 @@ process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, leve
 serialize_metadata_value <- function(value) {
   if (is.null(value)) {
     return(list(value = "NULL", type = "NULL"))
-  } else if (is.logical(value)) {
+  }
+  # Structured values (nested lists, or any vector longer than one) are stored
+  # as JSON. Flattening them with as.character() produced a vector, the caller
+  # recycled it into a single slot, and everything but the first element was
+  # silently dropped: project = list(name = , description = ) kept only the name.
+  if (is.list(value) || length(value) > 1L) {
+    return(list(
+      value = as.character(jsonlite::toJSON(value, auto_unbox = TRUE,
+                                            null = "null")),
+      type = "json"
+    ))
+  }
+  if (is.logical(value)) {
     return(list(value = as.character(value), type = "logical"))
   } else if (is.integer(value)) {
     return(list(value = as.character(value), type = "integer"))
@@ -514,6 +535,7 @@ deserialize_metadata_value <- function(value_str, type_str) {
       "date" = as.Date(value_str),
       "datetime" = as.POSIXct(value_str),
       "character" = value_str,
+      "json" = jsonlite::fromJSON(value_str, simplifyVector = TRUE),
       value_str  # default
     ),
     error = function(e) value_str
@@ -666,24 +688,37 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
   for (i in seq_len(nrow(type_lookup))) {
     fname <- type_lookup$field_name[i]
     ftype <- type_lookup$field_type[i]
-    if (fname %in% names(metadata_wide) && !is.null(ftype) && ftype != "character") {
-      metadata_wide[[fname]] <- vapply(
-        metadata_wide[[fname]],
-        function(v) {
-          if (is.na(v)) return(switch(ftype,
-            "numeric" = NA_real_,
-            "integer" = NA_integer_,
-            "logical" = NA,
-            NA_real_))
-          deserialize_metadata_value(v, ftype)
-        },
-        switch(ftype,
-          "numeric" = numeric(1),
-          "integer" = integer(1),
-          "logical" = logical(1),
-          character(1))
-      )
+    if (!fname %in% names(metadata_wide) || is.null(ftype) ||
+        ftype %in% c("character", "")) {
+      next
     }
+
+    if (identical(ftype, "json")) {
+      # Structured values (nested lists, multi-element vectors) deserialize to
+      # lists, so the column has to be a list-column rather than an atomic one.
+      metadata_wide[[fname]] <- lapply(metadata_wide[[fname]], function(v) {
+        if (length(v) == 0 || is.na(v)) return(NULL)
+        deserialize_metadata_value(v, ftype)
+      })
+      next
+    }
+
+    metadata_wide[[fname]] <- vapply(
+      metadata_wide[[fname]],
+      function(v) {
+        if (is.na(v)) return(switch(ftype,
+          "numeric" = NA_real_,
+          "integer" = NA_integer_,
+          "logical" = NA,
+          NA_real_))
+        deserialize_metadata_value(v, ftype)
+      },
+      switch(ftype,
+        "numeric" = numeric(1),
+        "integer" = integer(1),
+        "logical" = logical(1),
+        character(1))
+    )
   }
   
   # Join with bundles to ensure all bundles are present (even those without metadata)

@@ -70,7 +70,7 @@ For programmatic metadata see \code{\link[=set_metadata]{set_metadata()}} / \cod
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- demo_corpus()
 vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
-formants <- quantify(vowels, superassp::forest)
+formants <- quantify(vowels, superassp::trk_formant_forest)
 \dontshow{\}) # examplesIf}
 }
 \seealso{

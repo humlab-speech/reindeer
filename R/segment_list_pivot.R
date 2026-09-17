@@ -61,7 +61,7 @@
 #' @return A `track_long` tibble.
 #' @examplesIf interactive()
 #' segs <- query(corp, "Phonetic == V")
-#' wide <- quantify(segs, superassp::forest, .at = seq(0, 1, 0.1))
+#' wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.1))
 #' long <- pivot_tracks_longer(wide)
 #' head(long)
 #' @export

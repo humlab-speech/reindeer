@@ -53,14 +53,14 @@ set_metadata(corp, list(Speaker = "P001", Age = 25, Gender = "Female"),
 vowels <- query(corp, "Phonetic =~ [aeiou]")
 
 # 2. Extract formants at the midpoint
-formants <- quantify(vowels, superassp::forest, .at = 0.5)
+formants <- quantify(vowels, superassp::trk_formant_forest, .at = 0.5)
 
 # 3. Join speaker metadata
 data <- enrich(formants, corp)
 
 # 4. Summarise with dplyr
 data |>
-  group_by(label, Gender) |>
+  group_by(labels, Gender) |>
   summarise(mean_F1 = mean(F1, na.rm = TRUE),
             mean_F2 = mean(F2, na.rm = TRUE),
             .groups = "drop")
@@ -93,7 +93,7 @@ visible.
 
 ```r
 plan <- query(corp, "Phonetic =~ [aeiou]") |>
-  filter(label != "@") |>
+  filter(labels != "@") |>
   scout(steps_forward = 1) |>
   ascend_to("Word")
 
@@ -108,7 +108,7 @@ default. See `vignette("lazy_and_provenance")`.
 ### Persistent measurement cache
 
 ```r
-formants <- quantify(vowels, superassp::forest, .use_cache = TRUE)
+formants <- quantify(vowels, superassp::trk_formant_forest, .use_cache = TRUE)
 table(formants$.cache_status)   # "hit" / "miss"
 inspect_cache(corp)
 ```

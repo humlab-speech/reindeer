@@ -31,9 +31,9 @@ quantify(
 \item{...}{Forwarded to the DSP function. Values you pass win over
 metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...).}
 
-\item{dsp_function}{A DSP function. Common choices: \code{superassp::forest}
-(formants), \code{superassp::ksvF0} (pitch), \code{superassp::rmsana}
-(intensity), \code{superassp::dftSpectrum}.}
+\item{dsp_function}{A DSP function. Common choices: \code{superassp::trk_formant_forest}
+(formants), \code{superassp::trk_pitch_ksv} (pitch), \code{superassp::trk_rms}
+(intensity), \code{superassp::trk_dft_spectrum}.}
 
 \item{.at}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
 gives one row per segment (e.g. \code{0.5} for midpoint); a vector
@@ -62,7 +62,7 @@ only for debugging).}
 An \link{extended_segment_list}: every column of the input
 \code{segment_list} (see \code{\link[=query]{query()}} for the column inventory), plus one
 column per DSP output column produced by \code{dsp_function} (consult
-the function's own help — for example \code{superassp::forest} adds
+the function's own help — for example \code{superassp::trk_formant_forest} adds
 \code{F1}, \code{F2}, \code{F3}, \code{B1}, \code{B2}, \code{B3}). When \code{.at} is a vector, an
 extra \code{.time_point} column records which relative time each row
 came from. When \code{.use_cache = TRUE}, a \code{.cache_status} column
@@ -84,13 +84,13 @@ corp <- demo_corpus()
 segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 
 # Formants at the midpoint
-quantify(segs, superassp::forest, .at = 0.5)
+quantify(segs, superassp::trk_formant_forest, .at = 0.5)
 
 # Pitch contour: 11 evenly spaced points
-quantify(segs, superassp::ksvF0, .at = seq(0, 1, 0.1))
+quantify(segs, superassp::trk_pitch_ksv, .at = seq(0, 1, 0.1))
 
 # Override metadata-derived parameters
-quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
+quantify(segs, superassp::trk_formant_forest, nominalF1 = 500, windowSize = 20)
 \dontshow{\}) # examplesIf}
 }
 \seealso{

@@ -47,7 +47,7 @@ A successful cache lookup means `quantify()` didn't redo the work.
 You can see this at row level via the `.cache_status` column:
 
 ```{r}
-formants <- quantify(segs, superassp::forest, .use_cache = TRUE)
+formants <- quantify(segs, superassp::trk_formant_forest, .use_cache = TRUE)
 
 table(formants$.cache_status)
 # "hit"  -> read from cache

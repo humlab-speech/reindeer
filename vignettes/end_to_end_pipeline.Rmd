@@ -106,7 +106,7 @@ metadata.
 ```{r}
 audio_measures <- vowels |>
   collect() |>
-  quantify(superassp::forest, .at = seq(0, 1, 0.1))
+  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1))
 ```
 
 ### Iterating with the cache
@@ -120,13 +120,13 @@ column lets you tell hits from misses at a glance.
 # First pass: cache populates (.cache_status all "miss")
 audio_measures <- vowels |>
   collect() |>
-  quantify(superassp::forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
+  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
 table(audio_measures$.cache_status)
 
 # Iterating: same call returns from cache (.cache_status all "hit")
 audio_measures <- vowels |>
   collect() |>
-  quantify(superassp::forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
+  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
 table(audio_measures$.cache_status)
 ```
 
@@ -169,7 +169,7 @@ extended_segment_list.
 library(erodex)
 erodex::quantify_simulate(
   vowels |> collect(),
-  .using = superassp::forest,
+  .using = superassp::trk_formant_forest,
   .simulate = list(nominalF1 = seq(500, 900, 100)),
   .simulation_store = "simulations/formants"
 )

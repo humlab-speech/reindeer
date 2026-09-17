@@ -633,11 +633,6 @@ test_that("CMDI files contain expected metadata", {
 })
 
 test_that("metadata changes are detected from METADATA.json", {
-  # PENDING WP1.2/WP1.3 - red until detect_metadata_changes() scans the
-  # mandated filename instead of the legacy `.meta_json` one, and stops
-  # rewriting the state file when nothing changed.
-
-  skip("PENDING WP1.2 - see dev/REINDEER_REMEDIATION_PLAN.md")
   skip_if_no_emuR()
   skip_on_cran()
 

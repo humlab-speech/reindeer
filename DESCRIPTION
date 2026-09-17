@@ -70,7 +70,6 @@ Remotes:
   github::humlab-speech/protoscribe
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 8.1.0
 Depends: 
     R (>= 4.1.0)
 VignetteBuilder: knitr

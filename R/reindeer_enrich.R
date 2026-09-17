@@ -14,8 +14,8 @@ NULL
 #' @param object A `corpus` (run DSP corpus-wide) or `segment_list` /
 #'   `lazy_segment_list` / `extended_segment_list` (join metadata or
 #'   extract DSP per segment).
-#' @param .using A DSP function (typically `superassp::forest`,
-#'   `superassp::ksvF0`, etc.). Required for the corpus method.
+#' @param .using A DSP function (typically `superassp::trk_formant_forest`,
+#'   `superassp::trk_pitch_ksv`, etc.). Required for the corpus method.
 #' @param ... Extra arguments forwarded to the DSP function (e.g.
 #'   `minF`, `maxF`, `nominalF1`). User values override the
 #'   metadata-derived defaults.
@@ -39,7 +39,7 @@ NULL
 #'     before the join — see [get_metadata()] for the field set.
 #'   * **DSP** (`.using = fn`): an [extended_segment_list] equivalent to
 #'     [quantify()]'s output — input columns plus one column per DSP
-#'     output (e.g. `F1`, `F2`, `F3` for `superassp::forest`).
+#'     output (e.g. `F1`, `F2`, `F3` for `superassp::trk_formant_forest`).
 #' @family signal
 #' @seealso [quantify()], [get_metadata()], [dsp_parameters()],
 #'   [inspect_cache()]
@@ -47,12 +47,12 @@ NULL
 #' corp <- demo_corpus()
 #'
 #' # Corpus-wide formants, age/gender-aware parameters
-#' enrich(corp, .using = superassp::forest)
+#' enrich(corp, .using = superassp::trk_formant_forest)
 #'
 #' # Per-segment metadata join
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #' enrich(segs, corp)                              # metadata join
-#' enrich(segs, .using = superassp::forest)        # delegates to quantify()
+#' enrich(segs, .using = superassp::trk_formant_forest)        # delegates to quantify()
 #' @usage
 #' enrich(object, .using = NULL, ..., .metadata_fields = NULL, .force = FALSE,
 #'   .parallel = TRUE, .workers = NULL, .use_cache = TRUE, .cache_dir = NULL,
@@ -332,7 +332,10 @@ S7::method(enrich, lazy_segment_list) <- function(object, corpus_obj = NULL, ...
       cache_key <- digest::digest(list(
         bundle_row$full_path,
         file.info(bundle_row$full_path)$mtime,
-        dsp_params
+        dsp_params,
+        # The DSP routine is part of the identity: without it, a bundle marked
+        # as processed with one routine suppressed a later run with another.
+        dsp_fun_name
       ))
       if (!.force) {
         cached <- .get_persistent_cache(cache_key, cache_conn)
@@ -473,6 +476,23 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
     if (field %in% names(meta_list) && field %in% fun_formals) {
       params[[field]] <- meta_list[[field]]
     }
+  }
+
+  # A wrapper with no parameters beyond `...` cannot receive age/gender norms.
+  # superassp >= 3.0.0 exposes the wrapped routine's formals (nominalF1,
+  # windowSize, ...); older builds expose only (listOfFiles, ...), which made
+  # metadata-driven DSP degrade to plain defaults without a word. Say so once
+  # per session instead.
+  if (length(params) == 0L &&
+      all(fun_formals %in% c("listOfFiles", "...")) &&
+      "..." %in% fun_formals &&
+      isFALSE(getOption("reindeer.norm_warning_shown", FALSE))) {
+    options(reindeer.norm_warning_shown = TRUE)
+    cli::cli_warn(
+      c("DSP routine exposes no parameters, so Age/Gender norms are not applied.",
+        i = "The wrapper only accepts {.code listOfFiles} and {.code ...}.",
+        i = "superassp >= 3.0.0 exposes the wrapped routine's formals; older builds do not."),
+      class = c("reindeer_metadata_warning", "reindeer_warning"))
   }
 
   # Merge with user params (user params override)

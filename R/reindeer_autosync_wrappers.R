@@ -208,7 +208,7 @@ save_annotation_with_sync <- function(db_handle,
 
 #' Add session with auto-sync
 #'
-#' Wrapper for emuR::add_session that triggers CMDI sync
+#' Add a session to the cache and trigger a CMDI sync
 #'
 #' @param db_handle An emuDBhandle object
 #' @param name Session name

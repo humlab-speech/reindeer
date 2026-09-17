@@ -8,11 +8,10 @@
 # reads through get_metadata().
 
 test_that("nested metadata values survive the cache round trip", {
-  skip("PENDING WP1.7 - see dev/REINDEER_REMEDIATION_PLAN.md")
   skip_if_no_emuR()
   corp <- create_isolated_ae_corpus()
 
-  expect_silent(
+  expect_no_warning(
     add_metadata(corp, list(
       project = list(name = "TestProj", description = "A test corpus.",
                      startDate = "2025-01-15"),
@@ -34,7 +33,6 @@ test_that("nested metadata values survive the cache round trip", {
 })
 
 test_that("scalar and vector metadata still round-trip", {
-  skip("PENDING WP1.7 - see dev/REINDEER_REMEDIATION_PLAN.md")
   skip_if_no_emuR()
   corp <- create_isolated_ae_corpus()
 

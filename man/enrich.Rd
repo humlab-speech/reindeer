@@ -18,8 +18,8 @@ extract DSP per segment).}
 \code{minF}, \code{maxF}, \code{nominalF1}). User values override the
 metadata-derived defaults.}
 
-\item{.using}{A DSP function (typically \code{superassp::forest},
-\code{superassp::ksvF0}, etc.). Required for the corpus method.}
+\item{.using}{A DSP function (typically \code{superassp::trk_formant_forest},
+\code{superassp::trk_pitch_ksv}, etc.). Required for the corpus method.}
 
 \item{.metadata_fields}{Metadata fields fed to \code{\link[=dsp_parameters]{dsp_parameters()}}.
 Default \code{c("Gender", "Age")}.}
@@ -49,7 +49,7 @@ field. Inheritance is resolved (bundle > session > database)
 before the join — see \code{\link[=get_metadata]{get_metadata()}} for the field set.
 \item \strong{DSP} (\code{.using = fn}): an \link{extended_segment_list} equivalent to
 \code{\link[=quantify]{quantify()}}'s output — input columns plus one column per DSP
-output (e.g. \code{F1}, \code{F2}, \code{F3} for \code{superassp::forest}).
+output (e.g. \code{F1}, \code{F2}, \code{F3} for \code{superassp::trk_formant_forest}).
 }
 }
 \description{
@@ -66,12 +66,12 @@ pass \code{.using = fn} to extract acoustic measurements via \code{\link[=quanti
 corp <- demo_corpus()
 
 # Corpus-wide formants, age/gender-aware parameters
-enrich(corp, .using = superassp::forest)
+enrich(corp, .using = superassp::trk_formant_forest)
 
 # Per-segment metadata join
 segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 enrich(segs, corp)                              # metadata join
-enrich(segs, .using = superassp::forest)        # delegates to quantify()
+enrich(segs, .using = superassp::trk_formant_forest)        # delegates to quantify()
 \dontshow{\}) # examplesIf}
 }
 \seealso{

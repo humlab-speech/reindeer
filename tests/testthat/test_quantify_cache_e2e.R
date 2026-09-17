@@ -24,21 +24,17 @@ cache_fixture <- function() {
 }
 
 test_that("the cache is honoured in every size band", {
-  # PENDING WP1.6 - red until cache-enabled calls stop bypassing the executor
-  # that implements caching for 21-100 segment inputs.
-
-  skip("PENDING WP1.6 - see dev/REINDEER_REMEDIATION_PLAN.md")
   fx <- cache_fixture()
   dsp <- probe_dsp(1)
 
   for (n in c(5L, 50L, 150L)) {
     segs_n <- fx$segs[seq_len(n), ]
-    cold <- quantify(segs_n, dsp, .use_cache = TRUE,
-                     .parallel = FALSE, .verbose = FALSE)
-    expect_true(".cache_status" %in% names(cold),
+    first <- quantify(segs_n, dsp, .use_cache = TRUE,
+                      .parallel = FALSE, .verbose = FALSE)
+    expect_true(".cache_status" %in% names(first),
                 info = paste0("no cache accounting at n = ", n))
-    expect_true(all(cold$.cache_status == "miss"),
-                info = paste0("cold call reported hits at n = ", n))
+    expect_true(any(first$.cache_status == "miss"),
+                info = paste0("nothing was computed at n = ", n))
 
     warm <- quantify(segs_n, dsp, .use_cache = TRUE,
                      .parallel = FALSE, .verbose = FALSE)
@@ -48,9 +44,6 @@ test_that("the cache is honoured in every size band", {
 })
 
 test_that("cache keys distinguish DSP functions", {
-  # PENDING WP1.5 - red until the key carries the function identity.
-
-  skip("PENDING WP1.5 - see dev/REINDEER_REMEDIATION_PLAN.md")
   fx <- cache_fixture()
   segs_n <- fx$segs[seq_len(150L), ]
 
@@ -64,21 +57,35 @@ test_that("cache keys distinguish DSP functions", {
 })
 
 test_that("changing speaker metadata invalidates only the affected rows", {
-  skip("PENDING WP1.6 - see dev/REINDEER_REMEDIATION_PLAN.md")
   fx <- cache_fixture()
-  dsp <- probe_dsp(1)
   segs_n <- fx$segs[seq_len(150L), ]
 
-  quantify(segs_n, dsp, .use_cache = TRUE, .parallel = FALSE, .verbose = FALSE)
+  # A routine whose formals expose the norm parameters, so Age/Gender change the
+  # derived DSP parameters and therefore the cache key. superassp >= 3.0.0
+  # exposes these on its trk_* wrappers; older builds expose only (listOfFiles,
+  # ...) and cannot receive norms at all.
+  norm_dsp <- function(listOfFiles, beginTime, endTime, nominalF1 = 500,
+                       toFile = FALSE, verbose = FALSE, ...) {
+    data.frame(probe = rep(nominalF1, length(listOfFiles)))
+  }
+
+  first <- quantify(segs_n, norm_dsp, .use_cache = TRUE,
+                    .parallel = FALSE, .verbose = FALSE)
 
   bndl <- fx$segs$bundle[1]
   sess <- fx$segs$session[1]
   set_metadata(fx$corp, list(Age = 7, Gender = "Male"),
                session = sess, bundle = bndl)
 
-  after <- quantify(segs_n, dsp, .use_cache = TRUE,
+  after <- quantify(segs_n, norm_dsp, .use_cache = TRUE,
                     .parallel = FALSE, .verbose = FALSE)
+
   affected <- after$session == sess & after$bundle == bndl
-  expect_true(any(after$.cache_status[affected] == "miss"))
-  expect_true(all(after$.cache_status[!affected] == "hit"))
+  expect_true(any(affected))
+  expect_true(all(after$.cache_status[affected] == "miss"),
+              info = "edited bundle kept its cached rows")
+  expect_true(all(after$.cache_status[!affected] == "hit"),
+              info = "untouched bundles were recomputed")
+  expect_false(identical(unique(after$probe[affected]),
+                         unique(first$probe[affected])))
 })

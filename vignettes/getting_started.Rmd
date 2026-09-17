@@ -50,14 +50,14 @@ corp <- corpus("path/to/your_emuDB")
 vowels <- query(corp, "Phonetic =~ [aeiou]")
 
 # 2. Extract formants at the midpoint
-formants <- quantify(vowels, superassp::forest, .at = 0.5)
+formants <- quantify(vowels, superassp::trk_formant_forest, .at = 0.5)
 
 # 3. Add speaker metadata
 data <- enrich(formants, corp)
 
 # 4. Summarise
 data |>
-  group_by(label, Gender) |>
+  group_by(labels, Gender) |>
   summarise(mean_F1 = mean(F1, na.rm = TRUE),
             mean_F2 = mean(F2, na.rm = TRUE),
             .groups = "drop")
@@ -91,13 +91,13 @@ regex, and wrap sequences and dominances in `[ ]`. See the
 [EQL grammar](https://ips-lmu.github.io/The-EMU-SDMS-Manual/chap-querysys.html)
 for the full reference.
 
-Results are tidy: each row is one segment with `label`, `start`, `end`,
+Results are tidy: each row is one segment with `labels`, `start`, `end`,
 `session`, `bundle`, plus a few bookkeeping columns. You can pipe the
 result through any dplyr verb.
 
 ```{r}
 vowels <- query(corp, "Phonetic =~ [aeiou]")
-vowels |> filter(end - start > 100) |> count(label)
+vowels |> filter(end - start > 100) |> count(labels)
 ```
 
 ## Step 3 — Quantify
@@ -106,9 +106,9 @@ vowels |> filter(end - start > 100) |> count(label)
 measurements per segment (or per time point if you pass `.at`).
 
 ```{r}
-formants <- quantify(vowels, superassp::forest)                 # midpoint
-contour  <- quantify(vowels, superassp::ksvF0, .at = seq(0, 1, 0.1))
-intensity <- quantify(vowels, superassp::rmsana)
+formants <- quantify(vowels, superassp::trk_formant_forest)                 # midpoint
+contour  <- quantify(vowels, superassp::trk_pitch_ksv, .at = seq(0, 1, 0.1))
+intensity <- quantify(vowels, superassp::trk_rms)
 ```
 
 By default reindeer chooses age- and gender-aware parameters from each
@@ -124,7 +124,7 @@ dsp_parameters(corpus_obj = corp)   # one row per bundle
 Override anything explicitly through `...`:
 
 ```{r}
-quantify(vowels, superassp::forest,
+quantify(vowels, superassp::trk_formant_forest,
          nominalF1 = 500, windowSize = 20, numFormants = 4)
 ```
 
@@ -134,7 +134,7 @@ Slow DSP runs are worth caching. Turn it on once and reindeer will skip
 work that's already on disk:
 
 ```{r}
-formants <- quantify(vowels, superassp::forest, .use_cache = TRUE)
+formants <- quantify(vowels, superassp::trk_formant_forest, .use_cache = TRUE)
 formants$.cache_status   # "hit" / "miss" per row
 
 inspect_cache(corp)      # see what's stored
@@ -178,7 +178,7 @@ ordinary R.
 ```{r}
 library(ggplot2)
 
-ggplot(data, aes(x = F2, y = F1, color = label)) +
+ggplot(data, aes(x = F2, y = F1, color = labels)) +
   geom_point(alpha = 0.5) +
   scale_x_reverse() +
   scale_y_reverse() +
@@ -207,7 +207,7 @@ or any data-access method. Filter and navigate freely:
 
 ```{r}
 plan <- query(corp, "Phonetic =~ [aeiou]") |>
-  filter(label != "@") |>
+  filter(labels != "@") |>
   scout(steps_forward = 1) |>      # next phoneme
   ascend_to("Word")                # parent word
 

@@ -63,6 +63,13 @@ S7::method(serve, corpus) <- function(corpus,
   # Get emuDBhandle for compatibility with emuR functions
   emuDBhandle <- get_emuDBhandle(corpus)
 
+  # query() returns a lazy_segment_list by default, and serve() documents that a
+  # query result can be passed straight in (see the example below). Materialise
+  # it here so the validation below sees a segment_list.
+  if (S7::S7_inherits(seglist, lazy_segment_list)) {
+    seglist <- collect(seglist)
+  }
+
   # Load database configuration
   DBconfig <- load_DBconfig(emuDBhandle)
 

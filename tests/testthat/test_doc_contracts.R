@@ -11,7 +11,7 @@ pkg_root <- function() testthat::test_path("..", "..")
 pkg_fun_refs <- function(lines) {
   m <- regmatches(
     lines,
-    gregexpr("\\b([A-Za-z][A-Za-z0-9.]*)::([A-Za-z._][A-Za-z0-9._]*)", lines,
+    gregexpr("\\b([A-Za-z][A-Za-z0-9.]*)::([A-Za-z._][A-Za-z0-9._]*[A-Za-z0-9_])", lines,
              perl = TRUE)
   )
   refs <- unlist(m, use.names = FALSE)
@@ -25,7 +25,6 @@ pkg_fun_refs <- function(lines) {
 }
 
 test_that("every package::function reference in the docs resolves", {
-  skip("PENDING WP1.9 - see dev/REINDEER_REMEDIATION_PLAN.md")
   root <- pkg_root()
   files <- c(
     list.files(file.path(root, "R"), pattern = "\\.R$", full.names = TRUE),
@@ -35,8 +34,12 @@ test_that("every package::function reference in the docs resolves", {
   files <- files[file.exists(files)]
   expect_gt(length(files), 10)
 
-  refs <- pkg_fun_refs(unlist(lapply(files, readLines, warn = FALSE),
-                             use.names = FALSE))
+  # The vignette YAML header names the knitr engine ("knitr::rmarkdown"); that
+  # is a declaration, not a function reference.
+  lines <- unlist(lapply(files, readLines, warn = FALSE), use.names = FALSE)
+  lines <- lines[!grepl("\\\\VignetteEngine\\{", lines)]
+
+  refs <- pkg_fun_refs(lines)
   expect_gt(nrow(refs), 20)
 
   # Only packages whose namespace we can inspect are checked; a reference to an
@@ -76,26 +79,39 @@ test_that("every package::function reference in the docs resolves", {
   )
 })
 
-#' Columns named in the `\item` bullets of an Rd `\value` section
+#' Columns named in an Rd page
+#'
+#' Two shapes appear in this package: `\code{name}` bullet lists (`query.Rd`,
+#' under `\value`) and `name: description` bullet lists (`segment_list.Rd`,
+#' under `\section{Structure}`). Both are parsed, then filtered to lowercase
+#' identifiers so SEGMENT/EVENT/ITEM and prose bullets drop out.
 documented_columns <- function(rd_path) {
   txt <- readLines(rd_path, warn = FALSE)
-  start <- grep("^\\\\value\\{", txt)
-  expect_length(start, 1L)
-  rest <- txt[(start + 1L):length(txt)]
-  end <- grep("^\\}", rest)[1]
-  body <- if (!is.na(end)) rest[seq_len(end - 1L)] else rest
+  starts <- grep("^\\\\value\\{|^\\\\section\\{Structure\\}", txt)
+  expect_gt(length(starts), 0)
+
+  body <- character()
+  for (s in starts) {
+    rest <- txt[(s + 1L):length(txt)]
+    end <- grep("^\\}", rest)[1]
+    body <- c(body, if (!is.na(end)) rest[seq_len(end - 1L)] else rest)
+  }
+
   items <- grep("^\\\\item", body, value = TRUE)
-  tokens <- regmatches(items, gregexpr("\\\\code\\{([^}]*)\\}", items))
-  tokens <- unlist(tokens, use.names = FALSE)
-  tokens <- sub("^\\\\code\\{", "", tokens)
-  tokens <- sub("\\}$", "", tokens)
-  # Column names are lowercase identifiers; this drops SEGMENT/EVENT/ITEM and
-  # prose such as `lazy = FALSE`.
+  expect_gt(length(items), 0)
+
+  from_code <- unlist(regmatches(items, gregexpr("\\\\code\\{([^}]*)\\}", items)))
+  from_code <- sub("^\\\\code\\{", "", from_code)
+  from_code <- sub("\\}$", "", from_code)
+
+  from_colon <- sub("^\\\\item\\s+([A-Za-z0-9_.]+):.*$", "\\1", items)
+  from_colon <- from_colon[grepl("^[A-Za-z0-9_.]+$", from_colon)]
+
+  tokens <- unique(c(from_code, from_colon))
   tokens[grepl("^[a-z][a-z0-9_.]*$", tokens)]
 }
 
 test_that("columns documented for query() exist in the result", {
-  skip("PENDING WP1.9 - see dev/REINDEER_REMEDIATION_PLAN.md")
   docs <- documented_columns(file.path(pkg_root(), "man", "query.Rd"))
   expect_gt(length(docs), 5)  # guard against a vacuous parse
 
@@ -109,7 +125,6 @@ test_that("columns documented for query() exist in the result", {
 })
 
 test_that("columns documented for segment_list exist in the result", {
-  skip("PENDING WP1.9 - see dev/REINDEER_REMEDIATION_PLAN.md")
   docs <- documented_columns(file.path(pkg_root(), "man", "segment_list.Rd"))
   expect_gt(length(docs), 5)
 

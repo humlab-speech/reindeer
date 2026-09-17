@@ -8,10 +8,6 @@
 # package so that parallel workers can load it).
 
 test_that("segment result flattening keeps data frames intact", {
-  # PENDING WP1.10 - red until the flattening step is factored out of
-  # .process_parallel_io() and stops recursing into the data frames.
-
-  skip("PENDING WP1.10 - see dev/REINDEER_REMEDIATION_PLAN.md")
   a <- data.frame(f0 = 1:2, intensity = c(60, 61))
   b <- data.frame(f0 = 3L, intensity = 62)
   c <- data.frame(f0 = 4L, intensity = 63)
@@ -23,19 +19,16 @@ test_that("segment result flattening keeps data frames intact", {
   flat <- reindeer:::.flatten_segment_results(results)
 
   expect_type(flat, "list")
-  expect_length(flat, 5)
+  expect_length(flat, 4)
   expect_true(all(vapply(flat, is.data.frame, logical(1))))
   expect_setequal(vapply(flat, nrow, integer(1)), c(2L, 1L, 1L, 2L))
 
   # And the caller's binding step must accept the result as-is.
   bound <- data.table::rbindlist(flat, fill = TRUE)
-  expect_equal(nrow(bound), 5)
+  expect_equal(nrow(bound), 6)
 })
 
 test_that("quantify() works in the 21-100 segment band", {
-  # PENDING WP1.10 - the default parallel executor for this band errors.
-
-  skip("PENDING WP1.10 - see dev/REINDEER_REMEDIATION_PLAN.md")
   skip_if_no_emuR()
   skip_if_no_superassp()
   skip_if_not(workers_can_load_reindeer(),

@@ -26,13 +26,16 @@ test_that("get_handle creates proper emuDBhandle from corpus", {
 })
 
 test_that("serve() accepts the lazy segment list that query() returns", {
-  # PENDING WP1.1 - red until serve() collects a lazy_segment_list instead of
-  # rejecting it. The contract is documented in R/reindeer_serve.R:38, the
-  # README, and three vignette blocks, none of which execute in CI.
-
-  skip("PENDING WP1.1 - see dev/REINDEER_REMEDIATION_PLAN.md")
+  # The contract is documented in R/reindeer_serve.R:38, the README, and three
+  # vignette blocks, none of which execute in CI.
   skip_if_not_installed("emuR")
   skip_if_not_installed("httpuv")
+
+  # serve() resolves an EMU-webApp directory before it starts the server; a
+  # stub keeps the test independent of a local webApp checkout.
+  webapp <- withr::local_tempdir()
+  writeLines("<html><body></body></html>", file.path(webapp, "index.html"))
+  withr::local_options(reindeer.emuWebApp.dir = webapp)
 
   corp <- create_isolated_ae_corpus()
   lazy <- query(corp, "Phoneme =~ .+")

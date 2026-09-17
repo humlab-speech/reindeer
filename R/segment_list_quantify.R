@@ -8,9 +8,9 @@
 #' the next [collect()].
 #'
 #' @param object A `segment_list` (eager) or `lazy_segment_list`.
-#' @param dsp_function A DSP function. Common choices: `superassp::forest`
-#'   (formants), `superassp::ksvF0` (pitch), `superassp::rmsana`
-#'   (intensity), `superassp::dftSpectrum`.
+#' @param dsp_function A DSP function. Common choices: `superassp::trk_formant_forest`
+#'   (formants), `superassp::trk_pitch_ksv` (pitch), `superassp::trk_rms`
+#'   (intensity), `superassp::trk_dft_spectrum`.
 #' @param ... Forwarded to the DSP function. Values you pass win over
 #'   metadata-derived ones (`nominalF1`, `windowSize`, ...).
 #' @param .at Relative time points to sample, each in `[0, 1]`. A scalar
@@ -32,7 +32,7 @@
 #' @return An [extended_segment_list]: every column of the input
 #'   `segment_list` (see [query()] for the column inventory), plus one
 #'   column per DSP output column produced by `dsp_function` (consult
-#'   the function's own help — for example `superassp::forest` adds
+#'   the function's own help — for example `superassp::trk_formant_forest` adds
 #'   `F1`, `F2`, `F3`, `B1`, `B2`, `B3`). When `.at` is a vector, an
 #'   extra `.time_point` column records which relative time each row
 #'   came from. When `.use_cache = TRUE`, a `.cache_status` column
@@ -46,13 +46,13 @@
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #'
 #' # Formants at the midpoint
-#' quantify(segs, superassp::forest, .at = 0.5)
+#' quantify(segs, superassp::trk_formant_forest, .at = 0.5)
 #'
 #' # Pitch contour: 11 evenly spaced points
-#' quantify(segs, superassp::ksvF0, .at = seq(0, 1, 0.1))
+#' quantify(segs, superassp::trk_pitch_ksv, .at = seq(0, 1, 0.1))
 #'
 #' # Override metadata-derived parameters
-#' quantify(segs, superassp::forest, nominalF1 = 500, windowSize = 20)
+#' quantify(segs, superassp::trk_formant_forest, nominalF1 = 500, windowSize = 20)
 #' @usage
 #' quantify(object, dsp_function, ..., .at = NULL, .use_metadata = TRUE,
 #'   .use_cache = FALSE, .cache_dir = NULL, .cache_format = c("auto", "qs", "rds"),
@@ -94,6 +94,11 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   # Match cache format argument
   .cache_format <- match.arg(.cache_format)
+
+  # The caller's expression is only available here, at the boundary, where
+  # `dsp_function` is still the caller's promise. It identifies the routine in
+  # cache keys and in the result's metadata.
+  dsp_name <- .dsp_name_from_expr(substitute(dsp_function), dsp_function)
 
   if (nrow(object) == 0) {
     if (.verbose) cli::cli_alert_warning("Empty segment list")
@@ -199,7 +204,11 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   }
 
   # PHASE 2: Choose processing strategy based on optimize flag and available packages
-  if (.optimize && nrow(seg_df) > 100) {
+  # The vectorized executor is the only one that reads and writes the persistent
+  # cache, so a cache-enabled call routes there whatever its size. Previously a
+  # `.use_cache = TRUE` request for 21-100 segments was accepted and silently
+  # ignored, because that band used the parallel executor.
+  if ((.optimize && nrow(seg_df) > 100) || .use_cache) {
     # Use vectorized processing for large datasets
     if (.verbose) {
       cli::cli_alert_info("Using optimized vectorized processing")
@@ -216,7 +225,8 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     # PHASE 2: Vectorized batch processing
     results_list <- .process_segments_vectorized(
       seg_df, corpus_obj, dsp_function, dsp_params_base,
-      media_ext, .at, .verbose, .use_cache, cache_conn, .cache_format
+      media_ext, .at, .verbose, .use_cache, cache_conn, .cache_format,
+      dsp_name = dsp_name
     )
 
   } else if (.parallel && nrow(seg_df) > 20) {
@@ -297,20 +307,8 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     c(segment_cols, grep(metadata_pattern, names(combined), value = TRUE))
   )
 
-  # Get function name
-  dsp_fun_name <- tryCatch({
-    if (is.function(dsp_function)) {
-      # Try to get function name
-      fun_name <- deparse(substitute(dsp_function))
-      if (length(fun_name) == 1 && !grepl("^function", fun_name)) {
-        fun_name
-      } else {
-        "custom_function"
-      }
-    } else {
-      as.character(dsp_function)
-    }
-  }, error = function(e) "unknown")
+  # Function name recorded on the result (same identity used in cache keys)
+  dsp_fun_name <- dsp_name
 
   # Create extended_segment_list
   result <- extended_segment_list(

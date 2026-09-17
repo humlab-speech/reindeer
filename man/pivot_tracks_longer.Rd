@@ -48,7 +48,7 @@ many rows). It is a \code{track_long} tibble that carries \code{db_uuid},
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 segs <- query(corp, "Phonetic == V")
-wide <- quantify(segs, superassp::forest, .at = seq(0, 1, 0.1))
+wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.1))
 long <- pivot_tracks_longer(wide)
 head(long)
 \dontshow{\}) # examplesIf}

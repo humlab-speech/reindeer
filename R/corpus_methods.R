@@ -450,6 +450,33 @@ close_connection <- function(corpus_obj) {
   invisible(corpus_obj)
 }
 
+#' Register a finalizer that closes the corpus connection on garbage collection
+#'
+#' The connection is memoised in the corpus environment and no code path closes
+#' it, so a session that opens many corpora leaks one SQLite handle each until
+#' RSQLite's own finalizer complains. This closes it as soon as the corpus
+#' object is collected.
+#'
+#' @param corpus_obj A corpus object
+#' @return Invisibly NULL
+#' @keywords internal
+#' @noRd
+.register_connection_finalizer <- function(corpus_obj) {
+  env <- corpus_obj@.connection
+  if (!is.environment(env)) {
+    return(invisible(NULL))
+  }
+  reg.finalizer(env, function(e) {
+    if (exists("con", envir = e, inherits = FALSE)) {
+      con <- get("con", envir = e, inherits = FALSE)
+      if (!is.null(con) && inherits(con, "DBIConnection") && DBI::dbIsValid(con)) {
+        try(DBI::dbDisconnect(con), silent = TRUE)
+      }
+    }
+  }, onexit = TRUE)
+  invisible(NULL)
+}
+
 #' Get SQLite connection for corpus cache (delegates to cached connection)
 #' @keywords internal
 #' @noRd

@@ -304,12 +304,12 @@ cat(sprintf("Now %d short segments remain\n", nrow(short_segments_updated)))
 # 1. Initial analysis
 corp <- corpus("path/to/database_emuDB")
 vowels <- query(corp, "Phonetic =~ [aeiou]")
-formants <- quantify(vowels, superassp::forest)
+formants <- quantify(vowels, superassp::trk_formant_forest)
 
 # 2. Find outliers
 library(dplyr)
 outliers <- formants %>%
-  group_by(label) %>%
+  group_by(labels) %>%
   mutate(
     F1_z = scale(F1),
     F2_z = scale(F2)
@@ -330,7 +330,7 @@ serve_app(corp, seglist = outliers)
 
 # 4. Re-run analysis after corrections
 vowels_corrected <- query(corp, "Phonetic =~ [aeiou]")
-formants_corrected <- quantify(vowels_corrected, superassp::forest)
+formants_corrected <- quantify(vowels_corrected, superassp::trk_formant_forest)
 
 # 5. Compare results
 cat("Before correction:\n")
@@ -349,8 +349,8 @@ For team annotation projects:
 corp <- corpus("path/to/database_emuDB")
 
 # Create bundle lists (one-time setup, using emuR)
-# emuR::add_bundleList(corp, "Annotator_A", bundles_A)
-# emuR::add_bundleList(corp, "Annotator_B", bundles_B)
+# emuR::write_bundleList(get_emuDBhandle(corp), "Annotator_A", bundles_A)
+# emuR::write_bundleList(get_emuDBhandle(corp), "Annotator_B", bundles_B)
 
 # 2. Each annotator serves their assigned list
 serve_app(corp, bundleListName = "Annotator_A")
@@ -547,7 +547,7 @@ cat(sprintf("Completed %d/%d bundles\n",
 # === ANALYZE ===
 # Now ready for acoustic analysis
 phonemes_final <- query(corp, "Phonetic =~ [aeiou]")
-formants <- quantify(phonemes_final, superassp::forest)
+formants <- quantify(phonemes_final, superassp::trk_formant_forest)
 
 # Proceed with analysis...
 ```

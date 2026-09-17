@@ -69,22 +69,72 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   assign(cache_key, handle, envir = .tidy_cache)
   return(handle)
 }
-#' Precompute the loop-invariant parts of a quantify cache key.
+#' Stable name for a DSP function, for cache keys and result metadata
 #'
-#' The DSP function name and .at digest don't change across segments in a
-#' single quantify() call; hoist them out and reuse. The params digest is
-#' computed per row (effective params vary by bundle), so it is not hoisted.
+#' Callers capture the unevaluated expression at their own boundary (where the
+#' promise still exists) and hand it here. An anonymous closure is identified by
+#' its formals and body, so two different closures can never share a cache entry.
 #'
-#' @param dsp_function The DSP function symbol the caller passed in. The
-#'   caller must wrap with `substitute()` so we can recover its source name.
+#' @param expr The caller's unevaluated argument, from `substitute()`
+#' @param value The evaluated function (or character name)
+#' @return Character scalar
 #' @noRd
-.precompute_cache_key_parts <- function(dsp_function, params, .at = NULL) {
+.dsp_name_from_expr <- function(expr, value) {
+  if (is.character(value)) {
+    return(paste(value, collapse = "|"))
+  }
+  nm <- tryCatch(paste(deparse(expr), collapse = ""), error = function(e) NULL)
+  if (!is.null(nm) && nzchar(nm) && !grepl("^(function|NULL|\\()", nm)) {
+    return(nm)
+  }
+  tryCatch(
+    paste0("anonymous_",
+           digest::digest(list(formals(value), body(value)), algo = "xxhash64")),
+    error = function(e) "unknown")
+}
+
+#' Cache key components for a quantify result
+#'
+#' The `.at` digest and the DSP identity are loop-invariant for a call; the
+#' params digest is computed per row (effective params vary by bundle), so it is
+#' not hoisted.
+#'
+#' @param dsp_name Character name identifying the DSP routine. Pass the real
+#'   name; deriving it from the argument would capture the local variable name
+#'   instead, which is how every entry ended up labelled "dsp_function".
+#' @noRd
+.precompute_cache_key_parts <- function(dsp_name, params, .at = NULL) {
   list(
-    dsp_name = deparse(substitute(dsp_function))[1],
+    dsp_name = if (is.null(dsp_name) || !nzchar(dsp_name)) "unknown" else dsp_name,
     params_digest = digest::digest(params, algo = "xxhash64"),
     at_digest = if (is.null(.at)) "NA" else digest::digest(.at, algo = "xxhash64")
   )
 }
+#' Flatten per-file segment results into one list of data frames
+#'
+#' `results` holds one element per signal file; each element is the list
+#' produced by the per-segment loop, i.e. data frames with occasional NULLs
+#' where a file or segment failed.
+#'
+#' The flattening must stop at that level. `unlist()` recurses into the data
+#' frames themselves, so calling it twice turns every per-segment tibble into
+#' its columns and the caller's `rbindlist()` then fails with "Item 1 of input
+#' is not a data.frame, data.table or list" - which is what happened for every
+#' quantify() call in the 21-100 segment band.
+#'
+#' @param results List of per-file results
+#' @return Flat list of data frames, NULLs removed
+#' @noRd
+.flatten_segment_results <- function(results) {
+  if (length(results) == 0) {
+    return(list())
+  }
+  flat <- do.call(c, lapply(results, function(x) {
+    if (is.null(x)) list() else unname(x)
+  }))
+  Filter(Negate(is.null), flat)
+}
+
 #' Optimized batch processor for large segment lists
 #' Groups segments by audio file to minimize I/O operations
 #' @noRd
@@ -181,8 +231,8 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     Filter(Negate(is.null), segment_results)
   })
   
-  # Flatten nested list
-  unlist(results, recursive = FALSE)
+  # Flatten nested list, one level only: see .flatten_segment_results()
+  .flatten_segment_results(results)
 }
 
 # ============================================================================
@@ -454,7 +504,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 .process_segments_vectorized <- function(seg_df, corpus_obj, dsp_function, dsp_params,
                                          media_ext, .at = NULL, .verbose = FALSE,
                                          use_cache = TRUE, cache_conn = NULL,
-                                         cache_format = "auto") {
+                                         cache_format = "auto", dsp_name = NULL) {
   
   # Convert to data.table for faster operations
   dt <- data.table::as.data.table(seg_df)
@@ -479,7 +529,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     # per row: effective DSP params now vary by bundle (Age/Gender), so it is
     # no longer loop-invariant. Everything else (dsp name, .at) is hoisted.
     if (use_cache && !is.null(cache_conn)) {
-      key_pre <- .precompute_cache_key_parts(dsp_function, list(), .at)
+      key_pre <- .precompute_cache_key_parts(dsp_name, list(), .at)
       dt_valid[, seg_params_digest := vapply(seg_params, function(p) {
         digest::digest(p, algo = "xxhash64")
       }, character(1))]
@@ -515,45 +565,42 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     
     # Process uncached segments
     if (nrow(dt_uncached) > 0) {
-      # Group by file for efficient I/O
+      # Group by file so each group shares one bundle (hence one params list)
+      # and one file handle.
       dt_uncached[, file_group_id := .GRP, by = signal_file]
-      
-      results_list <- dt_uncached[, {
-        file <- unique(signal_file)[1]
-        
-        # Process all segments from this file at once. Rows in a file group
-        # share one bundle, hence one params list; build the invariant call
-        # args once and only re-supply the per-segment window.
-        params_file <- seg_params[[1]]
+
+      # One DSP call per segment, results kept in row order. The raw return
+      # value is stored untouched: real DSP routines return AsspDataObj track
+      # objects, and flattening them here would destroy the tracks.
+      raw_results <- vector("list", nrow(dt_uncached))
+      for (g in unique(dt_uncached$file_group_id)) {
+        idx <- which(dt_uncached$file_group_id == g)
+        file <- unique(dt_uncached$signal_file[idx])[1]
+        params_file <- dt_uncached$seg_params[[idx[1]]]
         dsp_call_base <- c(
           list(listOfFiles = file),
           params_file,
           list(toFile = FALSE, verbose = FALSE)
         )
-        segment_results <- lapply(seq_len(.N), function(i) {
-          tryCatch({
-            result <- do.call(dsp_function, c(
+        for (i in idx) {
+          raw_results[[i]] <- tryCatch(
+            do.call(dsp_function, c(
               dsp_call_base,
-              list(beginTime = start[i] / 1000, endTime = end[i] / 1000)
-            ))
-            
-            result
-          }, error = function(e) {
-            if (.verbose) {
-              cli::cli_alert_warning("Error: {conditionMessage(e)}")
-            }
-            NULL
-          })
-        })
-        
-        list(results = segment_results)
-      }, by = file_group_id]
-      
-      # Combine results with segment info
-      dt_uncached[, result := unlist(results_list$results, recursive = FALSE)]
+              list(beginTime = dt_uncached$start[i] / 1000,
+                   endTime = dt_uncached$end[i] / 1000)
+            )),
+            error = function(e) {
+              if (.verbose) {
+                cli::cli_alert_warning("Error: {conditionMessage(e)}")
+              }
+              NULL
+            })
+        }
+      }
+      dt_uncached[, result := raw_results]
 
       # Batch-write all misses in one transaction instead of per row.
-      if (use_cache && !is.null(cache_conn) && nrow(dt_uncached) > 0L) {
+      if (use_cache && !is.null(cache_conn)) {
         non_null <- !vapply(dt_uncached$result, is.null, logical(1))
         if (any(non_null)) {
           entries <- Map(
@@ -567,7 +614,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     } else {
       dt_uncached[, result := list()]
     }
-    
+
     # Combine cached and uncached
     if (nrow(dt_cached) > 0) {
       dt_cached[, result := cached_result]
@@ -575,54 +622,54 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     } else {
       dt_all <- dt_uncached
     }
-    
-    # Convert results to tibble format
-    result_list <- dt_all[, {
-      if (!is.null(result[[1]])) {
-        result_df <- if (inherits(result[[1]], "AsspDataObj")) {
-          track_data <- as.data.frame(result[[1]])
-          
-          if (!is.null(.at)) {
-            n_frames <- nrow(track_data)
-            frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
-            track_data <- track_data[frame_indices, , drop = FALSE]
-            track_data$.time_point <- .at
-          }
-          
-          track_data
-        } else if (is.data.frame(result[[1]])) {
-          result[[1]]
-        } else if (is.list(result[[1]])) {
-          as.data.frame(result[[1]])
-        } else {
-          data.frame(value = result[[1]])
-        }
-        
-        # Add segment info
-        n_result_rows <- nrow(result_df)
-        seg_info <- .SD[rep(1, n_result_rows)]
-        
-        cbind(
-          tibble::as_tibble(seg_info),
-          tibble::as_tibble(result_df)
-        )
-      } else {
-        NULL
+
+    # Assemble one tibble per segment: segment bookkeeping plus the DSP output,
+    # sampled at `.at` when the routine returned a track object.
+    pieces <- lapply(seq_len(nrow(dt_all)), function(i) {
+      dsp_result <- dt_all$result[[i]]
+      if (is.null(dsp_result)) {
+        return(NULL)
       }
-    }, by = seq_len(nrow(dt_all))]
-    
-    # Return list of tibbles
-    result_list[!vapply(result_list$V1, is.null, logical(1))]$V1
+
+      result_df <- if (inherits(dsp_result, "AsspDataObj")) {
+        track_data <- as.data.frame(dsp_result)
+        if (!is.null(.at)) {
+          n_frames <- nrow(track_data)
+          frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
+          track_data <- track_data[frame_indices, , drop = FALSE]
+          track_data$.time_point <- .at
+        }
+        track_data
+      } else if (is.data.frame(dsp_result)) {
+        dsp_result
+      } else if (is.list(dsp_result)) {
+        as.data.frame(dsp_result)
+      } else {
+        data.frame(value = dsp_result)
+      }
+
+      n_result_rows <- nrow(result_df)
+      seg_info <- dt_all[rep(i, n_result_rows)]
+      cbind(
+        tibble::as_tibble(seg_info),
+        tibble::as_tibble(result_df)
+      )
+    })
+
+    Filter(Negate(is.null), pieces)
 }
+
 #' Parallel audio file processing with true parallel I/O
 #' @noRd
 .process_parallel_io <- function(seg_df, corpus_obj, dsp_function, dsp_params,
-                                 media_ext, .at = NULL, .cores = NULL, .verbose = FALSE) {
+                                 media_ext, .at = NULL, .cores = NULL, .verbose = FALSE,
+                                 dsp_name = NULL) {
   
   if (!requireNamespace("future", quietly = TRUE)) {
     cli::cli_warn("Package {.pkg future} not available, falling back to sequential processing")
     return(.process_segments_vectorized(seg_df, corpus_obj, dsp_function, dsp_params,
-                                       media_ext, .at, .verbose, use_cache = FALSE))
+                                       media_ext, .at, .verbose, use_cache = FALSE,
+                                       dsp_name = dsp_name))
   }
   
   # Set up parallel processing
@@ -709,6 +756,6 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     })
   }, future.seed = TRUE)
   
-  # Flatten and return
-  unlist(unlist(results, recursive = FALSE), recursive = FALSE)
+  # Flatten one level only: see .flatten_segment_results()
+  .flatten_segment_results(results)
 }
