@@ -1099,3 +1099,31 @@ If `dsp_columns` is empty the DSP never produced anything and the guard is
 about the input; if it is populated while `names(q)` lacks `F1_Hz`, the
 columns are being dropped between `:327` and `:340`. Read `:285-295` next
 either way - that condition is the whole question.
+
+### CORRECTION: there is no eager/lazy divergence - it was an empty input
+
+Both earlier notes on this are wrong. Measured properly:
+
+    collect() |> quantify(trk_formant_forest, .at = 0.5)   ->  28 cols, 10 dsp_columns, F1_Hz present
+    quantify(...) |> collect()                              ->  28 cols, F1_Hz present
+
+The 16-column result came from the one input that had **0 rows**:
+
+    query "Phonetic =~ [aeiou]" |> ascend_to("Syllable") |> filter(end - start > 30)
+    -> rows: 0
+
+So `quantify()` on an empty list returns the base columns unchanged, which
+is reasonable, and the eager path is fine. My "the two entry paths
+disagree" claim was an artefact of a query that matched nothing.
+
+That also explains the `end_to_end_pipeline` render failure completely: the
+vignette's query filtered syllables to `> 30` and matched zero of them, so
+the following column subset (`F1_Hz`) had nothing to select. The vignette
+conversion failed on my query, not on the package - the filter threshold
+needs to suit syllable durations, or be dropped.
+
+The `quantify()` warning added in the same commit stands on its own merit:
+when a DSP run yields no results for a **non-empty** input, the bare
+return is now reported instead of silently handing back the input. It does
+not fire for empty inputs (nothing to report) or for working runs -
+both verified.

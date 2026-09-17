@@ -291,6 +291,13 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     if (.verbose) {
       cli::cli_alert_warning("No results generated")
     }
+    if (nrow(object) > 0) {
+      cli::cli_warn(
+        c("quantify() produced no measurements: the {nrow(object)} input segment{?s} came back unchanged.",
+          i = "The DSP routine returned nothing for every segment, so no columns were added.",
+          i = "Call with {.code .verbose = TRUE} to see the per-segment progress."),
+        class = c("reindeer_quantify_warning", "reindeer_warning"))
+    }
     return(extended_segment_list(data = as.data.frame(object)))
   }
 
