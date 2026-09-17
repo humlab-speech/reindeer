@@ -791,3 +791,25 @@ difference names the missing column, and the fix is to select it through
 consistently. Reproduce with
 `query(corp, "Phoneme =~ .+") |> scout(steps_forward = 99)` on the demo
 corpus.
+
+### scout() dead end: the reason string is empty, so neither hypothesis holds
+
+Running the reproduction and printing the error gives:
+
+    ERROR: <reindeer::segment_list> object is invalid:
+
+with nothing after the colon. S7 appends the validator's return value
+there, so the `required_cols` validator (`:60-75`) returned NULL - it is
+not what rejected the object. Combined with the previous note, this rules
+out both readings I had:
+
+- it is not "empty data is rejected" (the validator never mentions row
+  count), and
+- it is not "a required column is missing" (that would have been named).
+
+What remains is the parent class (`.tbl_df_S3_class`) or a property
+validator in `properties = list(...)` at `:56-59`, which I have not read.
+Next probe, one line: read `:53-60` for the property definitions, then
+build the zero-match frame by hand and call `S7::validate()` on it to see
+which one objects. `segment_list_classes.R:116` is where construction
+happens; the frame arriving there is what needs inspecting.
