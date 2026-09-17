@@ -104,6 +104,15 @@ re-litigates them.
   nested git checkout) and `tests/signalfiles` (124 MB, referenced only from an
   obsolete worktree). Both are excluded from the build meanwhile, so neither
   ships and neither trips the non-portable-filename check.
+- **A navigation dead end aborts instead of returning nothing.**
+  `scout(steps_forward = 99)` — far enough past the end that no item
+  matches — fails inside the `segment_list` validator
+  (`R/segment_list_classes.R:116`) rather than returning an empty result,
+  so the chain cannot report "100% of rows lost". Fixing it means letting
+  the validator accept a zero-row segment list with the required columns
+  present, then checking that `dropped_rows()` and the loss warning handle
+  that shape. `vignettes/lazy_and_provenance.Rmd` documents the limit
+  meanwhile.
 - **Collate matters.** Adding `R/parallel_utils.R` broke `R CMD INSTALL`
   ("files missing from Collate field") while `devtools::test()` stayed green,
   because `load_all()` ignores Collate. Run `devtools::document()` whenever a
