@@ -5,25 +5,7 @@
 \alias{quantify.segment_list}
 \title{Extract acoustic measurements from segments}
 \usage{
-quantify(object, dsp_function, ..., .at = NULL, .use_metadata = TRUE,
-  .use_cache = FALSE, .cache_dir = NULL, .cache_format = c("auto", "qs", "rds"),
-  .parallel = TRUE, .workers = NULL, .verbose = FALSE, .optimize = TRUE)
-
-## S7 method for class <reindeer::segment_list>
-quantify(
-  object,
-  dsp_function,
-  ...,
-  .at = NULL,
-  .use_metadata = TRUE,
-  .verbose = FALSE,
-  .parallel = TRUE,
-  .workers = NULL,
-  .use_cache = FALSE,
-  .cache_dir = NULL,
-  .cache_format = c("auto", "qs", "rds"),
-  .optimize = TRUE
-)
+quantify(object, ...)
 }
 \arguments{
 \item{object}{A \code{segment_list} (eager) or \code{lazy_segment_list}.}

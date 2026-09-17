@@ -53,15 +53,13 @@
 #'
 #' # Override metadata-derived parameters
 #' quantify(segs, superassp::trk_formant_forest, nominalF1 = 500, windowSize = 20)
-#' @usage
-#' quantify(object, dsp_function, ..., .at = NULL, .use_metadata = TRUE,
-#'   .use_cache = FALSE, .cache_dir = NULL, .cache_format = c("auto", "qs", "rds"),
-#'   .parallel = TRUE, .workers = NULL, .verbose = FALSE, .optimize = TRUE)
+#' @usage quantify(object, ...)
 #' @name quantify
 #' @export
 quantify <- S7::new_generic("quantify", "object")
 
 #' @rdname quantify
+#' @usage NULL
 #' @name quantify.segment_list
 S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .at = NULL,
