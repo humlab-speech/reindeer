@@ -1224,3 +1224,31 @@ test_quantify_segment_list.R 42 results, no failures.
 
 That retires three of the findings above at once - the empty pivot, the
 autoplot abort, and the missing `rel_time`.
+
+### The erodex failure is the superassp floor again
+
+`erodex::quantify_simulate()` dies with "subscript out of bounds" on the
+demo corpus, and the run that showed it also printed reindeer's own
+warning - the one added earlier for DSP routines that expose no tunable
+formals:
+
+    segs: 24 rows
+    SIM: ERROR: subscript out of bounds
+    i Reinstall it from GitHub: remotes::install_github("humlab-speech/superassp")
+
+So three separate-looking symptoms share one root cause, and it is the
+version floor rather than anything in reindeer:
+
+- `quantify()` uses default parameters instead of metadata norms (now
+  reported by the warning above);
+- `erodex::quantify_simulate()` fails outright, because injecting a
+  parameter sweep is exactly the operation a parameter-less wrapper cannot
+  accept;
+- the end_to_end vignette's simulation section cannot run here.
+
+All three disappear with superassp >= 3.0.0 installed. Until then the
+vignette gates the section and says so. This makes the superassp floor the
+single highest-value outstanding item: it is unpinnable in DESCRIPTION
+while 2.9.5 is the installed build, but the moment a >= 3.0.0 build is
+present, D6, the erodex failure and the vignette section all close
+together.
