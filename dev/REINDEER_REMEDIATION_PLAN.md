@@ -1,0 +1,602 @@
+# reindeer remediation plan
+
+Companion to `dev/REINDEER_PACKAGE_ASSESSMENT.md`. That document says what is
+wrong and where; this one says what to change, in what order, and what proves
+each change is safe.
+
+Target release: 1.2.0. No public API breaks in this program except the decisions
+listed in §3, each of which needs an explicit call before its work package runs.
+
+## 0. How to use this plan
+
+Every work package has the same shape:
+
+- **Evidence** — the finding being fixed, with a `file:line`.
+- **Change** — what to edit, specific enough to execute without re-deriving it.
+- **Proof** — the test or command that must pass, written *before* the change
+  where the behaviour is user-visible.
+- **Risk** — what can break, and the mitigation.
+
+Work items are ordered by dependency, not by size, inside each phase. Phases are
+gated: do not start the next one with a red gate.
+
+Non-goals for this program: no new features, no interface redesign beyond the
+items below, no emuR parity regressions, no changes to the behaviour of
+protoscribe, eggstract, erodex, or superassp.
+
+## 1. Invariants and baseline
+
+These hold after every commit, not just at phase gates:
+
+1. `devtools::test()` — no failures, no errors.
+2. `R CMD check` — never worse than baseline (7 WARNING, 1 NOTE). Target is zero
+   by the end of phase 4.
+3. `query()` output identical to `emuR::query()` on the ae corpus
+   (`tests/testthat/test_query_optimized.R` is the gate).
+4. No measurement value changes unless a work item says it should.
+5. No new exported symbol without documentation and an index entry.
+6. Every `pkg::fun` reference in `R/` roxygen, `vignettes/` and `README.md`
+   resolves against the installed package, and every column named in a
+   `@return` block exists in the returned object. Both are asserted by tests
+   from WP0.2 onward.
+
+**Baseline, measured 2026-09-17 on this machine** (R 4.6.1, M1 Pro, 10 cores):
+
+| What | Result |
+|---|---|
+| `devtools::test()` | **1799 passed, 0 failed, 0 errors, 3 warnings**, 247.6 s |
+| `devtools::load_all()` | 4.2 s, 72 exports |
+| `R CMD check` (last run, 2026-09-06) | 7 WARNING, 1 NOTE (`--no-manual --no-vignettes`) |
+| Worker spawn (`future::multisession`) | 0.77 s for 2 workers, 1.13 s for 9, +0.10 s teardown |
+| Local toolchain | devtools, testthat, emuR, superassp, qs2, pkgdown, knitr all installed |
+
+The three baseline test warnings are a defect, not noise: see B1 below.
+
+## 2. Defects found while preparing this plan
+
+These were not in the assessment; they come from the baseline run and from
+tracing its output.
+
+### B1. Nested metadata values are silently truncated in the cache
+
+`serialize_metadata_value()` (`R/metadata_core.R:483-499`) has branches for
+NULL, logical, integer, numeric, Date and POSIXt; everything else falls into
+`list(value = as.character(value), type = "character")`. A nested list such as
+`project = list(name = "TestProj", description = "A test corpus.")` therefore
+becomes a length-2 character vector, and the assignment in
+`process_metadata_list()` (`R/metadata_core.R:435-438`) recycles it into a
+length-1 slot. Reproduced today:
+
+```
+add_metadata(corp, list(project = list(name = "TestProj", description = "A test corpus."),
+                        funding = list(funder = "TestFunder", grantNumber = "G-001")))
+# Warning: number of items to replace is not a multiple of replacement length
+get_metadata(corp)$project    # "TestProj"   <- description and startDate gone
+get_metadata(corp)$funding    # "TestFunder" <- grantNumber gone
+```
+
+Scope, verified: `METADATA.json` is written first and correctly
+(`R/corpus_metadata_io.R:84`, `auto_unbox = TRUE`), so ground truth is intact and
+the loss is confined to the SQLite projection. The FAIR emitters are unaffected
+because `collect_corpus_summary()` reads the nested values straight from
+`METADATA.json` (`R/corpus_describe.R:33-49`) and then falls back to the flat
+cache fields (`:52-56`). What *is* affected: `get_metadata()` (the documented
+read API), everything built on it (`enrich(with = "metadata")`, `biographize()`),
+and users' trust, since the warning is unexplainable from the docs.
+
+### B2. Corpus connections are never closed
+
+The baseline run ends with RSQLite's finalizer warning, `call dbDisconnect()
+when finished working with a connection`. `close_connection()` exists
+(`R/corpus_methods.R:444`) but nothing calls it automatically and there is no
+`reg.finalizer` anywhere in the package. Each `corpus()` in a long session leaks
+a SQLite handle until GC.
+
+### B3. Three test warnings are load-bearing
+
+`tests/testthat/test_describe.R:63-72` and `:129-136` pass while emitting the
+B1 recycling warning. The suite currently encodes the truncation as acceptable
+behaviour; those tests must be tightened to `expect_silent()` plus a full
+round-trip assertion.
+
+### B4. The documented segment column is `label`; the actual column is `labels`
+
+`collect(query(corp, "Phonetic == n"))` returns columns `labels, start, end,
+db_uuid, session, bundle, …` — byte-identical to `emuR::query()`, which is
+correct for parity. The documents disagree with reality:
+
+| Surface | Says | Reality |
+|---|---|---|
+| `README.md` (2×), `vignettes/getting_started.Rmd` (5×), `vignettes/interactive_annotation.Rmd` (6×) | `label` | `labels` |
+| `man/query.Rd` `@return` (3×) | `label` | `labels` |
+| `man/segment_list.Rd`, `man/geom_label_tier.Rd`, class docs | `labels` | correct |
+
+Verified failure: `count(label)` on a query result errors with
+`Column 'label' is not found`. The README's five-minute workflow does not run.
+Nothing caught it because no example executes and the tests use whichever name
+they choose internally.
+
+### B5. Every documented DSP call names a function that does not exist
+
+reindeer's docs reference `superassp::forest` 38 times, `superassp::ksvF0` 7,
+`superassp::rmsana` 3, `superassp::dftSpectrum` 2 (README, all six vignettes,
+and 5 roxygen example blocks). The installed superassp (2.9.5) and the current
+source checkout (3.0.0) export none of those names; the real entry points are
+`trk_formant_forest`, `trk_formant_burg`, `trk_rms`, `trk_intensity`, and
+`lst_*` analysis functions.
+
+```
+> quantify(vowels, superassp::forest, .at = 0.5)
+Error: 'forest' is not an exported object from 'namespace:superassp'
+```
+
+The suite cannot catch this: every test passes a locally defined `fake_dsp`
+(`tests/testthat/test_quantify_segment_list.R:72`, `:131`), so no real DSP
+function is ever resolved. This is the most severe documentation defect in the
+package, and it is invisible for exactly the reason the assessment identified:
+examples and vignettes never execute.
+
+## 3. Decisions required before execution
+
+| ID | Decision | Recommendation | Blocks |
+|----|----------|----------------|--------|
+| D1 | Keep or retire the EAF/CMDI sync state machine (`R/reindeer_autosync.R` 698 l, `R/reindeer_autosync_wrappers.R` 411 l, `R/interop_elan_autosync.R` 243 l, 633-line test) now that `describe_corpus()` + `write_eaf()` cover the user-facing need | Keep through 1.2 (fix the bugs, delete the 5 unreachable wrappers), schedule full retirement for 2.0 | X2, X9 |
+| D2 | Keep the ten moved-function stubs through 1.2 | Keep; move them to their own reference-index section | PD3 |
+| D3 | Keep the 8.6 MB demo corpora in `inst/extdata` | Keep (they enable offline examples and vignettes), delete the unused 3 MB `inst/praat` tree | X6 |
+| D4 | Raise the parallel threshold from 20 segments and clamp workers to work units | Yes; output is identical, and provide `options(reindeer.workers = n)` as the escape hatch | WP2.1 |
+| D5 | Vignette execution policy: global env-var gate vs per-chunk capability gate | Capability gate (`requireNamespace`), so most vignette code runs in CI today | WP5.1 |
+| D6 | Which superassp API generation the docs target, and whether reindeer should expose its own stable aliases | Pin a minimum version (superassp ≥ 3.0.0, `trk_*` API) and record it in `DESCRIPTION`; defer an alias layer (`reindeer::dsp_formants()`) unless the upstream API is still moving | WP0.2 T1, WP1.9, WP4.2 |
+
+Until a decision is made, the dependent work packages stay out of scope.
+
+## 4. Work packages
+
+### Phase 0 — Baseline and safety net (est. 1 day)
+
+**WP0.1 Record the verification baselines.**
+Write `benchmarking/benchmark_core.R` producing a CSV with: `corpus()` open time
+(quick and rebuild), `query()` + `scout()` on the ae corpus, `quantify()` at 5 /
+50 / 150 segments with `.use_cache` off and on, and a worker-spawn counter
+(`future::plan` counts via a wrapper). Run it on the current commit and commit the
+CSV under `benchmarking/`. This is the reference for every energy and performance
+claim in phases 2 and 3.
+
+*Proof*: the CSV exists with today's numbers; re-running produces the same shape.
+
+**WP0.2 Write the missing regression tests first.** These must fail before their
+fix and pass after.
+
+| Test | Asserts | Currently |
+|---|---|---|
+| T1 cache round-trip | `quantify(..., .use_cache = TRUE)` twice: second call is all `"hit"`; after `set_metadata(Age = ...)` the affected bundle is `"miss"`; run at 5, 50 and 150 rows to cover all three executors | **no test uses `.use_cache` at all** (verified: zero hits across `tests/`) |
+| T2 cache key identity | two DSP functions with overlapping formal names do not share cache entries | fails (X7) |
+| T3 `serve()` accepts a lazy result | `serve(corp, seglist = query(corp, "Phonetic == n"))` passes validation | fails (S4) |
+| T4 autosync sees `METADATA.json` | editing `METADATA.json` makes `detect_metadata_changes()` report a change | fails (X3) |
+| T5 nested metadata round-trip | B1: `expect_silent()` on the write, and `get_metadata()` returns `description`, `startDate`, `grantNumber` intact | fails (B1) |
+| T6 demo corpus smoke | `demo_corpus()` + one EQL query + one metadata read succeed offline; this is the fixture vignettes will use | passes (2.5 s cold, 0.08 s warm); locks in the WP5.1 premise |
+| T7 doc-contract: symbols | every `pkg::fun` in roxygen, `vignettes/`, `README.md` resolves via `getNamespaceExports()` | fails immediately (B5: 50 references) |
+| T8 doc-contract: columns | every column named in a `@return` block exists in the object that function returns (start with `query()`, `quantify()`, `enrich()`, `collect()`) | fails (B4: `label`) |
+
+T1 must use a **real** DSP function on the demo corpus, not `fake_dsp`: the
+existing fakes never write a track file, so they cannot exercise the track-file
+cache path at all. Pick the canonical entry point decided in D6.
+
+*Proof*: `devtools::test()` shows T1–T5, T7 and T8 red, T6 green, everything
+else unchanged.
+
+**WP0.3 Make the dependency guards real.**
+Add `eggstract` and `protoscribe` to `Suggests` and `Remotes`, add `RoxygenNote`,
+and add them to the CI `extra-packages:` list. Clears two `R CMD check` warnings
+and makes the companion code paths testable.
+
+*Proof*: `R CMD check` no longer reports the undeclared-namespace warnings.
+
+**Gate 0**: baseline CSV committed; T1–T6 written and behaving as specified;
+`devtools::test()` otherwise green.
+
+---
+
+### Phase 1 — Correctness (est. 1.5 days)
+
+**WP1.1 `serve()` accepts a `lazy_segment_list`** (S4).
+In `R/reindeer_serve.R`, immediately after `emuDBhandle <- get_emuDBhandle(corpus)`
+(line 64) and before the `if (is.null(seglist))` block at line 71, collect lazy
+input: `if (S7::S7_inherits(seglist, lazy_segment_list)) seglist <- collect(seglist)`.
+Fixes the package's own example at `:38` and four documented call sites.
+*Proof*: T3. *Risk*: collection now happens at serve time; that matches the docs.
+
+**WP1.2 Autosync detects the mandated metadata file** (X3, E3 partly).
+`R/reindeer_autosync.R:224-229` scans `pattern = "^\\.meta_json$"` only. Add a
+second `list.files()` call built from `metadata.filename`
+(`R/metadata_core.R:12`) and concatenate. *Proof*: T4.
+
+**WP1.3 Autosync stops rewriting state on no-op scans** (E3).
+Move `save_sync_state(db_handle, state)` (`:197`) below the
+`if (length(changed) == 0) return(NULL)` block (`:199-200`), and add an
+`annot_mtimes` map to the state so only files whose mtime moved get hashed
+(hash when the mtime differs *or* the stored checksum is missing, so a
+timestamp-preserving edit still gets caught by the checksum comparison).
+*Proof*: T4 extended — a second no-op call leaves `.sync_state.json`'s mtime
+unchanged.
+
+**WP1.4 Constructor uses the fast metadata gatherer** (E4).
+`R/corpus_class.R:194,199` call `gather_metadata_internal()`; switch both to
+`gather_metadata()` (`R/metadata_core.R:222`), which is parallel, mtime-gated,
+bulk-inserting, and already reads legacy `.meta_json` where `METADATA.json` is
+absent. Its refresh gate tolerates caches without the `metadata_mtime` table
+(`:165-181`, error → refresh). Then delete `gather_metadata_internal()` and
+re-run the metadata tests.
+*Proof*: `test_metadata_optimized.R`, plus a new assertion that the cache after
+`corpus(quick = FALSE)` equals the cache after `load_metadata()`.
+
+**WP1.5 Cache keys identify the DSP function** (X7).
+In `R/tidy_trackdata_helpers.R:81-85`, take the function name as an argument
+instead of `deparse(substitute(...))` on a local variable, and pass it from the
+call site at `:482`. In `R/reindeer_enrich.R:332-336`, add `dsp_fun_name` (already
+in scope, `:88`) to the digest.
+*Proof*: T2. *Risk*: existing cache entries stop matching, so caches go cold on
+upgrade. That is safe (no wrong values), but it must be stated in NEWS.
+
+**WP1.6 Caching works in the 21–100 segment band** (E2).
+Either route cache-enabled calls through `.process_segments_vectorized()`, or
+thread `use_cache` / `cache_conn` / `cache_format` into `.process_parallel_io()`
+(`R/tidy_trackdata_helpers.R:619-620`). Prefer the routing change: it reuses the
+executor that already batches cache I/O, and it is one line plus a test.
+*Proof*: T1 at 50 rows.
+
+**WP1.7 Nested metadata survives the round-trip** (B1).
+Add a list branch to `serialize_metadata_value()` (`R/metadata_core.R:483-499`)
+that stores `jsonlite::toJSON(value, auto_unbox = TRUE)` as `type = "json"`, and
+a matching case in `deserialize_metadata_value()` (`:504-521`). Treat multi-element
+atomic vectors the same way, so `c("a","b")` stops being truncated. Fix the
+recycling assignment at `:435-438` to be explicit about lengths (abort on
+mismatch rather than recycle).
+*Proof*: T5, plus tightened `test_describe.R` cases.
+*Risk*: caches written before the fix hold truncated strings; the documented
+remedy is `load_metadata(corp)`, which rebuilds from `METADATA.json`. Say so in
+NEWS.
+
+**WP1.8 Corpus connections get closed** (B2).
+Register a finalizer when the connection environment is created
+(`R/corpus_class.R`, alongside `.connection = new.env(...)`), or on the corpus
+object, that calls the existing `close_connection()` (`R/corpus_methods.R:444`)
+if the handle is still valid. Keep `close_connection()` public and idempotent.
+*Proof*: a test that creates a corpus, drops it, calls `gc()`, and asserts no
+"call dbDisconnect()" warning is emitted; the baseline test run's trailing
+warning disappears.
+
+**WP1.9 Documented symbols and columns match reality** (B4, B5).
+One sweep, three surfaces:
+- Replace every `superassp::forest` / `ksvF0` / `rmsana` / `dftSpectrum`
+  reference with the canonical name from D6 (`trk_formant_forest` and friends)
+  across `README.md`, `vignettes/*.Rmd`, and the roxygen blocks in
+  `R/corpus_class.R`, `R/reindeer_enrich.R`, `R/segment_list_classes.R`,
+  `R/segment_list_pivot.R`, `R/segment_list_quantify.R`.
+- Check the parameters the docs pass (`nominalF1`, `windowSize`, `numFormants`)
+  against the formals of the chosen function, and correct or drop them.
+- Replace `label` with `labels` in `README.md`,
+  `vignettes/getting_started.Rmd`, `vignettes/interactive_annotation.Rmd`, and
+  `man/query.Rd`'s `@return`.
+*Proof*: T7 and T8 green; the README workflow runs end to end on
+`demo_corpus()` (add it as T6's second half).
+*Risk*: superassp's API may move again; T7 is the guard, and D6 decides whether
+to add a reindeer-side alias layer instead of tracking upstream names.
+
+**Gate 1**: T1–T5, T7, T8 green, full suite green, `R CMD check` no worse than
+baseline, zero occurrences of the RSQLite finalizer warning in the test log, and
+the README workflow running verbatim on `demo_corpus()`.
+
+---
+
+### Phase 2 — Energy (est. 2 days)
+
+Worker policy first, per-call I/O second. Every item reports a before/after
+number from `benchmark_core.R`.
+
+**WP2.1 One worker policy for the package** (E1, D4).
+Add a helper (e.g. `R/parallel_utils.R`) exposing
+`.reindeer_workers(n_units, requested = NULL)`, which returns 1 when
+`n_units < 2`, otherwise `min(requested %||% getOption("reindeer.workers") %||%
+<current default>, n_units)`. Use it at every site, and skip the parallel branch
+entirely when it returns 1:
+
+| Site | Current trigger | Change |
+|---|---|---|
+| `R/segment_list_quantify.R:222-236` | >20 rows | require `> 100` rows *or* `n_units > 1`; clamp |
+| `R/tidy_trackdata_helpers.R:629-650` | always in that executor | clamp to `length(file_groups)` |
+| `R/reindeer_enrich.R:298-300` | `.parallel` on any size | skip when bundles == 1; clamp |
+| `R/corpus_database.R:17,88` | >10 bundles | clamp to `nrow(sessions_bundles)` |
+| `R/metadata_core.R:326-332` | >50 files | already capped at 4; add clamp |
+| `R/reindeer_corpus_config.R:619-640` | dead code | delete (`process_bundles()` has no callers anywhere) |
+
+Consider `future::multicore` on POSIX when the caller has not pinned workers:
+fork avoids re-loading namespaces per worker, which is most of the 1.13 s.
+Keep the plan restore in `on.exit` either way.
+*Proof*: benchmark CSV shows the spawn cost gone for small jobs; suite green.
+*Risk*: a genuinely large corpus could get fewer workers than before — hence
+clamp-to-units rather than a hard cap, plus the option.
+
+**WP2.2 `enrich(corpus)` uses the batched cache** (E7).
+Replace the per-bundle `.get_persistent_cache()` / `.set_persistent_cache()`
+calls (`R/reindeer_enrich.R:338,356`) with the batched helpers
+(`R/tidy_trackdata_helpers.R:372-460`) — one transaction, one eviction pass, no
+`SELECT SUM(size_bytes)` per insert.
+*Proof*: T1 extended to `enrich(corpus)` on a 2-bundle corpus; identical results
+with cache on and off.
+
+**WP2.3 `serve()` streams media** (E6).
+Treat `bytes=0-` as `0..size-1` so it uses the existing `206` streaming branch
+(`R/reindeer_serve.R:236`, helper at `:849`) instead of `readBin` of the whole
+file. *Proof*: responses are byte-identical for the same range requests
+(compare digests in a test against a small fixture file).
+
+**WP2.4 Fixed I/O costs** (E8). Each is small and independently verifiable:
+
+- `R/interop_textgrid.R:19` — sniff the BOM with `readBin(..., n = 4)`.
+- `R/query_parser.R:1417`, `R/corpus_describe.R:25` — reuse `corpus@config`
+  instead of re-parsing `_DBconfig.json`.
+- `R/reindeer_serve.R:614` — hash the in-memory JSON, not the file just written.
+- `R/tidy_trackdata_helpers.R:221` — keep a running cache-size total instead of
+  walking the directory on connection open.
+- `R/segment_list_quantify.R:151-158` — fetch only the needed metadata rows,
+  reusing the parameterised query at `R/reindeer_enrich.R:252-271`.
+- `R/dsp_parameters_public.R:38`, `R/reindeer_enrich.R:453` — memoise the DSPP
+  tibble.
+
+**WP2.5 Incremental cache rebuild** (E5). The riskiest item; do it last in the
+phase. Stop unlinking the cache (`R/corpus_database.R:56-57`); upsert per bundle
+keyed on the stored `md5_annot_json` (`:172`, written at `:309`, `:515`); delete
+cache rows for bundles/sessions that no longer exist on disk; hash the bytes
+already read for parsing instead of a second read; keep an explicit
+`rebuild = TRUE` escape hatch for suspected corruption.
+*Proof*: new test — build twice → identical table row counts and identical
+content; delete a bundle directory → its rows are pruned; touch one annotation
+file → only that bundle is re-parsed (assert with a parse counter).
+*Risk*: stale cache if a file changes without a new mtime. Mitigate by comparing
+the stored checksum, as in WP1.3.
+
+**Gate 2**: benchmark CSV with before/after for every item; suite green; no
+change in any measured value.
+
+---
+
+### Phase 3 — Performance (est. 2–3 days)
+
+**WP3.1 Navigation queries become set operations** (P1, P2).
+Replace the per-segment loop in `scout_dt()` (`R/reindeer_sequence_ops_optimized.R:213-306`)
+with one non-equi keyed join per call, and scope the `labels` / `items` / `links`
+reads to the ids in hand (`:188-203`, `:425-440`, `:604`) instead of whole tables.
+Preserve `ignore_bundle_boundaries`, `capture`, `steps_forward` semantics exactly.
+*Proof*: before the change, capture current outputs for a matrix of
+scout/ascend/descend calls on the ae corpus into a fixture; after, compare
+identical. Gate: `test_query_optimized.R`, `test_lazy_segment_list.R`,
+`test_provenance.R`, `test_lazy_chain.R` green.
+*Risk*: the join must reproduce the boundary rule; the fixture comparison is the
+guard.
+
+**WP3.2 One connection per query** (P3, P4).
+Thread the connection from `query()` / `collect_lazy_impl()` into
+`deduce_item_times()` (`R/query_parser.R:1499`) rather than opening a third, and
+memoise a level/attribute map per connection environment to replace the probes in
+`.resolve_level_attribute()` (`:394-407`). Also reuse the built `list(sql, params)`
+from plan time instead of rebuilding it in `build_sql_from_parts()`.
+*Proof*: query parity suite; benchmark delta.
+
+**WP3.3 Eager compound queries use the SQL builders** (P7, P9).
+Make `execute_conjunction_query()` (`:876-886`) and
+`execute_disjunction_query()` (`:899-903`) reuse `build_conjunction_query_sql()`
+/ `build_disjunction_query_sql()` (one statement, parameters instead of spliced
+literals). *Proof*: `test_query_optimized.R` parity vs emuR; a test asserting
+identical results for the eager and lazy paths.
+
+**WP3.4 Assemble results without per-row groups** (P6, P8, P10).
+Vectorise the row expansion in `R/tidy_trackdata_helpers.R:580-612`, `:143-170`,
+`:684-701`; replace `as.data.frame()` / `merge()` in the quantify driver
+(`R/segment_list_quantify.R:100,147,170,174,262`) with keyed joins on the needed
+columns; digest distinct parameter lists once (`R/tidy_trackdata_helpers.R:483-485`).
+*Proof*: quantify and pivot tests; benchmark delta.
+
+**WP3.5 Per-file DSP calls** (P5) — only if WP3.1–3.4 are green.
+Issue one `do.call()` per signal file with recycled `listOfFiles` and vector
+`beginTime`/`endTime` (sites: `R/tidy_trackdata_helpers.R:138-141`, `:535-538`,
+`:669-672`, `R/reindeer_enrich.R:348-351`).
+*Proof*: hard gate — identical values to the per-segment path on a fixed fixture
+covering `.at` grids, all DSPs used in the tests, and both cached and uncached
+runs. If any column differs, abandon this item and record why; the other phase-3
+items stand on their own.
+
+**Gate 3**: benchmark CSV showing the improvement for WP3.1–3.4; parity suite
+green; WP3.5 either green or explicitly abandoned with the diff recorded.
+
+---
+
+### Phase 4 — Standards (est. 1.5 days)
+
+**WP4.1 `R CMD check` to zero warnings.**
+- Non-ASCII in `R/segment_list_pivot.R`.
+- Non-portable filenames: `inst/praat/praatdet/examples/*` disappear with WP6.3;
+  decide `tests/signalfiles/EGG/Session 1|2` separately (if the spaces are
+  deliberate path-handling coverage, rename and add a targeted test that creates
+  a spaced path at runtime).
+- Rd defects: `ascend_to` usage/`...`, the four `enrich.*` /
+  `quantify.lazy_segment_list` usage-without-alias pages, `print.lazy_segment_list`
+  `preview` argument, the `list_cache_files` link in `inspect_cache.Rd`.
+- Undefined globals: `.data`, `median`, `seg_params`, `seg_params_digest`,
+  `.cache_status` — `importFrom(stats, median)` plus `utils::globalVariables()`
+  for the data.table column names.
+- The partial-argument match in `browse_corpus_gadget` (`session` →
+  `session_pattern`).
+
+*Proof*: `devtools::check()` output clean; keep the log in the PR description.
+
+**WP4.2 Examples execute.** Convert the 39 capability-light `@examplesIf
+interactive()` blocks (of 46 total) to `@examplesIf requireNamespace(...)` gates,
+rewrite the 17 blocks that use placeholder paths to `demo_corpus()`, use the
+canonical DSP names from WP1.9, and add examples to the ten most-used
+undocumented verbs (`collect`, `glimpse`, `enrich.corpus`,
+`quantify.lazy_segment_list`, `nest_by_*`, `derive_dsp_parameters`,
+`extended_segment_list`).
+*Proof*: the count of examples executed by `R CMD check` rises from 3 to ≥30;
+check time stays under ~2× baseline (measure once).
+
+**WP4.3 Error reporting matches the package's stated goal** (S5).
+Replace the 13 catch-all `error = function(e) NULL` sites (list in the assessment)
+with classed warnings that name what failed, keeping a `NULL` only where a
+documented fallback exists. *Proof*: existing error-message tests extended; no
+new warnings in the suite.
+
+**WP4.4 Deprecation policy** (S6).
+Either add lifecycle badges plus `@deprecated` to `add_metadata()` and
+`gather_metadata()`, or drop the word "deprecated" from the vignette text. Pick
+one; do not leave the mismatch.
+
+**Gate 4**: `R CMD check` = 0 ERROR / 0 WARNING / 0 NOTE (or a written
+justification for any surviving NOTE); example execution count recorded.
+
+---
+
+### Phase 5 — Documentation, vignettes, site (est. 2 days)
+
+**WP5.1 Vignettes run.** Replace the global `REINDEER_EVAL_VIGNETTES` gate with
+per-chunk capability gates (`requireNamespace()`), and replace the placeholder
+corpora with `demo_corpus()`: 10 placeholders in `interactive_annotation.Rmd`,
+2 in `getting_started.Rmd`, 1 each in the other four.
+*Proof*: `devtools::build_vignettes()` locally renders all six with real output;
+add the CI job that executes them.
+
+**WP5.2 Correct the stale claims** (V3, B4): the "deprecated alias" wording (also
+WP4.4), `describe_corpus()`'s artifact count (five, not three), the
+`explain()`/DOI roadmap promises, the internal `corp@.cache_dir` reference in
+`cache_management.Rmd:78`, and any `label` wording that WP1.9 did not already
+catch (re-run T8 after every doc edit).
+
+**WP5.3 Re-cut the vignettes** (V4):
+1. `getting_started` — tighten, end on a real printed result.
+2. `speaker-aware_measurement` (new) — metadata → `dsp_parameters()` →
+   `quantify()` with `.at` → cache status column. This is the differentiator.
+3. `metadata_management` — keep, fix claims, show the Excel round-trip.
+4. `fairest_artifacts` (new) — `describe_corpus()`, the five emitted files, CMDI
+   validation. Currently one section; it is the archival selling point.
+5. `lazy_and_provenance` — keep, real output.
+6. `interactive_annotation` — cut to ~150 lines, one end-to-end serve/review/save
+   example.
+Retire `end_to_end_pipeline` if the companion packages cannot be installed in
+CI; otherwise keep it as the one place that shows all four integrations.
+
+**WP5.4 Reference pages** (D1–D3): fix the leaked link definitions at
+`man/query.Rd:83-85` (escape the brackets in `R/query_executor.R:57`), document
+`with =` and `corpus_obj =` in `man/enrich.Rd`, replace the obsolete
+`quantify(segs, corpus, tracks = "fm")` example in `man/segment_list.Rd`, and give
+the internal-bucket pages a usage-first pass.
+
+**WP5.5 Site hygiene** (PD1–PD5): move `VIGNETTES_SUMMARY.md` and
+`CMDI_VALIDATION.md` into `dev/`; add `rm -f docs/CLAUDE.html` to the pkgdown
+workflow (pkgdown renders every root `*.md`, `.Rbuildignore` notwithstanding);
+add a "Deprecated and moved" reference section; add the three capability pillars
+to the landing page; add an `og:image`; fix the README citation version and make
+`inst/CITATION` read `meta$Version`.
+
+**Gate 5**: local `pkgdown::build_site()` produces a site with no internal pages,
+articles showing real output, and no leaked markup; `R CMD check` still clean.
+
+---
+
+### Phase 6 — Deletions and closure (est. 1 day)
+
+**WP6.1 Delete dead corpus-config helpers.** `R/reindeer_corpus_config.R` has 26
+top-level functions; only `load_DBconfig`, `store_DBconfig` and `create_ae_db`
+have callers. Remove the other 23 (none are exported, none appear in `man/` or
+`tests/`), including the dead PSOCK `process_bundles()`.
+*Proof*: reachability scan rerun after deletion; suite and check green.
+
+**WP6.2 Delete unreachable autosync wrappers** (X2) or move the two test-only
+ones into `tests/testthat/`. The session writer hardcodes `.meta_json`
+(`R/reindeer_autosync_wrappers.R:106`), contradicting the mandated filename, so
+it should not survive in the package body.
+
+**WP6.3 Delete the unused vendored Praat assets** (X6, D3): `inst/praat`,
+`inst/praat/praatdet`, `inst/pymomelintsint` — 3 MB, no references from R code.
+*Proof*: `grep -rn praat R/` empty; installed size drops; the non-ASCII filename
+warning disappears.
+
+**WP6.4 Delete the remaining leftovers**: `ae()` / `emu_ae()` aliases
+(`R/reindeer_demodata.R:40-41`), the unreachable `tempdir()` cache fallback
+(X5), and the four `.Rbuildignore` families that match deleted files.
+
+**WP6.5 Repo hygiene** (S9): fix the eight dead pointers in `CLAUDE.md`, move
+`tests/*.md` dev notes to `dev/`, drop the stale `R/deprecated` / `R/*DELETE*`
+patterns from `codecov.yml`.
+
+**WP6.6 Close out.** Full `R CMD check` *with* vignettes and manual (no
+`--no-manual --no-vignettes`), site build, final benchmark table, NEWS entry
+covering: worker policy change, cache-key change (expect cold caches), metadata
+serializer fix (how to refresh), example/vignette execution, deletions.
+
+**Gate 6**: all invariants hold; benchmark table shows the energy and performance
+deltas; NEWS written.
+
+## 5. Verification matrix
+
+| Change | Primary test | Secondary evidence |
+|---|---|---|
+| serve lazy (WP1.1) | T3, `test_serve.R` | four doc examples run in vignettes |
+| autosync (WP1.2, WP1.3) | T4 + mtime assertion | `test_autosync.R` |
+| gatherer switch (WP1.4) | cache equality test | `test_metadata_optimized.R` |
+| cache keys (WP1.5) | T2 | cold-cache note in NEWS |
+| cache band (WP1.6) | T1 at 50 rows | `test_quantify_segment_list.R` |
+| metadata serializer (WP1.7) | T5 | tightened `test_describe.R` |
+| connection lifetime (WP1.8) | gc test | no RSQLite warning in test log |
+| documented symbols/columns (WP1.9) | T7, T8 | README runs verbatim on `demo_corpus()` |
+| worker policy (WP2.1) | benchmark CSV | suite runtime |
+| enrich batching (WP2.2) | T1 for `enrich(corpus)` | cache hit counts |
+| streaming media (WP2.3) | byte-equality test | `test_serve.R` |
+| incremental rebuild (WP2.5) | rebuild-equivalence test | cache build timing |
+| navigation joins (WP3.1) | fixture comparison | benchmark delta |
+| connections/level map (WP3.2–3.3) | `test_query_optimized.R` | emuR parity |
+| assembly (WP3.4) | quantify/pivot tests | benchmark delta |
+| per-file DSP (WP3.5) | bit-comparison fixture | abandon if mismatch |
+| check cleanup (WP4.1) | `devtools::check()` | check log |
+| examples (WP4.2) | example count | check runtime |
+| vignettes (WP5.1) | `devtools::build_vignettes()` | rendered HTML in `docs/` |
+| site (WP5.5) | local site build | no `CLAUDE.html` |
+
+## 6. Risk register
+
+| Risk | Where | Mitigation |
+|---|---|---|
+| Cache invalidation surprises users after WP1.5/WP1.7 | quantify/enrich caches | cold caches are safe; document refresh path in NEWS |
+| Parallel default change makes a large job slower | WP2.1 | clamp to work units, not a constant; `options(reindeer.workers)`; benchmark a large corpus before merging |
+| Incremental rebuild serves stale rows | WP2.5 | checksum comparison, per-bundle pruning, `rebuild = TRUE` escape hatch |
+| Navigation rewrite changes boundary semantics | WP3.1 | fixture comparison over a call matrix before and after |
+| Per-file DSP batching changes values | WP3.5 | hard bit-comparison gate; abandon otherwise |
+| Metadata serializer change alters stored types for existing fields | WP1.7 | only list/multi-element values change type; regression test on scalars, vectors and lists |
+| Deleting dead helpers breaks an unseen caller | WP6.1–6.4 | unexported, no man/test references; rerun the reachability scan and the full suite |
+| Vignette execution slows CI | WP5.1 | capability gates keep DSP chunks out of the default job; measure once |
+
+## 7. Definition of done
+
+| Area | Done means |
+|---|---|
+| Power | ≤2 worker-spawn sites remain, both clamped to work units; per-call corpus hashing gated by mtime; benchmark CSV shows the deltas |
+| Performance | navigation is join-based with a benchmark delta; parity suite green |
+| Standards | `R CMD check` 0/0/0 with vignettes included; worktree clean |
+| Vignettes | six render with executed output locally and in CI |
+| Documentation | every export either has an example or a written reason not to; the 90/10 rule holds on the pages in the reference index; every documented symbol and column exists (T7, T8) |
+| Superseded code | dead helpers, unreachable wrappers and vendored assets removed; NEWS records the deletions |
+| pkgdown | no internal pages published; articles show output; index covers deprecations |
+
+## 8. Execution checklist
+
+```
+Phase 0  [ ] benchmark_core.R + CSV   [ ] T1-T8 written (T1-T5,T7,T8 red)   [ ] Suggests/CI deps
+Phase 1  [ ] serve lazy  [ ] autosync pattern  [ ] autosync mtime  [ ] fast gatherer
+         [ ] cache keys  [ ] cache band  [ ] metadata serializer  [ ] connection finalizer
+         [ ] doc symbols + columns (B4, B5)
+Phase 2  [ ] worker policy (- process_bundles)  [ ] enrich batching  [ ] streamed media
+         [ ] fixed I/O costs  [ ] incremental rebuild
+Phase 3  [ ] scout/ascend/descend joins  [ ] one connection + level map  [ ] eager SQL
+         [ ] assembly vectorisation  [ ] per-file DSP (optional)
+Phase 4  [ ] check warnings to zero  [ ] examples execute  [ ] error reporting  [ ] deprecation policy
+Phase 5  [ ] vignettes execute  [ ] stale claims  [ ] vignette re-cut  [ ] reference pages  [ ] site hygiene
+Phase 6  [ ] dead helpers  [ ] autosync wrappers  [ ] Praat assets  [ ] leftovers  [ ] repo hygiene  [ ] close-out
+```
