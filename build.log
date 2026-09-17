@@ -3,3 +3,9 @@
 * checking DESCRIPTION meta-information ... OK
 * cleaning src
 * installing the package (it is needed to process help pages)
+* saving partial Rd database
+* creating vignettes ... OK
+* cleaning src
+* checking for LF line-endings in source and make files and shell scripts
+* checking for empty or unneeded directories
+* building ‘reindeer_1.1.1.tar.gz’

@@ -337,3 +337,66 @@ Meanwhile the workarounds stand and `R CMD build` passes. Treat B2 and B3 as
 four independent attempts have now failed to reproduce it. The next person
 should spend their effort on capturing the state, not on editing the
 export path.
+
+
+# Round 3 - this log has no issues; the plan moves to the next gate
+
+Line by line, the log is all-informational:
+
+    1  checking for file 'DESCRIPTION' ... OK
+    2  preparing 'reindeer':
+    3  checking DESCRIPTION meta-information ... OK
+    4  cleaning src                      <- removes object files from a prior compile
+    5  installing the package (needed to process help pages)
+    6  saving partial Rd database        <- normal, part of the Rd step
+    7  creating vignettes ... OK         <- the step that failed in Round 1
+    8  cleaning src
+    9  checking for LF line-endings ...  <- passes silently when clean
+    10 checking for empty or unneeded directories
+    11 building 'reindeer_1.1.1.tar.gz'
+
+Nothing here is an error or a warning. Two things this confirms:
+
+- **Round 1's failure chain is closed** - `creating vignettes ... OK` is the
+  line that used to be `ERROR`.
+- **Step A of Round 2 worked** - the four `Removed empty directory` lines are
+  gone, because the empty residue directories were deleted rather than
+  papered over.
+
+So `R CMD build` is green end to end. There is nothing in this log to amend.
+
+## What that implies for the plan
+
+A clean build is the *precondition* for the next gate, not the end of the
+work. The remaining items do not appear in a build log at all, which is the
+point to be explicit about:
+
+| Item | Visible in a build log? | Where it shows up |
+|---|---|---|
+| B2/B3 build-only defects (bracket read, export) | **no** - they only fire inside the build's own vignette render, and four attempts have failed to reproduce them | needs the state capture described in Round 2, not a build run |
+| superassp >= 3.0.0 | no | its own install log (SPTK headers) |
+| protoscribe | no | its own install log (retired `qs`) |
+| documentation warnings | no - those are `R CMD check`'s job | `R CMD check` |
+
+## The next gate: R CMD check
+
+Since the build is clean, the informative next run is:
+
+    R CMD build .            # produces the tarball (green, per this log)
+    R CMD check reindeer_1.1.1.tar.gz
+
+What to expect, from this session's earlier check run:
+
+- **1 WARNING**, documentation-only, from the `\usage`/`\arguments`
+  family. Everything else was cleared from a baseline of 7 WARNING + 1 NOTE.
+- **The vignette step will run under check too**, with the same two chunks
+  gated - so a green check does not mean B2/B3 are fixed, only that their
+  workarounds hold under check as well as build.
+
+Priority order from here, unchanged in substance:
+
+1. Capture the cache state for B2/B3 (the SQLite queries are in Round 2).
+2. Provide SPTK, reinstall superassp - closes D6, the erodex sweep, the
+   gated simulation section, and enables the version pin.
+3. Chase the remaining `\usage` warning down to zero, if a clean check is
+   wanted.
