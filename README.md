@@ -61,8 +61,8 @@ data <- enrich(formants, corp)
 # 4. Summarise with dplyr
 data |>
   group_by(labels, Gender) |>
-  summarise(mean_F1 = mean(F1, na.rm = TRUE),
-            mean_F2 = mean(F2, na.rm = TRUE),
+  summarise(mean_F1_Hz = mean(F1_Hz, na.rm = TRUE),
+            mean_F2_Hz = mean(F2_Hz, na.rm = TRUE),
             .groups = "drop")
 ```
 
