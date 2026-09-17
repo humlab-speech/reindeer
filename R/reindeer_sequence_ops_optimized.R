@@ -387,6 +387,7 @@ ascend_to <- S7::new_generic("ascend_to", ".segments")
 
 #' Ascend method for segment_list
 #' @rdname ascend_to
+#' @usage NULL
 #' @name ascend_to.segment_list
 S7::method(ascend_to, segment_list) <- function(.segments, level,
                                                   .from = NULL,
@@ -400,6 +401,7 @@ S7::method(ascend_to, segment_list) <- function(.segments, level,
 
 #' Ascend method for lazy_segment_list
 #' @rdname ascend_to
+#' @usage NULL
 #' @name ascend_to.lazy_segment_list
 S7::method(ascend_to, lazy_segment_list) <- function(.segments, level,
                                                        .from = NULL,

@@ -74,6 +74,7 @@ enrich <- S7::new_generic("enrich", "object")
 #' @param .force Force recomputation, bypassing the persistent cache.
 #' @param .verbose,.parallel,.workers,.use_cache,.cache_dir,.cache_format See `?enrich`.
 #' @return The corpus, invisibly.
+#' @usage NULL
 #' @name enrich.corpus
 S7::method(enrich, corpus) <- function(object, .using, ...,
                                        .metadata_fields = c("Gender", "Age"),
