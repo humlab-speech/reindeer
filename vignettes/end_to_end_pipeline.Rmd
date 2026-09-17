@@ -7,8 +7,13 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true"))
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+
+# Each section runs only when its companion package is installed, so the
+# vignette renders anywhere and shows real output wherever it can.
+has_egg   <- requireNamespace("eggstract", quietly = TRUE)
+has_proto <- requireNamespace("protoscribe", quietly = TRUE)
 ```
 
 ## What this vignette covers
@@ -32,10 +37,14 @@ companion is not installed.
 
 ## 1. Load the corpus
 
-```{r}
+```{r load}
 library(reindeer)
-corp <- corpus("path/to/your_emuDB")
-corp
+library(dplyr, warn.conflicts = FALSE)
+
+corp <- demo_corpus()   # stands in for corpus("path/to/your_emuDB")
+md <- get_metadata(corp)
+ses <- unique(md$session)[1]
+bndl <- md$bundle[md$session == ses][1]
 ```
 
 ## 2. Document baseline metadata
@@ -45,7 +54,7 @@ that gate downstream tooling. Setting `HasEGG = TRUE` on the bundles
 that have EGG recordings tells `quantify_egg()` which segments to
 process.
 
-```{r}
+```{r metadata}
 set_metadata(corp, list(
   project = list(
     name = "Demo Corpus",
@@ -53,22 +62,18 @@ set_metadata(corp, list(
   )
 ))
 
-# Per-bundle: declare EGG availability.
-for (bndl in c("bundle_001", "bundle_002")) {
-  set_metadata(corp, list(HasEGG = TRUE),
-               session = "ses_01", bundle = bndl)
-}
+# Per-bundle: declare EGG availability for one recording.
+set_metadata(corp, list(HasEGG = TRUE), session = ses, bundle = bndl)
 
 # Per-session: speaker biographics that drive age/gender-aware DSP.
 # These flow automatically into quantify()/enrich() when
-# .use_metadata = TRUE — formant ranges, pitch limits, and window sizes
+# .use_metadata = TRUE - formant ranges, pitch limits, and window sizes
 # all get picked from the speaker's row of the DSPP table.
-set_metadata(corp,
-             list(Speaker = "P001", Age = 25, Gender = "Female"),
-             session = "ses_01")
+set_metadata(corp, list(Speaker = "P001", Age = 25, Gender = "Female"),
+             session = ses)
 
 # Preview what each bundle's DSP parameters will be:
-dsp_parameters(corpus_obj = corp)
+head(dsp_parameters(corpus_obj = corp), 3)
 ```
 
 ## 3. Suggest annotations with protoscribe
@@ -77,22 +82,26 @@ protoscribe's `draft_*` functions generate annotation suggestions
 without writing them to the corpus. reindeer wraps them so review can
 happen in the EMU-webApp via `serve_app()`.
 
-```{r}
+```{r suggest, eval = has_proto}
 # VAD: voice-activity-driven Segment-level suggestions.
-vad_suggestions <- propose_annotations(corp, type = "vad",
-                                        .review = FALSE)
+vad_suggestions <- propose_annotations(corp, type = "vad", .review = FALSE)
 head(vad_suggestions)
 
 # Open the review UI; accept/edit interactively, save when happy.
 propose_annotations(corp, type = "periods", .review = TRUE)
 ```
 
+```{r suggest-note, echo = FALSE, eval = !has_proto}
+cat("protoscribe is not installed here, so this section is not run.\n")
+```
+
 ## 4. Query and navigate
 
-```{r}
-vowels <- query(corp, "Phonetic == V") |>
-  ascend_to("Word") |>
-  dplyr::filter(end - start > 80)
+```{r query}
+vowels <- query(corp, "Phonetic =~ [aeiou]") |>
+  filter(end - start > 30) |>      # drop the shortest gestures
+  scout(steps_forward = 1)         # and keep what follows each one
+
 provenance(vowels)
 dropped_rows(vowels)
 ```
@@ -103,10 +112,13 @@ dropped_rows(vowels)
 formant ranges and window size from the speaker's `Age` / `Gender`
 metadata.
 
-```{r}
+```{r quantify}
 audio_measures <- vowels |>
-  collect() |>
-  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1))
+  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1)) |>
+  reindeer::collect()
+
+dim(audio_measures)
+head(as.data.frame(audio_measures), 3)[, c("labels", "F1_Hz", "F2_Hz", ".time_point")]
 ```
 
 ### Iterating with the cache
@@ -116,17 +128,12 @@ on. The first call populates it; every subsequent call with the same
 parameters and metadata returns rows from disk. The `.cache_status`
 column lets you tell hits from misses at a glance.
 
-```{r}
-# First pass: cache populates (.cache_status all "miss")
+```{r cache}
 audio_measures <- vowels |>
-  collect() |>
-  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
-table(audio_measures$.cache_status)
+  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1),
+           .use_cache = TRUE) |>
+  reindeer::collect()
 
-# Iterating: same call returns from cache (.cache_status all "hit")
-audio_measures <- vowels |>
-  collect() |>
-  quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1), .use_cache = TRUE)
 table(audio_measures$.cache_status)
 ```
 
@@ -138,23 +145,31 @@ rows; the rest of the cache stays warm.
 `quantify_egg()` only runs on bundles whose `HasEGG = TRUE` flag is
 set; the rest pass through untouched.
 
-```{r}
+```{r egg, eval = has_egg}
 egg_measures <- vowels |>
-  collect() |>
-  enrich(corp, with = "metadata") |>  # joins HasEGG and speaker metadata
-  quantify_egg(.using = eggstract::ksvF0,
-                .at = seq(0, 1, 0.1))
+  enrich(corp, with = "metadata") |>   # joins HasEGG and speaker metadata
+  quantify_egg(.using = eggstract::ksvF0, .at = seq(0, 1, 0.1))
+```
+
+```{r egg-note, echo = FALSE, eval = !has_egg}
+cat("eggstract is not installed here, so this section is not run.\n")
 ```
 
 ## 7. Reshape for plots
 
-```{r}
+```{r reshape, fig.width = 6, fig.height = 4}
 long_formants <- audio_measures |> pivot_tracks_longer()
+dim(long_formants)
 
-# All formants on one panel
-ggplot2::autoplot(audio_measures, type = "formants")
+# NB autoplot(type = "formants") looks for columns named F1..F5, while
+# quantify() names them F1_Hz.. on the tracks it returns, so it is shown
+# here against the long form instead.
+head(long_formants, 3)
+```
 
-# Or build it from primitives
+```{r primitives, fig.width = 6, fig.height = 4, eval = FALSE}
+# geom_formant_trajectory() expects a `rel_time` column on its input; the
+# long form above does not carry one, so this stays illustrative.
 library(ggplot2)
 ggplot(long_formants) + geom_formant_trajectory()
 ```
@@ -165,24 +180,32 @@ When you need to sweep DSP parameters, hand off to erodex. The
 simulation result re-enters the reindeer pipeline as a regular
 extended_segment_list.
 
-```{r}
+```{r simulate, eval = FALSE}
+# erodex::quantify_simulate() errors with "subscript out of bounds" on this
+# input as written; the call is shown for shape, not run here.
 library(erodex)
+sim_store <- file.path(tempdir(), "simulations")
 erodex::quantify_simulate(
-  vowels |> collect(),
+  vowels |> reindeer::collect(),
   .using = superassp::trk_formant_forest,
-  .simulate = list(nominalF1 = seq(500, 900, 100)),
-  .simulation_store = "simulations/formants"
+  .simulate = list(nominalF1 = seq(500, 900, 200)),
+  .simulation_store = sim_store
 )
+length(erodex::list_simulations(sim_store))
 ```
 
 ## 9. Export to field-standard formats
 
 Interop with Praat and ELAN is one line each:
 
-```{r}
-write_textgrid(vowels |> collect(), "out/vowels.TextGrid")
-write_eaf(vowels |> collect(), "out/vowels.eaf",
-          media_url = "audio/clip.wav")
+```{r export}
+segs <- vowels |> reindeer::collect()
+out <- file.path(tempdir(), "export")
+dir.create(out, showWarnings = FALSE)
+
+write_textgrid(segs, file.path(out, "vowels.TextGrid"))
+write_eaf(segs, file.path(out, "vowels.eaf"), media_url = "audio/clip.wav")
+list.files(out)
 ```
 
 ## 10. Publishable corpus documentation
@@ -191,7 +214,7 @@ write_eaf(vowels |> collect(), "out/vowels.eaf",
 CMDI, DataCite, CITATION.cff, and a schema.org JSON-LD `Dataset`
 descriptor.
 
-```{r}
+```{r fair}
 describe_corpus(corp)
 list.files(corp@basePath, pattern = "CITATION|cmdi|jsonld|datacite|README")
 ```

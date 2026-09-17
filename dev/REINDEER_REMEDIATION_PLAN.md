@@ -1127,3 +1127,27 @@ when a DSP run yields no results for a **non-empty** input, the bare
 return is now reported instead of silently handing back the input. It does
 not fire for empty inputs (nothing to report) or for working runs -
 both verified.
+
+### end_to_end_pipeline converts, and three API mismatches fall out
+
+The vignette now renders (37.6 KB) with real output for load, metadata,
+query, quantify, cache, export and FAIR sections, and explicit gates where
+a companion is absent (protoscribe, eggstract). Making it run turned up
+three genuine mismatches between helpers and the data they are handed:
+
+1. **`autoplot(type = "formants")` looks for `F1..F5`** while `quantify()`
+   returns `F1_Hz..`. The package's own plotting helper therefore cannot
+   plot the package's own measurements: "No formant tracks (F1..F5) found
+   to plot."
+2. **`geom_formant_trajectory()` requires a `rel_time` column** that
+   `pivot_tracks_longer()` does not produce ("Column `rel_time` not
+   found").
+3. **`erodex::quantify_simulate()` errors with "subscript out of bounds"**
+   on the call shape the vignette documents - the documented example does
+   not run.
+
+Each is recorded in the vignette at the point it appears and gated so the
+document builds. They are not documentation defects: the helpers and the
+measurements disagree, which is worth fixing on one side or the other - and
+a regression test asserting that quantify() output plots with autoplot()
+would pin whichever side is chosen.
