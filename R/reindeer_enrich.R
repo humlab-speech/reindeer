@@ -502,12 +502,13 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
   if (length(params) == 0L &&
       all(fun_formals %in% c("listOfFiles", "...")) &&
       "..." %in% fun_formals &&
-      isFALSE(getOption("reindeer.norm_warning_shown", FALSE))) {
+      !isTRUE(getOption("reindeer.norm_warning_shown", FALSE))) {
     options(reindeer.norm_warning_shown = TRUE)
     cli::cli_warn(
       c("DSP routine exposes no parameters, so Age/Gender norms are not applied.",
         i = "The wrapper only accepts {.code listOfFiles} and {.code ...}.",
-        i = "superassp >= 3.0.0 exposes the wrapped routine's formals; older builds do not."),
+        i = "superassp >= 3.0.0 exposes the wrapped routine's formals; older builds do not.",
+        i = "Reinstall it from GitHub: {.run remotes::install_github(\"humlab-speech/superassp\")}."),
       class = c("reindeer_metadata_warning", "reindeer_warning"))
   }
 
