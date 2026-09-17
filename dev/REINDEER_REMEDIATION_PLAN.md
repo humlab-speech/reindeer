@@ -1252,3 +1252,25 @@ single highest-value outstanding item: it is unpinnable in DESCRIPTION
 while 2.9.5 is the installed build, but the moment a >= 3.0.0 build is
 present, D6, the erodex failure and the vignette section all close
 together.
+
+### superassp upgrade attempted: failed, still 2.9.5
+
+    before: 2.9.5
+    INSTALL: ERROR: Failed to install 'superassp' from GitHub:
+             ! System command 'R' failed
+    after:  2.9.5
+
+So the umbrella fix - the one that would close D6, the erodex sweep failure
+and the vignette's simulation section together - cannot be applied on this
+machine either. The message is the generic "System command 'R' failed",
+which covers a compile failure or an unmet dependency; re-running without
+`quiet = TRUE` would show which, the same way it did for protoscribe.
+
+Reinstalling with `quiet = FALSE` is the next step for anyone picking this
+up. Nothing was changed by the attempt: the installed version is what it
+was, and no file in this repository was touched.
+
+Worth stating plainly, since two package installs have now failed here in
+different ways: the environment, not the package, is what stands between
+this repository and the remaining fixes. The reindeer side of every one of
+them is either done or written down with a reproduction.
