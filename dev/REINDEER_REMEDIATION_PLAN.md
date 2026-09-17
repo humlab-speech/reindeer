@@ -32,7 +32,7 @@ protoscribe, eggstract, erodex, or superassp.
 | 1 Correctness | done | `83b1f34` |
 | 2 Energy | done | `3a7936e` |
 | 3 Performance | in progress (WP3.1 read scoping done; the join rewrite, connection reuse, eager SQL and assembly vectorisation remain) | see the commit that follows |
-| 4 Standards | in progress: check went from 7 WARNING / 1 NOTE to 2 WARNING / 0 NOTE; the `ascend_to` Rd warnings remain | `14c0467`, `86b9f86` |
+| 4 Standards | one warning left: `R CMD check` is down to a single `\usage`/`\arguments` warning; codoc, examples, tests and the NOTEs are clean | `14c0467` … `a2a073f` |
 | 5 Documentation, vignettes, site | not started | |
 | 6 Deletions and closure | partially done (dead PSOCK helper removed in phase 2) | |
 
@@ -89,6 +89,21 @@ re-litigates them.
   result assembly are all still open, each with its existing gate
   (`test_query_optimized.R` parity for the first two, the quantify/pivot tests
   for the third).
+- **The last check warning is a roxygen move, not a code problem.**
+  `\arguments` must match `\usage` on every page. The S7 generics now declare
+  their own signature (`scout(.segments, ...)`, `quantify(object, ...)`,
+  `ascend_to`, `descend_to`, `enrich`), so the method-only `@param` entries
+  (`steps_forward`, `level`, `.from`, `dsp_function`, `.at`, `.use_cache`, ...)
+  have to move from the generic's block to the family's first method block.
+  Left undone: a script that tried to do it automatically over-reached on
+  `ascend_to` and `descend_to` (it took the whole preceding comment run as one
+  `@param` entry) and was reverted from a pre-run copy. Do it by hand, four to
+  ten lines per family, and re-run the check; an automatic roxygen rewrite needs
+  a parse+diff gate before it writes.
+- **Two deletions remain the maintainer's call**: `inst/praat/praatdet` (a
+  nested git checkout) and `tests/signalfiles` (124 MB, referenced only from an
+  obsolete worktree). Both are excluded from the build meanwhile, so neither
+  ships and neither trips the non-portable-filename check.
 - **Collate matters.** Adding `R/parallel_utils.R` broke `R CMD INSTALL`
   ("files missing from Collate field") while `devtools::test()` stayed green,
   because `load_all()` ignores Collate. Run `devtools::document()` whenever a
