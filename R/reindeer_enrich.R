@@ -53,11 +53,7 @@ NULL
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #' enrich(segs, corp)                              # metadata join
 #' enrich(segs, .using = superassp::trk_formant_forest)        # delegates to quantify()
-#' @usage
-#' enrich(object, .using = NULL, ..., .metadata_fields = NULL, .force = FALSE,
-#'   .parallel = TRUE, .workers = NULL, .use_cache = TRUE, .cache_dir = NULL,
-#'   .cache_format = c("auto", "qs", "rds"), .signal_extension = NULL,
-#'   .verbose = FALSE)
+#' @usage enrich(object, ...)
 #' @export
 enrich <- S7::new_generic("enrich", "object")
 

@@ -4,10 +4,7 @@
 \alias{enrich}
 \title{Add DSP tracks or metadata to a corpus or segment list}
 \usage{
-enrich(object, .using = NULL, ..., .metadata_fields = NULL, .force = FALSE,
-  .parallel = TRUE, .workers = NULL, .use_cache = TRUE, .cache_dir = NULL,
-  .cache_format = c("auto", "qs", "rds"), .signal_extension = NULL,
-  .verbose = FALSE)
+enrich(object, ...)
 }
 \arguments{
 \item{object}{A \code{corpus} (run DSP corpus-wide) or \code{segment_list} /
