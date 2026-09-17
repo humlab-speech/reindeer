@@ -7,12 +7,12 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment  = "#>",
-  eval     = identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true")
-)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+
+# The measurement chunks need a signal-processing companion; the rest runs on
+# the corpus bundled with the package, so this vignette works offline.
+eval_dsp <- requireNamespace("superassp", quietly = TRUE)
 ```
 
 ## What reindeer does for you
@@ -29,22 +29,22 @@ any tidy dataset:
   know.
 
 This vignette shows the five-minute version of that loop, then expands
-each step.
+each step. Everything below runs against the demo corpus that ships with
+the package.
 
-## Installation
-
-```{r}
+```{r install, eval = FALSE}
+# Installation
 remotes::install_github("humlab-speech/reindeer")
 library(reindeer)
 ```
 
 ## Five-minute workflow
 
-```{r}
+```{r workflow}
 library(reindeer)
 library(dplyr)
 
-corp <- corpus("path/to/your_emuDB")
+corp <- demo_corpus()
 
 # 1. Query vowels
 vowels <- query(corp, "Phonetic =~ [aeiou]")
@@ -56,10 +56,10 @@ formants <- quantify(vowels, superassp::trk_formant_forest, .at = 0.5)
 data <- enrich(formants, corp)
 
 # 4. Summarise
-data |>
-  group_by(labels, Gender) |>
-  summarise(mean_F1 = mean(F1, na.rm = TRUE),
-            mean_F2 = mean(F2, na.rm = TRUE),
+reindeer::collect(data) |>
+  group_by(labels) |>
+  summarise(mean_F1_Hz = mean(F1_Hz, na.rm = TRUE),
+            mean_F2_Hz = mean(F2_Hz, na.rm = TRUE),
             .groups = "drop")
 ```
 
@@ -68,26 +68,33 @@ verb in more detail.
 
 ## Step 1 — Open the corpus
 
-```{r}
-corp <- corpus("path/to/your_emuDB")
+```{r open, eval = FALSE}
+corp <- corpus("path/to/your_emuDB")   # your corpus goes here
 ```
 
-The trailing `_emuDB` is appended automatically if you leave it off.
-If the corpus does not exist yet, pass `create = TRUE`.
+This vignette uses the demo corpus instead, so it runs anywhere:
+
+```{r open-demo}
+corp <- demo_corpus()
+corp
+```
+
+The trailing `_emuDB` is appended automatically if you leave it off. If
+the corpus does not exist yet, pass `create = TRUE`.
 
 ## Step 2 — Query
 
 `query()` understands EMU Query Language (EQL). Common shapes:
 
-```{r}
-query(corp, "Phonetic == t")                       # exact match
-query(corp, "Phonetic =~ [aeiou]")                 # regex
-query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")    # sequence
-query(corp, "[Syllable #== S ^ Phonetic =~ [aeiou]]")    # dominance
+```{r query-shapes, eval = FALSE}
+query(corp, "Phonetic == t")                        # exact match
+query(corp, "Phonetic =~ [aeiou]")                  # regex
+query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]")     # sequence
+query(corp, "[Syllable #== S ^ Phonetic =~ [aeiou]]")     # dominance
 ```
 
 Use `==` for equality (`=` triggers a parse error), `=~` / `!~` for
-regex, and wrap sequences and dominances in `[ ]`. See the
+regex, and wrap sequences and dominances in `[]`. See the
 [EQL grammar](https://ips-lmu.github.io/The-EMU-SDMS-Manual/chap-querysys.html)
 for the full reference.
 
@@ -95,8 +102,8 @@ Results are tidy: each row is one segment with `labels`, `start`, `end`,
 `session`, `bundle`, plus a few bookkeeping columns. You can pipe the
 result through any dplyr verb.
 
-```{r}
-vowels <- query(corp, "Phonetic =~ [aeiou]")
+```{r query-pipe}
+vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 vowels |> filter(end - start > 100) |> count(labels)
 ```
 
@@ -105,39 +112,40 @@ vowels |> filter(end - start > 100) |> count(labels)
 `quantify()` runs a DSP function on each segment and returns one row of
 measurements per segment (or per time point if you pass `.at`).
 
-```{r}
-formants <- quantify(vowels, superassp::trk_formant_forest)                 # midpoint
-contour  <- quantify(vowels, superassp::trk_pitch_ksv, .at = seq(0, 1, 0.1))
-intensity <- quantify(vowels, superassp::trk_rms)
+```{r quantify, eval = eval_dsp}
+formants   <- quantify(vowels, superassp::trk_formant_forest, .at = 0.5)
+contour    <- quantify(vowels, superassp::trk_pitch_ksv, .at = seq(0, 1, 0.1))
+intensity  <- quantify(vowels, superassp::trk_rms)
+head(formants)
 ```
 
 By default reindeer chooses age- and gender-aware parameters from each
 speaker's metadata (think: smaller windows for children, lower expected
-F1 for adult males). Preview what's being chosen with
+F1 for adult males). Preview what is being chosen with
 `dsp_parameters()`:
 
-```{r}
-dsp_parameters(age = 8, gender = "Male")
-dsp_parameters(corpus_obj = corp)   # one row per bundle
+```{r dsp-params, eval = eval_dsp}
+dsp_parameters(age = 8,  gender = "Male")
+dsp_parameters(age = 45, gender = "Female")
 ```
 
 Override anything explicitly through `...`:
 
-```{r}
+```{r quantify-override, eval = FALSE}
 quantify(vowels, superassp::trk_formant_forest,
          nominalF1 = 500, windowSize = 20, numFormants = 4)
 ```
 
 ### Caching results
 
-Slow DSP runs are worth caching. Turn it on once and reindeer will skip
-work that's already on disk:
+Slow DSP runs are worth caching. Turn it on once and reindeer skips work
+that is already on disk:
 
-```{r}
-formants <- quantify(vowels, superassp::trk_formant_forest, .use_cache = TRUE)
-formants$.cache_status   # "hit" / "miss" per row
-
-inspect_cache(corp)      # see what's stored
+```{r cache, eval = eval_dsp}
+formants <- quantify(vowels, superassp::trk_formant_forest,
+                     .at = 0.5, .use_cache = TRUE)
+table(formants$.cache_status)   # "hit" / "miss" per row
+inspect_cache(corp)             # see what's stored
 ```
 
 ## Step 4 — Add speaker metadata
@@ -146,26 +154,27 @@ inspect_cache(corp)      # see what's stored
 metadata onto the segments; with `.using = fn` it forwards to
 `quantify()`.
 
-```{r}
+```{r enrich, eval = eval_dsp}
 data <- enrich(formants, corp)              # metadata join (default)
+names(data)
 ```
 
-To set metadata in the first place, use `set_metadata()`:
+To set metadata in the first place, use `set_metadata()`. The three
+levels form an inheritance chain:
 
-```{r}
-set_metadata(corp, list(Project = "MyStudy"))                       # db level
-set_metadata(corp, list(Age = 25, Gender = "Female"),
-             session = "Session1")                                  # session
-set_metadata(corp, list(Quality = "Good"),
-             session = "Session1", bundle = "Bundle1")              # bundle
+```{r metadata}
+set_metadata(corp, list(Project = "MyStudy"))                  # database
+set_metadata(corp, list(Speaker = "P001", Age = 25,
+                        Gender = "Female"))                    # database-wide
+get_metadata(corp) |> select(session, bundle, Project, Speaker, Age, Gender)
 ```
 
 Bundle wins over session, session wins over database default.
-`load_metadata(corp)` rescans the on-disk `METADATA.json` files into
-the cache when you have edited them outside R. For batch editing,
+`load_metadata(corp)` rescans the on-disk `METADATA.json` files into the
+cache when you have edited them outside R. For batch editing,
 round-trip through Excel:
 
-```{r}
+```{r metadata-excel, eval = FALSE}
 export_metadata(corp, "metadata.xlsx")        # edit in spreadsheet
 load_metadata(corp, source = "excel", path = "metadata.xlsx")
 ```
@@ -175,29 +184,31 @@ load_metadata(corp, source = "excel", path = "metadata.xlsx")
 Once you have a tibble with measurements and metadata, the rest is
 ordinary R.
 
-```{r}
+```{r plot, fig.width = 6, fig.height = 4, eval = eval_dsp}
 library(ggplot2)
 
-ggplot(data, aes(x = F2, y = F1, color = labels)) +
+reindeer::collect(data) |>
+  ggplot(aes(x = as.numeric(F2_Hz), y = as.numeric(F1_Hz), color = Gender)) +
   geom_point(alpha = 0.5) +
   scale_x_reverse() +
   scale_y_reverse() +
-  facet_wrap(~ Gender) +
   theme_minimal() +
-  labs(title = "Vowel space by gender")
+  labs(title = "Vowel space")
 ```
 
 ## Interactive annotation (optional)
 
 To inspect or edit annotations in a browser-based UI:
 
-```{r}
+```{r serve, eval = FALSE}
 serve_app(corp)                              # whole corpus
-serve_app(corp, seglist = vowels)            # restrict to query result
+serve_app(corp, seglist = vowels)            # restrict to a query result
 serve_app(corp, sessionPattern = "Session0[1-3]")
 ```
 
-Close the tab or run `httpuv::stopAllServers()` to release the port.
+`serve_app()` starts a local EMU-webApp instance and returns; close the
+tab and call `httpuv::stopAllServers()` to release the port. It is not
+evaluated here because it opens a browser and a socket.
 
 ## Lazy pipelines and pipe-loss
 
@@ -205,20 +216,21 @@ Close the tab or run `httpuv::stopAllServers()` to release the port.
 nothing actually runs until you call `nrow()`, `head()`, `collect()`,
 or any data-access method. Filter and navigate freely:
 
-```{r}
+```{r lazy}
 plan <- query(corp, "Phonetic =~ [aeiou]") |>
   filter(labels != "@") |>
   scout(steps_forward = 1) |>      # next phoneme
-  ascend_to("Word")                # parent word
+  ascend_to("Syllable")            # containing syllable
 
-collect(plan)                       # run it
+result <- reindeer::collect(plan)
+nrow(result)
 ```
 
 If a pipeline drops more than 25% of rows reindeer warns. Inspect the
 loss with:
 
-```{r}
-provenance(plan)        # tibble: step / verb / rows_in / rows_out / rows_lost
+```{r provenance}
+provenance(plan)        # step / verb / rows_in / rows_out / rows_lost
 dropped_rows(plan)      # per-step row-loss summary
 dropped(plan)           # cumulative count
 ```
