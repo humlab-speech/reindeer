@@ -8,11 +8,12 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true")
-)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+
+# Every example below starts a local HTTP/WebSocket server and opens a
+# browser, so none are evaluated here: a build must not launch servers or
+# hijack the viewer. Chunks that can safely run opt back in with eval = TRUE.
+knitr::opts_chunk$set(eval = FALSE)
 ```
 
 ## Introduction
@@ -27,13 +28,25 @@ This vignette shows you how to use `serve_app()` for interactive annotation work
 library(reindeer)
 
 # Load your corpus
-corp <- corpus("path/to/database_emuDB")
+corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 
 # Launch the annotation interface
 serve_app(corp)
 ```
 
 The EMU-webApp opens in your browser (or the RStudio Viewer pane) and you can start annotating.
+
+## What gets served
+
+```{r quick-start-query, eval = TRUE}
+corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
+vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
+dim(vowels)
+head(vowels)[, c("session", "bundle", "labels", "start", "end")]
+```
+
+The corpus is narrowed by the arguments shown in the rest of this vignette -
+`sessionPattern`, `bundlePattern`, or a `seglist` from `query()`.
 
 ## Setup and configuration
 
@@ -69,7 +82,7 @@ serve_app(corp)
 ### Annotate entire corpus
 
 ```{r annotate-all}
-corp <- corpus("path/to/database_emuDB")
+corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 
 # Serve all bundles
 serve_app(corp)
@@ -264,7 +277,7 @@ library(reindeer)
 library(dplyr)
 
 # 1. Load corpus
-corp <- corpus("path/to/database_emuDB")
+corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 
 # 2. Find segments that might need review
 #    (e.g., very short segments)
@@ -302,7 +315,7 @@ cat(sprintf("Now %d short segments remain\n", nrow(short_segments_updated)))
 # Analysis → Annotation → Re-analysis cycle
 
 # 1. Initial analysis
-corp <- corpus("path/to/database_emuDB")
+corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 vowels <- query(corp, "Phonetic =~ [aeiou]")
 formants <- quantify(vowels, superassp::trk_formant_forest)
 
@@ -346,7 +359,7 @@ For team annotation projects:
 
 ```{r collaborative}
 # 1. Set up bundle lists for each annotator
-corp <- corpus("path/to/database_emuDB")
+corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 
 # Create bundle lists (one-time setup, using emuR)
 # emuR::write_bundleList(get_emuDBhandle(corp), "Annotator_A", bundles_A)
