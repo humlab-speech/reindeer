@@ -8,13 +8,11 @@
 #' the next [collect()].
 #'
 #' @param object A `segment_list` (eager) or `lazy_segment_list`.
-#' @param ... Forwarded to the DSP function. Values you pass win over
-#'   metadata-derived ones (`nominalF1`, `windowSize`, ...).
-quantify <- S7::new_generic("quantify", "object")
-
 #' @param dsp_function A DSP function. Common choices: `superassp::trk_formant_forest`
 #'   (formants), `superassp::trk_pitch_ksv` (pitch), `superassp::trk_rms`
 #'   (intensity), `superassp::trk_dft_spectrum`.
+#' @param ... Forwarded to the DSP function. Values you pass win over
+#'   metadata-derived ones (`nominalF1`, `windowSize`, ...).
 #' @param .at Relative time points to sample, each in `[0, 1]`. A scalar
 #'   gives one row per segment (e.g. `0.5` for midpoint); a vector
 #'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`).
@@ -58,7 +56,9 @@ quantify <- S7::new_generic("quantify", "object")
 #' @usage quantify(object, ...)
 #' @name quantify
 #' @export
-#' @rdname quantify.segment_list
+quantify <- S7::new_generic("quantify", "object")
+
+#' @rdname quantify
 #' @usage NULL
 #' @name quantify.segment_list
 S7::method(quantify, segment_list) <- function(object, dsp_function, ...,

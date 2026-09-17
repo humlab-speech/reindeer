@@ -2,6 +2,7 @@
 % Please edit documentation in R/segment_list_quantify.R
 \name{quantify}
 \alias{quantify}
+\alias{quantify.segment_list}
 \title{Extract acoustic measurements from segments}
 \usage{
 quantify(object, ...)
@@ -11,6 +12,45 @@ quantify(object, ...)
 
 \item{...}{Forwarded to the DSP function. Values you pass win over
 metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...).}
+
+\item{dsp_function}{A DSP function. Common choices: \code{superassp::trk_formant_forest}
+(formants), \code{superassp::trk_pitch_ksv} (pitch), \code{superassp::trk_rms}
+(intensity), \code{superassp::trk_dft_spectrum}.}
+
+\item{.at}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
+gives one row per segment (e.g. \code{0.5} for midpoint); a vector
+multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}).}
+
+\item{.use_metadata}{Look up DSP parameters from speaker metadata.
+Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
+
+\item{.verbose}{Print a per-step progress summary.}
+
+\item{.parallel, .workers}{Run segments concurrently via a
+multi-session future plan. Default: on, with \code{detectCores() - 1}.}
+
+\item{.use_cache}{Reuse persistent results when the cache key
+matches. Default \code{FALSE}. See \code{\link[=inspect_cache]{inspect_cache()}} for what's stored.
+When enabled, the returned tibble gains a \code{.cache_status} column
+(\code{"hit"} / \code{"miss"}).}
+
+\item{.cache_dir, .cache_format}{Where and how to persist cached
+results.}
+
+\item{.optimize}{Use optimized computation (default \code{TRUE}; turn off
+only for debugging).}
+}
+\value{
+An \link{extended_segment_list}: every column of the input
+\code{segment_list} (see \code{\link[=query]{query()}} for the column inventory), plus one
+column per DSP output column produced by \code{dsp_function} (consult
+the function's own help — for example \code{superassp::trk_formant_forest} adds
+\code{F1}, \code{F2}, \code{F3}, \code{B1}, \code{B2}, \code{B3}). When \code{.at} is a vector, an
+extra \code{.time_point} column records which relative time each row
+came from. When \code{.use_cache = TRUE}, a \code{.cache_status} column
+reports \code{"hit"} or \code{"miss"} per row. The DSP function and its
+added columns are also recorded on the object as the S7 properties
+\verb{@dsp_function} and \verb{@dsp_columns}.
 }
 \description{
 Apply a DSP function (typically from \code{superassp}) to every segment
@@ -20,3 +60,25 @@ speaker metadata (\code{Age}, \code{Gender}) unless overridden through \code{...
 For lazy pipelines \code{quantify()} records the request and runs it at
 the next \code{\link[=collect]{collect()}}.
 }
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+corp <- demo_corpus()
+segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
+
+# Formants at the midpoint
+quantify(segs, superassp::trk_formant_forest, .at = 0.5)
+
+# Pitch contour: 11 evenly spaced points
+quantify(segs, superassp::trk_pitch_ksv, .at = seq(0, 1, 0.1))
+
+# Override metadata-derived parameters
+quantify(segs, superassp::trk_formant_forest, nominalF1 = 500, windowSize = 20)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=enrich]{enrich()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
+
+Other signal:
+\code{\link[=enrich]{enrich()}}
+}
+\concept{signal}

@@ -13,26 +13,14 @@
 #' @include segment_list_classes.R reindeer_lazy_segment_list.R
 NULL
 
+#' Move forward or backward along an annotation level
+#'
+#' Given a `segment_list`, returns the item(s) `steps_forward` positions
+#' away on the same level — typically the previous or next phone, word,
+#' or syllable. Use negative steps to go backward, or `capture > 1` to
+#' grab a run of consecutive items.
+#'
 #' @param .segments A `segment_list` or `lazy_segment_list`.
-#' @usage scout(.segments, ...)
-#' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' stops <- query(corp, "Phonetic =~ [ptk]")
-#' next_phone <- scout(stops, steps_forward = 1)     # following phoneme
-#' prev_two   <- scout(stops, steps_forward = -1, capture = 2)
-#' @seealso [ascend_to()], [descend_to()]
-#' @export
-scout <- S7::new_generic("scout", ".segments")
-
-#' Scout method for segment_list (eager data.table path)
-#' @param .quiet Suppress informational messages.
-#' @param collect Materialise the result (default `TRUE`). With
-#'   `FALSE` the operation is deferred into the lazy plan — note that
-#'   the lazy SQL path for `scout` / `ascend_to` / `descend_to` does
-#'   not yet preserve every derived column (labels, attribute,
-#'   start_item_id, ...), so eager evaluation is the safe default
-#'   until full SQL parity lands.
 #' @param steps_forward Integer offset. `1` = next item, `-1` = previous,
 #'   `2` = item after next.
 #' @param count_from `"START"` (default) or `"END"` — which edge of the
@@ -45,7 +33,26 @@ scout <- S7::new_generic("scout", ".segments")
 #'   move; advanced, defaults are usually right.
 #' @param .from Optional `corpus` (only needed if the segment list lost
 #'   its `db_path`).
-#' @rdname scout.segment_list
+#' @param .quiet Suppress informational messages.
+#' @param collect Materialise the result (default `TRUE`). With
+#'   `FALSE` the operation is deferred into the lazy plan — note that
+#'   the lazy SQL path for `scout` / `ascend_to` / `descend_to` does
+#'   not yet preserve every derived column (labels, attribute,
+#'   start_item_id, ...), so eager evaluation is the safe default
+#'   until full SQL parity lands.
+#' @usage scout(.segments, ...)
+#' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
+#' @examplesIf interactive()
+#' corp <- corpus("path/to/ae_emuDB")
+#' stops <- query(corp, "Phonetic =~ [ptk]")
+#' next_phone <- scout(stops, steps_forward = 1)     # following phoneme
+#' prev_two   <- scout(stops, steps_forward = -1, capture = 2)
+#' @seealso [ascend_to()], [descend_to()]
+#' @export
+scout <- S7::new_generic("scout", ".segments")
+
+#' Scout method for segment_list (eager data.table path)
+#' @rdname scout
 #' @usage NULL
 #' @name scout.segment_list
 S7::method(scout, segment_list) <- function(.segments,
@@ -80,7 +87,7 @@ S7::method(scout, segment_list) <- function(.segments,
 #' `collect()`. The SQL form does not yet preserve every derived column,
 #' so eager remains the safe default.
 #'
-#' @rdname scout.lazy_segment_list
+#' @rdname scout
 #' @usage NULL
 #' @name scout.lazy_segment_list
 S7::method(scout, lazy_segment_list) <- function(.segments,
@@ -350,7 +357,21 @@ retreat <- function(.segments, steps_backward, ...) {
   scout(.segments, steps_forward = -abs(steps_backward), ...)
 }
 
+#' Move up the annotation hierarchy
+#'
+#' Returns the parent item(s) at `level` for every segment in the input.
+#' Follows the dominance links recorded in the corpus, so e.g. ascending
+#' from a phone to `"Word"` gives the containing word, and from a
+#' phone to `"Syllable"` gives the containing syllable.
+#'
 #' @param .segments A `segment_list` or `lazy_segment_list`.
+#' @param level Name of the target level.
+#' @param .from Optional `corpus` (only needed if the segment list lost
+#'   its `db_path`).
+#' @param .quiet Suppress informational messages.
+#' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
+#'   into the lazy plan (see note in [scout()] about partial SQL
+#'   coverage).
 #' @param ... Arguments for the level-specific method (`level`, `.from`,
 #'   `.quiet`, `collect`).
 #' @usage ascend_to(.segments, ...)
@@ -364,14 +385,7 @@ retreat <- function(.segments, steps_backward, ...) {
 ascend_to <- S7::new_generic("ascend_to", ".segments")
 
 #' Ascend method for segment_list
-#' @param level Name of the target level.
-#' @param .from Optional `corpus` (only needed if the segment list lost
-#'   its `db_path`).
-#' @param .quiet Suppress informational messages.
-#' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
-#'   into the lazy plan (see note in [scout()] about partial SQL
-#'   coverage).
-#' @rdname ascend_to.segment_list
+#' @rdname ascend_to
 #' @usage NULL
 #' @name ascend_to.segment_list
 S7::method(ascend_to, segment_list) <- function(.segments, level,
@@ -385,7 +399,7 @@ S7::method(ascend_to, segment_list) <- function(.segments, level,
 }
 
 #' Ascend method for lazy_segment_list
-#' @rdname ascend_to.lazy_segment_list
+#' @rdname ascend_to
 #' @usage NULL
 #' @name ascend_to.lazy_segment_list
 S7::method(ascend_to, lazy_segment_list) <- function(.segments, level,
@@ -533,7 +547,19 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   return(result)
 }
 
+#' Move down the annotation hierarchy
+#'
+#' Returns the child item(s) at `level` for every segment in the input.
+#' Inverse of [ascend_to()]: descending from a word to `"Phonetic"`
+#' gives every phone in that word.
+#'
 #' @param .segments A `segment_list` or `lazy_segment_list`.
+#' @param level Name of the target level.
+#' @param .from Optional `corpus`.
+#' @param .quiet Suppress messages.
+#' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
+#'   into the lazy plan (see note in [scout()] about partial SQL
+#'   coverage).
 #' @param ... Arguments for the level-specific method (`level`, `.from`,
 #'   `.quiet`, `collect`).
 #' @usage descend_to(.segments, ...)
@@ -546,13 +572,7 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 descend_to <- S7::new_generic("descend_to", ".segments")
 
 #' Descend method for segment_list
-#' @param level Name of the target level.
-#' @param .from Optional `corpus`.
-#' @param .quiet Suppress messages.
-#' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
-#'   into the lazy plan (see note in [scout()] about partial SQL
-#'   coverage).
-#' @rdname descend_to.segment_list
+#' @rdname descend_to
 #' @usage NULL
 #' @name descend_to.segment_list
 S7::method(descend_to, segment_list) <- function(.segments, level,
@@ -566,7 +586,7 @@ S7::method(descend_to, segment_list) <- function(.segments, level,
 }
 
 #' Descend method for lazy_segment_list
-#' @rdname descend_to.lazy_segment_list
+#' @rdname descend_to
 #' @usage NULL
 #' @name descend_to.lazy_segment_list
 S7::method(descend_to, lazy_segment_list) <- function(.segments, level,
