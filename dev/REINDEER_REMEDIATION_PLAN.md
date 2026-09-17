@@ -1208,3 +1208,19 @@ same choice.
 Evidence to keep, all measured on the demo corpus: the pivot returns 0x0;
 `autoplot(type = "formants")` aborts on quantified data; the vignette's
 quantified frame has 28 columns including `F1_Hz` and `.time_point`.
+
+### pivot/quantify contract: FIXED (Option A)
+
+`pivot_tracks_longer()` now recognises a `.time_point` column as the time
+axis and strips the unit suffix from the measurement names, so
+quantify(.at = ...) output pivots instead of collapsing to an empty frame.
+Values are coerced to plain numeric in the long table because the
+measurement columns carry a units class that `rbindlist` refuses to mix.
+
+Measured on the demo corpus afterwards: 1296 rows, tracks F1..F3 with a
+`rel_time` of 0-1, `autoplot(type = "formants")` works, and
+`geom_formant_trajectory()` works. test_lazy_quantify.R 7 results and
+test_quantify_segment_list.R 42 results, no failures.
+
+That retires three of the findings above at once - the empty pivot, the
+autoplot abort, and the missing `rel_time`.

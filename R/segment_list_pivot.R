@@ -109,7 +109,35 @@ pivot_tracks_longer <- function(seg,
   pieces <- list()
 
   # Wide-form pivot: one row per (segment, track, rel_time).
-  if (length(wide_cols) > 0L) {
+  #
+  # Two wide shapes reach here. quantify(.at = ...) returns measurement
+  # columns named for the unit (F1_Hz, RMS_dB) alongside a `.time_point`
+  # column, so that column is the time axis and the unit suffix comes off
+  # the name. Columns that instead encode the time in the name
+  # (<track>_<rel_time>) are parsed by .parse_track_name().
+  time_axis <- if (".time_point" %in% names(seg) && is.numeric(seg[[".time_point"]])) {
+    seg[[".time_point"]]
+  } else {
+    NULL
+  }
+
+  if (length(wide_cols) > 0L && !is.null(time_axis)) {
+    wide_cols <- setdiff(wide_cols, ".time_point")
+    if (length(wide_cols) > 0L) {
+      keep_meta_w <- keep_meta
+      base <- tibble::as_tibble(seg[, keep_meta_w, drop = FALSE])
+      stacked <- lapply(wide_cols, function(col) {
+        row <- base
+        row[[names_to]] <- sub("_[A-Za-z]+$", "", col)
+        row[[time_to]] <- time_axis
+        # Measurement columns carry a units class (F1_Hz [Hz]); a long table
+        # wants plain numbers, and rbindlist refuses the mixed attributes.
+        row[[values_to]] <- as.numeric(seg[[col]])
+        row
+      })
+      pieces$wide <- data.table::rbindlist(stacked, use.names = TRUE, fill = TRUE)
+    }
+  } else if (length(wide_cols) > 0L) {
     parsed <- lapply(wide_cols, .parse_track_name)
     valid <- !vapply(parsed, is.null, logical(1))
     if (!all(valid)) {
