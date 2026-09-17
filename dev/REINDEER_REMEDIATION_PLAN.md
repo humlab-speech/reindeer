@@ -1016,3 +1016,33 @@ What is established, without needing to know the mechanism:
 
 Worth noting for whoever picks this up: `quiet = TRUE` hides the reason.
 Re-running with `quiet = FALSE` will show what remotes actually did.
+
+### protoscribe: SOLVED - it is the `qs` dependency, not the repository
+
+Rerunning with `quiet = FALSE, force = TRUE` shows what actually happens:
+
+    Downloading GitHub repo humlab-speech/protoscribe@HEAD
+    Installing 2 packages: RcppTOML, reticulate
+    ERROR: dependency 'qs' is not available for package 'protoscribe'
+    ERROR: package installation failed
+    AVAILABLE: FALSE
+
+Two corrections to the notes above, both mine:
+
+- **The repository is fine.** It downloads. My `curl -sI` returned 404 and I
+  read that as a missing or private repo; the sensible reading was the one I
+  flagged as a caveat and then argued past - GitHub answers 404 to plenty of
+  unauthenticated HEAD requests that later succeed. The URL works.
+- **The cause is a stale dependency.** protoscribe declares `qs`, which is no
+  longer installable for this R (4.6). reindeer made exactly this migration:
+  its serialization moved to `qs2`. protoscribe has not.
+
+So the fix is in protoscribe's DESCRIPTION, not in reindeer and not in this
+machine's credentials: `qs` -> `qs2`. Until that lands, `end_to_end_pipeline`'s
+protoscribe sections cannot run anywhere, and the docs that present
+protoscribe as an installable companion are pointing at a package that is
+currently uninstallable from CRAN dependencies alone.
+
+Worth passing to whoever maintains the companion package. For a workaround on
+this machine: install `qs` from the CRAN archive if a source build succeeds,
+which pins protoscribe to a retired dependency - not recommended as a fix.
