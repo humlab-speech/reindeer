@@ -293,3 +293,47 @@ Not amendable from this repository:
 
 Each step's acceptance is a passing `R CMD build` plus the named test; no
 step requires touching another.
+
+
+## B1 RESULT: both defects are build-environment-only, and now not reproducible at all
+
+Ran the diagnostics in escalating fidelity. Every one passed:
+
+| Run | Issue 1 (bracket read) | Issue 4 (export) |
+|---|---|---|
+| hand-run, `load_all()` | OK, 11 fields | OK |
+| hand-run, **installed** package via `library(reindeer)` | OK, 11 fields | OK |
+| whole vignette rendered outside the build, both chunks re-enabled in a copy | renders, 35 KB | renders |
+| `R CMD build` with the chunk instrumented | build passes (exit 0) | build passes |
+
+The last row is the informative one. The instrumented chunk only (a) called
+`get_metadata(corp)` before the export and (b) wrapped the export in
+`tryCatch`. Nothing about the data changed, and the build went from failing
+to passing.
+
+**What that implies.** The failure is order- or timing-dependent rather than
+a pure function of the corpus contents. The leading hypothesis is now a
+**stale or duplicated metadata cache at the moment of export** - the
+`get_metadata()` call added for diagnosis may itself refresh the very state
+the export then trips over. That also fits the original symptom
+(`colNames must be a unique vector`): a duplicate field name in the cached
+field list would produce exactly that column set.
+
+**Next diagnostic, and it is cheap:** capture the cache state instead of the
+data. In the failing configuration, dump the field list straight from SQLite
+before exporting:
+
+```r
+con <- reindeer::get_connection(corp)
+DBI::dbGetQuery(con, "SELECT field_name, COUNT(*) n FROM metadata_fields GROUP BY field_name HAVING n > 1")
+DBI::dbGetQuery(con, "SELECT field_name, field_level, COUNT(*) n FROM metadata_metadata GROUP BY 1,2 HAVING n > 1")
+```
+
+Two rows in either result names the duplicate and the level it came from,
+which is what a fix has to de-duplicate.
+
+Meanwhile the workarounds stand and `R CMD build` passes. Treat B2 and B3 as
+**not yet actionable**: a fix needs the failing state reproduced first, and
+four independent attempts have now failed to reproduce it. The next person
+should spend their effort on capturing the state, not on editing the
+export path.
