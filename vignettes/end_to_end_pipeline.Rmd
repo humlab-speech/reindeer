@@ -14,6 +14,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 # vignette renders anywhere and shows real output wherever it can.
 has_egg   <- requireNamespace("eggstract", quietly = TRUE)
 has_proto <- requireNamespace("protoscribe", quietly = TRUE)
+has_dsp   <- requireNamespace("superassp", quietly = TRUE)
 ```
 
 ## What this vignette covers
@@ -112,13 +113,17 @@ dropped_rows(vowels)
 formant ranges and window size from the speaker's `Age` / `Gender`
 metadata.
 
-```{r quantify}
+```{r quantify, eval = has_dsp}
 audio_measures <- vowels |>
   quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1)) |>
   reindeer::collect()
 
 dim(audio_measures)
 head(as.data.frame(audio_measures), 3)[, c("labels", "F1_Hz", "F2_Hz", ".time_point")]
+```
+
+```{r dsp-note, echo = FALSE, eval = !has_dsp}
+cat("superassp is not installed here, so the audio-side sections are shown without output.\n")
 ```
 
 ### Iterating with the cache
@@ -128,7 +133,7 @@ on. The first call populates it; every subsequent call with the same
 parameters and metadata returns rows from disk. The `.cache_status`
 column lets you tell hits from misses at a glance.
 
-```{r cache}
+```{r cache, eval = has_dsp}
 audio_measures <- vowels |>
   quantify(superassp::trk_formant_forest, .at = seq(0, 1, 0.1),
            .use_cache = TRUE) |>
@@ -157,14 +162,14 @@ cat("eggstract is not installed here, so this section is not run.\n")
 
 ## 7. Reshape for plots
 
-```{r reshape, fig.width = 6, fig.height = 4}
+```{r reshape, eval = has_dsp, fig.width = 6, fig.height = 4}
 long_formants <- audio_measures |> pivot_tracks_longer()
 dim(long_formants)
 
 ggplot2::autoplot(audio_measures, type = "formants")
 ```
 
-```{r primitives, fig.width = 6, fig.height = 4}
+```{r primitives, eval = has_dsp, fig.width = 6, fig.height = 4}
 library(ggplot2)
 ggplot(long_formants) + geom_formant_trajectory()
 ```

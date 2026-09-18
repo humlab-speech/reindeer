@@ -30,7 +30,8 @@ any tidy dataset:
 
 This vignette shows the five-minute version of that loop, then expands
 each step. Everything below runs against the demo corpus that ships with
-the package.
+the package. The measurement steps additionally need **superassp**; where
+it is not installed those chunks are shown but not executed.
 
 ```{r install, eval = FALSE}
 # Installation
@@ -48,7 +49,9 @@ corp <- demo_corpus()
 
 # 1. Query vowels
 vowels <- query(corp, "Phonetic =~ [aeiou]")
+```
 
+```{r workflow-quantify, eval = eval_dsp}
 # 2. Extract formants at the midpoint
 formants <- quantify(vowels, superassp::trk_formant_forest, .at = 0.5)
 

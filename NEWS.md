@@ -7,11 +7,14 @@
   paths are now wrapped in a single transaction so a rebuild never leaves
   a partially cleared cache.
 
-- Vignettes now use conditional evaluation (`eval =
-  identical(Sys.getenv("REINDEER_EVAL_VIGNETTES"), "true")`), so they
-  still build without the heavy DSP companions in CI but can render real
-  output when the environment variable is set. Fixed stale `.meta_json` /
-  `serve()` references in the interactive-annotation vignette.
+- Vignettes gate evaluation per chunk instead of via the removed global
+  `REINDEER_EVAL_VIGNETTES` switch: the setup chunk of each vignette records
+  which companions are installed (`requireNamespace()`), and every chunk that
+  needs one is marked with the matching flag (`eval_dsp` for superassp,
+  `has_egg`/`has_proto`/`eval_qs2` for eggstract, protoscribe, qs2). The
+  vignettes therefore build and publish without the heavy DSP companions while
+  showing real output wherever those companions are installed. Fixed stale
+  `.meta_json` / `serve()` references in the interactive-annotation vignette.
 
 - Corrected documentation that overstated lazy deferral (`query()` now
   states that plan-time level/attribute resolution and compound sub-query
