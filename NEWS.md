@@ -1,5 +1,11 @@
 # reindeer (development version)
 
+- `Suggests` floors superassp at 3.0.0, the first release whose `trk_*`
+  wrappers expose the wrapped routine's parameters, and CI installs it from
+  `github::humlab-speech/superassp` (its source tree now ships the SPTK headers
+  that earlier source builds stopped on). The DSP tests and the vignette
+  sections that need it therefore run in CI instead of skipping.
+
 - The corpus constructor's metadata gather now honours the legacy
   `<name>.meta_json` fallback (via `.resolve_metadata_file()`) at the
   database, session, and bundle levels, instead of only reading

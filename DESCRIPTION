@@ -48,7 +48,7 @@ Suggests:
     rmarkdown,
     yardstick,
     bigstatsr,
-    superassp,
+    superassp (>= 3.0.0),
     openxlsx,
     av,
     readr,

@@ -39,13 +39,13 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          # superassp / av / eggstract / protoscribe are heavy or private
-          # GitHub deps; every vignette chunk that needs them is gated with
-          # requireNamespace(), so the docs site builds without them. dplyr is
-          # the one Suggests the ungated chunks do require. Skip the rest of
-          # the Suggests with dependencies: "hard" to keep the build fast and
-          # avoid transient compile failures.
-          extra-packages: any::pkgdown, any::knitr, any::rmarkdown, any::dplyr, local::.
+          # eggstract and protoscribe are private repositories and cannot be
+          # fetched from CI; every chunk that needs one is gated with
+          # requireNamespace(), so the site builds without them. superassp
+          # comes from GitHub, and dplyr is the one Suggests the ungated chunks
+          # require, so both are installed on top of the hard dependencies to
+          # publish the vignettes with real DSP output.
+          extra-packages: any::pkgdown, any::knitr, any::rmarkdown, any::dplyr, github::humlab-speech/superassp, local::.
           needs: website
           dependencies: '"hard"'
 

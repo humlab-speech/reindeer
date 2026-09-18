@@ -23,10 +23,10 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          # Resolving the full Suggests set tries to fetch the private
-          # companion repos (eggstract, protoscribe) and superassp, which does
-          # not currently build; install hard dependencies plus the Suggests
-          # the suite uses, and let companion-gated tests skip.
+          # Install hard dependencies plus the Suggests the suite uses: the
+          # private companion repos (eggstract, protoscribe) cannot be fetched
+          # from CI, so the companion-gated tests skip, while superassp comes
+          # from GitHub and the DSP tests do run.
           dependencies: '"hard"'
           extra-packages: |
             any::covr
@@ -37,6 +37,7 @@ jobs:
             any::qs2
             any::ggplot2
             any::openxlsx
+            github::humlab-speech/superassp
           needs: coverage
 
       - name: Test coverage
