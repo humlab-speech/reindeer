@@ -23,7 +23,20 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::covr
+          # Resolving the full Suggests set tries to fetch the private
+          # companion repos (eggstract, protoscribe) and superassp, which does
+          # not currently build; install hard dependencies plus the Suggests
+          # the suite uses, and let companion-gated tests skip.
+          dependencies: '"hard"'
+          extra-packages: |
+            any::covr
+            any::testthat
+            any::withr
+            any::emuR
+            any::dplyr
+            any::qs2
+            any::ggplot2
+            any::openxlsx
           needs: coverage
 
       - name: Test coverage
