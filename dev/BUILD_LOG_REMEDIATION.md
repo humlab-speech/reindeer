@@ -458,3 +458,60 @@ confirming with a search of the code before removing.
 3. Capture the cache state for the two build-only defects.
 4. Provide SPTK, reinstall superassp; then D6, the erodex sweep, the gated
    simulation section and the version pin all close together.
+
+
+# Round 5 - the mechanical \usage fix fails both checks, and why
+
+Tried the obvious repair: generate each `@usage` line from the block's own
+`@param` names so usage and arguments cannot drift. Result: **2 WARNINGs**,
+worse than the one it started from.
+
+## Why it cannot work like that
+
+The two checks want opposite things on a generic's page:
+
+    * checking for code/documentation mismatches ... WARNING
+      Codoc mismatches from Rd file 'ascend_to.Rd':
+        Code: function(.segments, ...)
+        Docs: function(.segments, ..., collect, .quiet, .from, level)
+        Argument names in docs not in code: collect .quiet .from level
+
+    * checking Rd \usage sections ... WARNING
+      Undocumented arguments in Rd file 'scout.Rd'  '...'
+
+- `codoc` compares the `\usage` line against the **code** - and the code here
+  is the generic, `function(.segments, ...)`. Listing the method's arguments
+  (`level`, `.from`, `.quiet`, `collect`) therefore creates a mismatch by
+  construction.
+- The `\usage` check wants every documented argument to appear in `\usage`.
+- And a third constraint I tripped over: `\usage` must not contain an
+  argument that is not documented - keeping `...` from the old usage line
+  while not documenting it produced `Undocumented arguments ... '...'`.
+
+Satisfying all three at once is impossible while the method's parameters and
+the generic's usage share one page.
+
+## The fix that does satisfy them
+
+Split the page, exactly as recorded in the earlier recipe:
+
+1. the **generic's** page keeps `@usage fname(.segments, ...)` and documents
+   only `.segments` and `...`;
+2. the **method** gets its own Rd page - `@rdname fname_method` or a distinct
+   alias - carrying its real signature in `\usage` and its own `@param`
+   entries for `level`, `.from`, `.quiet`, `collect`.
+
+That is four pages to restructure (`ascend_to`, `descend_to`, `enrich`,
+`quantify`) plus `scout`'s missing `...` documentation, with a check run
+after each to keep the count moving in one direction.
+
+The mechanical change was reverted: `R/` and `man/` are back to the state
+that produces the single known warning, because two warnings is a
+regression and a half-finished page split would be worse.
+
+## Lesson for the next attempt
+
+Do one page end to end - split it, document it, check it - and only then
+repeat for the others. A blanket rewrite across four pages cannot be
+verified in one step, which is precisely how this attempt produced a
+regression instead of a fix.
