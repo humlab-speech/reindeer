@@ -181,10 +181,9 @@ simulation result re-enters the reindeer pipeline as a regular
 extended_segment_list.
 
 ```{r simulate, eval = FALSE}
-# erodex works by injecting the simulated parameters into the DSP routine,
-# which needs a routine that accepts them: on superassp 2.9.5 the trk_*
-# wrappers expose only (listOfFiles, ...), so the call stops with
-# "subscript out of bounds". Run this once superassp >= 3.0.0 is installed.
+# erodex::quantify_simulate() stops with "subscript out of bounds" while
+# indexing the per-bundle signal hashes (erodex 0.2.12, with superassp 3.0.0),
+# so the call is shown for shape rather than run here.
 library(erodex)
 sim_store <- file.path(tempdir(), "simulations")
 erodex::quantify_simulate(

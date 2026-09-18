@@ -1253,6 +1253,22 @@ while 2.9.5 is the installed build, but the moment a >= 3.0.0 build is
 present, D6, the erodex failure and the vignette section all close
 together.
 
+### Correction (2026-09-18): the erodex failure survives the superassp floor
+
+With superassp 3.0.0 and erodex 0.2.12 installed,
+`erodex::quantify_simulate()` still stops with "subscript out of bounds" on
+the demo corpus, after printing `Simulating 3 parameter combinations on 24
+segments` and `DSP parameters: nominalF1`. `formals(superassp::trk_formant_forest)`
+does expose `nominalF1` now, so the version floor is not the cause.
+
+The failing frame is in erodex 0.2.12 itself, `R/simulation_core.R:489`,
+`hash_info <- .what_with_hash$hashes[[seg_idx]]`: `get_signal_hashes()`
+returns one row per (session, bundle) whose `hashes` column holds the decoded
+per-bundle JSON, and the loop indexes that column with a *segment* index, so
+it runs out of bounds as soon as a corpus has more segments than bundles.
+Two of the three symptoms do close with 3.0.0: the norm warning is gone and
+the vignette's DSP sections now run with real output.
+
 ### superassp upgrade attempted: failed, still 2.9.5
 
     before: 2.9.5
