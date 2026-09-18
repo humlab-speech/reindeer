@@ -400,3 +400,61 @@ Priority order from here, unchanged in substance:
    gated simulation section, and enables the version pin.
 3. Chase the remaining `\usage` warning down to zero, if a clean check is
    wanted.
+
+
+# Round 4 - R CMD check: the ERROR was mine, the WARNING is the known family
+
+First check run: **1 ERROR, 1 WARNING**. Second, after one fix: **0 ERROR,
+1 WARNING**, exit 0.
+
+    * checking Rd \usage sections ... WARNING     <- survives
+    * checking re-building of vignette outputs     <- clean now
+    Status: 1 WARNING
+
+## The ERROR was a vignette bug I introduced, and check caught what load_all() hid
+
+    Quitting from interactive_annotation.Rmd:41-46 [quick-start-query]
+    Error in `demo_corpus()`: ! could not find function "demo_corpus"
+
+That chunk opts back into evaluation with `eval = TRUE`, but the
+`library(reindeer)` it relies on sits in the gated `quick-start` chunk. It
+passed in my own renders because `load_all()` had already attached the
+package; `R CMD check` renders against the installed package, where the
+dependency is real. Fixed by attaching the package inside the chunk, with a
+comment saying why.
+
+Worth generalising: every `eval = TRUE` chunk in a vignette whose siblings
+are gated must be self-sufficient. That was the second time this pattern bit
+(the first was a chunk relying on a `corp` from a gated neighbour).
+
+## The WARNING is the \usage family already on the ledger
+
+    ascend_to.Rd   : 'level' '.from' '.quiet' 'collect'
+    descend_to.Rd  : (same shape)
+    enrich.Rd      : '.using' '.metadata_fields' '.force' '.parallel'
+                     '.workers' '.use_cache' '.cache_dir' '.cache_format'
+                     '.signal_extension' '.verbose'
+    quantify.Rd    : (same shape)
+
+Method pages sharing a generic's documentation. The remedy is the one that
+took the check from 7 WARNING + 1 NOTE to this single family earlier: give
+each method its own Rd page carrying a real `\usage` and move its `@param`
+entries there. Four roxygen edits, then `devtools::document()` and a check.
+
+## Incidental finding: six uninstalled Suggests
+
+    Packages suggested but not available:
+      'yardstick', 'bigstatsr', 'rPraat', 'DT', 'eggstract', 'protoscribe'
+
+Two of these - `bigstatsr` and `yardstick` - look unused by a speech corpus
+package. If they are, dropping them from `Suggests` cuts install weight and
+check time, and shortens the list a contributor has to satisfy. Worth
+confirming with a search of the code before removing.
+
+## Next
+
+1. Fix the four \usage pages (roxygen, document, re-check).
+2. Confirm and trim the unused `Suggests`.
+3. Capture the cache state for the two build-only defects.
+4. Provide SPTK, reinstall superassp; then D6, the erodex sweep, the gated
+   simulation section and the version pin all close together.

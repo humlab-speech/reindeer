@@ -39,6 +39,9 @@ The EMU-webApp opens in your browser (or the RStudio Viewer pane) and you can st
 ## What gets served
 
 ```{r quick-start-query, eval = TRUE}
+# This chunk opts back in, so it must attach the package itself - the
+# library() call above sits in a chunk that is deliberately not evaluated.
+library(reindeer)
 corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 dim(vowels)
