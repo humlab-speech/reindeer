@@ -60,14 +60,9 @@ Suggests:
     withr,
     shiny,
     miniUI,
-    DT,
-    eggstract,
-    protoscribe
+    DT
 Remotes:
   github::humlab-speech/superassp,
-  github::humlab-speech/av,
-  github::humlab-speech/eggstract,
-  github::humlab-speech/protoscribe
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 Depends: 
