@@ -1,11 +1,16 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 1.1.1
-Date: 2026-07-10
+Version: 1.2.
+Date: 2026-09-19
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0003-3373-0934"))
+           comment = c(ORCID = "0000-0003-3373-0934")),
+    person("Markus", "Jochim", , "markusjochim@phonetik.uni-muenchen.de", c("ctb"), comment = c(ORCID = "0000-0002-5638-4870")),
+    person("Raphael", "Winkelmann", , "raphael@phonetik.uni-muenchen.de", c("ctb")),
+    person("Klaus", "Jaensch", , "klausj@phonetik.uni-muenchen.de", c("ctb")),
+    person("Steve", "Cassidy", , "steve.cassidy@mq.edu.au", c("ctb")),
+    person("Jonathan", "Harrington", , "jmh@phonetik.uni-muenchen.de", c("ctb")))
   )
 Description: A systematic framework for speech corpora management that retains emuR compatibility, but provides
   expanded ability to store metadata associated with the recording, use the metadata to guide signal processing when appropriate, and support the user in future archiving and FAIR use
@@ -39,7 +44,8 @@ Imports:
     tidyselect,
     rlang,
     httpuv,
-    jsonvalidate
+    jsonvalidate,
+    units
 Suggests:
     testthat (>= 3.0.0),
     emuR,
