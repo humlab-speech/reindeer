@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 1.2.
+Version: 1.2.0
 Date: 2026-09-19
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -11,7 +11,6 @@ Authors@R: c(
     person("Klaus", "Jaensch", , "klausj@phonetik.uni-muenchen.de", c("ctb")),
     person("Steve", "Cassidy", , "steve.cassidy@mq.edu.au", c("ctb")),
     person("Jonathan", "Harrington", , "jmh@phonetik.uni-muenchen.de", c("ctb")))
-  )
 Description: A systematic framework for speech corpora management that retains emuR compatibility, but provides
   expanded ability to store metadata associated with the recording, use the metadata to guide signal processing when appropriate, and support the user in future archiving and FAIR use
   by automating the creation, and continuous updating, of standard compliant metadata files for corpora.
@@ -52,9 +51,10 @@ Suggests:
     qs2,
     knitr,
     rmarkdown,
-    yardstick,
-    bigstatsr,
     superassp (>= 3.0.0),
+    protoscribe,
+    eggstract,
+    erodex,
     openxlsx,
     av,
     readr,
@@ -69,6 +69,9 @@ Suggests:
     DT
 Remotes:
   github::humlab-speech/superassp,
+  github::humlab-speech/protoscribe,
+  github::humlab-speech/eggstract,
+  github::humlab-speech/erodex,
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 Depends: 

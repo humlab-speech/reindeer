@@ -153,11 +153,14 @@ reference:
       - validate_cmdi
 
   - title: "Companion packages"
-    desc: "Glue for protoscribe, eggstract, and erodex."
+    desc: >
+      Glue for protoscribe and eggstract that needs reindeer's own
+      corpus/quantify()/cache machinery, not just the companion's API.
+      erodex and superassp are called directly, without reindeer-side
+      wrappers.
     contents:
       - propose_annotations
       - quantify_egg
-      - enrich_egg
 
   - title: "Psychoacoustic helpers"
     desc: "Frequency-scale conversions used in DSP."
@@ -166,7 +169,12 @@ reference:
       - erb
 
   - title: "Visualization"
-    desc: "ggplot2 layers and autoplot methods for segment lists."
+    desc: >
+      ggplot2 layers and autoplot methods for reindeer's own tidy
+      post-measurement shape (segment_list / track_long from
+      pivot_tracks_longer()). Raw-signal plotting (spectrograms,
+      EGG wavegrams) is out of scope here — see superassp and
+      eggstract's geom_wavegram()/geom_egg_signal().
     contents:
       - geom_formant_trajectory
       - geom_pitch_track

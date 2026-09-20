@@ -10,6 +10,7 @@
 \alias{reminisce}
 \alias{reminisce_tracks}
 \alias{list_simulations}
+\alias{enrich_egg}
 \alias{deprecated-moved-functions}
 \title{Functions moved to companion packages}
 \usage{
@@ -30,6 +31,8 @@ reminisce(...)
 reminisce_tracks(...)
 
 list_simulations(...)
+
+enrich_egg(...)
 }
 \arguments{
 \item{...}{Ignored — the stub never executes the call.}
@@ -53,6 +56,8 @@ Use \code{\link[=propose_annotations]{propose_annotations()}} for the reindeer-s
 \item Parameter-grid simulation (\code{quantify_simulate}, \code{enrich_simulate},
 \code{reminisce}, \code{reminisce_tracks}, \code{list_simulations}) lives in
 \href{https://github.com/humlab-speech/erodex}{erodex}.
+\item \code{enrich_egg} is removed outright (its \code{eggstract::enrich_with_egg}
+target never existed). Use \code{\link[=quantify_egg]{quantify_egg()}} instead.
 }
 }
 \keyword{internal}

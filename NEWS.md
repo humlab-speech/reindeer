@@ -1,5 +1,21 @@
 # reindeer (development version)
 
+- Fixed a malformed `Authors@R` field (stray trailing paren) that made
+  `DESCRIPTION` fail to parse under R CMD check.
+
+- `protoscribe`, `eggstract`, and `erodex` are now declared in `Suggests`
+  and `Remotes`, matching what the companion glue (`propose_annotations()`,
+  `quantify_egg()`, `deprecated_stubs.R`) already assumed. Removed the
+  unused `yardstick`/`bigstatsr` Suggests left over from before the
+  simulation code moved to erodex.
+
+- `enrich_egg()` is removed: it forwarded to `eggstract::enrich_with_egg`,
+  which eggstract has never exported, so the wrapper always aborted. Calling
+  it now raises the standard "moved" redirect pointing at `quantify_egg()`.
+  `quantify_egg()`'s default `.using` is corrected from the non-existent
+  `eggstract::ksvF0` to `eggstract::trk_f0`, and a missing export now aborts
+  cleanly instead of raising a raw "object not found" error.
+
 - `Suggests` floors superassp at 3.0.0, the first release whose `trk_*`
   wrappers expose the wrapped routine's parameters, and CI installs it from
   `github::humlab-speech/superassp` (its source tree now ships the SPTK headers

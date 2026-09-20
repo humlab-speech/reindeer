@@ -64,6 +64,19 @@ reminisce_tracks <- function(...) .companion_redirect(
 list_simulations <- function(...) .companion_redirect(
   "list_simulations", "erodex", "humlab-speech/erodex")
 
+# --- eggstract (retired in v1.3, never had a working companion target) ------
+
+#' @rdname deprecated-moved-functions
+#' @export
+enrich_egg <- function(...) {
+  cli::cli_abort(c(
+    "{.fn enrich_egg} has been removed from {.pkg reindeer}.",
+    "i" = "It forwarded to {.code eggstract::enrich_with_egg}, which {.pkg eggstract} has never exported.",
+    "i" = "Use {.fn quantify_egg} for EGG-track measurement via {.pkg eggstract}'s {.fn trk_f0} (and friends).",
+    "i" = "See {.url https://github.com/humlab-speech/eggstract}."
+  ), class = c("reindeer_moved_error", "reindeer_error"))
+}
+
 #' Functions moved to companion packages
 #'
 #' These names were exported from earlier versions of `reindeer` but have
@@ -79,6 +92,8 @@ list_simulations <- function(...) .companion_redirect(
 #' * Parameter-grid simulation (`quantify_simulate`, `enrich_simulate`,
 #'   `reminisce`, `reminisce_tracks`, `list_simulations`) lives in
 #'   [erodex](https://github.com/humlab-speech/erodex).
+#' * `enrich_egg` is removed outright (its `eggstract::enrich_with_egg`
+#'   target never existed). Use [quantify_egg()] instead.
 #'
 #' @name deprecated-moved-functions
 #' @param ... Ignored — the stub never executes the call.

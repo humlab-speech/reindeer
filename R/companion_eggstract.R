@@ -56,7 +56,7 @@
 #' @param seg A `segment_list` or `extended_segment_list`.
 #' @param corpus Optional `corpus`. Resolved from `seg@db_path` when NULL.
 #' @param .using The eggstract DSP function to apply. Defaults to
-#'   `eggstract::ksvF0` when eggstract is installed. Pass any function
+#'   `eggstract::trk_f0` when eggstract is installed. Pass any function
 #'   compatible with [quantify()].
 #' @param ... Forwarded to [quantify()].
 #' @param .at Optional relative-time vector.
@@ -77,7 +77,15 @@ quantify_egg <- function(seg, corpus = NULL,
     .companion_abort("eggstract", purpose = "EGG-track quantification")
   }
   if (is.null(.using)) {
-    .using <- get("ksvF0", envir = asNamespace("eggstract"))
+    .using <- tryCatch(
+      get("trk_f0", envir = asNamespace("eggstract")),
+      error = function(e) NULL
+    )
+    if (is.null(.using)) {
+      cli::cli_abort(
+        "eggstract is installed but does not export {.fn trk_f0}; upgrade eggstract or pass {.arg .using} explicitly."
+      )
+    }
   }
   if (isTRUE(.require_egg_flag)) {
     seg <- .filter_to_egg_bundles(seg)
@@ -93,32 +101,4 @@ quantify_egg <- function(seg, corpus = NULL,
     }
   }
   quantify(seg, dsp_function = .using, ..., .at = .at)
-}
-
-#' Enrich a corpus or segment_list with EGG-derived signal tracks
-#'
-#' Thin wrapper that delegates to `eggstract::enrich_with_egg` when the
-#' eggstract companion is installed. Returns the input on success or
-#' aborts with `reindeer_missing_companion_error` when eggstract is
-#' absent.
-#'
-#' @param corpus A `corpus` object.
-#' @param ... Forwarded to `eggstract::enrich_with_egg`.
-#' @return The (possibly updated) `corpus`, invisibly.
-#' @export
-enrich_egg <- function(corpus, ...) {
-  if (!requireNamespace("eggstract", quietly = TRUE)) {
-    .companion_abort("eggstract", purpose = "EGG enrichment")
-  }
-  fn <- tryCatch(
-    get("enrich_with_egg", envir = asNamespace("eggstract")),
-    error = function(e) NULL
-  )
-  if (is.null(fn)) {
-    cli::cli_abort(
-      paste0("eggstract is installed but does not export ",
-             "{.fn enrich_with_egg}; upgrade eggstract.")
-    )
-  }
-  invisible(fn(corpus, ...))
 }

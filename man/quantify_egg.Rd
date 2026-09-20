@@ -19,7 +19,7 @@ quantify_egg(
 \item{corpus}{Optional \code{corpus}. Resolved from \code{seg@db_path} when NULL.}
 
 \item{.using}{The eggstract DSP function to apply. Defaults to
-\code{eggstract::ksvF0} when eggstract is installed. Pass any function
+\code{eggstract::trk_f0} when eggstract is installed. Pass any function
 compatible with \code{\link[=quantify]{quantify()}}.}
 
 \item{...}{Forwarded to \code{\link[=quantify]{quantify()}}.}

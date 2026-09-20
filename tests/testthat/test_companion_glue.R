@@ -17,14 +17,11 @@ test_that("quantify_egg() aborts with reindeer_missing_companion_error when eggs
   expect_s3_class(err, "reindeer_missing_companion_error")
 })
 
-test_that("enrich_egg() aborts when eggstract is absent", {
-  if (requireNamespace("eggstract", quietly = TRUE)) {
-    skip("eggstract installed")
-  }
+test_that("enrich_egg() is removed and always redirects", {
   ae <- create_shared_ae_corpus()
   err <- tryCatch(enrich_egg(ae),
-                  reindeer_missing_companion_error = function(e) e)
-  expect_s3_class(err, "reindeer_missing_companion_error")
+                  reindeer_moved_error = function(e) e)
+  expect_s3_class(err, "reindeer_moved_error")
 })
 
 test_that("propose_annotations() aborts when protoscribe is absent", {
