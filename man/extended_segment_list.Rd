@@ -39,8 +39,7 @@ frame also gains a \code{.cache_status} column with values \code{"hit"} /
 }
 \description{
 An S7 class representing a segment list with DSP-derived measurements.
-Returned by \code{\link[=quantify]{quantify()}} and by the segment-list DSP path of
-\code{\link[=enrich]{enrich()}}. Inherits everything from \code{segment_list} (and from
+Returned by \code{\link[=quantify]{quantify()}}. Inherits everything from \code{segment_list} (and from
 \code{tbl_df} / \code{tbl} / \code{data.frame}), so dplyr verbs and the tidyverse
 work transparently.
 }

@@ -3,7 +3,7 @@
 #' Returns the annotation segments that match an EQL expression. Syntax
 #' is the same as `emuR::query()` so existing queries work unchanged;
 #' see the EMU-SDMS manual for the full grammar. Results come back as a
-#' tibble-like `segment_list` ready for [enrich()] / [quantify()] / dplyr.
+#' tibble-like `segment_list` ready for [quantify()] / [biographize()] / dplyr.
 #'
 #' Since v0.7 the query is **deferred by default**: a [lazy_segment_list]
 #' is returned and the main result SQL fires when you access the rows

@@ -585,7 +585,7 @@ register_metadata_field <- function(con, field_name, field_type) {
 #' **bundle > session > database** precedence — a value set at a more
 #' specific scope wins over a less specific one. This is what most
 #' analyses want — feed it to [`dplyr::left_join`] against a
-#' `segment_list`, or use [enrich(segs, corp)][enrich()] to do the join
+#' `segment_list`, or use [biographize(segs, corp)][biographize()] to do the join
 #' for you.
 #'
 #' @param corpus_obj A `corpus`.
@@ -596,7 +596,7 @@ register_metadata_field <- function(con, field_name, field_type) {
 #'   Field columns carry the original R type (numeric, integer, logical,
 #'   or character) as recorded when the metadata was written.
 #' @family metadata
-#' @seealso [set_metadata()], [load_metadata()], [enrich()]
+#' @seealso [set_metadata()], [load_metadata()], [biographize()]
 #' @examplesIf interactive()
 #' corp <- demo_corpus()
 #' get_metadata(corp)

@@ -4,7 +4,7 @@ NULL
 #' Inspect age/gender-aware DSP parameters
 #'
 #' Returns the age/gender-appropriate DSP parameters that
-#' [enrich()] and [quantify()] would pass to a DSP routine when
+#' [quantify()] would pass to a DSP routine when
 #' `.use_metadata = TRUE`. Use this to preview what `windowSize`,
 #' `minF`, `nominalF1/F2/F3` etc. will be applied before you run
 #' a quantification, or to compare two speakers side-by-side.

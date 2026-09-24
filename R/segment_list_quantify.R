@@ -43,7 +43,7 @@ NULL
 #'   added columns are also recorded on the object as the S7 properties
 #'   `@dsp_function` and `@dsp_columns`.
 #' @family signal
-#' @seealso [enrich()], [dsp_parameters()], [inspect_cache()]
+#' @seealso [biographize()], [dsp_parameters()], [inspect_cache()]
 #' @examplesIf interactive()
 #' corp <- demo_corpus()
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
@@ -171,7 +171,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     # Fetch only needed metadata from correct table (metadata_bundle).
     # Filtering in SQL keeps the transfer proportional to the query result
     # rather than to the whole corpus; the composite key matches the expression
-    # used by enrich().
+    # used by biographize().
     db_uuid <- corpus_obj@.uuid
     ub_keys <- unique(paste(unique_bundles$session, unique_bundles$bundle, sep = "||"))
     placeholders <- paste(rep("?", length(ub_keys)), collapse = ", ")

@@ -96,6 +96,6 @@ quantify(segs, superassp::trk_formant_forest, nominalF1 = 500, windowSize = 20)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=enrich]{enrich()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
+\code{\link[=biographize]{biographize()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
 }
 \concept{signal}

@@ -12,8 +12,8 @@ Character vector of column names.
 \description{
 Tidyselect helper for columns that are neither required segment columns
 (see \code{\link[=segment_cols]{segment_cols()}}) nor DSP-derived track columns (see \code{\link[=track_cols]{track_cols()}}).
-Typically this captures speaker/bundle metadata that \code{biographize()} or
-\code{enrich()} joined onto the segment_list.
+Typically this captures speaker/bundle metadata that \code{biographize()}
+joined onto the segment_list.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}

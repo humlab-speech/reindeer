@@ -6,7 +6,7 @@
 #'
 #' `corpus()` is the entry point to every reindeer workflow. Point it at
 #' an EMU-SDMS database (a directory whose name ends in `_emuDB`) and you
-#' get back a `corpus` object you can [query()], [enrich()], [serve()],
+#' get back a `corpus` object you can [query()], [quantify()], [serve()],
 #' or [describe_corpus()].
 #'
 #' @param path Path to the corpus directory (the `_emuDB` suffix is
@@ -41,7 +41,7 @@
 #' corp["Session1", "Bundle1"] <- "audio.mp3" # import media
 #' }
 #' For programmatic metadata see [set_metadata()] / [get_metadata()].
-#' @seealso [demo_corpus()], [query()], [enrich()], [load_metadata()],
+#' @seealso [demo_corpus()], [query()], [quantify()], [load_metadata()],
 #'   [serve_app()]
 #' @examplesIf interactive()
 #' corp <- demo_corpus()

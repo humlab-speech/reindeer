@@ -374,9 +374,9 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #' Enrich query results with metadata
 #'
 #' Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
-#' containing session and bundle columns. This is the metadata half of
-#' [enrich()]; call it directly when you want only the metadata join, or
-#' pass a `lazy_segment_list` to defer the join until [collect()].
+#' containing session and bundle columns. Call it directly when you want
+#' only the metadata join, or pass a `lazy_segment_list` to defer the join
+#' until [collect()].
 #'
 #' @param segs_tbl A `segment_list`, `lazy_segment_list`, or data.frame with
 #'   session and bundle columns. A lazy input defers the join until `collect()`.
@@ -385,7 +385,6 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #' @param algorithm Hash algorithm for digests (default: "sha1")
 #' @return An \code{extended_segment_list} with metadata columns appended (or
 #'   the same `lazy_segment_list` with a deferred step appended).
-#' @seealso [enrich()] for the combined metadata + DSP entry point.
 #' @family metadata
 #'
 #' @examplesIf interactive()

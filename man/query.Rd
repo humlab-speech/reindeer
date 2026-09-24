@@ -40,7 +40,7 @@ Provenance is recorded on the result; see \code{\link[=provenance]{provenance()}
 Returns the annotation segments that match an EQL expression. Syntax
 is the same as \code{emuR::query()} so existing queries work unchanged;
 see the EMU-SDMS manual for the full grammar. Results come back as a
-tibble-like \code{segment_list} ready for \code{\link[=enrich]{enrich()}} / \code{\link[=quantify]{quantify()}} / dplyr.
+tibble-like \code{segment_list} ready for \code{\link[=quantify]{quantify()}} / \code{\link[=biographize]{biographize()}} / dplyr.
 }
 \details{
 Since v0.7 the query is \strong{deferred by default}: a \link{lazy_segment_list}

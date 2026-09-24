@@ -50,7 +50,7 @@ used by the cache machinery; treat as read-only.
 \description{
 \code{corpus()} is the entry point to every reindeer workflow. Point it at
 an EMU-SDMS database (a directory whose name ends in \verb{_emuDB}) and you
-get back a \code{corpus} object you can \code{\link[=query]{query()}}, \code{\link[=enrich]{enrich()}}, \code{\link[=serve]{serve()}},
+get back a \code{corpus} object you can \code{\link[=query]{query()}}, \code{\link[=quantify]{quantify()}}, \code{\link[=serve]{serve()}},
 or \code{\link[=describe_corpus]{describe_corpus()}}.
 }
 \section{Bracket access}{
@@ -74,6 +74,6 @@ formants <- quantify(vowels, superassp::trk_formant_forest)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=demo_corpus]{demo_corpus()}}, \code{\link[=query]{query()}}, \code{\link[=enrich]{enrich()}}, \code{\link[=load_metadata]{load_metadata()}},
+\code{\link[=demo_corpus]{demo_corpus()}}, \code{\link[=query]{query()}}, \code{\link[=quantify]{quantify()}}, \code{\link[=load_metadata]{load_metadata()}},
 \code{\link[=serve_app]{serve_app()}}
 }
