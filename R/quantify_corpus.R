@@ -31,7 +31,14 @@ NULL
     fn_name <- dsp_fun_name
     pkg <- tryCatch({
       env_name <- environmentName(topenv(environment(dsp_fun)))
-      if (nzchar(env_name) && !env_name %in% c("R_GlobalEnv", "base")) {
+      # Under full-suite `devtools::test()` loading (unlike a lone
+      # `testthat::test_file()` run), a closure defined inline in a test
+      # has this package's own namespace reachable in its environment
+      # chain, so `topenv()` resolves to the package itself rather than
+      # "R_GlobalEnv" — exclude it too, computed from this very function's
+      # home so it stays correct if the package is ever renamed.
+      own_pkg <- environmentName(topenv(environment(.resolve_dsp_identity)))
+      if (nzchar(env_name) && !env_name %in% c("R_GlobalEnv", "base", own_pkg)) {
         env_name
       } else {
         NA_character_
