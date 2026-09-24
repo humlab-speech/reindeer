@@ -160,3 +160,59 @@ test_that("quantify.corpus runs end-to-end with a real superassp function (smoke
   expect_equal(entry$generator$`function`, "trk_rms")
   expect_equal(entry$generator$package, "superassp")
 })
+
+test_that("quantify.corpus connect-existing (fileExtension) registers without computing", {
+  ae <- create_isolated_ae_corpus()
+
+  result <- quantify(ae, name = "rms", columnName = "rms", fileExtension = "rms")
+
+  expect_true(S7::S7_inherits(result, reindeer::corpus))
+  cfg <- reindeer:::load_DBconfig(ae)
+  track_names <- vapply(cfg$ssffTrackDefinitions, function(t) t$name, character(1))
+  expect_true("rms" %in% track_names)
+  entry <- cfg$ssffTrackDefinitions[[which(track_names == "rms")]]
+  expect_null(entry$generator)
+  rms_files <- list.files(ae@basePath, pattern = "\\.rms$", recursive = TRUE)
+  expect_equal(length(rms_files), 0)  # no computation happened
+})
+
+test_that("quantify.corpus connect-existing (from/index) addresses a sub-column", {
+  ae <- create_isolated_ae_corpus()
+
+  quantify(ae, name = "F1", from = "F[Hz]", index = 1L,
+           columnName = "F[Hz]", fileExtension = "fms")
+
+  cfg <- reindeer:::load_DBconfig(ae)
+  track_names <- vapply(cfg$ssffTrackDefinitions, function(t) t$name, character(1))
+  entry <- cfg$ssffTrackDefinitions[[which(track_names == "F1")]]
+  expect_equal(entry$from, "F[Hz]")
+  expect_equal(entry$index, 1L)
+})
+
+test_that("quantify.corpus connect-existing requires name", {
+  ae <- create_isolated_ae_corpus()
+  expect_error(
+    quantify(ae, fileExtension = "rms"),
+    class = "reindeer_error"
+  )
+})
+
+test_that("quantify.corpus connect-existing requires fileExtension xor from+index", {
+  ae <- create_isolated_ae_corpus()
+  expect_error(quantify(ae, name = "rms"), class = "reindeer_error")
+  expect_error(
+    quantify(ae, name = "F1", from = "F[Hz]"),  # index missing
+    class = "reindeer_error"
+  )
+})
+
+test_that("quantify.corpus connect-existing records an explicit documentation-only generator", {
+  ae <- create_isolated_ae_corpus()
+  quantify(ae, name = "rms", fileExtension = "rms",
+           generator = list(`function` = "external_tool", package = NA, version = "1.0"))
+
+  cfg <- reindeer:::load_DBconfig(ae)
+  track_names <- vapply(cfg$ssffTrackDefinitions, function(t) t$name, character(1))
+  entry <- cfg$ssffTrackDefinitions[[which(track_names == "rms")]]
+  expect_equal(entry$generator$`function`, "external_tool")
+})

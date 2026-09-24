@@ -409,7 +409,51 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
   }
 }
 
+#' Connect-existing mode for quantify.corpus (no DSP call, no file write)
+#' @noRd
 .quantify_corpus_connect <- function(corpus_obj, name, columnName, fileExtension,
                                      from, index, overwrite, dots) {
-  cli::cli_abort("connect-existing mode not yet implemented", .internal = TRUE)
+  if (is.null(name)) {
+    cli::cli_abort(c(
+      "{.arg name} is required when connecting an existing track (no {.arg .using}).",
+      "i" = "Pass {.arg name} plus either {.arg fileExtension} or {.arg from}/{.arg index}."
+    ), class = c("reindeer_track_validation_error", "reindeer_error"))
+  }
+  if (length(name) != 1L) {
+    cli::cli_abort("{.arg name} must be a single string in connect-existing mode.",
+                   class = c("reindeer_track_validation_error", "reindeer_error"))
+  }
+
+  has_ext <- !is.null(fileExtension)
+  has_sub <- !is.null(from) || !is.null(index)
+  if (has_sub && (is.null(from) || is.null(index))) {
+    cli::cli_abort(c(
+      "{.arg from} and {.arg index} must both be supplied together.",
+      "i" = "{.arg from} names the already-registered multi-column track; {.arg index} (1-based) picks a column."
+    ), class = c("reindeer_track_validation_error", "reindeer_error"))
+  }
+  if (!has_ext && !has_sub) {
+    cli::cli_abort(c(
+      "Connect-existing mode needs either {.arg fileExtension} (adopt a whole file) ",
+      "or {.arg from}/{.arg index} (name one column of a registered track)."
+    ), class = c("reindeer_track_validation_error", "reindeer_error"))
+  }
+  # Note: fileExtension and from/index are NOT mutually exclusive here — a
+  # from/index sub-column reference may also carry the fileExtension of the
+  # underlying multi-column file (see the "(from/index) addresses a
+  # sub-column" test, which supplies both together).
+
+  track_def <- list(name = name)
+  if (!is.null(columnName)) track_def$columnName <- columnName
+  if (has_ext) track_def$fileExtension <- fileExtension
+  if (has_sub) {
+    track_def$from <- from
+    track_def$index <- as.integer(index)
+  }
+  if (!is.null(dots$generator)) {
+    track_def$generator <- dots$generator
+  }
+
+  .upsert_ssff_track_definition(corpus_obj, track_def, overwrite = overwrite)
+  invisible(corpus_obj)
 }
