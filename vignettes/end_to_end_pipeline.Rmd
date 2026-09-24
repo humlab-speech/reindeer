@@ -67,7 +67,7 @@ set_metadata(corp, list(
 set_metadata(corp, list(HasEGG = TRUE), session = ses, bundle = bndl)
 
 # Per-session: speaker biographics that drive age/gender-aware DSP.
-# These flow automatically into quantify()/enrich() when
+# These flow automatically into quantify() when
 # .use_metadata = TRUE - formant ranges, pitch limits, and window sizes
 # all get picked from the speaker's row of the DSPP table.
 set_metadata(corp, list(Speaker = "P001", Age = 25, Gender = "Female"),
@@ -152,7 +152,7 @@ set; the rest pass through untouched.
 
 ```{r egg, eval = has_egg}
 egg_measures <- vowels |>
-  enrich(corp, with = "metadata") |>   # joins HasEGG and speaker metadata
+  biographize(corp) |>   # joins HasEGG and speaker metadata
   quantify_egg(.using = eggstract::ksvF0, .at = seq(0, 1, 0.1))
 ```
 
