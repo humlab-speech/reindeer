@@ -1,7 +1,7 @@
 # reindeer (development version)
 
 - **`enrich()` is removed** (hard stub, no deprecation window — same
-  precedent as `enrich_egg()`'s removal above). `quantify()` now covers
+  precedent as `enrich_egg()`'s removal). `quantify()` now covers
   everything: `quantify(corp, .using = fn)` runs a DSP routine across
   every signal file in a corpus (what `enrich(corp, .using = fn)` did),
   writes the resulting SSFF files, and — new — registers each output
