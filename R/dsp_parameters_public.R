@@ -1,4 +1,4 @@
-#' @include reindeer_signal_extensions_dt.R reindeer_enrich.R
+#' @include reindeer_signal_extensions_dt.R dsp_parameter_derivation.R
 NULL
 
 #' Inspect age/gender-aware DSP parameters

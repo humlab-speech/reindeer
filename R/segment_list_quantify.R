@@ -1,3 +1,6 @@
+#' @include segment_list_classes.R reindeer_lazy_segment_list.R
+NULL
+
 #' Extract acoustic measurements from segments
 #'
 #' Apply a DSP function (typically from `superassp`) to every segment

@@ -1,4 +1,4 @@
-#' @include corpus_class.R segment_list_quantify.R reindeer_corpus_config.R
+#' @include corpus_class.R segment_list_quantify.R reindeer_corpus_config.R dsp_parameter_derivation.R
 NULL
 
 # ==============================================================================

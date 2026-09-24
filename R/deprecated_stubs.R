@@ -77,6 +77,21 @@ enrich_egg <- function(...) {
   ), class = c("reindeer_moved_error", "reindeer_error"))
 }
 
+# --- reindeer itself (quantify unification, v1.2.0) --------------------------
+
+#' @rdname deprecated-moved-functions
+#' @export
+enrich <- function(...) {
+  cli::cli_abort(c(
+    "{.fn enrich} has been removed from {.pkg reindeer}.",
+    "i" = "Corpus-level DSP (write + register a track): use {.fn quantify} \\
+           instead, e.g. {.code quantify(corp, .using = fn)}.",
+    "i" = "Segment-level metadata join: use {.fn biographize} instead.",
+    "i" = "Segment-level DSP: use {.fn quantify} instead (same call shape \\
+           you already use)."
+  ), class = c("reindeer_moved_error", "reindeer_error"))
+}
+
 #' Functions moved to companion packages
 #'
 #' These names were exported from earlier versions of `reindeer` but have
@@ -94,6 +109,9 @@ enrich_egg <- function(...) {
 #'   [erodex](https://github.com/humlab-speech/erodex).
 #' * `enrich_egg` is removed outright (its `eggstract::enrich_with_egg`
 #'   target never existed). Use [quantify_egg()] instead.
+#' * `enrich()` is removed outright; corpus-level DSP now goes through
+#'   [quantify()] (`quantify(corp, .using = fn)`), segment-level metadata
+#'   joins through [biographize()], segment-level DSP through [quantify()].
 #'
 #' @name deprecated-moved-functions
 #' @param ... Ignored — the stub never executes the call.
