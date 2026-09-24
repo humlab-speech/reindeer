@@ -293,3 +293,66 @@ test_that("quantify handles list output from DSP", {
   expect_gt(nrow(result), 0)
   expect_true(any(grepl("f0|intensity|quality", names(result))))
 })
+
+test_that("quantify(segs, character_name) reads back a registered, already-computed track", {
+  ae <- create_isolated_ae_corpus()
+  quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
+           .verbose = FALSE, .parallel = FALSE)
+
+  segs <- query(ae, "Phonetic == n", lazy = FALSE)
+  segs@db_path <- ae@basePath
+  result <- quantify(segs, "RMS", .verbose = FALSE, .parallel = FALSE)
+
+  expect_true(is.data.frame(result))
+  expect_gt(nrow(result), 0)
+  expect_true(any(grepl("^RMS", names(result))))
+})
+
+test_that("quantify(segs, character vector) reads back multiple registered tracks", {
+  ae <- create_isolated_ae_corpus()
+  quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
+           .verbose = FALSE, .parallel = FALSE)
+  quantify(ae, .using = wrassp::ksvF0, name = "F0", fileExtension = "f0",
+           .verbose = FALSE, .parallel = FALSE)
+
+  segs <- query(ae, "Phonetic == n", lazy = FALSE)
+  segs@db_path <- ae@basePath
+  result <- quantify(segs, c("RMS", "F0"), .verbose = FALSE, .parallel = FALSE)
+
+  expect_true(any(grepl("^RMS", names(result))))
+  expect_true(any(grepl("^F0", names(result))))
+})
+
+test_that("quantify(segs, character_name) errors on an unregistered track", {
+  ae <- create_isolated_ae_corpus()
+  segs <- query(ae, "Phonetic == n", lazy = FALSE)
+  segs@db_path <- ae@basePath
+  expect_error(
+    quantify(segs, "NoSuchTrack", .verbose = FALSE, .parallel = FALSE),
+    class = "reindeer_error"
+  )
+})
+
+test_that("quantify(segs, dsp_function) rejects mixed character/non-character input", {
+  ae <- create_isolated_ae_corpus()
+  segs <- query(ae, "Phonetic == n", lazy = FALSE)
+  segs@db_path <- ae@basePath
+  expect_error(
+    quantify(segs, list("RMS", wrassp::rmsana), .verbose = FALSE),
+    class = "reindeer_error"
+  )
+})
+
+test_that("quantify(segs, character_name) falls back to compute when the on-the-fly recipe is registered but file is missing", {
+  ae <- create_isolated_ae_corpus()
+  quantify(ae, name = "rms_recipe", fileExtension = "rms",
+           generator = list(`function` = "rmsana", package = "wrassp",
+                            version = as.character(utils::packageVersion("wrassp"))))
+  # No files were actually written (connect-existing, documentation-only) —
+  # the character path must recompute via the stored recipe rather than error.
+  segs <- query(ae, "Phonetic == n", lazy = FALSE)
+  segs@db_path <- ae@basePath
+  result <- quantify(segs, "rms_recipe", .verbose = FALSE, .parallel = FALSE)
+  expect_true(is.data.frame(result))
+  expect_gt(nrow(result), 0)
+})

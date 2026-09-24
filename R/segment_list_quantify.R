@@ -78,7 +78,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     msg = "object must be a segment_list"
   )
   assertthat::assert_that(
-    is.function(dsp_function) || is.character(dsp_function),
+    is.function(dsp_function) || is.character(dsp_function) || is.list(dsp_function),
     msg = "dsp_function must be a function or character string"
   )
   assertthat::assert_that(
@@ -89,6 +89,22 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     assertthat::is.flag(.optimize),
     msg = "Logical flags must be TRUE or FALSE"
   )
+
+  if (is.list(dsp_function) && !is.function(dsp_function)) {
+    cli::cli_abort(c(
+      "{.arg dsp_function} must be a function or a character vector of registered track names.",
+      "x" = "Got a {.cls {class(dsp_function)}}."
+    ), class = c("reindeer_track_validation_error", "reindeer_error"))
+  }
+
+  if (is.character(dsp_function)) {
+    return(.quantify_segment_list_by_name(
+      object, dsp_function, ...,
+      .at = .at, .verbose = .verbose, .parallel = .parallel,
+      .workers = .workers, .use_cache = .use_cache,
+      .cache_dir = .cache_dir, .cache_format = match.arg(.cache_format)
+    ))
+  }
 
   # Match cache format argument
   .cache_format <- match.arg(.cache_format)
@@ -380,4 +396,134 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
     list(spec)
   )
   invisible(object)
+}
+
+#' Character-track-name branch of quantify.segment_list
+#'
+#' Looks each name up in the corpus' `ssffTrackDefinitions`. If the track
+#' has files on disk (registered via `quantify(corp, .using = fn)`), reads
+#' the segment's window directly with `superassp::read_track()`. If the
+#' track was registered without computation (connect-existing mode with a
+#' `generator` recipe but no files — e.g. `suggestCaching == FALSE` at
+#' registration) and no file exists for a bundle, recomputes via the
+#' stored `generator$function`/`generator$package` recipe instead.
+#'
+#' @noRd
+.quantify_segment_list_by_name <- function(object, track_names, ...,
+                                           .at, .verbose, .parallel, .workers,
+                                           .use_cache, .cache_dir, .cache_format) {
+  corpus_obj <- get_corpus_cached(object, NULL)
+  if (is.null(corpus_obj)) {
+    cli::cli_abort(c(
+      "Cannot access corpus",
+      "x" = "Unable to load corpus from db_path: {object@db_path}"
+    ), class = c("reindeer_corpus_access_error", "reindeer_error"))
+  }
+
+  dbConfig <- load_DBconfig(corpus_obj)
+  all_tracks <- dbConfig$ssffTrackDefinitions %||% list()
+  all_names <- vapply(all_tracks, function(t) t$name %||% "", character(1))
+
+  unknown <- setdiff(track_names, all_names)
+  if (length(unknown) > 0) {
+    cli::cli_abort(c(
+      "Unregistered track name{?s}: {.val {unknown}}.",
+      "i" = "Register with {.code quantify(corpus, .using = fn)} or {.code quantify(corpus, name = ..., fileExtension = ...)} first.",
+      "i" = "Currently registered: {.val {all_names}}."
+    ), class = c("reindeer_unknown_track_error", "reindeer_error"))
+  }
+
+  seg_df <- as.data.frame(object)
+  media_ext <- corpus_obj@config$mediafileExtension %||% "wav"
+  time_points <- if (is.null(.at)) list(NA_real_) else as.list(.at)
+
+  results <- list()
+  for (tn in track_names) {
+    track_def <- all_tracks[[match(tn, all_names)]]
+    for (i in seq_len(nrow(seg_df))) {
+      seg <- seg_df[i, ]
+      signal_dir <- file.path(corpus_obj@basePath, paste0(seg$session, session.suffix),
+                              paste0(seg$bundle, bundle.dir.suffix))
+      track_file <- list.files(signal_dir,
+                               pattern = paste0("^", seg$bundle, "\\.", track_def$fileExtension, "$"),
+                               full.names = TRUE)
+
+      for (tp in time_points) {
+        if (is.na(tp)) {
+          begin <- seg$start / 1000; end <- seg$end / 1000
+        } else {
+          t_abs <- (seg$start + tp * (seg$end - seg$start)) / 1000
+          begin <- t_abs; end <- t_abs
+        }
+
+        row_data <- NULL
+        if (length(track_file) == 1L && file.exists(track_file)) {
+          col_arg <- if (!is.null(track_def$from)) track_def$from else track_def$columnName %||% tn
+          track_data <- tryCatch(
+            superassp::read_track(track_file, begin = begin, end = end, tracks = col_arg),
+            error = function(e) NULL
+          )
+          if (!is.null(track_data) && length(track_data) >= 1) {
+            mat <- track_data[[1]]
+            if (!is.null(track_def$index)) mat <- mat[, track_def$index, drop = FALSE]
+            row_data <- as.data.frame(mat[nrow(mat), , drop = FALSE])
+            names(row_data) <- if (ncol(row_data) > 1) {
+              paste0(tn, seq_len(ncol(row_data)))
+            } else {
+              tn
+            }
+          }
+        }
+
+        if (is.null(row_data) && !is.null(track_def$generator)) {
+          gen <- track_def$generator
+          if (is.null(gen$package) || is.na(gen$package)) {
+            cli::cli_abort("Track {.val {tn}} has no on-disk file and no resolvable {.arg generator$package} to recompute from.")
+          }
+          dsp_fun <- tryCatch(get(gen$`function`, envir = asNamespace(gen$package)),
+                              error = function(e) NULL)
+          if (is.null(dsp_fun)) {
+            cli::cli_abort("Cannot resolve {.code {gen$package}::{gen$`function`}} to recompute {.val {tn}}.")
+          }
+          signal_file <- list.files(signal_dir, pattern = paste0("^", seg$bundle, "\\.", media_ext, "$"),
+                                    full.names = TRUE)
+          if (length(signal_file) != 1L) next
+          computed <- tryCatch(
+            do.call(dsp_fun, c(list(listOfFiles = signal_file), gen$args %||% list(),
+                               list(toFile = FALSE, verbose = FALSE))),
+            error = function(e) NULL
+          )
+          if (!is.null(computed) && is.list(computed) && length(computed) >= 1) {
+            mat <- computed[[1]]
+            row_data <- as.data.frame(mat[min(nrow(mat), max(1, round((if (is.na(tp)) 0.5 else tp) * nrow(mat)))), , drop = FALSE])
+            names(row_data) <- tn
+          }
+        }
+
+        if (!is.null(row_data)) {
+          key <- paste(i, tp, sep = "|")
+          if (is.null(results[[key]])) {
+            results[[key]] <- cbind(seg, row_data)
+            if (!is.na(tp)) results[[key]]$.time_point <- tp
+          } else {
+            results[[key]] <- cbind(results[[key]], row_data)
+          }
+        }
+      }
+    }
+  }
+
+  if (length(results) == 0) {
+    if (.verbose) cli::cli_alert_warning("No results generated")
+    return(extended_segment_list(data = seg_df))
+  }
+
+  combined <- data.table::rbindlist(results, fill = TRUE) |> tibble::as_tibble()
+  dsp_cols <- setdiff(names(combined), names(seg_df))
+
+  result <- extended_segment_list(
+    data = combined, db_uuid = object@db_uuid, db_path = object@db_path,
+    dsp_function = paste(track_names, collapse = "|"), dsp_columns = dsp_cols
+  )
+  .record_step(result, object, "quantify", sys.call(-2L))
 }
