@@ -100,3 +100,47 @@ test_that("validate_corpus returns empty tibble when no JSON files present", {
     expect_true("file" %in% names(res))
   }
 })
+
+test_that("ssffTrack schema accepts a generator block and from/index", {
+  skip_if_no_jsonvalidate()
+  validator <- reindeer:::.get_schema_validator("dbconfig.schema.json")
+  skip_if(is.null(validator), "jsonvalidate engine unavailable")
+
+  db_config <- list(
+    name = "test", UUID = "abc-123",
+    mediafileExtension = "wav",
+    levelDefinitions = list(), linkDefinitions = list(),
+    ssffTrackDefinitions = list(
+      list(
+        name = "F1", columnName = "F[Hz]", fileExtension = "fms",
+        from = "F[Hz]", index = 1L,
+        generator = list(
+          `function` = "trk_formant_forest",
+          package = "superassp",
+          version = "3.1.0",
+          args = list(windowSize = 20),
+          generatedAt = "2026-09-24T10:00:00+0000"
+        )
+      )
+    )
+  )
+  json <- jsonlite::toJSON(db_config, auto_unbox = TRUE, force = TRUE)
+  expect_true(isTRUE(validator(as.character(json))))
+})
+
+test_that("ssffTrack schema still accepts a legacy track with no generator", {
+  skip_if_no_jsonvalidate()
+  validator <- reindeer:::.get_schema_validator("dbconfig.schema.json")
+  skip_if(is.null(validator), "jsonvalidate engine unavailable")
+
+  db_config <- list(
+    name = "test", UUID = "abc-123",
+    mediafileExtension = "wav",
+    levelDefinitions = list(), linkDefinitions = list(),
+    ssffTrackDefinitions = list(
+      list(name = "rms", columnName = "rms", fileExtension = "rms")
+    )
+  )
+  json <- jsonlite::toJSON(db_config, auto_unbox = TRUE, force = TRUE)
+  expect_true(isTRUE(validator(as.character(json))))
+})

@@ -38,7 +38,20 @@
       "properties": {
         "name": { "type": "string" },
         "columnName": { "type": "string" },
-        "fileExtension": { "type": "string" }
+        "fileExtension": { "type": "string" },
+        "from": { "type": "string" },
+        "index": { "type": "integer", "minimum": 1 },
+        "generator": {
+          "type": "object",
+          "properties": {
+            "function": { "type": "string" },
+            "package": { "type": ["string", "null"] },
+            "version": { "type": ["string", "null"] },
+            "args": { "type": "object" },
+            "generatedAt": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
       },
       "additionalProperties": true
     },
