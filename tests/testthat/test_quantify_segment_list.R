@@ -359,7 +359,15 @@ test_that("quantify(segs, character_name) falls back to compute when the on-the-
   # Guard against the fallback branch silently returning the same
   # arbitrary-in-file row for every segment (e.g. treating a relative
   # time point as a fraction of the whole recording instead of indexing
-  # by the segment's own absolute start time): segments with different
-  # start/end times must genuinely produce different measurements.
-  expect_gt(length(unique(result$rms_recipe)), 1)
+  # by the segment's own absolute start time). Comparing across the full
+  # `segs` set isn't a sharp enough test here: cross-bundle content
+  # variation alone would produce multiple unique values even under the
+  # bug (each bundle is a different recording), masking a same-bundle
+  # regression. Narrow it to two segments known to share one bundle —
+  # that's where the bug's effect (identical value regardless of
+  # in-bundle position) would actually show up.
+  same_bundle <- segs[segs$bundle == segs$bundle[1], ][1:2, ]
+  same_bundle@db_path <- ae@basePath
+  result2 <- quantify(same_bundle, "rms_recipe", .verbose = FALSE, .parallel = FALSE)
+  expect_true(nrow(result2) < 2 || length(unique(result2$rms_recipe)) > 1)
 })
