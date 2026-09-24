@@ -66,7 +66,7 @@ NULL
     `function` = identity$`function`,
     package = identity$package,
     version = identity$version,
-    args = if (length(user_params)) user_params else list(),
+    args = if (length(user_params)) user_params else stats::setNames(list(), character(0)),
     generatedAt = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z")
   )
 }

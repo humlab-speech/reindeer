@@ -41,7 +41,9 @@ test_that("generator with empty args round-trips through toJSON as an object, no
     superassp::trk_rms, "superassp::trk_rms", user_params = list()
   )
   json <- jsonlite::toJSON(list(generator = block), auto_unbox = TRUE, force = TRUE)
+  # Verify the JSON string contains an object {}, not an array []
+  expect_match(as.character(json), '"args":\\{\\}')
+  # Also verify round-trip produces a list
   parsed <- jsonlite::fromJSON(json, simplifyVector = FALSE)
   expect_true(is.list(parsed$generator$args))
-  expect_null(names(parsed$generator$args))  # empty named list -> {} -> empty list on read-back, not a vector
 })
