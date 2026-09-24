@@ -77,8 +77,15 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     S7::S7_inherits(object, segment_list),
     msg = "object must be a segment_list"
   )
+  if (is.list(dsp_function) && !is.function(dsp_function)) {
+    cli::cli_abort(c(
+      "{.arg dsp_function} must be a function or a character vector of registered track names.",
+      "x" = "Got a {.cls {class(dsp_function)}}."
+    ), class = c("reindeer_track_validation_error", "reindeer_error"))
+  }
+
   assertthat::assert_that(
-    is.function(dsp_function) || is.character(dsp_function) || is.list(dsp_function),
+    is.function(dsp_function) || is.character(dsp_function),
     msg = "dsp_function must be a function or character string"
   )
   assertthat::assert_that(
@@ -89,13 +96,6 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     assertthat::is.flag(.optimize),
     msg = "Logical flags must be TRUE or FALSE"
   )
-
-  if (is.list(dsp_function) && !is.function(dsp_function)) {
-    cli::cli_abort(c(
-      "{.arg dsp_function} must be a function or a character vector of registered track names.",
-      "x" = "Got a {.cls {class(dsp_function)}}."
-    ), class = c("reindeer_track_validation_error", "reindeer_error"))
-  }
 
   if (is.character(dsp_function)) {
     return(.quantify_segment_list_by_name(
@@ -495,7 +495,11 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
           )
           if (!is.null(computed) && is.list(computed) && length(computed) >= 1) {
             mat <- computed[[1]]
-            row_data <- as.data.frame(mat[min(nrow(mat), max(1, round((if (is.na(tp)) 0.5 else tp) * nrow(mat)))), , drop = FALSE])
+            sample_rate <- attr(computed, "sampleRate") %||% 100
+            start_time  <- attr(computed, "startTime") %||% 0
+            frame_idx <- round((begin - start_time) * sample_rate) + 1L
+            frame_idx <- max(1L, min(nrow(mat), frame_idx))
+            row_data <- as.data.frame(mat[frame_idx, , drop = FALSE])
             names(row_data) <- tn
           }
         }

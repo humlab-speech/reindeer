@@ -355,4 +355,11 @@ test_that("quantify(segs, character_name) falls back to compute when the on-the-
   result <- quantify(segs, "rms_recipe", .verbose = FALSE, .parallel = FALSE)
   expect_true(is.data.frame(result))
   expect_gt(nrow(result), 0)
+
+  # Guard against the fallback branch silently returning the same
+  # arbitrary-in-file row for every segment (e.g. treating a relative
+  # time point as a fraction of the whole recording instead of indexing
+  # by the segment's own absolute start time): segments with different
+  # start/end times must genuinely produce different measurements.
+  expect_gt(length(unique(result$rms_recipe)), 1)
 })
