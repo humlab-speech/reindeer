@@ -13,7 +13,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 ## Why metadata matters in reindeer
 
-Speaker metadata is what lets `quantify()` and `enrich()` pick the right
+Speaker metadata is what lets `quantify()` pick the right
 DSP parameters for each recording — child versus adult, female versus
 male, fast versus slow speech. Set the metadata once, then every
 downstream analysis uses age- and gender-aware windows, formant ranges
@@ -119,7 +119,7 @@ get_metadata(corp, session_pattern = "0000") |> nrow()
 ```
 
 For most pipelines you do not need to call this directly — use
-`enrich(segs, corp)` and reindeer joins the metadata for you.
+`biographize(segs, corp)` and reindeer joins the metadata for you.
 
 ## Round-tripping through a spreadsheet
 

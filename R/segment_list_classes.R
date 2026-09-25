@@ -146,8 +146,7 @@ is_segment_list <- function(x) {
 #' Extended Segment List S7 Class
 #'
 #' An S7 class representing a segment list with DSP-derived measurements.
-#' Returned by [quantify()] and by the segment-list DSP path of
-#' [enrich()]. Inherits everything from `segment_list` (and from
+#' Returned by [quantify()]. Inherits everything from `segment_list` (and from
 #' `tbl_df` / `tbl` / `data.frame`), so dplyr verbs and the tidyverse
 #' work transparently.
 #'

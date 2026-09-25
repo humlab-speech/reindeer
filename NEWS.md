@@ -1,5 +1,25 @@
 # reindeer (development version)
 
+- **`enrich()` is removed** (hard stub, no deprecation window — same
+  precedent as `enrich_egg()`'s removal). `quantify()` now covers
+  everything: `quantify(corp, .using = fn)` runs a DSP routine across
+  every signal file in a corpus (what `enrich(corp, .using = fn)` did),
+  writes the resulting SSFF files, and — new — registers each output
+  track in `ssffTrackDefinitions` with a `generator` block recording the
+  producing function, package, version, and any explicit non-default
+  arguments. `quantify(corp, name = ..., fileExtension = ...)` (or
+  `from`/`index` for one column of an existing multi-column track)
+  connects a track definition to files that already exist on disk
+  without computing anything. `quantify(segs, "TrackName")` (or a
+  character vector of names) reads a registered track back for a
+  segment_list, recomputing on the fly if the track was registered
+  without files. Segment-level metadata joins — `enrich(segs, corp)`'s
+  default behaviour — are unchanged and now go through `biographize()`
+  directly. `inst/schemas/dbconfig.schema.json` documents the new
+  `generator`/`from`/`index` keys on `ssffTrackDefinitions` entries
+  (previously accepted only via the schema's pre-existing
+  `additionalProperties: true`, now explicit).
+
 - Fixed a malformed `Authors@R` field (stray trailing paren) that made
   `DESCRIPTION` fail to parse under R CMD check.
 

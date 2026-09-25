@@ -24,7 +24,7 @@ value for every bundle, with inheritance applied in
 \strong{bundle > session > database} precedence — a value set at a more
 specific scope wins over a less specific one. This is what most
 analyses want — feed it to \code{\link[dplyr:left_join]{dplyr::left_join}} against a
-\code{segment_list}, or use \link[=enrich]{enrich(segs, corp)} to do the join
+\code{segment_list}, or use \link[=biographize]{biographize(segs, corp)} to do the join
 for you.
 }
 \examples{
@@ -35,7 +35,7 @@ get_metadata(corp, session_pattern = "0000")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=set_metadata]{set_metadata()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=enrich]{enrich()}}
+\code{\link[=set_metadata]{set_metadata()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=biographize]{biographize()}}
 
 Other metadata:
 \code{\link[=add_metadata]{add_metadata()}},

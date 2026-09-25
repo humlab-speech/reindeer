@@ -1,3 +1,6 @@
+#' @include segment_list_classes.R reindeer_lazy_segment_list.R
+NULL
+
 #' Extract acoustic measurements from segments
 #'
 #' Apply a DSP function (typically from `superassp`) to every segment
@@ -15,7 +18,11 @@
 #'   metadata-derived ones (`nominalF1`, `windowSize`, ...).
 #' @param .at Relative time points to sample, each in `[0, 1]`. A scalar
 #'   gives one row per segment (e.g. `0.5` for midpoint); a vector
-#'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`).
+#'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`). Required (no default) when
+#'   `dsp_function` is a character vector of registered track names —
+#'   character-mode reads one specific time point per segment, so there
+#'   is no unambiguous "whole contour" fallback the way there is for a
+#'   DSP function.
 #' @param .use_metadata Look up DSP parameters from speaker metadata.
 #'   Default `TRUE`. See [dsp_parameters()] to preview.
 #' @param .use_cache Reuse persistent results when the cache key
@@ -29,6 +36,10 @@
 #' @param .verbose Print a per-step progress summary.
 #' @param .optimize Use optimized computation (default `TRUE`; turn off
 #'   only for debugging).
+#' @details When `dsp_function` is a character vector of registered
+#'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,
+#'   and `.cache_format` have no effect — reading or recomputing an
+#'   already-registered track doesn't go through the DSP result cache.
 #' @return An [extended_segment_list]: every column of the input
 #'   `segment_list` (see [query()] for the column inventory), plus one
 #'   column per DSP output column produced by `dsp_function` (consult
@@ -40,7 +51,7 @@
 #'   added columns are also recorded on the object as the S7 properties
 #'   `@dsp_function` and `@dsp_columns`.
 #' @family signal
-#' @seealso [enrich()], [dsp_parameters()], [inspect_cache()]
+#' @seealso [biographize()], [dsp_parameters()], [inspect_cache()]
 #' @examplesIf interactive()
 #' corp <- demo_corpus()
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
@@ -77,6 +88,13 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     S7::S7_inherits(object, segment_list),
     msg = "object must be a segment_list"
   )
+  if (is.list(dsp_function) && !is.function(dsp_function)) {
+    cli::cli_abort(c(
+      "{.arg dsp_function} must be a function or a character vector of registered track names.",
+      "x" = "Got a {.cls {class(dsp_function)}}."
+    ), class = c("reindeer_track_validation_error", "reindeer_error"))
+  }
+
   assertthat::assert_that(
     is.function(dsp_function) || is.character(dsp_function),
     msg = "dsp_function must be a function or character string"
@@ -89,6 +107,15 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     assertthat::is.flag(.optimize),
     msg = "Logical flags must be TRUE or FALSE"
   )
+
+  if (is.character(dsp_function)) {
+    return(.quantify_segment_list_by_name(
+      object, dsp_function, ...,
+      .at = .at, .verbose = .verbose, .parallel = .parallel,
+      .workers = .workers, .use_cache = .use_cache,
+      .cache_dir = .cache_dir, .cache_format = match.arg(.cache_format)
+    ))
+  }
 
   # Match cache format argument
   .cache_format <- match.arg(.cache_format)
@@ -152,7 +179,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     # Fetch only needed metadata from correct table (metadata_bundle).
     # Filtering in SQL keeps the transfer proportional to the query result
     # rather than to the whole corpus; the composite key matches the expression
-    # used by enrich().
+    # used by biographize().
     db_uuid <- corpus_obj@.uuid
     ub_keys <- unique(paste(unique_bundles$session, unique_bundles$bundle, sep = "||"))
     placeholders <- paste(rep("?", length(ub_keys)), collapse = ", ")
@@ -380,4 +407,171 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
     list(spec)
   )
   invisible(object)
+}
+
+#' Character-track-name branch of quantify.segment_list
+#'
+#' Looks each name up in the corpus' `ssffTrackDefinitions`. If the track
+#' has files on disk (registered via `quantify(corp, .using = fn)`), reads
+#' the segment's window directly with `superassp::read_track()`. If the
+#' track was registered without computation (connect-existing mode with a
+#' `generator` recipe but no files — e.g. `suggestCaching == FALSE` at
+#' registration) and no file exists for a bundle, recomputes via the
+#' stored `generator$function`/`generator$package` recipe instead.
+#'
+#' @noRd
+.quantify_segment_list_by_name <- function(object, track_names, ...,
+                                           .at, .verbose, .parallel, .workers,
+                                           .use_cache, .cache_dir, .cache_format) {
+  corpus_obj <- get_corpus_cached(object, NULL)
+  if (is.null(corpus_obj)) {
+    cli::cli_abort(c(
+      "Cannot access corpus",
+      "x" = "Unable to load corpus from db_path: {object@db_path}"
+    ), class = c("reindeer_corpus_access_error", "reindeer_error"))
+  }
+
+  dbConfig <- load_DBconfig(corpus_obj)
+  all_tracks <- dbConfig$ssffTrackDefinitions %||% list()
+  all_names <- vapply(all_tracks, function(t) t$name %||% "", character(1))
+
+  unknown <- setdiff(track_names, all_names)
+  if (length(unknown) > 0) {
+    cli::cli_abort(c(
+      "Unregistered track name{?s}: {.val {unknown}}.",
+      "i" = "Register with {.code quantify(corpus, .using = fn)} or {.code quantify(corpus, name = ..., fileExtension = ...)} first.",
+      "i" = "Currently registered: {.val {all_names}}."
+    ), class = c("reindeer_unknown_track_error", "reindeer_error"))
+  }
+
+  if (is.null(.at)) {
+    cli::cli_abort(c(
+      "{.arg .at} is required when {.arg dsp_function} names registered tracks.",
+      "i" = "Character-mode quantify() reads one specific time point per segment; pass e.g. {.code .at = 0.5} for the midpoint.",
+      "i" = "To get every frame of a segment's contour, pass the DSP function itself (not a character vector) with {.code .at = NULL}."
+    ), class = c("reindeer_quantify_missing_at_error", "reindeer_error"))
+  }
+
+  dots <- list(...)
+  if (length(dots) > 0) {
+    cli::cli_abort(c(
+      "Extra argument{?s} {.val {names(dots)}} have no effect when {.arg dsp_function} names registered tracks.",
+      "i" = "Registered-track reads don't take DSP parameters — pass the DSP function itself instead of a character vector if you need that."
+    ), class = c("reindeer_quantify_unused_arg_error", "reindeer_error"))
+  }
+
+  seg_df <- as.data.frame(object)
+  media_ext <- corpus_obj@config$mediafileExtension %||% "wav"
+  time_points <- as.list(.at)
+
+  results <- list()
+  for (tn in track_names) {
+    track_def <- all_tracks[[match(tn, all_names)]]
+    for (i in seq_len(nrow(seg_df))) {
+      seg <- seg_df[i, ]
+      signal_dir <- file.path(corpus_obj@basePath, paste0(seg$session, session.suffix),
+                              paste0(seg$bundle, bundle.dir.suffix))
+      track_file <- list.files(signal_dir,
+                               pattern = paste0("^", seg$bundle, "\\.", track_def$fileExtension, "$"),
+                               full.names = TRUE)
+
+      for (tp in time_points) {
+        t_abs <- (seg$start + tp * (seg$end - seg$start)) / 1000
+        begin <- t_abs; end <- t_abs
+
+        row_data <- NULL
+        if (length(track_file) == 1L && file.exists(track_file)) {
+          col_arg <- if (!is.null(track_def$from)) track_def$from else track_def$columnName %||% tn
+          track_data <- tryCatch(
+            superassp::read_track(track_file, begin = begin, end = end, tracks = col_arg),
+            error = function(e) NULL
+          )
+          if (!is.null(track_data) && length(track_data) >= 1) {
+            mat <- track_data[[1]]
+            if (!is.null(track_def$index)) mat <- mat[, track_def$index, drop = FALSE]
+            row_data <- as.data.frame(mat[nrow(mat), , drop = FALSE])
+            names(row_data) <- if (ncol(row_data) > 1) {
+              paste0(tn, seq_len(ncol(row_data)))
+            } else {
+              tn
+            }
+          }
+        }
+
+        if (is.null(row_data) && !is.null(track_def$generator)) {
+          gen <- track_def$generator
+          if (is.null(gen$package) || is.na(gen$package)) {
+            cli::cli_abort("Track {.val {tn}} has no on-disk file and no resolvable {.arg generator$package} to recompute from.")
+          }
+          dsp_fun <- tryCatch(get(gen$`function`, envir = asNamespace(gen$package)),
+                              error = function(e) NULL)
+          if (is.null(dsp_fun)) {
+            cli::cli_abort("Cannot resolve {.code {gen$package}::{gen$`function`}} to recompute {.val {tn}}.")
+          }
+          signal_file <- list.files(signal_dir, pattern = paste0("^", seg$bundle, "\\.", media_ext, "$"),
+                                    full.names = TRUE)
+          if (length(signal_file) != 1L) next
+          computed <- tryCatch(
+            do.call(dsp_fun, c(list(listOfFiles = signal_file), gen$args %||% list(),
+                               list(toFile = FALSE, verbose = FALSE))),
+            error = function(e) NULL
+          )
+          if (!is.null(computed) && is.list(computed) && length(computed) >= 1) {
+            elem_idx <- if (!is.null(track_def$from) && !is.null(names(computed)) &&
+                             track_def$from %in% names(computed)) {
+              which(names(computed) == track_def$from)
+            } else {
+              1L
+            }
+            mat <- computed[[elem_idx]]
+            if (!is.null(track_def$index)) mat <- mat[, track_def$index, drop = FALSE]
+            if (is.null(attr(computed, "sampleRate"))) {
+              cli::cli_abort("Recomputed {.val {tn}} has no {.val sampleRate} attribute; cannot align it to the segment's time.")
+            }
+            sample_rate <- attr(computed, "sampleRate")
+            start_time  <- attr(computed, "startTime") %||% 0
+            frame_idx <- round((begin - start_time) * sample_rate) + 1L
+            frame_idx <- max(1L, min(nrow(mat), frame_idx))
+            row_data <- as.data.frame(mat[frame_idx, , drop = FALSE])
+            names(row_data) <- if (ncol(row_data) > 1) {
+              paste0(tn, seq_len(ncol(row_data)))
+            } else {
+              tn
+            }
+          }
+        }
+
+        if (!is.null(row_data)) {
+          key <- paste(i, tp, sep = "|")
+          if (is.null(results[[key]])) {
+            results[[key]] <- cbind(seg, row_data)
+            if (!is.na(tp)) results[[key]]$.time_point <- tp
+          } else {
+            results[[key]] <- cbind(results[[key]], row_data)
+          }
+        }
+      }
+    }
+  }
+
+  expected_n <- nrow(seg_df) * length(time_points)
+  if (length(results) < expected_n && length(results) > 0) {
+    cli::cli_alert_warning(
+      "{expected_n - length(results)} of {expected_n} segment/time-point combination{?s} produced no measurement and {?was/were} dropped."
+    )
+  }
+
+  if (length(results) == 0) {
+    if (.verbose) cli::cli_alert_warning("No results generated")
+    return(extended_segment_list(data = seg_df))
+  }
+
+  combined <- data.table::rbindlist(results, fill = TRUE) |> tibble::as_tibble()
+  dsp_cols <- setdiff(names(combined), names(seg_df))
+
+  result <- extended_segment_list(
+    data = combined, db_uuid = object@db_uuid, db_path = object@db_path,
+    dsp_function = paste(track_names, collapse = "|"), dsp_columns = dsp_cols
+  )
+  .record_step(result, object, "quantify", sys.call(-2L))
 }

@@ -56,7 +56,7 @@ vowels <- query(corp, "Phonetic =~ [aeiou]")
 formants <- quantify(vowels, superassp::trk_formant_forest, .at = 0.5)
 
 # 3. Join speaker metadata
-data <- enrich(formants, corp)
+data <- biographize(formants, corp)
 
 # 4. Summarise with dplyr
 data |>
@@ -72,7 +72,7 @@ See `vignette("getting_started")` for the expanded walkthrough.
 
 ### Speaker-aware DSP
 
-Set Age / Gender once; every `quantify()` and `enrich()` call picks
+Set Age / Gender once; every `quantify()` call picks
 appropriate formant ranges, window lengths, and pitch limits.
 
 ```r

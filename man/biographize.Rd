@@ -22,9 +22,9 @@ the same \code{lazy_segment_list} with a deferred step appended).
 }
 \description{
 Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
-containing session and bundle columns. This is the metadata half of
-\code{\link[=enrich]{enrich()}}; call it directly when you want only the metadata join, or
-pass a \code{lazy_segment_list} to defer the join until \code{\link[=collect]{collect()}}.
+containing session and bundle columns. Call it directly when you want
+only the metadata join, or pass a \code{lazy_segment_list} to defer the join
+until \code{\link[=collect]{collect()}}.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
@@ -34,8 +34,6 @@ enriched <- biographize(segs, corp)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=enrich]{enrich()}} for the combined metadata + DSP entry point.
-
 Other metadata:
 \code{\link[=add_metadata]{add_metadata()}},
 \code{\link[=get_metadata]{get_metadata()}}

@@ -11,6 +11,7 @@
 \alias{reminisce_tracks}
 \alias{list_simulations}
 \alias{enrich_egg}
+\alias{enrich}
 \alias{deprecated-moved-functions}
 \title{Functions moved to companion packages}
 \usage{
@@ -33,6 +34,8 @@ reminisce_tracks(...)
 list_simulations(...)
 
 enrich_egg(...)
+
+enrich(...)
 }
 \arguments{
 \item{...}{Ignored — the stub never executes the call.}
@@ -58,6 +61,9 @@ Use \code{\link[=propose_annotations]{propose_annotations()}} for the reindeer-s
 \href{https://github.com/humlab-speech/erodex}{erodex}.
 \item \code{enrich_egg} is removed outright (its \code{eggstract::enrich_with_egg}
 target never existed). Use \code{\link[=quantify_egg]{quantify_egg()}} instead.
+\item \code{enrich()} is removed outright; corpus-level DSP now goes through
+\code{\link[=quantify]{quantify()}} (\code{quantify(corp, .using = fn)}), segment-level metadata
+joins through \code{\link[=biographize]{biographize()}}, segment-level DSP through \code{\link[=quantify]{quantify()}}.
 }
 }
 \keyword{internal}

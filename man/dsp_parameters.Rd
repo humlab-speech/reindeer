@@ -24,7 +24,7 @@ nominalF3, plus any others present).
 }
 \description{
 Returns the age/gender-appropriate DSP parameters that
-\code{\link[=enrich]{enrich()}} and \code{\link[=quantify]{quantify()}} would pass to a DSP routine when
+\code{\link[=quantify]{quantify()}} would pass to a DSP routine when
 \code{.use_metadata = TRUE}. Use this to preview what \code{windowSize},
 \code{minF}, \code{nominalF1/F2/F3} etc. will be applied before you run
 a quantification, or to compare two speakers side-by-side.

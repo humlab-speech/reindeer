@@ -17,8 +17,7 @@ eval_dsp <- requireNamespace("superassp", quietly = TRUE)
 
 ## What reindeer caches
 
-When you call `quantify(..., .use_cache = TRUE)` or
-`enrich(corpus, ..., .use_cache = TRUE)`, results are written to a
+When you call `quantify(corpus, .using = fn, .use_cache = TRUE)`, results are written to a
 persistent cache in `<corpus>/.quantify_cache/`. The next time you run
 the same call with the same parameters, reindeer reads the result from
 disk instead of re-running the DSP.

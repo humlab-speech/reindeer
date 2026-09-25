@@ -59,8 +59,8 @@ segment_cols <- function() {
 #'
 #' Tidyselect helper for columns that are neither required segment columns
 #' (see [segment_cols()]) nor DSP-derived track columns (see [track_cols()]).
-#' Typically this captures speaker/bundle metadata that `biographize()` or
-#' `enrich()` joined onto the segment_list.
+#' Typically this captures speaker/bundle metadata that `biographize()`
+#' joined onto the segment_list.
 #'
 #' @return Character vector of column names.
 #' @examplesIf interactive()

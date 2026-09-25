@@ -22,25 +22,21 @@ test_that("biographize on a lazy_segment_list defers (stays lazy)", {
   expect_equal(b@query_parts$post_transforms[[1]]$type, "biographize")
 })
 
-test_that("enrich(metadata) on a lazy_segment_list defers via biographize", {
-  ae <- create_isolated_ae_corpus()
-  lz <- query(ae, "Phonetic == n", lazy = TRUE)
-
-  out <- enrich(lz, ae)  # metadata path (default with = "metadata")
-
-  expect_true(S7::S7_inherits(out, lazy_segment_list))
-  expect_false(out@.state$materialized)
-  expect_equal(out@query_parts$post_transforms[[1]]$type, "biographize")
+test_that("biographize on a lazy_segment_list defers (already covered above; enrich() is removed)", {
+  # Superseded by the "biographize is a public export" /
+  # "biographize on a lazy_segment_list defers" tests earlier in this file.
+  # enrich() no longer exists — see test_deprecated_enrich.R.
+  succeed()
 })
 
-test_that("enrich(.using) on a lazy_segment_list defers via quantify", {
+test_that("quantify(fn) on a lazy_segment_list defers (replaces the old enrich(.using) test)", {
   ae <- create_isolated_ae_corpus()
   lz <- query(ae, "Phonetic == n", lazy = TRUE)
 
   called <- 0L
   fake_dsp <- function(file, ...) { called <<- called + 1L; list(f0 = 1) }
 
-  out <- enrich(lz, .using = fake_dsp)
+  out <- quantify(lz, fake_dsp)
 
   expect_true(S7::S7_inherits(out, lazy_segment_list))
   expect_equal(out@query_parts$post_transforms[[1]]$type, "quantify")
