@@ -185,7 +185,7 @@ NULL
 
   if (.verbose) {
     cli::cli_h2("Quantifying corpus with {.fn {dsp_fun_name}}")
-    cli::cli_alert_info("Processing {.val {.signal_extension}} files")
+    cli::cli_alert_info("Processing {.val {(.signal_extension)}} files")
   }
 
   signal_files <- peek_signals(corpus_obj)
@@ -194,7 +194,7 @@ NULL
                                 grepl(bundlePattern, signal_files$bundle), ]
 
   if (nrow(signal_files) == 0) {
-    cli::cli_alert_warning("No signal files found with extension {.val {.signal_extension}}")
+    cli::cli_alert_warning("No signal files found with extension {.val {(.signal_extension)}}")
     return(invisible(corpus_obj))
   }
 
@@ -232,7 +232,7 @@ NULL
 
   if (.parallel && .use_parallel_workers(nrow(signal_files_with_meta), .workers)) {
     .workers <- .reindeer_workers(nrow(signal_files_with_meta), .workers)
-    if (.verbose) cli::cli_alert_info("Using parallel processing with {.workers} worker{?s}")
+    if (.verbose) cli::cli_alert_info("Using parallel processing with {(.workers)} worker{?s}")
     old_plan <- future::plan()
     on.exit(future::plan(old_plan), add = TRUE)
     future::plan(future::multisession, workers = .workers)
