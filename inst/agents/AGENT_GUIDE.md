@@ -51,8 +51,8 @@ formants <- quantify(segs, dsp_function = superassp::forest, .at = 0.5)        #
 formants <- quantify(segs, dsp_function = superassp::forest, .use_cache = TRUE) # cached
 
 # Apply DSP to whole corpus (writes SSFF track files)
-enrich(corp, .using = superassp::forest)
-enrich(corp, .using = superassp::ksvF0, minF = 75, maxF = 500)
+quantify(corp, .using = superassp::forest)
+quantify(corp, .using = superassp::ksvF0, minF = 75, maxF = 500)
 
 # Metadata
 get_metadata(corp)
@@ -82,14 +82,14 @@ serve(corp)
 ### Signal Processing Pipeline
 
 ```
-corpus --> enrich(.using = dsp_func)     --> SSFF files in bundle dirs
+corpus --> quantify(.using = dsp_func)   --> SSFF files in bundle dirs
 segment_list --> quantify(dsp_function)  --> extended_segment_list with measurements
 ```
 
-Both `enrich()` and `quantify()` support:
+Both corpus-mode and segment_list-mode `quantify()` support:
 - **Metadata-driven parameters**: Age/Gender metadata automatically maps to
   DSP function parameters (formant settings, pitch range, etc.) via
-  `derive_dsp_parameters()` in `R/reindeer_enrich.R`
+  `derive_dsp_parameters()` in `R/dsp_parameter_derivation.R`
 - **Persistent caching**: `.use_cache = TRUE` stores results in SQLite
 - **Parallel processing**: `.parallel = TRUE` (default) via `future`/`furrr`
 - **Cache format**: `.cache_format = "auto"` uses `qs` if available (faster,
@@ -174,7 +174,7 @@ Map these to R function arguments.
 
 | If reimplementing... | Use this pattern |
 |---|---|
-| A per-file DSP function (formants, F0, etc.) | Write a function compatible with `quantify()` / `enrich()` |
+| A per-file DSP function (formants, F0, etc.) | Write a function compatible with `quantify()` |
 | A batch processing pipeline | Write a function that takes a `corpus` object |
 | An annotation generator | Contribute to protoscribe, not reindeer |
 | A measurement extractor | Write as `quantify()` method or standalone function |
@@ -233,7 +233,7 @@ my_dsp_function <- function(listOfFiles, beginTime = 0, endTime = 0, ...) {
 }
 ```
 
-### 5. Register with quantify/enrich
+### 5. Register with quantify
 
 Once your function follows the `listOfFiles` calling convention:
 
@@ -242,8 +242,8 @@ Once your function follows the `listOfFiles` calling convention:
 segs <- query(corp, "Phonetic == t")
 results <- quantify(segs, dsp_function = my_dsp_function, .use_cache = TRUE)
 
-# Use with enrich (whole corpus)
-enrich(corp, .using = my_dsp_function, .force = TRUE)
+# Use with quantify (whole corpus)
+quantify(corp, .using = my_dsp_function, .force = TRUE)
 ```
 
 ### 6. Validate Output Fidelity

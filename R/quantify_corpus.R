@@ -44,6 +44,13 @@ NULL
         NA_character_
       }
     }, error = function(e) NA_character_)
+    if (!is.na(pkg)) {
+      real_name <- tryCatch({
+        exported <- getNamespaceExports(pkg)
+        Find(function(nm) identical(get(nm, envir = asNamespace(pkg)), dsp_fun), exported)
+      }, error = function(e) NULL)
+      if (!is.null(real_name)) fn_name <- real_name
+    }
   }
 
   version <- if (!is.na(pkg)) {
@@ -328,6 +335,20 @@ NULL
 
   written_file <- sub(paste0("\\.", .signal_extension, "$"), paste0(".", dsp_ext),
                       successes[[1]]$full_path)
+  if (!file.exists(written_file)) {
+    # cli_alert_warning() (unlike cli_warn()/cli_abort()) doesn't render a
+    # c(...) vector's "i" elements as separate bulleted lines -- it glues
+    # them onto the main line with no separator. Match this file's own
+    # established multi-line alert style instead (see the "bundle{?s}
+    # failed processing" alert above): one cli_alert_warning() for the
+    # headline, one cli_alert_info() for the detail.
+    cli::cli_alert_warning(
+      "{.fn {dsp_fun_name}} completed without error, but no {.val {dsp_ext}} file was found on disk afterward."
+    )
+    cli::cli_alert_info(
+      "Registering the track definition from {.fn {dsp_fun_name}}'s declared metadata only; nothing was actually materialized."
+    )
+  }
   column_names <- .discover_written_column_names(written_file, display_tracks)
 
   for (i in seq_along(display_tracks)) {
@@ -351,11 +372,12 @@ NULL
 #'   from the DSP function when omitted — one entry per output track
 #'   group (e.g. formants register `F` and `B` separately). In
 #'   connect-existing mode (`.using` omitted), `name` is required.
-#' @param from,index Connect-existing mode only: address one column
-#'   (`index`, 1-based) of an already-registered multi-column track
-#'   (`from`) instead of a whole file.
-#' @param write_files Connect-existing-mode escape hatch; unused when
-#'   `.using` is supplied (files are always written there).
+#' @param from,index Connect-existing mode only: `from` is the on-disk
+#'   SSFF column label within the underlying file (e.g. `"F[Hz]"` for a
+#'   formant track) — the same string you'd pass to
+#'   `superassp::read_track(tracks = )` — not the registered track's
+#'   `name`. `index` (1-based) then picks one column of that (for a
+#'   column that itself holds more than one value per frame).
 #' @param overwrite Replace an existing same-`name` track definition
 #'   instead of erroring. Default `FALSE`.
 #' @param sessionPattern,bundlePattern Regex filters over which bundles
@@ -367,7 +389,6 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
                                          columnName = NULL,
                                          fileExtension = NULL,
                                          from = NULL, index = NULL,
-                                         write_files = NULL,
                                          overwrite = FALSE,
                                          sessionPattern = ".*",
                                          bundlePattern = ".*",

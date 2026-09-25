@@ -36,6 +36,13 @@ test_that(".build_generator_block captures only explicit user args", {
   expect_match(block$generatedAt, "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}")
 })
 
+test_that(".build_generator_block recovers the real exported name behind a locally-renamed function (Fix 7A / I5)", {
+  local_fn <- wrassp::rmsana
+  block <- reindeer:::.build_generator_block(local_fn, "local_fn", list())
+  expect_equal(block$`function`, "rmsana")
+  expect_equal(block$package, "wrassp")
+})
+
 test_that("generator with empty args round-trips through toJSON as an object, not an array", {
   block <- reindeer:::.build_generator_block(
     superassp::trk_rms, "superassp::trk_rms", user_params = list()

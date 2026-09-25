@@ -18,7 +18,11 @@ NULL
 #'   metadata-derived ones (`nominalF1`, `windowSize`, ...).
 #' @param .at Relative time points to sample, each in `[0, 1]`. A scalar
 #'   gives one row per segment (e.g. `0.5` for midpoint); a vector
-#'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`).
+#'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`). Required (no default) when
+#'   `dsp_function` is a character vector of registered track names —
+#'   character-mode reads one specific time point per segment, so there
+#'   is no unambiguous "whole contour" fallback the way there is for a
+#'   DSP function.
 #' @param .use_metadata Look up DSP parameters from speaker metadata.
 #'   Default `TRUE`. See [dsp_parameters()] to preview.
 #' @param .use_cache Reuse persistent results when the cache key
@@ -32,6 +36,10 @@ NULL
 #' @param .verbose Print a per-step progress summary.
 #' @param .optimize Use optimized computation (default `TRUE`; turn off
 #'   only for debugging).
+#' @details When `dsp_function` is a character vector of registered
+#'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,
+#'   and `.cache_format` have no effect — reading or recomputing an
+#'   already-registered track doesn't go through the DSP result cache.
 #' @return An [extended_segment_list]: every column of the input
 #'   `segment_list` (see [query()] for the column inventory), plus one
 #'   column per DSP output column produced by `dsp_function` (consult
@@ -436,9 +444,25 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
     ), class = c("reindeer_unknown_track_error", "reindeer_error"))
   }
 
+  if (is.null(.at)) {
+    cli::cli_abort(c(
+      "{.arg .at} is required when {.arg dsp_function} names registered tracks.",
+      "i" = "Character-mode quantify() reads one specific time point per segment; pass e.g. {.code .at = 0.5} for the midpoint.",
+      "i" = "To get every frame of a segment's contour, pass the DSP function itself (not a character vector) with {.code .at = NULL}."
+    ), class = c("reindeer_quantify_missing_at_error", "reindeer_error"))
+  }
+
+  dots <- list(...)
+  if (length(dots) > 0) {
+    cli::cli_abort(c(
+      "Extra argument{?s} {.val {names(dots)}} have no effect when {.arg dsp_function} names registered tracks.",
+      "i" = "Registered-track reads don't take DSP parameters — pass the DSP function itself instead of a character vector if you need that."
+    ), class = c("reindeer_quantify_unused_arg_error", "reindeer_error"))
+  }
+
   seg_df <- as.data.frame(object)
   media_ext <- corpus_obj@config$mediafileExtension %||% "wav"
-  time_points <- if (is.null(.at)) list(NA_real_) else as.list(.at)
+  time_points <- as.list(.at)
 
   results <- list()
   for (tn in track_names) {
@@ -452,12 +476,8 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
                                full.names = TRUE)
 
       for (tp in time_points) {
-        if (is.na(tp)) {
-          begin <- seg$start / 1000; end <- seg$end / 1000
-        } else {
-          t_abs <- (seg$start + tp * (seg$end - seg$start)) / 1000
-          begin <- t_abs; end <- t_abs
-        }
+        t_abs <- (seg$start + tp * (seg$end - seg$start)) / 1000
+        begin <- t_abs; end <- t_abs
 
         row_data <- NULL
         if (length(track_file) == 1L && file.exists(track_file)) {
@@ -497,13 +517,27 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
             error = function(e) NULL
           )
           if (!is.null(computed) && is.list(computed) && length(computed) >= 1) {
-            mat <- computed[[1]]
-            sample_rate <- attr(computed, "sampleRate") %||% 100
+            elem_idx <- if (!is.null(track_def$from) && !is.null(names(computed)) &&
+                             track_def$from %in% names(computed)) {
+              which(names(computed) == track_def$from)
+            } else {
+              1L
+            }
+            mat <- computed[[elem_idx]]
+            if (!is.null(track_def$index)) mat <- mat[, track_def$index, drop = FALSE]
+            if (is.null(attr(computed, "sampleRate"))) {
+              cli::cli_abort("Recomputed {.val {tn}} has no {.val sampleRate} attribute; cannot align it to the segment's time.")
+            }
+            sample_rate <- attr(computed, "sampleRate")
             start_time  <- attr(computed, "startTime") %||% 0
             frame_idx <- round((begin - start_time) * sample_rate) + 1L
             frame_idx <- max(1L, min(nrow(mat), frame_idx))
             row_data <- as.data.frame(mat[frame_idx, , drop = FALSE])
-            names(row_data) <- tn
+            names(row_data) <- if (ncol(row_data) > 1) {
+              paste0(tn, seq_len(ncol(row_data)))
+            } else {
+              tn
+            }
           }
         }
 
@@ -518,6 +552,13 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
         }
       }
     }
+  }
+
+  expected_n <- nrow(seg_df) * length(time_points)
+  if (length(results) < expected_n && length(results) > 0) {
+    cli::cli_alert_warning(
+      "{expected_n - length(results)} of {expected_n} segment/time-point combination{?s} produced no measurement and {?was/were} dropped."
+    )
   }
 
   if (length(results) == 0) {

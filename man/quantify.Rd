@@ -20,7 +20,11 @@ metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...).}
 
 \item{.at}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
 gives one row per segment (e.g. \code{0.5} for midpoint); a vector
-multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}).}
+multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}). Required (no default) when
+\code{dsp_function} is a character vector of registered track names —
+character-mode reads one specific time point per segment, so there
+is no unambiguous "whole contour" fallback the way there is for a
+DSP function.}
 
 \item{.use_metadata}{Look up DSP parameters from speaker metadata.
 Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
@@ -47,12 +51,12 @@ from the DSP function when omitted — one entry per output track
 group (e.g. formants register \code{F} and \code{B} separately). In
 connect-existing mode (\code{.using} omitted), \code{name} is required.}
 
-\item{from, index}{Connect-existing mode only: address one column
-(\code{index}, 1-based) of an already-registered multi-column track
-(\code{from}) instead of a whole file.}
-
-\item{write_files}{Connect-existing-mode escape hatch; unused when
-\code{.using} is supplied (files are always written there).}
+\item{from, index}{Connect-existing mode only: \code{from} is the on-disk
+SSFF column label within the underlying file (e.g. \code{"F[Hz]"} for a
+formant track) — the same string you'd pass to
+\code{superassp::read_track(tracks = )} — not the registered track's
+\code{name}. \code{index} (1-based) then picks one column of that (for a
+column that itself holds more than one value per frame).}
 
 \item{overwrite}{Replace an existing same-\code{name} track definition
 instead of erroring. Default \code{FALSE}.}
@@ -79,6 +83,12 @@ in a \code{segment_list} and get one row of measurements back per segment
 speaker metadata (\code{Age}, \code{Gender}) unless overridden through \code{...}.
 For lazy pipelines \code{quantify()} records the request and runs it at
 the next \code{\link[=collect]{collect()}}.
+}
+\details{
+When \code{dsp_function} is a character vector of registered
+track names, \code{.use_cache}, \code{.parallel}, \code{.workers}, \code{.cache_dir},
+and \code{.cache_format} have no effect — reading or recomputing an
+already-registered track doesn't go through the DSP result cache.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
