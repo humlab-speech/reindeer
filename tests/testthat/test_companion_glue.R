@@ -1,8 +1,7 @@
-# Tests for the sister-package glue wrappers (eggstract + protoscribe).
-# eggstract and protoscribe are in Suggests and may not be installed; the
-# tests primarily verify the missing-companion abort path and the gating
-# logic. When the companions are installed, we exercise the happy path
-# minimally.
+# Tests for the eggstract glue wrapper. eggstract is in Suggests and may
+# not be installed; the tests primarily verify the missing-companion
+# abort path and the gating logic. When it's installed, we exercise the
+# happy path minimally.
 
 skip_if_no_emuR()
 
@@ -22,24 +21,6 @@ test_that("enrich_egg() is removed and always redirects", {
   err <- tryCatch(enrich_egg(ae),
                   reindeer_moved_error = function(e) e)
   expect_s3_class(err, "reindeer_moved_error")
-})
-
-test_that("propose_annotations() aborts when protoscribe is absent", {
-  if (requireNamespace("protoscribe", quietly = TRUE)) {
-    skip("protoscribe installed")
-  }
-  ae <- create_shared_ae_corpus()
-  err <- tryCatch(propose_annotations(ae, type = "vad"),
-                  reindeer_missing_companion_error = function(e) e)
-  expect_s3_class(err, "reindeer_missing_companion_error")
-})
-
-test_that("propose_annotations rejects unknown types", {
-  ae <- create_shared_ae_corpus()
-  expect_error(
-    propose_annotations(ae, type = "bogus_kind"),
-    "should be one of"
-  )
 })
 
 test_that(".filter_to_egg_bundles is silent and pass-through without HasEGG", {

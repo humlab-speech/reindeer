@@ -42,7 +42,7 @@
 #' Abort with a "missing companion package" condition.
 #'
 #' Raised when a reindeer entry point depends on a companion package
-#' (erodex, protoscribe, eggstract, superassp) that is not installed.
+#' (eggstract, superassp) that is not installed.
 #' Catch with `tryCatch(..., reindeer_missing_companion_error = ...)`.
 #'
 #' @param pkg Character; the missing package name.
@@ -53,8 +53,6 @@
 .companion_abort <- function(pkg, purpose = NULL,
                              call = rlang::caller_env()) {
   url <- switch(pkg,
-    erodex     = "https://github.com/humlab-speech/erodex",
-    protoscribe = "https://github.com/humlab-speech/protoscribe",
     eggstract  = "https://github.com/humlab-speech/eggstract",
     superassp  = "https://github.com/humlab-speech/superassp",
     NULL
