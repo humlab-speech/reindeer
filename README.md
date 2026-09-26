@@ -142,15 +142,23 @@ inspect, correct, or extend annotations from R.
 
 ## Companion packages
 
+### DSP backends (required to run the corresponding verb)
+
 - **[superassp](https://github.com/humlab-speech/superassp)** —
   formant, pitch, voice-quality, and other DSP functions used inside
   `quantify()`.
-- **[protoscribe](https://github.com/humlab-speech/protoscribe)** —
-  draft annotation generation (VAD, VOT, MOMEL/INTSINT, …).
-- **[erodex](https://github.com/humlab-speech/erodex)** — parameter-
-  grid simulation and result inspection.
 - **[eggstract](https://github.com/humlab-speech/eggstract)** —
-  electroglottography measurements.
+  electroglottography measurements used inside `quantify_egg()`.
+
+### Optional workflow add-ons (independent, not required for core use)
+
+- **[protoscribe](https://github.com/humlab-speech/protoscribe)** —
+  draft annotation generation (VAD, VOT, MOMEL/INTSINT, …) with its own
+  complete `draft_*() -> assess() -> prepare() -> transcribe()`
+  workflow and vignettes. reindeer has no code dependency on it.
+- **[erodex](https://github.com/humlab-speech/erodex)** — DSP
+  parameter-grid and signal-erosion simulation, with its own vignette
+  set. reindeer has no code dependency on it.
 
 ## Documentation
 
