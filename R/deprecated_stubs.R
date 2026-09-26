@@ -5,16 +5,6 @@
 # Provides a helpful redirect for users upgrading from older reindeer
 # versions whose scripts still call these symbols unqualified.
 
-.companion_redirect <- function(fn_name, package, install_url) {
-  cli::cli_abort(c(
-    "{.fn {fn_name}} moved out of {.pkg reindeer} into {.pkg {package}}.",
-    "i" = "Install with {.code remotes::install_github(\"{install_url}\")} ",
-    "i" = "then call {.code {package}::{fn_name}(...)} instead.",
-    "i" = "See {.url https://github.com/{install_url}}.",
-    .envir = environment()
-  ), class = c("reindeer_moved_error", "reindeer_error"))
-}
-
 # --- eggstract (retired in v1.3, never had a working companion target) ------
 
 #' @rdname deprecated-moved-functions

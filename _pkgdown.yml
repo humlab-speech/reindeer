@@ -154,12 +154,9 @@ reference:
 
   - title: "Companion packages"
     desc: >
-      Glue for protoscribe and eggstract that needs reindeer's own
+      Glue for eggstract that needs reindeer's own
       corpus/quantify()/cache machinery, not just the companion's API.
-      erodex and superassp are called directly, without reindeer-side
-      wrappers.
     contents:
-      - propose_annotations
       - quantify_egg
 
   - title: "Psychoacoustic helpers"
@@ -197,10 +194,6 @@ reference:
       - st
       - DSPP
       - deprecated-moved-functions
-      - enrich.corpus
-      - enrich.extended_segment_list
-      - enrich.lazy_segment_list
-      - enrich.segment_list
       - quantify.lazy_segment_list
       - print.bundle_list
       - print.extended_segment_list

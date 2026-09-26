@@ -174,7 +174,7 @@ library(ggplot2)
 ggplot(long_formants) + geom_formant_trajectory()
 ```
 
-## 9. Export to field-standard formats
+## 8. Export to field-standard formats
 
 Interop with Praat and ELAN is one line each:
 
@@ -188,7 +188,7 @@ write_eaf(segs, file.path(out, "vowels.eaf"), media_url = "audio/clip.wav")
 list.files(out)
 ```
 
-## 10. Publishable corpus documentation
+## 9. Publishable corpus documentation
 
 `describe_corpus()` emits five FAIR artifacts in one call: README,
 CMDI, DataCite, CITATION.cff, and a schema.org JSON-LD `Dataset`

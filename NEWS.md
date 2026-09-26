@@ -1,6 +1,6 @@
-# reindeer (development version)
+# reindeer 2.0.0
 
-## Breaking changes (2.0.0)
+## Breaking changes
 
 - **`propose_annotations()` is removed.** Its dispatch table
   (`draft_vad`/`draft_vot`/`draft_periods`/`draft_momel_intsint`/
@@ -28,6 +28,8 @@
 - `end_to_end_pipeline.Rmd` and `cache_management.Rmd` no longer
   demonstrate protoscribe/erodex usage; the former's protoscribe
   section is replaced with an EQL sequence/dominance query example.
+
+## Other changes since 1.0.1
 
 - **`enrich()` is removed** (hard stub, no deprecation window — same
   precedent as `enrich_egg()`'s removal). `quantify()` now covers

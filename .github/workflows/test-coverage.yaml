@@ -24,9 +24,9 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           # Install hard dependencies plus the Suggests the suite uses: the
-          # private companion repos (eggstract, protoscribe) cannot be fetched
-          # from CI, so the companion-gated tests skip, while superassp comes
-          # from GitHub and the DSP tests do run.
+          # private eggstract companion repo cannot be fetched from CI, so
+          # the companion-gated tests skip, while superassp comes from
+          # GitHub and the DSP tests do run.
           dependencies: '"hard"'
           extra-packages: |
             any::covr
