@@ -13,28 +13,30 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 # Each section runs only when its companion package is installed, so the
 # vignette renders anywhere and shows real output wherever it can.
 has_egg   <- requireNamespace("eggstract", quietly = TRUE)
-has_proto <- requireNamespace("protoscribe", quietly = TRUE)
 has_dsp   <- requireNamespace("superassp", quietly = TRUE)
 ```
 
 ## What this vignette covers
 
 A full pipeline that walks a corpus from raw recordings to publishable
-analysis, gluing reindeer's verbs to four companion packages:
+analysis, gluing reindeer's verbs to two DSP companion packages:
 
 - **superassp** for the audio-side DSP (formants, F0, intensity, ...).
 - **eggstract** for the electroglottography (EGG) DSP when EGG signal
   files are present.
-- **protoscribe** for draft annotation generation (VAD, VOT, periods,
-  MOMEL/INTSINT).
-- **erodex** for parameter-grid simulations.
 
 reindeer itself supplies the corpus class, metadata system, EQL query
 engine, lazy pipeline, provenance accounting, tidyverse-friendly
-verbs, and FAIR documentation emitters. The companion packages plug
+verbs, and FAIR documentation emitters. These two DSP backends plug
 into well-defined extension points and are gated by
 `requireNamespace()` checks so the pipeline degrades gracefully when a
 companion is not installed.
+
+Draft annotation generation and DSP parameter-grid simulation are
+fully independent optional add-ons — see
+[protoscribe](https://github.com/humlab-speech/protoscribe)'s
+`vignette("protoscribe-with-reindeer")` and
+[erodex](https://github.com/humlab-speech/erodex)'s own vignette set.
 
 ## 1. Load the corpus
 
@@ -77,23 +79,21 @@ set_metadata(corp, list(Speaker = "P001", Age = 25, Gender = "Female"),
 head(dsp_parameters(corpus_obj = corp), 3)
 ```
 
-## 3. Suggest annotations with protoscribe
+## 3. Sequence and dominance queries (EQL)
 
-protoscribe's `draft_*` functions generate annotation suggestions
-without writing them to the corpus. reindeer wraps them so review can
-happen in the EMU-webApp via `serve_app()`.
+Beyond simple label matches, EQL supports sequences (`->`) and
+dominance (`^`) directly against the SQLite cache. Find vowels
+immediately followed by a `t`, then the syllables that dominate each
+`t`:
 
-```{r suggest, eval = has_proto}
-# VAD: voice-activity-driven Segment-level suggestions.
-vad_suggestions <- propose_annotations(corp, type = "vad", .review = FALSE)
-head(vad_suggestions)
+```{r eql}
+vowel_then_t <- query(corp, "[Phonetic =~ [aeiou] -> Phonetic == t]") |>
+  reindeer::collect()
+head(vowel_then_t)
 
-# Open the review UI; accept/edit interactively, save when happy.
-propose_annotations(corp, type = "periods", .review = TRUE)
-```
-
-```{r suggest-note, echo = FALSE, eval = !has_proto}
-cat("protoscribe is not installed here, so this section is not run.\n")
+dominating_syllables <- query(corp, "[Syllable == S ^ Phonetic == t]") |>
+  reindeer::collect()
+head(dominating_syllables)
 ```
 
 ## 4. Query and navigate
@@ -172,27 +172,6 @@ ggplot2::autoplot(audio_measures, type = "formants")
 ```{r primitives, eval = has_dsp, fig.width = 6, fig.height = 4}
 library(ggplot2)
 ggplot(long_formants) + geom_formant_trajectory()
-```
-
-## 8. Parameter-grid simulation (erodex)
-
-When you need to sweep DSP parameters, hand off to erodex. The
-simulation result re-enters the reindeer pipeline as a regular
-extended_segment_list.
-
-```{r simulate, eval = FALSE}
-# erodex::quantify_simulate() stops with "subscript out of bounds" while
-# indexing the per-bundle signal hashes (erodex 0.2.12, with superassp 3.0.0),
-# so the call is shown for shape rather than run here.
-library(erodex)
-sim_store <- file.path(tempdir(), "simulations")
-erodex::quantify_simulate(
-  vowels |> reindeer::collect(),
-  .using = superassp::trk_formant_forest,
-  .simulate = list(nominalF1 = seq(500, 900, 200)),
-  .simulation_store = sim_store
-)
-length(erodex::list_simulations(sim_store))
 ```
 
 ## 9. Export to field-standard formats
