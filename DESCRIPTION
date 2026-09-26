@@ -43,8 +43,7 @@ Imports:
     tidyselect,
     rlang,
     httpuv,
-    jsonvalidate,
-    units
+    jsonvalidate
 Suggests:
     testthat (>= 3.0.0),
     emuR,
@@ -57,12 +56,10 @@ Suggests:
     erodex,
     openxlsx,
     av,
-    readr,
     rstudioapi,
     dplyr (>= 1.0.0),
     vctrs,
     ggplot2,
-    rPraat,
     withr,
     shiny,
     miniUI,
