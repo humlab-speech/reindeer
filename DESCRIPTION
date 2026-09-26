@@ -1,8 +1,8 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 1.2.0
-Date: 2026-09-19
+Version: 2.0.0
+Date: 2026-09-26
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-3373-0934")),
@@ -13,7 +13,9 @@ Authors@R: c(
     person("Jonathan", "Harrington", , "jmh@phonetik.uni-muenchen.de", c("ctb")))
 Description: A systematic framework for speech corpora management that retains emuR compatibility, but provides
   expanded ability to store metadata associated with the recording, use the metadata to guide signal processing when appropriate, and support the user in future archiving and FAIR use
-  by automating the creation, and continuous updating, of standard compliant metadata files for corpora.
+  by automating the creation, and continuous updating, of standard compliant metadata files for corpora. Draft-annotation
+  generation and DSP parameter-grid/signal-erosion simulation are provided by fully independent, optional companion
+  packages (protoscribe and erodex) built on top of this package's core API; neither is required for core operation.
 License: GPL (>= 2)
 URL: https://humlab-speech.github.io/reindeer/, https://github.com/humlab-speech/reindeer
 BugReports: https://github.com/humlab-speech/reindeer/issues
@@ -52,9 +54,7 @@ Suggests:
     knitr,
     rmarkdown,
     superassp (>= 3.0.0),
-    protoscribe,
     eggstract,
-    erodex,
     openxlsx,
     av,
     readr,
@@ -69,9 +69,7 @@ Suggests:
     DT
 Remotes:
   github::humlab-speech/superassp,
-  github::humlab-speech/protoscribe,
   github::humlab-speech/eggstract,
-  github::humlab-speech/erodex,
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 Depends: 
