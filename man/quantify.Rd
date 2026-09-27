@@ -11,70 +11,11 @@ quantify(object, ...)
 \arguments{
 \item{object}{A \code{segment_list} (eager) or \code{lazy_segment_list}.}
 
-\item{...}{Forwarded to the DSP function. Values you pass win over
-metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...).}
-
-\item{dsp_function}{A DSP function. Common choices: \code{superassp::trk_formant_forest}
-(formants), \code{superassp::trk_pitch_ksv} (pitch), \code{superassp::trk_rms}
-(intensity), \code{superassp::trk_dft_spectrum}.}
-
-\item{.at}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
-gives one row per segment (e.g. \code{0.5} for midpoint); a vector
-multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}). Required (no default) when
-\code{dsp_function} is a character vector of registered track names -
-character-mode reads one specific time point per segment, so there
-is no unambiguous "whole contour" fallback the way there is for a
-DSP function.}
-
-\item{.use_metadata}{Look up DSP parameters from speaker metadata.
-Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
-
-\item{.verbose}{Print a per-step progress summary.}
-
-\item{.parallel, .workers}{Run segments concurrently via a
-multi-session future plan. Default: on, with \code{detectCores() - 1}.}
-
-\item{.use_cache}{Reuse persistent results when the cache key
-matches. Default \code{FALSE}. See \code{\link[=inspect_cache]{inspect_cache()}} for what's stored.
-When enabled, the returned tibble gains a \code{.cache_status} column
-(\code{"hit"} / \code{"miss"}).}
-
-\item{.cache_dir, .cache_format}{Where and how to persist cached
-results.}
-
-\item{.optimize}{Use optimized computation (default \code{TRUE}; turn off
-only for debugging).}
-
-\item{.using}{DSP function to compute and register a new track.
-Omit to connect to an already-existing SSFF track instead (see
-\code{from}/\code{index}).}
-
-\item{name, columnName, fileExtension}{Track identity for the corpus
-method. In compute-and-register mode (\code{.using} given), auto-derived
-from the DSP function when omitted - one entry per output track
-group (e.g. formants register \code{F} and \code{B} separately). In
-connect-existing mode (\code{.using} omitted), \code{name} is required.}
-
-\item{from, index}{Connect-existing mode only: \code{from} is the on-disk
-SSFF column label within the underlying file (e.g. \code{"F[Hz]"} for a
-formant track) - the same string you'd pass to
-\code{superassp::read_track(tracks = )} - not the registered track's
-\code{name}. \code{index} (1-based) then picks one column of that (for a
-column that itself holds more than one value per frame).}
-
-\item{overwrite}{Replace an existing same-\code{name} track definition
-instead of erroring. Default \code{FALSE}.}
-
-\item{sessionPattern, bundlePattern}{Regex filters over which bundles
-to process. Default \code{".*"} (all).}
-
-\item{.metadata_fields}{Speaker metadata fields used to derive DSP
-parameters. Default \code{c("Gender", "Age")}.}
-
-\item{.signal_extension}{Media file extension to read signal files
-from. Defaults to the database's configured media extension.}
-
-\item{.force}{Recompute and overwrite cached results. Default \code{FALSE}.}
+\item{...}{Forwarded to the DSP function (segment_list method) or to
+the SSFF track generator (corpus method). Values you pass win over
+metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...). See the
+"Method arguments" section below for the named arguments each
+method accepts ahead of \code{...}.}
 }
 \value{
 An \link{extended_segment_list}: every column of the input
@@ -104,6 +45,68 @@ track names, \code{.use_cache}, \code{.parallel}, \code{.workers}, \code{.cache_
 and \code{.cache_format} have no effect - reading or recomputing an
 already-registered track doesn't go through the DSP result cache.
 }
+\section{Method arguments - segment_list}{
+
+\describe{
+\item{\code{dsp_function}}{A DSP function. Common choices:
+\code{superassp::trk_formant_forest} (formants), \code{superassp::trk_pitch_ksv}
+(pitch), \code{superassp::trk_rms} (intensity), \code{superassp::trk_dft_spectrum}.}
+\item{\code{.at}}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
+gives one row per segment (e.g. \code{0.5} for midpoint); a vector
+multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}). Required (no default) when
+\code{dsp_function} is a character vector of registered track names -
+character-mode reads one specific time point per segment, so there
+is no unambiguous "whole contour" fallback the way there is for a
+DSP function.}
+\item{\code{.use_metadata}}{Look up DSP parameters from speaker metadata.
+Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
+\item{\code{.use_cache}}{Reuse persistent results when the cache key
+matches. Default \code{FALSE}. See \code{\link[=inspect_cache]{inspect_cache()}} for what's stored.
+When enabled, the returned tibble gains a \code{.cache_status} column
+(\code{"hit"} / \code{"miss"}).}
+\item{\code{.cache_dir}, \code{.cache_format}}{Where and how to persist cached
+results.}
+\item{\code{.parallel}, \code{.workers}}{Run segments concurrently via a
+multi-session future plan. Default: on, with \code{detectCores() - 1}.}
+\item{\code{.verbose}}{Print a per-step progress summary.}
+\item{\code{.optimize}}{Use optimized computation (default \code{TRUE}; turn off
+only for debugging).}
+}
+}
+
+\section{Method arguments - corpus}{
+
+\describe{
+\item{\code{.using}}{DSP function to compute and register a new track.
+Omit to connect to an already-existing SSFF track instead (see
+\code{from}/\code{index}).}
+\item{\code{.metadata_fields}}{Speaker metadata fields used to derive DSP
+parameters. Default \code{c("Gender", "Age")}.}
+\item{\code{.signal_extension}}{Media file extension to read signal files
+from. Defaults to the database's configured media extension.}
+\item{\code{.force}}{Recompute and overwrite cached results. Default \code{FALSE}.}
+\item{\code{name}, \code{columnName}, \code{fileExtension}}{Track identity for the
+corpus method. In compute-and-register mode (\code{.using} given),
+auto-derived from the DSP function when omitted - one entry per
+output track group (e.g. formants register \code{F} and \code{B}
+separately). In connect-existing mode (\code{.using} omitted), \code{name}
+is required.}
+\item{\code{from}, \code{index}}{Connect-existing mode only: \code{from} is the
+on-disk SSFF column label within the underlying file (e.g.
+\code{"F[Hz]"} for a formant track) - the same string you'd pass to
+\code{superassp::read_track(tracks = )} - not the registered track's
+\code{name}. \code{index} (1-based) then picks one column of that (for a
+column that itself holds more than one value per frame).}
+\item{\code{overwrite}}{Replace an existing same-\code{name} track definition
+instead of erroring. Default \code{FALSE}.}
+\item{\code{sessionPattern}, \code{bundlePattern}}{Regex filters over which
+bundles to process. Default \code{".*"} (all).}
+\item{\code{.verbose}, \code{.parallel}, \code{.workers}, \code{.use_cache},
+\code{.cache_dir}, \code{.cache_format}}{As for the segment_list method
+(see above), applied per bundle.}
+}
+}
+
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- demo_corpus()

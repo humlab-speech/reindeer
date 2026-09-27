@@ -40,10 +40,10 @@ NULL
 #'   not yet preserve every derived column (labels, attribute,
 #'   start_item_id, ...), so eager evaluation is the safe default
 #'   until full SQL parity lands.
-#' @param ... Arguments for the level-specific method (`steps_forward`,
-#'   `count_from`, `capture`, `ignore_bundle_boundaries`,
-#'   `calculate_times`, `times_from`, `.from`, `.quiet`, `collect`).
-#' @usage scout(.segments, ...)
+#' @usage
+#' scout(.segments, steps_forward, count_from = "START", capture = 1,
+#'   ignore_bundle_boundaries = FALSE, calculate_times = TRUE,
+#'   times_from = NULL, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")
@@ -52,7 +52,18 @@ NULL
 #' prev_two   <- scout(stops, steps_forward = -1, capture = 2)
 #' @seealso [ascend_to()], [descend_to()]
 #' @export
-scout <- S7::new_generic("scout", ".segments")
+scout <- S7::new_generic("scout", ".segments", fun = function(.segments,
+                                                                steps_forward,
+                                                                count_from = "START",
+                                                                capture = 1,
+                                                                ignore_bundle_boundaries = FALSE,
+                                                                calculate_times = TRUE,
+                                                                times_from = NULL,
+                                                                .from = NULL,
+                                                                .quiet = TRUE,
+                                                                collect = TRUE) {
+  S7::S7_dispatch()
+})
 
 #' Scout method for segment_list (eager data.table path)
 #' @rdname scout
@@ -375,9 +386,7 @@ retreat <- function(.segments, steps_backward, ...) {
 #' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
 #'   into the lazy plan (see note in [scout()] about partial SQL
 #'   coverage).
-#' @param ... Arguments for the level-specific method (`level`, `.from`,
-#'   `.quiet`, `collect`).
-#' @usage ascend_to(.segments, ...)
+#' @usage ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")
@@ -385,7 +394,13 @@ retreat <- function(.segments, steps_backward, ...) {
 #' words  <- ascend_to(vowels, "Word")
 #' @seealso [descend_to()], [scout()]
 #' @export
-ascend_to <- S7::new_generic("ascend_to", ".segments")
+ascend_to <- S7::new_generic("ascend_to", ".segments", fun = function(.segments,
+                                                                        level,
+                                                                        .from = NULL,
+                                                                        .quiet = TRUE,
+                                                                        collect = TRUE) {
+  S7::S7_dispatch()
+})
 
 #' Ascend method for segment_list
 #' @rdname ascend_to
@@ -563,16 +578,20 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' @param collect Materialise (default `TRUE`); pass `FALSE` to defer
 #'   into the lazy plan (see note in [scout()] about partial SQL
 #'   coverage).
-#' @param ... Arguments for the level-specific method (`level`, `.from`,
-#'   `.quiet`, `collect`).
-#' @usage descend_to(.segments, ...)
+#' @usage descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
 #' words  <- query(corp, "Word =~ .*")
 #' phones <- descend_to(words, "Phonetic")
 #' @seealso [ascend_to()], [scout()]
 #' @export
-descend_to <- S7::new_generic("descend_to", ".segments")
+descend_to <- S7::new_generic("descend_to", ".segments", fun = function(.segments,
+                                                                          level,
+                                                                          .from = NULL,
+                                                                          .quiet = TRUE,
+                                                                          collect = TRUE) {
+  S7::S7_dispatch()
+})
 
 #' Descend method for segment_list
 #' @rdname descend_to

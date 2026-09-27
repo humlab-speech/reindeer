@@ -6,13 +6,10 @@
 \alias{ascend_to.lazy_segment_list}
 \title{Move up the annotation hierarchy}
 \usage{
-ascend_to(.segments, ...)
+ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 }
 \arguments{
 \item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
-
-\item{...}{Arguments for the level-specific method (\code{level}, \code{.from},
-\code{.quiet}, \code{collect}).}
 
 \item{level}{Name of the target level.}
 

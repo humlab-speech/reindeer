@@ -11,31 +11,37 @@ NULL
 #' the next [collect()].
 #'
 #' @param object A `segment_list` (eager) or `lazy_segment_list`.
-#' @param dsp_function A DSP function. Common choices: `superassp::trk_formant_forest`
-#'   (formants), `superassp::trk_pitch_ksv` (pitch), `superassp::trk_rms`
-#'   (intensity), `superassp::trk_dft_spectrum`.
-#' @param ... Forwarded to the DSP function. Values you pass win over
-#'   metadata-derived ones (`nominalF1`, `windowSize`, ...).
-#' @param .at Relative time points to sample, each in `[0, 1]`. A scalar
-#'   gives one row per segment (e.g. `0.5` for midpoint); a vector
-#'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`). Required (no default) when
-#'   `dsp_function` is a character vector of registered track names - 
-#'   character-mode reads one specific time point per segment, so there
-#'   is no unambiguous "whole contour" fallback the way there is for a
-#'   DSP function.
-#' @param .use_metadata Look up DSP parameters from speaker metadata.
-#'   Default `TRUE`. See [dsp_parameters()] to preview.
-#' @param .use_cache Reuse persistent results when the cache key
-#'   matches. Default `FALSE`. See [inspect_cache()] for what's stored.
-#'   When enabled, the returned tibble gains a `.cache_status` column
-#'   (`"hit"` / `"miss"`).
-#' @param .cache_dir,.cache_format Where and how to persist cached
-#'   results.
-#' @param .parallel,.workers Run segments concurrently via a
-#'   multi-session future plan. Default: on, with `detectCores() - 1`.
-#' @param .verbose Print a per-step progress summary.
-#' @param .optimize Use optimized computation (default `TRUE`; turn off
-#'   only for debugging).
+#' @param ... Forwarded to the DSP function (segment_list method) or to
+#'   the SSFF track generator (corpus method). Values you pass win over
+#'   metadata-derived ones (`nominalF1`, `windowSize`, ...). See the
+#'   "Method arguments" section below for the named arguments each
+#'   method accepts ahead of `...`.
+#' @section Method arguments - segment_list:
+#' \describe{
+#'   \item{`dsp_function`}{A DSP function. Common choices:
+#'     `superassp::trk_formant_forest` (formants), `superassp::trk_pitch_ksv`
+#'     (pitch), `superassp::trk_rms` (intensity), `superassp::trk_dft_spectrum`.}
+#'   \item{`.at`}{Relative time points to sample, each in `[0, 1]`. A scalar
+#'     gives one row per segment (e.g. `0.5` for midpoint); a vector
+#'     multiplies rows (e.g. `c(0.2, 0.5, 0.8)`). Required (no default) when
+#'     `dsp_function` is a character vector of registered track names -
+#'     character-mode reads one specific time point per segment, so there
+#'     is no unambiguous "whole contour" fallback the way there is for a
+#'     DSP function.}
+#'   \item{`.use_metadata`}{Look up DSP parameters from speaker metadata.
+#'     Default `TRUE`. See [dsp_parameters()] to preview.}
+#'   \item{`.use_cache`}{Reuse persistent results when the cache key
+#'     matches. Default `FALSE`. See [inspect_cache()] for what's stored.
+#'     When enabled, the returned tibble gains a `.cache_status` column
+#'     (`"hit"` / `"miss"`).}
+#'   \item{`.cache_dir`, `.cache_format`}{Where and how to persist cached
+#'     results.}
+#'   \item{`.parallel`, `.workers`}{Run segments concurrently via a
+#'     multi-session future plan. Default: on, with `detectCores() - 1`.}
+#'   \item{`.verbose`}{Print a per-step progress summary.}
+#'   \item{`.optimize`}{Use optimized computation (default `TRUE`; turn off
+#'     only for debugging).}
+#' }
 #' @details When `dsp_function` is a character vector of registered
 #'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,
 #'   and `.cache_format` have no effect - reading or recomputing an

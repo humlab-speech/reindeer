@@ -6,14 +6,12 @@
 \alias{scout.lazy_segment_list}
 \title{Move forward or backward along an annotation level}
 \usage{
-scout(.segments, ...)
+scout(.segments, steps_forward, count_from = "START", capture = 1,
+  ignore_bundle_boundaries = FALSE, calculate_times = TRUE,
+  times_from = NULL, .from = NULL, .quiet = TRUE, collect = TRUE)
 }
 \arguments{
 \item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
-
-\item{...}{Arguments for the level-specific method (\code{steps_forward},
-\code{count_from}, \code{capture}, \code{ignore_bundle_boundaries},
-\code{calculate_times}, \code{times_from}, \code{.from}, \code{.quiet}, \code{collect}).}
 
 \item{steps_forward}{Integer offset. \code{1} = next item, \code{-1} = previous,
 \code{2} = item after next.}

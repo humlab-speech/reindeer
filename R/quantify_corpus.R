@@ -367,29 +367,36 @@ NULL
 }
 
 #' @rdname quantify
-#' @param .using DSP function to compute and register a new track.
-#'   Omit to connect to an already-existing SSFF track instead (see
-#'   `from`/`index`).
-#' @param .metadata_fields Speaker metadata fields used to derive DSP
-#'   parameters. Default `c("Gender", "Age")`.
-#' @param .signal_extension Media file extension to read signal files
-#'   from. Defaults to the database's configured media extension.
-#' @param .force Recompute and overwrite cached results. Default `FALSE`.
-#' @param name,columnName,fileExtension Track identity for the corpus
-#'   method. In compute-and-register mode (`.using` given), auto-derived
-#'   from the DSP function when omitted - one entry per output track
-#'   group (e.g. formants register `F` and `B` separately). In
-#'   connect-existing mode (`.using` omitted), `name` is required.
-#' @param from,index Connect-existing mode only: `from` is the on-disk
-#'   SSFF column label within the underlying file (e.g. `"F[Hz]"` for a
-#'   formant track) - the same string you'd pass to
-#'   `superassp::read_track(tracks = )` - not the registered track's
-#'   `name`. `index` (1-based) then picks one column of that (for a
-#'   column that itself holds more than one value per frame).
-#' @param overwrite Replace an existing same-`name` track definition
-#'   instead of erroring. Default `FALSE`.
-#' @param sessionPattern,bundlePattern Regex filters over which bundles
-#'   to process. Default `".*"` (all).
+#' @section Method arguments - corpus:
+#' \describe{
+#'   \item{`.using`}{DSP function to compute and register a new track.
+#'     Omit to connect to an already-existing SSFF track instead (see
+#'     `from`/`index`).}
+#'   \item{`.metadata_fields`}{Speaker metadata fields used to derive DSP
+#'     parameters. Default `c("Gender", "Age")`.}
+#'   \item{`.signal_extension`}{Media file extension to read signal files
+#'     from. Defaults to the database's configured media extension.}
+#'   \item{`.force`}{Recompute and overwrite cached results. Default `FALSE`.}
+#'   \item{`name`, `columnName`, `fileExtension`}{Track identity for the
+#'     corpus method. In compute-and-register mode (`.using` given),
+#'     auto-derived from the DSP function when omitted - one entry per
+#'     output track group (e.g. formants register `F` and `B`
+#'     separately). In connect-existing mode (`.using` omitted), `name`
+#'     is required.}
+#'   \item{`from`, `index`}{Connect-existing mode only: `from` is the
+#'     on-disk SSFF column label within the underlying file (e.g.
+#'     `"F[Hz]"` for a formant track) - the same string you'd pass to
+#'     `superassp::read_track(tracks = )` - not the registered track's
+#'     `name`. `index` (1-based) then picks one column of that (for a
+#'     column that itself holds more than one value per frame).}
+#'   \item{`overwrite`}{Replace an existing same-`name` track definition
+#'     instead of erroring. Default `FALSE`.}
+#'   \item{`sessionPattern`, `bundlePattern`}{Regex filters over which
+#'     bundles to process. Default `".*"` (all).}
+#'   \item{`.verbose`, `.parallel`, `.workers`, `.use_cache`,
+#'     `.cache_dir`, `.cache_format`}{As for the segment_list method
+#'     (see above), applied per bundle.}
+#' }
 #' @usage NULL
 #' @name quantify.corpus
 S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
