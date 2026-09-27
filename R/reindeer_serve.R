@@ -969,7 +969,7 @@ get_emuDBhandle <- function(corpus) {
 
 
 # ============================================================================
-# Alias: serve_app() — disambiguate from emuR::serve()
+# Alias: serve_app() - disambiguate from emuR::serve()
 # ============================================================================
 
 #' Launch the EMU-webApp (alias for [serve()])

@@ -31,7 +31,7 @@ Invisibly, a list with \code{size_bytes}, \code{size_formatted},
 \description{
 Low-level companion to \code{\link[=inspect_cache]{inspect_cache()}}; useful when you want to
 run a threshold check inside a script. Prefer \code{inspect_cache()} for
-interactive use — it summarises every reindeer-managed cache at once.
+interactive use - it summarises every reindeer-managed cache at once.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}

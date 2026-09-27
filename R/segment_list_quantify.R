@@ -5,7 +5,7 @@ NULL
 #'
 #' Apply a DSP function (typically from `superassp`) to every segment
 #' in a `segment_list` and get one row of measurements back per segment
-#' — or per time point when `.at` is given. Parameters are picked from
+#' - or per time point when `.at` is given. Parameters are picked from
 #' speaker metadata (`Age`, `Gender`) unless overridden through `...`.
 #' For lazy pipelines `quantify()` records the request and runs it at
 #' the next [collect()].
@@ -19,7 +19,7 @@ NULL
 #' @param .at Relative time points to sample, each in `[0, 1]`. A scalar
 #'   gives one row per segment (e.g. `0.5` for midpoint); a vector
 #'   multiplies rows (e.g. `c(0.2, 0.5, 0.8)`). Required (no default) when
-#'   `dsp_function` is a character vector of registered track names —
+#'   `dsp_function` is a character vector of registered track names - 
 #'   character-mode reads one specific time point per segment, so there
 #'   is no unambiguous "whole contour" fallback the way there is for a
 #'   DSP function.
@@ -38,12 +38,12 @@ NULL
 #'   only for debugging).
 #' @details When `dsp_function` is a character vector of registered
 #'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,
-#'   and `.cache_format` have no effect — reading or recomputing an
+#'   and `.cache_format` have no effect - reading or recomputing an
 #'   already-registered track doesn't go through the DSP result cache.
 #' @return An [extended_segment_list]: every column of the input
 #'   `segment_list` (see [query()] for the column inventory), plus one
 #'   column per DSP output column produced by `dsp_function` (consult
-#'   the function's own help — for example `superassp::trk_formant_forest` adds
+#'   the function's own help - for example `superassp::trk_formant_forest` adds
 #'   `F1`, `F2`, `F3`, `B1`, `B2`, `B3`). When `.at` is a vector, an
 #'   extra `.time_point` column records which relative time each row
 #'   came from. When `.use_cache = TRUE`, a `.cache_status` column
@@ -378,7 +378,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   .record_step(result, object, "quantify", sys.call(-1L))
 }
 
-#' Quantify method for lazy_segment_list — defer DSP until collect()
+#' Quantify method for lazy_segment_list - defer DSP until collect()
 #'
 #' When called on a lazy segment list, `quantify()` does not execute DSP.
 #' Instead it appends a "quantify" entry to the lazy chain's
@@ -415,7 +415,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
 #' has files on disk (registered via `quantify(corp, .using = fn)`), reads
 #' the segment's window directly with `superassp::read_track()`. If the
 #' track was registered without computation (connect-existing mode with a
-#' `generator` recipe but no files — e.g. `suggestCaching == FALSE` at
+#' `generator` recipe but no files - e.g. `suggestCaching == FALSE` at
 #' registration) and no file exists for a bundle, recomputes via the
 #' stored `generator$function`/`generator$package` recipe instead.
 #'
@@ -456,7 +456,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
   if (length(dots) > 0) {
     cli::cli_abort(c(
       "Extra argument{?s} {.val {names(dots)}} have no effect when {.arg dsp_function} names registered tracks.",
-      "i" = "Registered-track reads don't take DSP parameters — pass the DSP function itself instead of a character vector if you need that."
+      "i" = "Registered-track reads don't take DSP parameters - pass the DSP function itself instead of a character vector if you need that."
     ), class = c("reindeer_quantify_unused_arg_error", "reindeer_error"))
   }
 

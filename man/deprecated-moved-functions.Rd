@@ -11,7 +11,7 @@ enrich_egg(...)
 enrich(...)
 }
 \arguments{
-\item{...}{Ignored — the stub never executes the call.}
+\item{...}{Ignored - the stub never executes the call.}
 }
 \value{
 Never returns; always errors with a redirect message.

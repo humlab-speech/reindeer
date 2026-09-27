@@ -35,7 +35,7 @@ NULL
       # `testthat::test_file()` run), a closure defined inline in a test
       # has this package's own namespace reachable in its environment
       # chain, so `topenv()` resolves to the package itself rather than
-      # "R_GlobalEnv" — exclude it too, computed from this very function's
+      # "R_GlobalEnv" - exclude it too, computed from this very function's
       # home so it stays correct if the package is ever renamed.
       own_pkg <- environmentName(topenv(environment(.resolve_dsp_identity)))
       if (nzchar(env_name) && !env_name %in% c("R_GlobalEnv", "base", own_pkg)) {
@@ -64,7 +64,7 @@ NULL
 
 #' Build the `generator` block recorded on an `ssffTrackDefinitions` entry
 #'
-#' `args` contains only what the caller explicitly passed to `quantify()` —
+#' `args` contains only what the caller explicitly passed to `quantify()` - 
 #' never metadata-derived or per-bundle-resolved values (those have no home
 #' in a single global track definition; see the design spec's "Non-goals").
 #'
@@ -367,15 +367,23 @@ NULL
 }
 
 #' @rdname quantify
+#' @param .using DSP function to compute and register a new track.
+#'   Omit to connect to an already-existing SSFF track instead (see
+#'   `from`/`index`).
+#' @param .metadata_fields Speaker metadata fields used to derive DSP
+#'   parameters. Default `c("Gender", "Age")`.
+#' @param .signal_extension Media file extension to read signal files
+#'   from. Defaults to the database's configured media extension.
+#' @param .force Recompute and overwrite cached results. Default `FALSE`.
 #' @param name,columnName,fileExtension Track identity for the corpus
 #'   method. In compute-and-register mode (`.using` given), auto-derived
-#'   from the DSP function when omitted — one entry per output track
+#'   from the DSP function when omitted - one entry per output track
 #'   group (e.g. formants register `F` and `B` separately). In
 #'   connect-existing mode (`.using` omitted), `name` is required.
 #' @param from,index Connect-existing mode only: `from` is the on-disk
 #'   SSFF column label within the underlying file (e.g. `"F[Hz]"` for a
-#'   formant track) — the same string you'd pass to
-#'   `superassp::read_track(tracks = )` — not the registered track's
+#'   formant track) - the same string you'd pass to
+#'   `superassp::read_track(tracks = )` - not the registered track's
 #'   `name`. `index` (1-based) then picks one column of that (for a
 #'   column that itself holds more than one value per frame).
 #' @param overwrite Replace an existing same-`name` track definition
@@ -459,7 +467,7 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
       "or {.arg from}/{.arg index} (name one column of a registered track)."
     ), class = c("reindeer_track_validation_error", "reindeer_error"))
   }
-  # Note: fileExtension and from/index are NOT mutually exclusive here — a
+  # Note: fileExtension and from/index are NOT mutually exclusive here - a
   # from/index sub-column reference may also carry the fileExtension of the
   # underlying multi-column file (see the "(from/index) addresses a
   # sub-column" test, which supplies both together).

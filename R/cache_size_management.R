@@ -121,7 +121,7 @@ get_file_size <- function(path, recursive = FALSE) {
 #'
 #' Low-level companion to [inspect_cache()]; useful when you want to
 #' run a threshold check inside a script. Prefer `inspect_cache()` for
-#' interactive use — it summarises every reindeer-managed cache at once.
+#' interactive use - it summarises every reindeer-managed cache at once.
 #'
 #' @param cache_path Path to a cache file or directory.
 #' @param cache_type Label used in the warning message
@@ -643,9 +643,9 @@ inspect_cache <- function(corpus_obj, verbose = TRUE) {
 #'
 #' @param corpus A corpus object
 #' @param action Character; one of:
-#'   - "status": Show cache sizes and warnings (default)
-#'   - "list": List all cache files sorted by size
-#'   - "clean": Remove old cache files (interactive prompt)
+#' - "status": Show cache sizes and warnings (default)
+#' - "list": List all cache files sorted by size
+#' - "clean": Remove old cache files (interactive prompt)
 #' @param days_old Integer; for "clean" action, remove files older than this
 #'   (default: 30 days)
 #' @param cache_type Character; type of cache to manage for "list" action:
@@ -654,9 +654,9 @@ inspect_cache <- function(corpus_obj, verbose = TRUE) {
 #'   without actually deleting (default: TRUE)
 #'
 #' @return Depends on action:
-#'   - "status": List with cache sizes (invisibly)
-#'   - "list": Data frame of cache files
-#'   - "clean": Summary of cleanup (invisibly)
+#' - "status": List with cache sizes (invisibly)
+#' - "list": Data frame of cache files
+#' - "clean": Summary of cleanup (invisibly)
 #'
 #' @export
 #'

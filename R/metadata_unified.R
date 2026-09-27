@@ -51,10 +51,10 @@ load_metadata <- function(corpus_obj,
 #'
 #' Writes one or more metadata fields at the chosen scope. The scope is
 #' chosen by which of `session` and `bundle` you pass:
-#' * neither — *database* level (defaults that apply to every bundle).
-#' * `session` only — *session* level (overrides the database default
+#' * neither - *database* level (defaults that apply to every bundle).
+#' * `session` only - *session* level (overrides the database default
 #'   for that session's bundles).
-#' * `session` + `bundle` — *bundle* level (overrides both).
+#' * `session` + `bundle` - *bundle* level (overrides both).
 #'
 #' On read, [get_metadata()] resolves inheritance with
 #' **bundle > session > database** precedence: a value set at a more

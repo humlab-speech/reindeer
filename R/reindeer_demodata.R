@@ -2,7 +2,7 @@
 #'
 #' Returns a ready-to-use [corpus()] object loaded from the `ae` demo
 #' speech database that ships inside the package. Intended for examples
-#' and quick experiments — no separate download, no `emuR` install
+#' and quick experiments - no separate download, no `emuR` install
 #' required. Two flavours of the same data are available:
 #' WAV-backed (default) and FLAC-backed.
 #'

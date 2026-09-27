@@ -21,7 +21,7 @@ metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...).}
 \item{.at}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
 gives one row per segment (e.g. \code{0.5} for midpoint); a vector
 multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}). Required (no default) when
-\code{dsp_function} is a character vector of registered track names —
+\code{dsp_function} is a character vector of registered track names -
 character-mode reads one specific time point per segment, so there
 is no unambiguous "whole contour" fallback the way there is for a
 DSP function.}
@@ -45,16 +45,20 @@ results.}
 \item{.optimize}{Use optimized computation (default \code{TRUE}; turn off
 only for debugging).}
 
+\item{.using}{DSP function to compute and register a new track.
+Omit to connect to an already-existing SSFF track instead (see
+\code{from}/\code{index}).}
+
 \item{name, columnName, fileExtension}{Track identity for the corpus
 method. In compute-and-register mode (\code{.using} given), auto-derived
-from the DSP function when omitted — one entry per output track
+from the DSP function when omitted - one entry per output track
 group (e.g. formants register \code{F} and \code{B} separately). In
 connect-existing mode (\code{.using} omitted), \code{name} is required.}
 
 \item{from, index}{Connect-existing mode only: \code{from} is the on-disk
 SSFF column label within the underlying file (e.g. \code{"F[Hz]"} for a
-formant track) — the same string you'd pass to
-\code{superassp::read_track(tracks = )} — not the registered track's
+formant track) - the same string you'd pass to
+\code{superassp::read_track(tracks = )} - not the registered track's
 \code{name}. \code{index} (1-based) then picks one column of that (for a
 column that itself holds more than one value per frame).}
 
@@ -63,12 +67,20 @@ instead of erroring. Default \code{FALSE}.}
 
 \item{sessionPattern, bundlePattern}{Regex filters over which bundles
 to process. Default \code{".*"} (all).}
+
+\item{.metadata_fields}{Speaker metadata fields used to derive DSP
+parameters. Default \code{c("Gender", "Age")}.}
+
+\item{.signal_extension}{Media file extension to read signal files
+from. Defaults to the database's configured media extension.}
+
+\item{.force}{Recompute and overwrite cached results. Default \code{FALSE}.}
 }
 \value{
 An \link{extended_segment_list}: every column of the input
 \code{segment_list} (see \code{\link[=query]{query()}} for the column inventory), plus one
 column per DSP output column produced by \code{dsp_function} (consult
-the function's own help — for example \code{superassp::trk_formant_forest} adds
+the function's own help - for example \code{superassp::trk_formant_forest} adds
 \code{F1}, \code{F2}, \code{F3}, \code{B1}, \code{B2}, \code{B3}). When \code{.at} is a vector, an
 extra \code{.time_point} column records which relative time each row
 came from. When \code{.use_cache = TRUE}, a \code{.cache_status} column
@@ -79,15 +91,17 @@ added columns are also recorded on the object as the S7 properties
 \description{
 Apply a DSP function (typically from \code{superassp}) to every segment
 in a \code{segment_list} and get one row of measurements back per segment
-— or per time point when \code{.at} is given. Parameters are picked from
+\itemize{
+\item or per time point when \code{.at} is given. Parameters are picked from
 speaker metadata (\code{Age}, \code{Gender}) unless overridden through \code{...}.
 For lazy pipelines \code{quantify()} records the request and runs it at
 the next \code{\link[=collect]{collect()}}.
 }
+}
 \details{
 When \code{dsp_function} is a character vector of registered
 track names, \code{.use_cache}, \code{.parallel}, \code{.workers}, \code{.cache_dir},
-and \code{.cache_format} have no effect — reading or recomputing an
+and \code{.cache_format} have no effect - reading or recomputing an
 already-registered track doesn't go through the DSP result cache.
 }
 \examples{

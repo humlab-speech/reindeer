@@ -16,14 +16,14 @@ NULL
 #' Move forward or backward along an annotation level
 #'
 #' Given a `segment_list`, returns the item(s) `steps_forward` positions
-#' away on the same level — typically the previous or next phone, word,
+#' away on the same level - typically the previous or next phone, word,
 #' or syllable. Use negative steps to go backward, or `capture > 1` to
 #' grab a run of consecutive items.
 #'
 #' @param .segments A `segment_list` or `lazy_segment_list`.
 #' @param steps_forward Integer offset. `1` = next item, `-1` = previous,
 #'   `2` = item after next.
-#' @param count_from `"START"` (default) or `"END"` — which edge of the
+#' @param count_from `"START"` (default) or `"END"` - which edge of the
 #'   current segment to count from.
 #' @param capture Number of consecutive items to return per input
 #'   segment. Default `1`.
@@ -35,11 +35,14 @@ NULL
 #'   its `db_path`).
 #' @param .quiet Suppress informational messages.
 #' @param collect Materialise the result (default `TRUE`). With
-#'   `FALSE` the operation is deferred into the lazy plan — note that
+#'   `FALSE` the operation is deferred into the lazy plan - note that
 #'   the lazy SQL path for `scout` / `ascend_to` / `descend_to` does
 #'   not yet preserve every derived column (labels, attribute,
 #'   start_item_id, ...), so eager evaluation is the safe default
 #'   until full SQL parity lands.
+#' @param ... Arguments for the level-specific method (`steps_forward`,
+#'   `count_from`, `capture`, `ignore_bundle_boundaries`,
+#'   `calculate_times`, `times_from`, `.from`, `.quiet`, `collect`).
 #' @usage scout(.segments, ...)
 #' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
 #' @examplesIf interactive()
@@ -195,7 +198,7 @@ scout_dt <- function(.segments,
     cli::cli_abort("Cannot determine corpus. Provide via {.arg .from}")
   }
   
-  # Get database connection — reuse cached connection for corpus objects
+  # Get database connection - reuse cached connection for corpus objects
   conn <- get_or_create_connection(corp)
 
   # Query all items on the same levels
@@ -447,7 +450,7 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     cli::cli_abort("Cannot determine corpus")
   }
   
-  # Get database connection — reuse cached connection for corpus objects
+  # Get database connection - reuse cached connection for corpus objects
   conn <- get_or_create_connection(corp)
 
   # Query for upward links
@@ -634,7 +637,7 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     cli::cli_abort("Cannot determine corpus")
   }
   
-  # Get database connection — reuse cached connection for corpus objects
+  # Get database connection - reuse cached connection for corpus objects
   conn <- get_or_create_connection(corp)
 
   # Query for downward links (from our segments to target level)

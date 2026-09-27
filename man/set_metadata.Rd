@@ -49,10 +49,10 @@ determined by which of \code{session}/\code{bundle} are provided.
 Writes one or more metadata fields at the chosen scope. The scope is
 chosen by which of \code{session} and \code{bundle} you pass:
 \itemize{
-\item neither — \emph{database} level (defaults that apply to every bundle).
-\item \code{session} only — \emph{session} level (overrides the database default
+\item neither - \emph{database} level (defaults that apply to every bundle).
+\item \code{session} only - \emph{session} level (overrides the database default
 for that session's bundles).
-\item \code{session} + \code{bundle} — \emph{bundle} level (overrides both).
+\item \code{session} + \code{bundle} - \emph{bundle} level (overrides both).
 }
 }
 \details{

@@ -113,7 +113,7 @@ initialize_metadata_schema <- function(con) {
 #'
 #' Returns a data.frame with `rel_path` (relative to `basePath`) and the
 #' file's current `mtime` as a numeric POSIX seconds value, for every
-#' database / session / bundle metadata file that exists on disk —
+#' database / session / bundle metadata file that exists on disk - 
 #' `METADATA.json` or, where absent at a level, the legacy `.meta_json`.
 #'
 #' @noRd
@@ -158,7 +158,7 @@ initialize_metadata_schema <- function(con) {
 #'
 #' Compares disk mtimes against the cached values in `metadata_mtime`.
 #' Returns `FALSE` only when the set of files AND their mtimes match
-#' exactly — any added, removed, or modified file triggers a `TRUE`,
+#' exactly - any added, removed, or modified file triggers a `TRUE`,
 #' i.e. "rebuild needed".
 #'
 #' @noRd
@@ -205,7 +205,7 @@ initialize_metadata_schema <- function(con) {
 #' Rescan METADATA.json files into the metadata cache
 #'
 #' Deprecated alias for `load_metadata(corp, source = "files")`. Use the
-#' new entry point in new code — both behave identically. Call this
+#' new entry point in new code - both behave identically. Call this
 #' (or `load_metadata()`) whenever you have edited `METADATA.json`
 #' files outside of R and want the corpus to pick the changes up.
 #'
@@ -237,7 +237,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   initialize_metadata_schema(con)
 
   # Fast-path: if every tracked METADATA.json has an unchanged mtime since
-  # the last successful gather, the cache is already current — skip the
+  # the last successful gather, the cache is already current - skip the
   # full rescan. Repeated gather_metadata() calls in the same session
   # (and across sessions when files haven't moved) become near-free.
   if (!.metadata_needs_refresh(con, basePath, db_uuid)) {
@@ -355,7 +355,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   }
   
   # OPTIMIZATION: Bulk process all bundle metadata in a single transaction.
-  # Field registration is deduped here — the previous version called
+  # Field registration is deduped here - the previous version called
   # register_metadata_field once per (bundle, field) which means O(N) SQL
   # round-trips for a single distinct field name.
   DBI::dbWithTransaction(con, {
@@ -582,9 +582,9 @@ register_metadata_field <- function(con, field_name, field_type) {
 #'
 #' Returns a tidy one-row-per-bundle tibble with the effective metadata
 #' value for every bundle, with inheritance applied in
-#' **bundle > session > database** precedence — a value set at a more
+#' **bundle > session > database** precedence - a value set at a more
 #' specific scope wins over a less specific one. This is what most
-#' analyses want — feed it to [`dplyr::left_join`] against a
+#' analyses want - feed it to [`dplyr::left_join`] against a
 #' `segment_list`, or use [biographize(segs, corp)][biographize()] to do the join
 #' for you.
 #'
@@ -854,7 +854,7 @@ set_metadata_validated <- function(corpus_obj, meta_list, session, bundle, level
   }
 }
 
-# write_metadata_to_json was removed in v0.5.2 — add_metadata now routes
+# write_metadata_to_json was removed in v0.5.2 - add_metadata now routes
 # through corpus_assign_metadata -> set_metadata_database/session/bundle,
 # giving exactly one canonical write path for metadata.
 

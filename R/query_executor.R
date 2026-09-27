@@ -24,16 +24,16 @@
 #' @return A [lazy_segment_list] (default) or a [segment_list]
 #'   (`lazy = FALSE`). Both have one row per matched annotation with the
 #'   following columns:
-#'   * `session`, `bundle` — corpus location.
-#'   * `start`, `end` — segment times in ms (start == end for events).
-#'   * `labels` — the annotation label that matched.
-#'   * `level`, `attribute`, `type` — annotation level and the matched
+#'   * `session`, `bundle` - corpus location.
+#'   * `start`, `end` - segment times in ms (start == end for events).
+#'   * `labels` - the annotation label that matched.
+#'   * `level`, `attribute`, `type` - annotation level and the matched
 #'     attribute name, plus the level type (`SEGMENT` / `EVENT` /
 #'     `ITEM`).
 #'   * `start_item_id`, `end_item_id`, `start_item_seq_idx`,
-#'     `end_item_seq_idx` — internal item references used by
+#'     `end_item_seq_idx` - internal item references used by
 #'     [scout()] / [ascend_to()] / [descend_to()].
-#'   * `db_uuid` — for joining against the cache.
+#'   * `db_uuid` - for joining against the cache.
 #'   Provenance is recorded on the result; see [provenance()].
 #' @section Supported EQL features:
 #'   reindeer's query engine targets parity with `emuR::query()` and
@@ -52,7 +52,7 @@
 #'   * Attribute-as-level resolution: querying a defined attribute
 #'     name (e.g. `Text == "always"`) resolves to its host level.
 #' @section Common pitfalls:
-#'   * Use `==` (double equals) for equality — `=` triggers a parse error.
+#'   * Use `==` (double equals) for equality - `=` triggers a parse error.
 #'   * Regex patterns go with `=~`/`!~`, exact strings with `==`/`!=`.
 #'   * Wrap sequences and dominances in `[ ]`: `[A -> B]`, `[A ^ B]`.
 #' @family query
@@ -137,7 +137,7 @@ query <- function(emuDB, eql, ...) {
   
   if (lazy) {
     # Return lazy segment list without executing query
-    # Build base SQL query but don't execute — returns list(sql, params)
+    # Build base SQL query but don't execute - returns list(sql, params)
     parsed <- parse_eql_query(eql)
 
     # One connection threaded through all sub-builders avoids per-branch
@@ -200,7 +200,7 @@ query <- function(emuDB, eql, ...) {
 build_base_sql <- function(db_path, parsed, opts = list(), con = NULL) {
   result_level <- opts$result_level %||% NULL
 
-  # Build SQL based on query type — all builders return list(sql, params).
+  # Build SQL based on query type - all builders return list(sql, params).
   # `con` is threaded through so nested builders share a single connection;
   # NULL falls back to per-builder open/close for back-compat.
   result <- switch(parsed$type,
@@ -404,13 +404,13 @@ build_function_query_sql <- function(db_path, parsed, con = NULL) {
   }
 
   # ORDER BY is invalid inside an INTERSECT / UNION compound on SQLite, so
-  # strip a trailing ORDER BY here — the lazy path applies its own ordering
+  # strip a trailing ORDER BY here - the lazy path applies its own ordering
   # after collect(), and conjunction/disjunction can safely embed the result.
   q$sql <- sub("\\s*ORDER BY[^()]*$", "", q$sql)
   q
 }
 
-#' Eager scope-filter executor — reuses the lazy SQL builder
+#' Eager scope-filter executor - reuses the lazy SQL builder
 #' @keywords internal
 #' @noRd
 execute_scope_filter_eager <- function(db_path, parsed, con = NULL) {

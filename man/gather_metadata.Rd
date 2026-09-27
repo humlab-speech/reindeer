@@ -18,7 +18,7 @@ The corpus, invisibly.
 }
 \description{
 Deprecated alias for \code{load_metadata(corp, source = "files")}. Use the
-new entry point in new code — both behave identically. Call this
+new entry point in new code - both behave identically. Call this
 (or \code{load_metadata()}) whenever you have edited \code{METADATA.json}
 files outside of R and want the corpus to pick the changes up.
 }

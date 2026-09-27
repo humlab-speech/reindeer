@@ -27,7 +27,7 @@
 
   # Simulation S3 methods moved to the erodex companion package; no registration here.
 
-  # vctrs hooks — needed so vec_slice/dplyr operations don't reject S7 objects
+  # vctrs hooks - needed so vec_slice/dplyr operations don't reject S7 objects
   # as "scalars". tibble (Imports) brings vctrs as a transitive dep.
   if (requireNamespace("vctrs", quietly = TRUE)) {
     registerS3method("vec_proxy", "reindeer::segment_list",
@@ -40,7 +40,7 @@
                      .vec_restore_extended_segment_list, envir = asNamespace("vctrs"))
   }
 
-  # Bracket subsetting — enforces required-cols downcast for select-like ops
+  # Bracket subsetting - enforces required-cols downcast for select-like ops
   registerS3method("[", "reindeer::segment_list",
                    .bracket_segment_list, envir = asNamespace(pkgname))
   registerS3method("[", "reindeer::extended_segment_list",

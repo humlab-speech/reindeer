@@ -70,7 +70,7 @@ parse_eql_query <- function(query_string) {
     if (!is.null(split_on_operator(inner, "^"))) {
       return(parse_dominance_query(query_string))
     }
-    # No top-level operator found — strip redundant brackets and re-parse
+    # No top-level operator found - strip redundant brackets and re-parse
     return(parse_eql_query(inner))
   }
 
@@ -119,7 +119,7 @@ parse_simple_query <- function(query_string) {
     ))
   }
 
-  # Handle bare level name (no operator) — means "all items on this level"
+  # Handle bare level name (no operator) - means "all items on this level"
   bare_level_pattern <- "^([A-Za-z_]+)(?::([A-Za-z_]+))?$"
   bare_match <- regexec(bare_level_pattern, query_string)
   bare_matches <- regmatches(query_string, bare_match)[[1]]
@@ -163,7 +163,7 @@ parse_simple_query <- function(query_string) {
     trimws(matches[7])
   }
 
-  # Reject a value that is itself an operator fragment — happens when the
+  # Reject a value that is itself an operator fragment - happens when the
   # user wrote e.g. "Phonetic ==" and the regex backtracked, matching
   # `=` as the operator and the trailing `=` as the value. Surface the
   # parse error at query() time instead of letting an empty query run.
@@ -397,7 +397,7 @@ parse_function_query <- function(query_string) {
     "SELECT 1 FROM items WHERE level = ? LIMIT 1", params = list(level))
   if (nrow(check) > 0) return(list(level = level, attribute = attribute))
 
-  # Level not found — check if it's an attribute name in labels
+  # Level not found - check if it's an attribute name in labels
   attr_check <- DBI::dbGetQuery(con,
     "SELECT DISTINCT i.level FROM items i JOIN labels l ON i.db_uuid=l.db_uuid AND i.session=l.session AND i.bundle=l.bundle AND i.item_id=l.item_id WHERE l.name=? LIMIT 1",
     params = list(level))
@@ -512,7 +512,7 @@ build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = 
   left_attr_default <- left_resolved$attribute
   right_attr_default <- right_resolved$attribute
 
-  # Pre-execute non-simple sub-queries BEFORE level check — compound sub-queries
+  # Pre-execute non-simple sub-queries BEFORE level check - compound sub-queries
   # (e.g., dominance) may resolve to a different level than extract_level_from_query reports
   left_preexec <- NULL
   right_preexec <- NULL
@@ -781,7 +781,7 @@ execute_dominance_query_corrected <- function(db_path, parsed_query, result_leve
 
 # Build SQL for a dominance query. Returns list(sql, params) or NULL if a
 # non-simple sub-query was pre-executed and returned no rows. Sub-query
-# handling: same Option B as sequence — non-simple branches are
+# handling: same Option B as sequence - non-simple branches are
 # materialised here; the outer dominance CTE chain is a single SQL
 # statement that the lazy path can defer to collect().
 # @keywords internal
@@ -1026,7 +1026,7 @@ create_empty_result <- function() {
   ))
 }
 
-# Dominance SQL builder — returns list(sql, params) for parameterized execution
+# Dominance SQL builder - returns list(sql, params) for parameterized execution
 build_corrected_dominance_sql <- function(con, left_query, right_query, left_level, right_level,
                                           result_level, hierarchy_info,
                                           left_item_ids = NULL, right_item_ids = NULL) {
@@ -1057,7 +1057,7 @@ build_corrected_dominance_sql <- function(con, left_query, right_query, left_lev
     )
   }
 
-  # Get attribute for final label display — use result_level to pick side,
+  # Get attribute for final label display - use result_level to pick side,
   # then extract_attribute_from_query handles function/dominance/compound queries
   result_attr <- if (result_level == left_level) {
     extract_attribute_from_query(left_query)
@@ -1199,7 +1199,7 @@ build_recursive_dominance_chain <- function(path_info) {
     .query_abort("build_recursive_dominance_chain called for direct dominance")
   }
 
-  # Validate level names — they're used as SQL identifiers and values.
+  # Validate level names - they're used as SQL identifiers and values.
   # Level names come from DBconfig JSON (trusted) but we still validate
   # to prevent any injection through malformed config files.
   for (lvl in path) {

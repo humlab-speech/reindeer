@@ -12,9 +12,9 @@
 #' @param output_file Path for the output CMDI XML file. If NULL, writes to
 #'   corpus_name_cmdi.xml in the database base directory.
 #' @param profile Character. CMDI profile to use:
-#'   - "media-corpus" (default): General media corpus profile
-#'   - "speech-corpus": Speech corpus with participants
-#'   - "speech-corpus-dlu": Speech corpus DLU variant
+#' - "media-corpus" (default): General media corpus profile
+#' - "speech-corpus": Speech corpus with participants
+#' - "speech-corpus-dlu": Speech corpus DLU variant
 #' @param corpus_title Character. Title of the corpus (defaults to database name)
 #' @param corpus_description Character. Description of the corpus
 #' @param author Character. Author/creator of the corpus
@@ -679,7 +679,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
 #' Two layers. **Structural** checks always run offline: a CMD 1.2 envelope
 #' root, `CMDVersion = "1.2"`, the required `Header` fields, a
 #' `ResourceProxyList`, and an `xsi:schemaLocation` that binds a profile
-#' schema. **XSD** validation is attempted when a schema is available — a
+#' schema. **XSD** validation is attempted when a schema is available - a
 #' local `xsd`, a bundled envelope schema under `inst/cmdi/`, or (with
 #' `online = TRUE`) the CMD envelope schema fetched from CLARIN. The envelope
 #' schema validates the envelope/Header/Resources; validating the profile
@@ -763,8 +763,8 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
   profile_ns  <- .cmdi_profile_ns(profile_id)
   profile_xsd <- .cmdi_profile_xsd_url(profile_id)
 
-  # Create root CMD element. CMDI 1.2 needs two namespaces — the envelope
-  # (cmd:) and the profile payload (cmdp:) — and an xsi:schemaLocation that
+  # Create root CMD element. CMDI 1.2 needs two namespaces - the envelope
+  # (cmd:) and the profile payload (cmdp:) - and an xsi:schemaLocation that
   # binds BOTH, so a validator can resolve the profile schema for the
   # Components subtree.
   doc <- xml2::xml_new_root("cmd:CMD",

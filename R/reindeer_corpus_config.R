@@ -283,11 +283,11 @@ store_DBconfig <- function(obj, dbConfig, basePath = NULL) {
   # by an unresolvable DSP function, round-tripped through
   # read_json_fast(..., simplifyVector = FALSE) as a real NULL) must
   # re-serialize as JSON `null`, not jsonlite's default `{}` empty-object
-  # stand-in for NULL — the schema declares those fields `["string","null"]`.
+  # stand-in for NULL - the schema declares those fields `["string","null"]`.
   json <- jsonlite::toJSON(dbConfig, auto_unbox = TRUE,
                            force = TRUE, pretty = TRUE, null = "null")
 
-  # Validate before writing — write paths are always strict
+  # Validate before writing - write paths are always strict
   .validate_against_schema(as.character(json), "dbconfig.schema.json",
                            file_path = dbCfgPath, write = TRUE)
 

@@ -148,7 +148,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     paste0(seg_df$bundle, ".", media_ext)
   )
   
-  # Hoist file existence checks out of the per-group loop — one vectorised
+  # Hoist file existence checks out of the per-group loop - one vectorised
   # filesystem hit beats N system calls when batches cluster on the same
   # missing files. Drops missing-file groups before the lapply runs.
   unique_files <- unique(seg_df$signal_file)
@@ -457,7 +457,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 #' Batch write to the persistent cache.
 #'
 #' Serializes every entry once, evicts once if over budget, then inserts all
-#' rows inside a single transaction — replacing the per-row SELECT-SUM +
+#' rows inside a single transaction - replacing the per-row SELECT-SUM +
 #' INSERT pattern that ran two statements per miss.
 #' @noRd
 .set_persistent_cache_batch <- function(entries, conn, max_cache_size_mb = 1000,
@@ -539,7 +539,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         sep = "_"
       )]
       
-      # Batch cache lookup — a handful of chunked IN queries instead of one
+      # Batch cache lookup - a handful of chunked IN queries instead of one
       # SELECT + UPDATE per row.
       cached_map <- .get_persistent_cache_batch(dt_valid$cache_key, cache_conn)
       dt_valid[, cached_result := lapply(cache_key, function(k) cached_map[[k]])]

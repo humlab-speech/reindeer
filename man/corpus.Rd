@@ -40,10 +40,10 @@ To re-sync metadata selectively without reopening, use
 A \code{corpus} object. The S7 class exposes the following
 properties you can read from user code (use \code{@}):
 \itemize{
-\item \verb{@dbName} — corpus name (the basename minus \verb{_emuDB}).
-\item \verb{@basePath} — path to the \verb{_emuDB} directory.
-\item \verb{@config} — parsed \verb{_DBconfig.json} (level + link definitions).
-\item Internal: \verb{@.uuid}, \verb{@.connection}, \verb{@.cache_dir}, \verb{@.sync} —
+\item \verb{@dbName} - corpus name (the basename minus \verb{_emuDB}).
+\item \verb{@basePath} - path to the \verb{_emuDB} directory.
+\item \verb{@config} - parsed \verb{_DBconfig.json} (level + link definitions).
+\item Internal: \verb{@.uuid}, \verb{@.connection}, \verb{@.cache_dir}, \verb{@.sync} -
 used by the cache machinery; treat as read-only.
 }
 }

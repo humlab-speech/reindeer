@@ -11,10 +11,14 @@ scout(.segments, ...)
 \arguments{
 \item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
 
+\item{...}{Arguments for the level-specific method (\code{steps_forward},
+\code{count_from}, \code{capture}, \code{ignore_bundle_boundaries},
+\code{calculate_times}, \code{times_from}, \code{.from}, \code{.quiet}, \code{collect}).}
+
 \item{steps_forward}{Integer offset. \code{1} = next item, \code{-1} = previous,
 \code{2} = item after next.}
 
-\item{count_from}{\code{"START"} (default) or \code{"END"} — which edge of the
+\item{count_from}{\code{"START"} (default) or \code{"END"} - which edge of the
 current segment to count from.}
 
 \item{capture}{Number of consecutive items to return per input
@@ -32,7 +36,7 @@ its \code{db_path}).}
 \item{.quiet}{Suppress informational messages.}
 
 \item{collect}{Materialise the result (default \code{TRUE}). With
-\code{FALSE} the operation is deferred into the lazy plan — note that
+\code{FALSE} the operation is deferred into the lazy plan - note that
 the lazy SQL path for \code{scout} / \code{ascend_to} / \code{descend_to} does
 not yet preserve every derived column (labels, attribute,
 start_item_id, ...), so eager evaluation is the safe default
@@ -43,7 +47,7 @@ A \code{segment_list}, or \code{lazy_segment_list} when \code{collect = FALSE}.
 }
 \description{
 Given a \code{segment_list}, returns the item(s) \code{steps_forward} positions
-away on the same level — typically the previous or next phone, word,
+away on the same level - typically the previous or next phone, word,
 or syllable. Use negative steps to go backward, or \code{capture > 1} to
 grab a run of consecutive items.
 

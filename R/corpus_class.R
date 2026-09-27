@@ -26,10 +26,10 @@
 #'   Default `<basePath>/.quantify_cache`.
 #' @return A `corpus` object. The S7 class exposes the following
 #'   properties you can read from user code (use `@`):
-#'   * `@dbName` — corpus name (the basename minus `_emuDB`).
-#'   * `@basePath` — path to the `_emuDB` directory.
-#'   * `@config` — parsed `_DBconfig.json` (level + link definitions).
-#'   * Internal: `@.uuid`, `@.connection`, `@.cache_dir`, `@.sync` —
+#'   * `@dbName` - corpus name (the basename minus `_emuDB`).
+#'   * `@basePath` - path to the `_emuDB` directory.
+#'   * `@config` - parsed `_DBconfig.json` (level + link definitions).
+#'   * Internal: `@.uuid`, `@.connection`, `@.cache_dir`, `@.sync` - 
 #'     used by the cache machinery; treat as read-only.
 #' @section Bracket access:
 #' Once you have a corpus, you can read and write metadata by name:
@@ -183,7 +183,7 @@ corpus <- S7::new_class(
     con <- get_or_create_connection(corpus_obj)
     initialize_metadata_schema(con)
 
-    # Gather metadata from METADATA.json / legacy .meta_json files — skip
+    # Gather metadata from METADATA.json / legacy .meta_json files - skip
     # in quick mode if the metadata cache is already populated
     if (quick) {
       has_metadata <- tryCatch({

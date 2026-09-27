@@ -17,7 +17,7 @@ is supplied.}
 pulls Age/Gender for every bundle and returns one row per bundle.}
 }
 \value{
-A tibble with one row per requested (age, gender) — or one
+A tibble with one row per requested (age, gender) - or one
 row per bundle when \code{corpus_obj} is supplied. Columns mirror the
 internal DSPP table (windowSize, minF, maxF, nominalF1, nominalF2,
 nominalF3, plus any others present).

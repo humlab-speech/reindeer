@@ -2,7 +2,7 @@
 % Please edit documentation in R/segment_list_quantify.R
 \name{quantify.lazy_segment_list}
 \alias{quantify.lazy_segment_list}
-\title{Quantify method for lazy_segment_list — defer DSP until collect()}
+\title{Quantify method for lazy_segment_list - defer DSP until collect()}
 \arguments{
 \item{object}{A \code{lazy_segment_list} (from \code{query(corp, query, lazy = TRUE)}).}
 

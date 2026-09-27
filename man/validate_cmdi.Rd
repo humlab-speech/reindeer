@@ -22,7 +22,7 @@ Invisibly, a list with \code{structural} (logical), \code{problems}
 Two layers. \strong{Structural} checks always run offline: a CMD 1.2 envelope
 root, \code{CMDVersion = "1.2"}, the required \code{Header} fields, a
 \code{ResourceProxyList}, and an \code{xsi:schemaLocation} that binds a profile
-schema. \strong{XSD} validation is attempted when a schema is available — a
+schema. \strong{XSD} validation is attempted when a schema is available - a
 local \code{xsd}, a bundled envelope schema under \verb{inst/cmdi/}, or (with
 \code{online = TRUE}) the CMD envelope schema fetched from CLARIN. The envelope
 schema validates the envelope/Header/Resources; validating the profile

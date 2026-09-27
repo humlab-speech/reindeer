@@ -48,7 +48,7 @@ enrich <- function(...) {
 #'   joins through [biographize()], segment-level DSP through [quantify()].
 #'
 #' @name deprecated-moved-functions
-#' @param ... Ignored — the stub never executes the call.
+#' @param ... Ignored - the stub never executes the call.
 #' @return Never returns; always errors with a redirect message.
 #' @keywords internal
 NULL

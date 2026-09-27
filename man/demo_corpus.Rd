@@ -21,7 +21,7 @@ temp directory rather than re-unpacking.
 \description{
 Returns a ready-to-use \code{\link[=corpus]{corpus()}} object loaded from the \code{ae} demo
 speech database that ships inside the package. Intended for examples
-and quick experiments — no separate download, no \code{emuR} install
+and quick experiments - no separate download, no \code{emuR} install
 required. Two flavours of the same data are available:
 WAV-backed (default) and FLAC-backed.
 }

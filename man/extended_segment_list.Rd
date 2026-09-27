@@ -27,9 +27,9 @@ extended_segment_list(
 An \code{extended_segment_list} object (inherits from segment_list).
 Adds two read-only S7 properties on top of \code{segment_list}:
 \itemize{
-\item \verb{@dsp_function} — character; the name of the DSP function whose
+\item \verb{@dsp_function} - character; the name of the DSP function whose
 output extended this list (e.g. \code{"superassp::trk_formant_forest"}).
-\item \verb{@dsp_columns} — character vector; the columns the DSP function
+\item \verb{@dsp_columns} - character vector; the columns the DSP function
 added (e.g. \code{c("F1", "F2", "F3", "B1", "B2", "B3")}). Use this
 to programmatically discover the new measurement columns.
 When \code{\link[=quantify]{quantify()}} is called with \code{.use_cache = TRUE}, the data
@@ -48,7 +48,7 @@ work transparently.
 An \code{extended_segment_list} contains every column of the originating
 \link{segment_list} (see its \code{Structure}
 section), plus one column per DSP output (the names depend on
-\code{dsp_function} — look at \verb{@dsp_columns} to see them). When
+\code{dsp_function} - look at \verb{@dsp_columns} to see them). When
 \code{\link[=quantify]{quantify()}} was called with a vector \code{.at}, an extra \code{.time_point}
 column records the relative time each row was sampled at.
 }

@@ -1,5 +1,5 @@
 # ==============================================================================
-# describe() — emit standards-compliant corpus documentation (Item 5)
+# describe() - emit standards-compliant corpus documentation (Item 5)
 # ==============================================================================
 #
 # A single entry point that produces README.md, CMDI XML, and DataCite 4.5
@@ -49,7 +49,7 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
     if (!is.null(db_meta$team)) proj$team <- db_meta$team
   }
 
-  # Also honour flat database-level fields set via add_metadata() — the metadata
+  # Also honour flat database-level fields set via add_metadata() - the metadata
   # API writes flat keys (Project, Funder, ...), not the nested project/funding
   # objects read above, so without this user-set metadata never reaches the
   # generated artifacts.
@@ -259,7 +259,7 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
 
 #' @keywords internal
 .emit_citation_cff <- function(summary, path) {
-  # Build authors list — CFF requires at least one author.
+  # Build authors list - CFF requires at least one author.
   team <- summary$project$team
   authors <- list()
   if (is.data.frame(team) && nrow(team) > 0) {
@@ -341,10 +341,10 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   add("authors:")
   for (a in cff$authors) {
     if (!is.null(a$`family-names`)) {
-      add("  - family-names: ", esc(a$`family-names`))
+      add(" - family-names: ", esc(a$`family-names`))
       add("    given-names: ", esc(a$`given-names`))
     } else {
-      add("  - name: ", esc(a$name))
+      add(" - name: ", esc(a$name))
     }
     if (!is.null(a$affiliation)) {
       add("    affiliation: ", esc(a$affiliation))
@@ -352,12 +352,12 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   }
   add("identifiers:")
   for (id in cff$identifiers) {
-    add("  - type: ", id$type)
+    add(" - type: ", id$type)
     add("    value: ", esc(id$value))
     add("    description: ", esc(id$description))
   }
   add("keywords:")
-  for (kw in cff$keywords) add("  - ", esc(kw))
+  for (kw in cff$keywords) add(" - ", esc(kw))
 
   writeLines(lines, path, useBytes = TRUE)
   invisible(path)
@@ -595,7 +595,7 @@ describe_corpus <- function(corpus_obj,
     tryCatch(writeLines(state_hash, state_file), error = function(e) NULL)
   }
 
-  # Artifacts are back in sync — clear the dirty bit.
+  # Artifacts are back in sync - clear the dirty bit.
   .clear_metadata_dirty(corpus_obj)
 
   invisible(written)

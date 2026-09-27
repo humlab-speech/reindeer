@@ -19,7 +19,7 @@ NULL
 #'   is supplied.
 #' @param corpus_obj Optional corpus object. When given, the function
 #'   pulls Age/Gender for every bundle and returns one row per bundle.
-#' @return A tibble with one row per requested (age, gender) — or one
+#' @return A tibble with one row per requested (age, gender) - or one
 #'   row per bundle when `corpus_obj` is supplied. Columns mirror the
 #'   internal DSPP table (windowSize, minF, maxF, nominalF1, nominalF2,
 #'   nominalF3, plus any others present).

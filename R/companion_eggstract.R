@@ -25,7 +25,7 @@
 
 # Internal: filter a segment_list to rows whose bundle has HasEGG truthy.
 # Returns the segment_list (possibly empty) and warns if everything filters
-# out, but never aborts — empty results are valid downstream.
+# out, but never aborts - empty results are valid downstream.
 .filter_to_egg_bundles <- function(seg) {
   if (!"HasEGG" %in% names(seg)) {
     cli::cli_alert_warning(

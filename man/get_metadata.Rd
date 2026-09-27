@@ -21,9 +21,9 @@ or character) as recorded when the metadata was written.
 \description{
 Returns a tidy one-row-per-bundle tibble with the effective metadata
 value for every bundle, with inheritance applied in
-\strong{bundle > session > database} precedence — a value set at a more
+\strong{bundle > session > database} precedence - a value set at a more
 specific scope wins over a less specific one. This is what most
-analyses want — feed it to \code{\link[dplyr:left_join]{dplyr::left_join}} against a
+analyses want - feed it to \code{\link[dplyr:left_join]{dplyr::left_join}} against a
 \code{segment_list}, or use \link[=biographize]{biographize(segs, corp)} to do the join
 for you.
 }

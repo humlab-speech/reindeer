@@ -69,7 +69,7 @@
 # Helper: reshape parsed _annot.json into a write_eaf()-ready tibble.
 #
 # `annot_json` is the result of jsonlite::read_json(..., simplifyVector = FALSE)
-# — a nested list with `sampleRate`, `levels`, and `links`. Returns a
+# - a nested list with `sampleRate`, `levels`, and `links`. Returns a
 # tibble with columns start, end, labels, level (all in milliseconds).
 .annot_levels_to_segments <- function(annot_json, align_items = TRUE) {
   sample_rate <- annot_json$sampleRate %||% 0
@@ -112,7 +112,7 @@
         p <- as.numeric(item$samplePoint)
         timing[[id_chr]] <- c(p, p)
       }
-      # ITEM-type timing is deduced lazily below — they have no own
+      # ITEM-type timing is deduced lazily below - they have no own
       # sampleStart/Dur/Point.
     }
   }

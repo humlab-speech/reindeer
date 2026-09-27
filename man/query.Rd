@@ -23,16 +23,16 @@ A \link{lazy_segment_list} (default) or a \link{segment_list}
 (\code{lazy = FALSE}). Both have one row per matched annotation with the
 following columns:
 \itemize{
-\item \code{session}, \code{bundle} — corpus location.
-\item \code{start}, \code{end} — segment times in ms (start == end for events).
-\item \code{labels} — the annotation label that matched.
-\item \code{level}, \code{attribute}, \code{type} — annotation level and the matched
+\item \code{session}, \code{bundle} - corpus location.
+\item \code{start}, \code{end} - segment times in ms (start == end for events).
+\item \code{labels} - the annotation label that matched.
+\item \code{level}, \code{attribute}, \code{type} - annotation level and the matched
 attribute name, plus the level type (\code{SEGMENT} / \code{EVENT} /
 \code{ITEM}).
 \item \code{start_item_id}, \code{end_item_id}, \code{start_item_seq_idx},
-\code{end_item_seq_idx} — internal item references used by
+\code{end_item_seq_idx} - internal item references used by
 \code{\link[=scout]{scout()}} / \code{\link[=ascend_to]{ascend_to()}} / \code{\link[=descend_to]{descend_to()}}.
-\item \code{db_uuid} — for joining against the cache.
+\item \code{db_uuid} - for joining against the cache.
 Provenance is recorded on the result; see \code{\link[=provenance]{provenance()}}.
 }
 }
@@ -75,7 +75,7 @@ name (e.g. \code{Text == "always"}) resolves to its host level.
 \section{Common pitfalls}{
 
 \itemize{
-\item Use \code{==} (double equals) for equality — \code{=} triggers a parse error.
+\item Use \code{==} (double equals) for equality - \code{=} triggers a parse error.
 \item Regex patterns go with \verb{=~}/\verb{!~}, exact strings with \code{==}/\code{!=}.
 \item Wrap sequences and dominances in \verb{[ ]}: \verb{[A -> B]}, \verb{[A ^ B]}.
 }

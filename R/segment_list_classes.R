@@ -157,9 +157,9 @@ is_segment_list <- function(x) {
 #' @param dsp_columns Character vector of column names added by DSP processing
 #' @return An \code{extended_segment_list} object (inherits from segment_list).
 #'   Adds two read-only S7 properties on top of `segment_list`:
-#'   * `@dsp_function` — character; the name of the DSP function whose
+#'   * `@dsp_function` - character; the name of the DSP function whose
 #'     output extended this list (e.g. `"superassp::trk_formant_forest"`).
-#'   * `@dsp_columns` — character vector; the columns the DSP function
+#'   * `@dsp_columns` - character vector; the columns the DSP function
 #'     added (e.g. `c("F1", "F2", "F3", "B1", "B2", "B3")`). Use this
 #'     to programmatically discover the new measurement columns.
 #'   When [quantify()] is called with `.use_cache = TRUE`, the data
@@ -170,7 +170,7 @@ is_segment_list <- function(x) {
 #' An `extended_segment_list` contains every column of the originating
 #' [segment_list][reindeer::segment_list] (see its `Structure`
 #' section), plus one column per DSP output (the names depend on
-#' `dsp_function` — look at `@dsp_columns` to see them). When
+#' `dsp_function` - look at `@dsp_columns` to see them). When
 #' [quantify()] was called with a vector `.at`, an extra `.time_point`
 #' column records the relative time each row was sampled at.
 #'
