@@ -27,9 +27,9 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
-      # Forcing Suggests would fail: eggstract and protoscribe are private
-      # repositories, so they cannot be installed from CI, and the rest of the
-      # Suggests (shiny, DT, readr, ...) are not needed by the tests. The ones
+      # Forcing Suggests would fail: eggstract is a private repository, so
+      # it cannot be installed from CI, and the rest of the Suggests
+      # (shiny, DT, readr, ...) are not needed by the tests. The ones
       # that are needed get installed explicitly below, superassp included.
       _R_CHECK_FORCE_SUGGESTS_: "false"
 

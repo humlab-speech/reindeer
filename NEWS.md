@@ -1,4 +1,35 @@
-# reindeer (development version)
+# reindeer 2.0.0
+
+## Breaking changes
+
+- **`propose_annotations()` is removed.** Its dispatch table
+  (`draft_vad`/`draft_vot`/`draft_periods`/`draft_momel_intsint`/
+  `draft_slam`/`draft_slam_plus`/`draft_slamp3`) was already stale
+  against protoscribe's current `draft_*()` surface (which has since
+  grown `draft_creak`, `draft_mdq`, `draft_align_words`,
+  `draft_whisper(x)`, `draft_wh_import`,
+  `draft_vad_brouhaha`/`ltsd`/`tandem`, `draft_sevq_gci`,
+  `draft_voice_quality`, `draft_voxit_pauses`, none of which were wired
+  in). protoscribe now ships a complete standalone workflow
+  (`draft_*() -> assess() -> prepare() -> transcribe() -> reverse()`)
+  that doesn't need a reindeer-side dispatcher; see
+  `vignette("protoscribe-with-reindeer", package = "protoscribe")`.
+- **The `draft_vad`, `draft_vot`, `draft_periods`, `draft_momel_intsint`,
+  `quantify_simulate`, `enrich_simulate`, `reminisce`,
+  `reminisce_tracks`, and `list_simulations` redirect stubs are
+  removed.** These were flagged in this file as retained only until "a
+  future major release" — this is that release. Call them from
+  `protoscribe::` / `erodex::` directly.
+- **`protoscribe` and `erodex` are dropped from `Suggests` and
+  `Remotes`.** No reindeer code references either package anymore;
+  both are fully independent, optional add-ons with their own vignette
+  sets. `eggstract` and `superassp` remain in `Suggests` as DSP
+  backends that `quantify()`/`quantify_egg()` still call into.
+- `end_to_end_pipeline.Rmd` and `cache_management.Rmd` no longer
+  demonstrate protoscribe/erodex usage; the former's protoscribe
+  section is replaced with an EQL sequence/dominance query example.
+
+## Other changes since 1.0.1
 
 - **`enrich()` is removed** (hard stub, no deprecation window — same
   precedent as `enrich_egg()`'s removal). `quantify()` now covers

@@ -22,14 +22,10 @@ persistent cache in `<corpus>/.quantify_cache/`. The next time you run
 the same call with the same parameters, reindeer reads the result from
 disk instead of re-running the DSP.
 
-Two companion packages keep their own caches and provide their own
-management tools:
-
-- **erodex** — simulation result tables. See `erodex::list_simulations()`.
-- **protoscribe** — draft annotation cache. See `protoscribe`'s docs.
-
-This vignette covers only the quantify/enrich cache, which reindeer
-manages itself.
+protoscribe (draft annotation cache) and erodex (simulation result
+cache) each manage their own caches independently — see their own
+vignettes for those. This vignette covers only the quantify/enrich
+cache, which reindeer manages itself.
 
 ## Set up a corpus
 

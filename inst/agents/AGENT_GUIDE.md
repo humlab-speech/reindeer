@@ -407,7 +407,7 @@ jsonlite, RcppSimdJson, assertthat, future, furrr, httpuv, xml2, Rcpp, tibble,
 Rdpack, imputeTS, future.apply
 
 **Optional (Suggests):** emuR, superassp (GitHub: humlab-speech/superassp), qs,
-protoscribe, knitr, rmarkdown, yardstick, bigstatsr, openxlsx, av, readr
+knitr, rmarkdown, yardstick, bigstatsr, openxlsx, av, readr
 
 superassp provides the bridge between Praat's DSP algorithms and R. Install with:
 ```r
