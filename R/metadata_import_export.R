@@ -420,11 +420,15 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
   # Join with segment list
   result <- merge(segs_tbl, metadata, by = c("session", "bundle"), all.x = TRUE)
 
-  # Preserve S7 class after join
-  if (S7::S7_inherits(segs_tbl, extended_segment_list)) {
-    result <- extended_segment_list(data = as.data.frame(result))
-  } else if (S7::S7_inherits(segs_tbl, segment_list)) {
-    result <- extended_segment_list(data = as.data.frame(result))
+  # Preserve S7 class (and db_uuid/db_path) after join
+  if (S7::S7_inherits(segs_tbl, segment_list)) {
+    result <- extended_segment_list(
+      data = as.data.frame(result),
+      db_uuid = segs_tbl@db_uuid,
+      db_path = segs_tbl@db_path,
+      dsp_function = if (S7::S7_inherits(segs_tbl, extended_segment_list)) segs_tbl@dsp_function else "",
+      dsp_columns = if (S7::S7_inherits(segs_tbl, extended_segment_list)) segs_tbl@dsp_columns else character(0)
+    )
   }
 
   if (S7::S7_inherits(segs_tbl, segment_list)) {

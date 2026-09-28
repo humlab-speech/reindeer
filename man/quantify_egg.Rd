@@ -35,7 +35,7 @@ An \code{extended_segment_list} with EGG-derived measurements.
 }
 \description{
 Thin wrapper around \code{\link[=quantify]{quantify()}} that delegates DSP to a function from
-the eggstract companion package (e.g. \code{eggstract::ksvF0}) and gates
+the eggstract companion package (e.g. \code{eggstract::trk_f0}) and gates
 availability via the bundle-level \code{HasEGG} metadata field. Use this
 when the corpus mixes audio and EGG bundles and only the EGG-equipped
 ones should be measured.

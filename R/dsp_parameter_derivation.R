@@ -48,7 +48,13 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
         # Pull every DSPP norm column the DSP function actually accepts.
         norm_cols <- setdiff(intersect(names(row), fun_formals), c("Age", "Gender"))
         for (col in norm_cols) {
-          if (!is.na(row[[col]])) params[[col]] <- row[[col]]
+          val <- row[[col]]
+          if (!is.na(val)) {
+            # DSPP norms are integer internally (dspp_metadataParameters_dt());
+            # most DSP routines are .Call-based and require a double (R's
+            # REAL() rejects an INTSXP), so widen here at the shared boundary.
+            params[[col]] <- if (is.numeric(val)) as.double(val) else val
+          }
         }
       } else {
         cli::cli_warn(

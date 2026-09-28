@@ -48,7 +48,7 @@
 #' Quantify segments using an eggstract EGG processor
 #'
 #' Thin wrapper around [quantify()] that delegates DSP to a function from
-#' the eggstract companion package (e.g. `eggstract::ksvF0`) and gates
+#' the eggstract companion package (e.g. `eggstract::trk_f0`) and gates
 #' availability via the bundle-level `HasEGG` metadata field. Use this
 #' when the corpus mixes audio and EGG bundles and only the EGG-equipped
 #' ones should be measured.
@@ -95,7 +95,7 @@ quantify_egg <- function(seg, corpus = NULL,
         seg,
         db_uuid = if (S7::S7_inherits(seg, segment_list)) seg@db_uuid else "",
         db_path = if (S7::S7_inherits(seg, segment_list)) seg@db_path else "",
-        dsp_function = "eggstract::ksvF0",
+        dsp_function = "eggstract::trk_f0",
         dsp_columns = character()
       ))
     }

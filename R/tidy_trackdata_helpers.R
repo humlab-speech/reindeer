@@ -138,7 +138,20 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 #' Optimized batch processor for large segment lists
 #' Groups segments by audio file to minimize I/O operations
 #' @noRd
-.process_by_file_batch <- function(seg_df, corpus_obj, dsp_function, dsp_params, 
+# Bind segment bookkeeping columns with DSP result columns, renaming any
+# DSP column whose name collides with a segment column (e.g. a track's own
+# `sample_rate` vs the segment's cached one) so rbindlist() downstream never
+# sees duplicate names.
+.bind_seg_and_result <- function(seg_df, result_df) {
+  dup <- intersect(names(seg_df), names(result_df))
+  if (length(dup) > 0) {
+    is_dup <- names(result_df) %in% dup
+    names(result_df)[is_dup] <- paste0(names(result_df)[is_dup], "_dsp")
+  }
+  cbind(tibble::as_tibble(seg_df), tibble::as_tibble(result_df))
+}
+
+.process_by_file_batch <- function(seg_df, corpus_obj, dsp_function, dsp_params,
                                    media_ext, .at = NULL, .verbose = FALSE) {
   # Group by audio file
   seg_df$signal_file <- file.path(
@@ -215,10 +228,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         seg_replicated <- seg[rep(1, n_result_rows), , drop = FALSE]
         rownames(seg_replicated) <- NULL
         
-        cbind(
-          tibble::as_tibble(seg_replicated),
-          tibble::as_tibble(result_df)
-        )
+        .bind_seg_and_result(seg_replicated, result_df)
       }, error = function(e) {
         if (.verbose) {
           cli::cli_alert_warning("Error processing segment: {conditionMessage(e)}")
@@ -650,10 +660,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 
       n_result_rows <- nrow(result_df)
       seg_info <- dt_all[rep(i, n_result_rows)]
-      cbind(
-        tibble::as_tibble(seg_info),
-        tibble::as_tibble(result_df)
-      )
+      .bind_seg_and_result(seg_info, result_df)
     })
 
     Filter(Negate(is.null), pieces)
@@ -738,10 +745,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         seg_replicated <- seg[rep(1, n_result_rows), , drop = FALSE]
         rownames(seg_replicated) <- NULL
         
-        cbind(
-          tibble::as_tibble(seg_replicated),
-          tibble::as_tibble(result_df)
-        )
+        .bind_seg_and_result(seg_replicated, result_df)
       }, error = function(e) {
         if (.verbose) {
           cli::cli_alert_warning("Error: {conditionMessage(e)}")

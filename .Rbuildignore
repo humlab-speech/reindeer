@@ -38,6 +38,7 @@
 ^bench\.log$
 ^build\.log$
 ^dev$
+^specs$
 ^render_vignette\.R$
 ^verify_implementation\.R$
 ^\.worktrees$
