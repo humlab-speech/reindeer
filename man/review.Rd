@@ -12,23 +12,6 @@ review(corpus, ...)
 \item{...}{Server options forwarded to the Artic session: \code{host},
 \code{port}, \code{autoOpenURL}, \code{browser}, \code{useViewer},
 \code{debug}, \code{debugLevel}.}
-
-\item{seglist}{A \code{segment_list}, \code{extended_segment_list},
-\code{lazy_segment_list}, or data.frame with \code{session} and
-\code{bundle} plus anchor columns.}
-
-\item{tracks}{Registered SSFF tracks to overlay while reviewing. Defaults to
-the \code{dsp_columns} of an \code{extended_segment_list}, else none.}
-
-\item{perspective}{Perspective to attach track overlays to (name or index;
-defaults to the first perspective).}
-
-\item{canvas}{Signal canvas to overlay tracks on (default \code{"SPEC"}).}
-
-\item{bundleListName}{Optional bundle-list name used to persist per-bundle
-\code{comment}/\code{finishedEditing} progress.}
-
-\item{appDir}{Optional explicit Artic dist directory.}
 }
 \value{
 Invisibly \code{TRUE}. Stop the server as for \code{\link[=annotate]{annotate()}}.
@@ -42,6 +25,24 @@ list becomes a review playlist. Rows are played in their current order, so
 \code{dplyr::arrange()} before \code{review()} sets the order (e.g. worst
 measurement first).
 }
+\section{Method arguments - corpus}{
+
+\describe{
+\item{\code{seglist}}{A \code{segment_list}, \code{extended_segment_list},
+\code{lazy_segment_list}, or data.frame with \code{session} and
+\code{bundle} plus anchor columns.}
+\item{\code{tracks}}{Registered SSFF tracks to overlay while reviewing.
+Defaults to the \code{dsp_columns} of an \code{extended_segment_list},
+else none.}
+\item{\code{perspective}}{Perspective to attach track overlays to (name or
+index; defaults to the first perspective).}
+\item{\code{canvas}}{Signal canvas to overlay tracks on (default \code{"SPEC"}).}
+\item{\code{bundleListName}}{Optional bundle-list name used to persist
+per-bundle \code{comment}/\code{finishedEditing} progress.}
+\item{\code{appDir}}{Optional explicit Artic dist directory.}
+}
+}
+
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")

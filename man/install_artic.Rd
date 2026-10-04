@@ -38,7 +38,7 @@ Invisibly, the path to the installed dist.
 }
 \description{
 reindeer serves Artic from a prebuilt \code{dist/} directory. This installs
-one into the per-user cache used by \code{\link{find_artic}}. It never runs
+one into the per-user cache used by \code{find_artic()}. It never runs
 implicitly: \code{annotate()} and \code{review()} only look for a build and
 point at this function when none is found.
 }
