@@ -202,15 +202,15 @@ reindeer::collect(data) |>
 
 To inspect or edit annotations in a browser-based UI:
 
-```{r serve, eval = FALSE}
-serve_app(corp)                              # whole corpus
-serve_app(corp, seglist = vowels)            # restrict to a query result
-serve_app(corp, sessionPattern = "Session0[1-3]")
+```{r annotate, eval = FALSE}
+annotate(corp)                               # edit the whole corpus
+review(corp, vowels)                         # playlist from a query result
+annotate(corp, sessionPattern = "Session0[1-3]")
 ```
 
-`serve_app()` starts a local EMU-webApp instance and returns; close the
-tab and call `httpuv::stopAllServers()` to release the port. It is not
-evaluated here because it opens a browser and a socket.
+`annotate()` and `review()` start a local Artic instance and return; close the
+tab and call `httpuv::stopAllServers()` to release the port. They are not
+evaluated here because they open a browser and a socket.
 
 ## Lazy pipelines and pipe-loss
 
@@ -242,7 +242,7 @@ dropped(plan)           # cumulative count
 - `vignette("metadata_management")` — three-level inheritance,
   spreadsheet round-trip, validation.
 - `vignette("cache_management")` — inspect_cache, cleanup, thresholds.
-- `vignette("interactive_annotation")` — full serve / EMU-webApp workflow.
+- `vignette("interactive_annotation")` — full annotate / review / Artic workflow.
 - `vignette("lazy_and_provenance")` — lazy plans, pipe-loss debugging.
 - `?corpus`, `?query`, `?quantify`, `?enrich`, `?set_metadata` —
   function reference.

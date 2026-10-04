@@ -1,59 +1,29 @@
 # ==============================================================================
-# SERVE EMU-WEBAPP FOR REINDEER CORPUS
+# ARTIC SESSION ENGINE
 # ==============================================================================
+#
+# One HTTP + WebSocket server implementing the EMU-webApp protocol
+# (EMU-webApp-websocket-protocol 0.0.2), used by annotate() and review().
+# The HTTP server also serves the Artic static build and range-aware media;
+# the WebSocket server answers the protocol commands for DBconfig, bundle
+# lists (including review time anchors), bundles, and save-back.
 
-#' Open a corpus in the EMU-webApp annotation interface
-#'
-#' Launches a local web server and opens the EMU-webApp pointed at the
-#' corpus, so you can inspect waveforms and spectrograms, edit
-#' annotations, and have the changes write straight back to the corpus.
-#' Use [serve_app()] if you also have `emuR` attached and want to avoid
-#' the name clash.
-#'
-#' @param corpus A `corpus` object.
-#' @param ... Filters and server options:
-#'   `sessionPattern` / `bundlePattern` (regex filters),
-#'   `seglist` (a `segment_list` to restrict the bundles shown),
-#'   `port` (default `17890`),
-#'   `host` (default `"127.0.0.1"`),
-#'   `useViewer` (default `TRUE` in RStudio),
-#'   `autoOpenURL` (set `""` to skip browser launch).
-#' @return Invisibly `TRUE`. The server keeps running until you press
-#'   the *clear* button in the webApp, close the tab, or stop it with
-#'   `httpuv::stopServer(getOption("reindeer.serve_handle"))` (or
-#'   `httpuv::stopAllServers()`).
-#' @section EMU-webApp location:
-#' On first use, point reindeer at your EMU-webApp install:
-#' \preformatted{
-#' options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
-#' # or persistently:
-#' Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
-#' }
-#' If neither is set reindeer looks at `system.file("EMU-webApp/dist",
-#' package = "reindeer")` and emits a helpful error otherwise.
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' serve(corp)
-#' serve(corp, sessionPattern = "Session.*")
-#' serve(corp, seglist = query(corp, "Duration > 500"))
-#' @seealso [serve_app()], [query()]
 #' @importFrom httpuv startServer stopAllServers
-#' @export
-serve <- S7::new_generic("serve", "corpus")
-
-#' @export
-S7::method(serve, corpus) <- function(corpus,
-                                      sessionPattern = ".*",
-                                      bundlePattern = ".*",
-                                      seglist = NULL,
-                                      bundleListName = NULL,
-                                      host = "127.0.0.1",
-                                      port = 17890,
-                                      autoOpenURL = "http://127.0.0.1:17890/?autoConnect=true",
-                                      browser = getOption("browser"),
-                                      useViewer = TRUE,
-                                      debug = FALSE,
-                                      debugLevel = 0) {
+.artic_session <- function(corpus,
+                           bundle_entries = NULL,
+                           dbconfig_overlay = NULL,
+                           sessionPattern = ".*",
+                           bundlePattern = ".*",
+                           bundleListName = NULL,
+                           host = "127.0.0.1",
+                           port = 17890,
+                           autoOpenURL = "http://127.0.0.1:17890/?autoConnect=true",
+                           browser = getOption("browser"),
+                           useViewer = TRUE,
+                           debug = FALSE,
+                           debugLevel = 0,
+                           appDir = NULL,
+                           require_artic = character()) {
 
   # Set debug level
   if (debug && debugLevel == 0) {
@@ -63,110 +33,53 @@ S7::method(serve, corpus) <- function(corpus,
   # Get emuDBhandle for compatibility with emuR functions
   emuDBhandle <- get_emuDBhandle(corpus)
 
-  # query() returns a lazy_segment_list by default, and serve() documents that a
-  # query result can be passed straight in (see the example below). Materialise
-  # it here so the validation below sees a segment_list.
-  if (S7::S7_inherits(seglist, lazy_segment_list)) {
-    seglist <- collect(seglist)
-  }
-
-  # Load database configuration
+  # Load database configuration and apply the in-memory overlay (editing
+  # permissions, renderable perspectives, review track overlays). The corpus
+  # _DBconfig.json on disk is never modified.
   DBconfig <- load_DBconfig(emuDBhandle)
+  if (!is.null(dbconfig_overlay)) {
+    DBconfig <- dbconfig_overlay(DBconfig)
+  }
 
-  # Get bundle list
-  if (is.null(seglist)) {
-    allBundlesDf <- .list_bundles(emuDBhandle)
+  # Bundle scope: a review playlist (pre-built entries with time anchors), a
+  # saved bundle list, or the corpus bundle table filtered by patterns.
+  entries <- if (!is.null(bundle_entries)) {
+    if (!is.null(bundleListName)) {
+      .artic_abort("{.arg bundle_entries} and {.arg bundleListName} are mutually exclusive.")
+    }
+    bundle_entries
   } else {
-    # Check if seglist is valid
-    if (!S7::S7_inherits(seglist, segment_list) && !is.data.frame(seglist)) {
-      cli::cli_abort("seglist must be a segment_list or data.frame with required columns")
+    bl <- if (!is.null(bundleListName)) {
+      .read_bundle_list(emuDBhandle$basePath, bundleListName)
+    } else {
+      .list_bundles(emuDBhandle)
     }
-
-    # Validate required columns
-    required_cols <- c("session", "bundle")
-    optional_cols <- c("start", "end", "sample_rate")  # Used by some functions but not required here
-    missing_cols <- setdiff(required_cols, names(seglist))
-
-    if (length(missing_cols) > 0) {
-      cli::cli_abort(c(
-        "seglist is missing required columns: {.field {missing_cols}}",
-        "i" = "Required columns are: {.field {required_cols}}"
-      ))
+    if (!is.null(sessionPattern) && sessionPattern != ".*") {
+      bl <- bl[reindeer_regexprl(sessionPattern, bl[["session"]]), , drop = FALSE]
     }
-
-    # Validate column types for required columns
-    if (!is.character(seglist$session) && !is.factor(seglist$session)) {
-      cli::cli_abort("seglist column {.field session} must be character or factor, not {.cls {class(seglist$session)}}")
+    if (!is.null(bundlePattern) && bundlePattern != ".*") {
+      bl <- bl[reindeer_regexprl(bundlePattern, bl[["name"]]), , drop = FALSE]
     }
-    if (!is.character(seglist$bundle) && !is.factor(seglist$bundle)) {
-      cli::cli_abort("seglist column {.field bundle} must be character or factor, not {.cls {class(seglist$bundle)}}")
+    if (nrow(bl) == 0L) {
+      .artic_abort("No bundles to serve (check the session/bundle patterns).")
     }
-
-    # Validate optional columns if present
-    if ("start" %in% names(seglist) && !is.numeric(seglist$start)) {
-      cli::cli_abort("seglist column {.field start} must be numeric, not {.cls {class(seglist$start)}}")
-    }
-    if ("end" %in% names(seglist) && !is.numeric(seglist$end)) {
-      cli::cli_abort("seglist column {.field end} must be numeric, not {.cls {class(seglist$end)}}")
-    }
-    if ("sample_rate" %in% names(seglist) && !is.numeric(seglist$sample_rate)) {
-      cli::cli_abort("seglist column {.field sample_rate} must be numeric, not {.cls {class(seglist$sample_rate)}}")
-    }
-
-    tmp <- data.frame(
-      session = as.character(seglist$session),
-      bundle = as.character(seglist$bundle),
-      stringsAsFactors = FALSE
-    )
-    allBundlesDf <- unique(tmp)
+    lapply(seq_len(nrow(bl)), function(i) {
+      e <- list(
+        session = as.character(bl$session[[i]]),
+        name = as.character(bl$name[[i]])
+      )
+      if ("comment" %in% names(bl)) e$comment <- as.character(bl$comment[[i]])
+      if ("finishedEditing" %in% names(bl)) e$finishedEditing <- as.logical(bl$finishedEditing[[i]])
+      e
+    })
+  }
+  if (length(entries) == 0L) {
+    .artic_abort("No bundles to serve.")
   }
 
-  bundlesDf <- allBundlesDf
-
-  # Handle bundle list
-  if (!is.null(bundleListName)) {
-    if (!is.null(seglist)) {
-      cli::cli_abort("both seglist & bundleListName can't be set at the same time!")
-    }
-    bundlesDf <- .read_bundle_list(emuDBhandle$basePath, bundleListName)
-
-    # Ensure restrictions are set for bundle comments/editing
-    if (is.null(DBconfig$EMUwebAppConfig$restrictions$bundleComments) ||
-        is.null(DBconfig$EMUwebAppConfig$restrictions$bundleFinishedEditing)) {
-      DBconfig$EMUwebAppConfig$restrictions$bundleComments <- TRUE
-      DBconfig$EMUwebAppConfig$restrictions$bundleFinishedEditing <- TRUE
-      store_DBconfig(emuDBhandle, DBconfig)
-    }
-  }
-
-  # Warning about bundle comments/editing without bundle list
-  if (!is.null(DBconfig$EMUwebAppConfig$restrictions$bundleComments) ||
-      !is.null(DBconfig$EMUwebAppConfig$restrictions$bundleFinishedEditing)) {
-    if (is.null(bundleListName)) {
-      cli::cli_warn(paste0(
-        "'bundleComments' and/or 'bundleFinishedEditing' are set to true ",
-        "in the DBconfig and the bundleListName parameter wasn't set! Any changes made ",
-        "to those fields in the bundleListSideBar in the EMU-webApp won't be saved as ",
-        "those values are stored in the bundleLists!"
-      ))
-    }
-  }
-
-  # Filter by session pattern (only if bundleListName is not set, since it was already loaded)
-  if (is.null(bundleListName) && !is.null(sessionPattern) && sessionPattern != ".*") {
-    ssl <- reindeer_regexprl(sessionPattern, bundlesDf[["session"]])
-    bundlesDf <- bundlesDf[ssl, ]
-  }
-
-  # Filter by bundle pattern (only if bundleListName is not set)
-  if (is.null(bundleListName) && !is.null(bundlePattern) && bundlePattern != ".*") {
-    bsl <- reindeer_regexprl(bundlePattern, bundlesDf[["name"]])
-    bundlesDf <- bundlesDf[bsl, ]
-  }
-
-  # Resolve the EMU-webApp directory once per serve() call (the fallback
-  # ladder does filesystem checks, so it should not run per request).
-  webAppDir <- get_webapp_dir()
+  # Resolve the Artic dist once per session (the fallback ladder does
+  # filesystem checks, so it should not run per request).
+  webAppDir <- find_artic(appDir = appDir, require = require_artic)
 
   # Define HTTP request handler
   httpRequest <- function(req) {
@@ -342,43 +255,16 @@ S7::method(serve, corpus) <- function(corpus,
         response <- list(
           status = list(type = "SUCCESS"),
           callbackID = jr$callbackID,
-          dataType = "uttList",
-          data = bundlesDf
+          dataType = "bundleList",
+          data = entries
         )
-
-        # Add time anchors if seglist provided
-        if (!is.null(seglist)) {
-          dataWithTimeAnchors <- list()
-          for (i in 1:nrow(response$data)) {
-            sesBool <- response$data[i, ]$session == seglist$session
-            bndlBool <- response$data[i, ]$bundle == seglist$bundle
-
-            start_sample_vals <- round(((seglist[sesBool & bndlBool, ]$start / 1000) +
-                                         0.5 / seglist[sesBool & bndlBool, ]$sample_rate) *
-                                        seglist[sesBool & bndlBool, ]$sample_rate)
-            end_sample_vals <- round(((seglist[sesBool & bndlBool, ]$end / 1000) +
-                                       0.5 / seglist[sesBool & bndlBool, ]$sample_rate) *
-                                      seglist[sesBool & bndlBool, ]$sample_rate)
-
-            dataWithTimeAnchors[[i]] <- list(
-              session = response$data[i, ]$session,
-              name = response$data[i, ]$bundle,
-              timeAnchors = data.frame(
-                sample_start = start_sample_vals,
-                sample_end = end_sample_vals
-              )
-            )
-          }
-          response$data <- dataWithTimeAnchors
-        }
 
         responseJSON <- jsonlite::toJSON(response, auto_unbox = TRUE, force = TRUE, pretty = TRUE)
         if (debugLevel >= 5) cli::cli_alert_info("{responseJSON}")
         result <- ws$send(responseJSON)
         if (debugLevel >= 2) {
-          cli::cli_alert_success("Sent utterance list with length: {nrow(bundlesDf)}")
+          cli::cli_alert_success("Sent bundle list with length: {length(entries)}")
         }
-
       } else if (jr$type == "GETBUNDLE") {
         bundleName <- jr[["name"]]
         bundleSess <- jr[["session"]]
@@ -448,29 +334,27 @@ S7::method(serve, corpus) <- function(corpus,
           ssffFileExts <- names(ssffFilesHash)
           for (ssffFileExt in ssffFileExts) {
             ssffFilePath <- ssffFilesHash[ssffFileExt]
-            mf <- tryCatch(file(ssffFilePath, "rb"), error = function(e) {
-              err <<- e
-            })
-
-            if (is.null(err)) {
-              mfData <- readBin(mf, raw(), n = file.info(ssffFilePath)$size)
-              if (inherits(mfData, "error")) {
-                err <- mfData
-                break
-              }
-            } else {
-              break
+            mf <- tryCatch(file(ssffFilePath, "rb"), error = function(e) NULL)
+            if (is.null(mf)) {
+              # A registered track with no file on disk must not block the whole
+              # bundle; skip it so the rest of the annotation still loads.
+              cli::cli_warn("Missing SSFF file for {bundleSess}/{bundleName}: {.path {ssffFilePath}}; skipping.")
+              next
             }
-
-            mfDataBase64 <- base64enc::base64encode(mfData)
-            encoding <- "BASE64"
-            ssffDatObj <- list(
-              encoding = encoding,
-              data = mfDataBase64,
+            mfData <- tryCatch(
+              readBin(mf, raw(), n = file.info(ssffFilePath)$size),
+              error = function(e) NULL
+            )
+            close(mf)
+            if (is.null(mfData)) {
+              cli::cli_warn("Could not read SSFF file {.path {ssffFilePath}}; skipping.")
+              next
+            }
+            ssffFiles[[length(ssffFiles) + 1]] <- list(
+              encoding = "BASE64",
+              data = base64enc::base64encode(mfData),
               fileExtension = ssffFileExt
             )
-            ssffFiles[[length(ssffFiles) + 1]] <- ssffDatObj
-            close(mf)
           }
 
           if (is.null(err)) {
@@ -671,12 +555,12 @@ S7::method(serve, corpus) <- function(corpus,
   }
 
   # Print server info
-  cli::cli_h2("Starting reindeer EMU-webApp server")
+  cli::cli_h2("Starting reindeer Artic server")
   cli::cli_alert_info("Navigate your browser to: {.url http://localhost:{port}}")
   cli::cli_alert_info("Server connection URL: {.url ws://localhost:{port}}")
   cli::cli_alert_info("To stop the server:")
   cli::cli_ul(c(
-    "Press the 'clear' button in the EMU-webApp",
+    "Press the 'clear' button in Artic",
     "Close/reload the webApp in your browser",
     "Call {.code httpuv::stopServer(getOption('reindeer.serve_handle'))} in R"
   ))
@@ -689,7 +573,16 @@ S7::method(serve, corpus) <- function(corpus,
   )
 
   # Start server and retain the handle so it can be stopped scoped later.
-  server <- httpuv::startServer(host = host, port = port, app = app)
+  server <- tryCatch(
+    httpuv::startServer(host = host, port = port, app = app),
+    error = function(e) {
+      .artic_abort(c(
+        "Could not start the Artic server on {host}:{port}.",
+        "i" = "The port may be in use; try {.code port = httpuv::randomPort()}.",
+        "x" = conditionMessage(e)
+      ))
+    }
+  )
   options(reindeer.serve_handle = server)
 
   # Auto-open browser
@@ -697,43 +590,8 @@ S7::method(serve, corpus) <- function(corpus,
     viewer <- getOption("viewer")
 
     if (useViewer & requireNamespace("rstudioapi", quietly = TRUE) & rstudioapi::isAvailable()) {
-      webApp_path <- get_webapp_dir()
-
-      if (!dir.exists(webApp_path)) {
-        cli::cli_abort(c(
-          "EMU-webApp directory not found at: {.path {webApp_path}}",
-          "i" = "Please ensure the EMU-webApp is available at the expected location"
-        ))
-      }
-
-      # Prepare base path for RStudio
-      base_path <- "/"
-      if (requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
-        if (rstudioapi::translateLocalUrl(paste0("http://localhost:", port, "/")) !=
-            paste0("http://localhost:", port, "/")) {
-          base_path <- paste0("/", rstudioapi::translateLocalUrl(paste0("http://localhost:", port, "/")))
-        }
-      }
-
-      # Modify index.html for local serving
-      index_html <- readLines(file.path(webApp_path, "index.html"), warn = FALSE)
-      index_html <- paste(index_html, collapse = "\n")
-      index_html_new <- sub(
-        "<base href=\"/EMU-webApp/\">",
-        paste0("<base href=\"", base_path, "\">"),
-        index_html,
-        fixed = TRUE
-      )
-      index_html_new <- sub(
-        "manifest=\"manifest.appcache\"",
-        "",
-        index_html_new,
-        fixed = TRUE
-      )
-
-      # Write modified index.html to temp location
-      temp_index <- tempfile(fileext = ".html")
-      writeLines(index_html_new, temp_index)
+      # Artic is served from its dist root, so absolute asset URLs resolve
+      # against the server root; the RStudio Viewer can load the URL directly.
 
       # Open in viewer or browser
       if (!is.null(viewer)) {
@@ -760,50 +618,6 @@ S7::method(serve, corpus) <- function(corpus,
   return(invisible(TRUE))
 }
 
-#' Get EMU-webApp directory path
-#'
-#' Returns the path to the revised EMU-webApp distribution directory.
-#' The function looks for the EMU-webApp in this order:
-#' 1. Option: getOption("reindeer.emuWebApp.dir")
-#' 2. Environment variable: EMU_WEBAPP_DIR
-#' 3. Package installation: system.file("EMU-webApp/dist", package = "reindeer")
-#' 4. Default fallback: ../EMU-webApp/dist relative to package location
-#'
-#' @return Path to EMU-webApp dist directory
-#' @keywords internal
-#' @noRd
-get_webapp_dir <- function() {
-  # Check option first
-  webapp_path <- getOption("reindeer.emuWebApp.dir")
-
-  # Fall back to environment variable
-  if (is.null(webapp_path) || webapp_path == "") {
-    webapp_path <- Sys.getenv("EMU_WEBAPP_DIR", unset = "")
-  }
-
-  # Fall back to package-installed version
-  if (webapp_path == "") {
-    webapp_path <- system.file("EMU-webApp/dist", package = "reindeer")
-  }
-
-  # Final fallback: relative to package location
-  if (webapp_path == "" || !dir.exists(webapp_path)) {
-    pkg_path <- system.file(package = "reindeer")
-    webapp_path <- file.path(dirname(pkg_path), "EMU-webApp", "dist")
-  }
-
-  # Validate that the path exists
-  if (!dir.exists(webapp_path)) {
-    cli::cli_abort(c(
-      "EMU-webApp directory not found.",
-      "i" = "Tried: {.path {webapp_path}}",
-      "i" = "Set a custom path via {.code options(reindeer.emuWebApp.dir = '/path/to/EMU-webApp/dist')}",
-      "i" = "Or set environment variable: {.code Sys.setenv(EMU_WEBAPP_DIR = '/path/to/EMU-webApp/dist')}"
-    ))
-  }
-
-  return(webapp_path)
-}
 
 # Read a file for an HTTP response, honouring an optional byte-range header.
 # Returns list(status, headers, body). Serves full content (200) when no
@@ -936,6 +750,24 @@ guess_mime_type <- function(path) {
     "gif" = "image/gif",
     "svg" = "image/svg+xml",
     "txt" = "text/plain",
+    "mjs" = "text/javascript",
+    "map" = "application/json",
+    "wasm" = "application/wasm",
+    "woff" = "font/woff",
+    "woff2" = "font/woff2",
+    "ttf" = "font/ttf",
+    "otf" = "font/otf",
+    "eot" = "application/vnd.ms-fontobject",
+    "ico" = "image/x-icon",
+    "webp" = "image/webp",
+    "m4a" = "audio/mp4",
+    "aac" = "audio/aac",
+    "flac" = "audio/flac",
+    "ogg" = , "oga" = "audio/ogg",
+    "wma" = "audio/x-ms-wma",
+    "webm" = "video/webm",
+    "mp4" = "video/mp4",
+    "mov" = "video/quicktime",
     "application/octet-stream"  # default
   )
 }
@@ -965,26 +797,4 @@ get_emuDBhandle <- function(corpus) {
 
   class(handle) <- "emuDBhandle"
   return(handle)
-}
-
-
-# ============================================================================
-# Alias: serve_app() - disambiguate from emuR::serve()
-# ============================================================================
-
-#' Launch the EMU-webApp (alias for [serve()])
-#'
-#' Functionally identical to [serve()] but with a name that does not
-#' collide with `emuR::serve()`. Useful when both packages are
-#' attached.
-#'
-#' @param corpus A reindeer corpus object.
-#' @param ... Forwarded to [serve()].
-#' @return Invisible `TRUE`.
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/mydb_emuDB")
-#' serve_app(corp)
-#' @export
-serve_app <- function(corpus, ...) {
-  serve(corpus, ...)
 }

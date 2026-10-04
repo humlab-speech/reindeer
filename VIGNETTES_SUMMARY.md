@@ -31,7 +31,7 @@ The reindeer package provides comprehensive documentation through 7 active vigne
 - Basic corpus loading and querying
 - Signal processing with `quantify()`
 - Metadata enrichment with `biographize()`
-- **NEW**: Interactive annotation with `serve()`
+- **NEW**: Interactive annotation with `annotate()` / `review()`
 - Common workflows (vowels, pitch, VOT)
 - Troubleshooting guide
 - Tips and best practices
@@ -45,20 +45,20 @@ The reindeer package provides comprehensive documentation through 7 active vigne
 ```r
 corp <- corpus("path/to/db_emuDB")
 vowels <- query(corp, "Phonetic =~ [aeiou]")
-formants <- quantify(vowels, superassp::forest)
+formants <- quantify(vowels, superassp::trk_formant_forest)
 data <- biographize(formants, corp)
-serve(corp, seglist = vowels)  # NEW in v0.1.4
+review(corp, vowels)
 ```
 
 ---
 
-### 2. **Interactive Annotation with EMU-webApp**
+### 2. **Interactive Annotation with Artic**
 **File**: `interactive_annotation.Rmd`
 **Status**: ✅ **NEW in v0.1.4**
 **Audience**: Annotators, Quality control, Manual correction
 
 **Contents**:
-- Complete `serve()` function documentation
+- Complete `annotate()` / `review()` function documentation
 - Setup and configuration (3 methods)
 - Basic annotation workflows
 - Advanced usage (custom ports, debug mode, bundle lists)
@@ -76,7 +76,7 @@ serve(corp, seglist = vowels)  # NEW in v0.1.4
 - Targeted annotation of query results
 
 **Key Features Covered**:
-- Configurable EMU-webApp path resolution
+- Configurable Artic build resolution (`install_artic()`, `reindeer.artic.dir`)
 - Session/bundle pattern filtering
 - Query result annotation (navigate to specific segments)
 - Real-time annotation with auto-save
@@ -86,14 +86,14 @@ serve(corp, seglist = vowels)  # NEW in v0.1.4
 ```r
 # Quick QC workflow
 outliers <- formants %>% filter(abs(F1_z) > 3)
-serve(corp, seglist = outliers)
+review(corp, outliers)
 
 # Targeted annotation
 vowels <- query(corp, "Phonetic =~ [aeiou]")
-serve(corp, seglist = vowels)
+review(corp, vowels)
 
 # Collaborative work
-serve(corp, bundleListName = "Annotator_A")
+annotate(corp, bundleListName = "Annotator_A")
 ```
 
 ---
@@ -332,7 +332,7 @@ browseVignettes("reindeer")
 
 ### New Content
 1. **✨ Interactive Annotation Vignette** (`interactive_annotation.Rmd`)
-   - Complete `serve()` function documentation
+   - Complete `annotate()` / `review()` function documentation
    - Setup and configuration guide
    - 10+ annotation workflows
    - Troubleshooting guide

@@ -1,8 +1,8 @@
 Package: reindeer
 Type: Package
 Title: Extend emuR for Speech Data in a Nordic Climate
-Version: 2.1.0
-Date: 2026-09-27
+Version: 2.2.0
+Date: 2026-10-04
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-3373-0934")),
@@ -79,6 +79,8 @@ Collate:
     'addin_browse_corpus.R'
     'addin_edit_metadata.R'
     'annotation_io.R'
+    'artic_dist.R'
+    'artic_playlist.R'
     'cache_size_management.R'
     'companion_eggstract.R'
     'conditions.R'
@@ -113,6 +115,7 @@ Collate:
     'query_executor.R'
     'query_parser.R'
     'reindeer.R'
+    'reindeer_annotate.R'
     'reindeer_autosync.R'
     'reindeer_autosync_wrappers.R'
     'reindeer_cmdi.R'

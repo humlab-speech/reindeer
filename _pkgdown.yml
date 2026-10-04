@@ -178,9 +178,12 @@ reference:
       - geom_label_tier
 
   - title: "Interactive annotation"
-    desc: "Launch the EMU-webApp from R."
+    desc: "Open a corpus in the Artic annotation web app."
     contents:
-      - serve_app
+      - annotate
+      - review
+      - install_artic
+      - artic_info
       - browse_corpus_gadget
       - edit_metadata_gadget
 
@@ -190,10 +193,10 @@ reference:
       - add_metadata
       - gather_metadata
       - import_metadata
-      - serve
       - st
       - DSPP
       - deprecated-moved-functions
+      - deprecated-serve
       - quantify.lazy_segment_list
       - print.bundle_list
       - print.extended_segment_list

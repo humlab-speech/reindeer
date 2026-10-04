@@ -12,7 +12,7 @@
 enrich_egg <- function(...) {
   cli::cli_abort(c(
     "{.fn enrich_egg} has been removed from {.pkg reindeer}.",
-    "i" = "It forwarded to {.code eggstract::enrich_with_egg}, which {.pkg eggstract} has never exported.",
+    "i" = "It forwarded to {.code enrich_with_egg} in {.pkg eggstract}, which {.pkg eggstract} has never exported.",
     "i" = "Use {.fn quantify_egg} for EGG-track measurement via {.pkg eggstract}'s {.fn trk_f0} (and friends).",
     "i" = "See {.url https://github.com/humlab-speech/eggstract}."
   ), class = c("reindeer_moved_error", "reindeer_error"))
@@ -41,8 +41,8 @@ enrich <- function(...) {
 #' install + namespace. New code should call them directly from the
 #' companion package.
 #'
-#' * `enrich_egg` is removed outright (its `eggstract::enrich_with_egg`
-#'   target never existed). Use [quantify_egg()] instead.
+#' * `enrich_egg` is removed outright (its `enrich_with_egg` target in
+#'   eggstract never existed). Use [quantify_egg()] instead.
 #' * `enrich()` is removed outright; corpus-level DSP now goes through
 #'   [quantify()] (`quantify(corp, .using = fn)`), segment-level metadata
 #'   joins through [biographize()], segment-level DSP through [quantify()].
@@ -52,3 +52,41 @@ enrich <- function(...) {
 #' @return Never returns; always errors with a redirect message.
 #' @keywords internal
 NULL
+
+# --- reindeer web-app verbs (annotate/review) --------------------------------
+
+#' Renamed web-app verbs
+#'
+#' `serve()` and `serve_app()` were replaced by [annotate()] and [review()].
+#' They stay exported so old scripts get an actionable error instead of
+#' resolving to a different package's function.
+#'
+#' * `serve(corp)` -> [annotate()] (or [review()] with a segment list).
+#' * `serve_app(corp)` -> [annotate()].
+#'
+#' @param corpus A reindeer `corpus` object.
+#' @param ... Ignored - the stub never executes the call.
+#' @return Never returns; always errors with a redirect message.
+#' @name deprecated-serve
+#' @keywords internal
+NULL
+
+#' @rdname deprecated-serve
+#' @export
+serve <- function(corpus, ...) {
+  cli::cli_abort(c(
+    "{.fn serve} has been replaced in {.pkg reindeer}.",
+    "i" = "Annotate a corpus: use {.fn annotate}.",
+    "i" = "Review a segment list as a playlist: use {.fn review}."
+  ), class = c("reindeer_moved_error", "reindeer_error"))
+}
+
+#' @rdname deprecated-serve
+#' @export
+serve_app <- function(corpus, ...) {
+  cli::cli_abort(c(
+    "{.fn serve_app} has been replaced in {.pkg reindeer}.",
+    "i" = "Use {.fn annotate} (it no longer collides with {.fn emuR::serve}).",
+    "i" = "For a segment-list playlist: use {.fn review}."
+  ), class = c("reindeer_moved_error", "reindeer_error"))
+}

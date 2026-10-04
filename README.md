@@ -133,12 +133,16 @@ describe_corpus(corp)
 ### Interactive annotation
 
 ```r
-serve_app(corp)                                  # all bundles
-serve_app(corp, seglist = query(corp, "..."))    # a query result
+annotate(corp)                                   # edit the whole corpus
+review(corp, query(corp, "Phonetic == t"))       # review a segment-list playlist
+
+install_artic()                                  # fetch/upgrade the pinned build
 ```
 
-`serve_app()` launches a local instance of the EMU-webApp so you can
-inspect, correct, or extend annotations from R.
+`annotate()` opens the corpus in [Artic](https://github.com/humlab-speech/artic)
+in editing mode. `review()` turns a segment list — a `query()` result, a
+`quantify()` result, any augmented segment list — into a playlist of time
+anchors so you can step through, listen, and adjust just those portions.
 
 ## Companion packages
 

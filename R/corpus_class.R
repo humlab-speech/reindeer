@@ -6,7 +6,7 @@
 #'
 #' `corpus()` is the entry point to every reindeer workflow. Point it at
 #' an EMU-SDMS database (a directory whose name ends in `_emuDB`) and you
-#' get back a `corpus` object you can [query()], [quantify()], [serve()],
+#' get back a `corpus` object you can [query()], [quantify()], [annotate()],
 #' or [describe_corpus()].
 #'
 #' @param path Path to the corpus directory (the `_emuDB` suffix is
@@ -42,7 +42,7 @@
 #' }
 #' For programmatic metadata see [set_metadata()] / [get_metadata()].
 #' @seealso [demo_corpus()], [query()], [quantify()], [load_metadata()],
-#'   [serve_app()]
+#'   [annotate()]
 #' @examplesIf interactive()
 #' corp <- demo_corpus()
 #' vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)

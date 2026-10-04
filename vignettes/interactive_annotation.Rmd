@@ -1,8 +1,8 @@
 ---
-title: "Interactive Annotation with EMU-webApp"
+title: "Interactive Annotation with Artic"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Interactive Annotation with EMU-webApp}
+  %\VignetteIndexEntry{Interactive Annotation with Artic}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -18,9 +18,9 @@ knitr::opts_chunk$set(eval = FALSE)
 
 ## Introduction
 
-The **reindeer** package provides `serve_app()`, a function that launches the EMU-webApp annotation interface directly from R. This lets you view speech data as interactive spectrograms, annotate segments and events, play audio synchronized with annotations, edit annotations in real time, and save changes back to the database.
+The **reindeer** package provides `annotate()` and `review()`, which launch the [Artic](https://github.com/humlab-speech/artic) annotation interface directly from R. Artic shows interactive spectrograms and signal tracks, plays audio synchronised with the annotation, and writes edits straight back to the database. `annotate()` opens the whole corpus for editing; `review()` turns a segment list into a playlist of time anchors so you can step through just the portions you care about.
 
-This vignette shows you how to use `serve_app()` for interactive annotation workflows.
+This vignette shows you how to use `annotate()` and `review()` for interactive annotation and review workflows.
 
 ## Quick start
 
@@ -31,10 +31,10 @@ library(reindeer)
 corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 
 # Launch the annotation interface
-serve_app(corp)
+annotate(corp)
 ```
 
-The EMU-webApp opens in your browser (or the RStudio Viewer pane) and you can start annotating.
+Artic opens in your browser (or the RStudio Viewer pane) and you can start annotating.
 
 ## What gets served
 
@@ -49,35 +49,40 @@ head(vowels)[, c("session", "bundle", "labels", "start", "end")]
 ```
 
 The corpus is narrowed by the arguments shown in the rest of this vignette -
-`sessionPattern`, `bundlePattern`, or a `seglist` from `query()`.
+`sessionPattern` and `bundlePattern` for `annotate()`, or a segment list from
+`query()`/`quantify()` for `review()`.
 
 ## Setup and configuration
 
 ### First-time setup
 
-The `serve_app()` function looks for the EMU-webApp in several locations:
+`annotate()` and `review()` look for the Artic build in this order:
 
 ```{r setup}
-# Method 1: Set R option (recommended for interactive use)
-options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
+# 1. Explicit per-call directory (wins over everything)
+annotate(corp, appDir = "../artic/dist")
 
-# Method 2: Set environment variable (recommended for scripts)
-Sys.setenv(EMU_WEBAPP_DIR = "/path/to/EMU-webApp/dist")
+# 2. R option
+options(reindeer.artic.dir = "/path/to/artic/dist")
 
-# Method 3: Let reindeer find it automatically
-# - Checks package installation directory
-# - Looks for ../EMU-webApp/dist relative to package
-serve_app(corp)  # Will use auto-detected path
+# 3. Environment variable
+Sys.setenv(ARTIC_DIR = "/path/to/artic/dist")
+
+# 4. The build bundled with reindeer
+# 5. The install_artic() cache
+# 6. A sibling ../artic/dist checkout
+annotate(corp)  # uses the auto-detected build
 ```
 
 ### Verifying setup
 
 ```{r verify}
-# The function will show an informative error if webapp not found
-serve_app(corp)
-# Error: EMU-webApp directory not found.
-# ℹ Tried: /path/that/was/checked
-# ℹ Set a custom path via options(reindeer.emuWebApp.dir = '/path/to/EMU-webApp/dist')
+# Inspect the resolved build and what its manifest advertises
+artic_info()
+
+# Install a different build: pinned download, or a local directory
+install_artic()
+install_artic(local = "../artic/dist")
 ```
 
 ## Basic annotation workflows
@@ -88,9 +93,9 @@ serve_app(corp)
 corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 
 # Serve all bundles
-serve_app(corp)
+annotate(corp)
 
-# The webApp will show:
+# Artic will show:
 # - All sessions in the corpus
 # - All bundles in each session
 # - Navigate with arrow keys or bundle list
@@ -100,20 +105,20 @@ serve_app(corp)
 
 ```{r annotate-sessions}
 # Serve only specific sessions using regex patterns
-serve_app(corp, sessionPattern = "Session0[12]")
+annotate(corp, sessionPattern = "Session0[12]")
 
 # Or more complex patterns
-serve_app(corp, sessionPattern = "^(pilot|main)_")
+annotate(corp, sessionPattern = "^(pilot|main)_")
 ```
 
 ### Annotate specific bundles
 
 ```{r annotate-bundles}
 # Serve only bundles matching a pattern
-serve_app(corp, bundlePattern = "recording_0[1-5]")
+annotate(corp, bundlePattern = "recording_0[1-5]")
 
 # Combine session and bundle patterns
-serve_app(corp,
+annotate(corp,
       sessionPattern = "Session01",
       bundlePattern = "msajc.*")
 ```
@@ -126,10 +131,10 @@ You can navigate directly to the segments you care about:
 # Find all /t/ phonemes
 t_segments <- query(corp, "Phonetic == t")
 
-# Open webApp at those specific segments
-serve_app(corp, seglist = t_segments)
+# Open Artic at those specific segments
+review(corp, t_segments)
 
-# The webApp will:
+# Artic will:
 # 1. Show only bundles containing /t/
 # 2. Automatically navigate to each /t/ segment
 # 3. Highlight the segment boundaries
@@ -146,9 +151,9 @@ length(unique(paste(vowels$session, vowels$bundle)))
 # > 45 bundles with vowels
 
 # 3. Open annotation interface
-serve_app(corp, seglist = vowels)
+review(corp, vowels)
 
-# 4. Annotate in the webApp:
+# 4. Annotate in Artic:
 #    - Add stress markers
 #    - Adjust boundaries
 #    - Add comments
@@ -162,23 +167,23 @@ serve_app(corp, seglist = vowels)
 
 ```{r custom-server}
 # Use a different port (useful if default is busy)
-serve_app(corp, port = 8080)
+annotate(corp, port = 8080)
 
 # Bind to a different interface
-serve_app(corp, host = "0.0.0.0", port = 17890)  # Allow external connections
+annotate(corp, host = "0.0.0.0", port = 17890)  # Allow external connections
 
 # Disable auto-opening browser
-serve_app(corp, autoOpenURL = "")
+annotate(corp, autoOpenURL = "")
 
 # Use external browser instead of RStudio viewer
-serve_app(corp, useViewer = FALSE)
+annotate(corp, useViewer = FALSE)
 ```
 
 ### Debug mode
 
 ```{r debug}
 # Enable debug output
-serve_app(corp, debug = TRUE, debugLevel = 2)
+annotate(corp, debug = TRUE, debugLevel = 2)
 
 # Debug levels:
 # 0 = no debug output
@@ -193,7 +198,7 @@ If your database has predefined bundle lists:
 
 ```{r bundle-lists}
 # Serve a specific bundle list
-serve_app(corp, bundleListName = "AnnotationQueue")
+annotate(corp, bundleListName = "AnnotationQueue")
 
 # This is useful for:
 # - Annotation workflows with specific bundles to review
@@ -205,7 +210,7 @@ serve_app(corp, bundleListName = "AnnotationQueue")
 
 ### Navigation
 
-Once the webApp opens:
+Once Artic opens:
 
 **Keyboard Shortcuts:**
 - `←` / `→` - Previous/Next bundle
@@ -251,16 +256,16 @@ View multiple signal representations:
 # via emuR::add_ssffTrackDefinition()
 
 # Example: Add formant track
-# Then it will appear in the webApp automatically
+# Then it will appear in Artic automatically
 ```
 
 ## Stopping the server
 
-**Method 1: Clear button in webApp**
-- Click the "clear" button in the EMU-webApp interface
+**Method 1: Clear button in Artic**
+- Click the "clear" button in Artic interface
 
 **Method 2: Close browser**
-- Simply close or reload the webApp page
+- Simply close or reload Artic page
 
 **Method 3: R command**
 ```{r stop-server}
@@ -293,9 +298,9 @@ short_segments <- all_segments %>%
 cat(sprintf("Found %d short segments to review\n", nrow(short_segments)))
 
 # 3. Open annotation interface for review
-serve_app(corp, seglist = short_segments)
+review(corp, short_segments)
 
-# 4. Annotator reviews and fixes in webApp
+# 4. Annotator reviews and fixes in Artic
 #    - Adjust boundaries
 #    - Delete artifacts
 #    - Merge segments
@@ -312,7 +317,7 @@ cat(sprintf("Now %d short segments remain\n", nrow(short_segments_updated)))
 
 ## Integration with analysis pipeline
 
-`serve_app()` integrates with an analysis pipeline:
+`annotate()` integrates with an analysis pipeline:
 
 ```{r integration}
 # Analysis → Annotation → Re-analysis cycle
@@ -336,7 +341,7 @@ outliers <- formants %>%
 cat(sprintf("Found %d outlier measurements\n", nrow(outliers)))
 
 # 3. Review outliers in context
-serve_app(corp, seglist = outliers)
+review(corp, outliers)
 
 # Annotator checks:
 # - Are boundaries accurate?
@@ -369,7 +374,7 @@ corp <- demo_corpus()   # stands in for corpus("path/to/database_emuDB")
 # emuR::write_bundleList(get_emuDBhandle(corp), "Annotator_B", bundles_B)
 
 # 2. Each annotator serves their assigned list
-serve_app(corp, bundleListName = "Annotator_A")
+annotate(corp, bundleListName = "Annotator_A")
 
 # 3. Track progress
 bundles_A <- emuR::read_bundleList(get_emuDBhandle(corp), "Annotator_A")
@@ -386,20 +391,21 @@ bundles_A <- emuR::read_bundleList(get_emuDBhandle(corp), "Annotator_A")
 
 ```{r troubleshoot-open}
 # Check if port is already in use
-serve_app(corp, port = 8080)  # Try different port
+annotate(corp, port = 8080)  # Try different port
 
 # Check browser setting
-serve_app(corp, browser = getOption("browser"))
+annotate(corp, browser = getOption("browser"))
 ```
 
-**Problem:** "EMU-webApp directory not found"
+**Problem:** "Artic (the annotation web app) was not found"
 
 ```{r troubleshoot-path}
-# Set the path explicitly
-options(reindeer.emuWebApp.dir = "/path/to/EMU-webApp/dist")
+# Point at a build explicitly
+options(reindeer.artic.dir = "/path/to/artic/dist")
 
-# Verify path exists
-dir.exists(getOption("reindeer.emuWebApp.dir"))
+# Inspect what was resolved, and install a build if needed
+artic_info()
+install_artic(local = "../artic/dist")
 ```
 
 **Problem:** Changes not saving
@@ -426,12 +432,13 @@ httpuv::stopAllServers()
 
 ```{r help}
 # Function documentation
-?serve_app
+?annotate
+?review
 
 # Check server status
 # (No built-in status check, but server will error if already running)
 
-# View EMU-webApp console for errors
+# View Artic console for errors
 # Open browser developer tools (F12)
 ```
 
@@ -442,7 +449,7 @@ httpuv::stopAllServers()
 ```{r tip-small}
 # Don't serve the entire corpus at once
 # Start with a small session
-serve_app(corp, sessionPattern = "pilot_session")
+annotate(corp, sessionPattern = "pilot_session")
 
 # Then scale up as needed
 ```
@@ -452,15 +459,16 @@ serve_app(corp, sessionPattern = "pilot_session")
 ```{r tip-query}
 # Much more efficient than browsing all bundles
 vowels <- query(corp, "Phonetic =~ [aeiou]")
-serve_app(corp, seglist = vowels)
+review(corp, vowels)
 ```
 
 ### 3. Save regularly
 
 ```{r tip-save}
-# The webApp auto-saves, but:
-# - Close properly (don't kill the server)
-# - Check database after major annotation sessions
+# Artic saves when you save the bundle:
+# - The save button is enabled by annotate()/review()
+# - Switching bundles prompts if there are unsaved edits
+# - Check the database after major annotation sessions
 # - Consider git commits for version control
 ```
 
@@ -468,7 +476,7 @@ serve_app(corp, seglist = vowels)
 
 ```{r tip-viewer}
 # Default behavior in RStudio
-serve_app(corp, useViewer = TRUE)
+annotate(corp, useViewer = TRUE)
 
 # Benefits:
 # - Side-by-side with R console
@@ -531,14 +539,14 @@ cat(sprintf("Found %d bundles needing phonetic annotation\n",
             nrow(bundles_needing_annotation)))
 
 # === ANNOTATE ===
-# Convert to segment_list format for serve_app()
+# Convert to segment_list format for annotate()
 work_segments <- words %>%
   semi_join(bundles_needing_annotation, by = c("session", "bundle"))
 
 # Open annotation interface
-serve_app(corp, seglist = work_segments)
+review(corp, work_segments)
 
-# [ Annotator works in webApp ]
+# [ Annotator works in Artic ]
 # - Add phonetic segments within each word
 # - Adjust boundaries as needed
 # - Save changes (automatic)
@@ -570,10 +578,15 @@ formants <- quantify(phonemes_final, superassp::trk_formant_forest)
 
 ## Summary
 
-`serve_app()` launches with one call, filters to the sessions, bundles, or segments you pass it, works directly with query results, and saves changes back to the database automatically.
+`annotate()` opens the corpus for editing with one call; `review()` turns a
+segment list into a playlist of time anchors. Both filter to exactly the
+sessions, bundles, or segments you pass, work directly with query and
+quantify results, and save changes back to the database when you save a
+bundle.
 
 ## See also
 
-- `?serve_app` - Complete function documentation
+- `?annotate`, `?review` - function documentation
+- `?install_artic`, `?artic_info` - provision and inspect the web app
 - `vignette("getting_started")` - Reindeer basics
-- EMU-webApp documentation: https://ips-lmu.github.io/EMU-webApp/
+- Artic source and releases: https://github.com/humlab-speech/artic

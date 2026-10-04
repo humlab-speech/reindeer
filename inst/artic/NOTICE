@@ -1,0 +1,5 @@
+This directory contains a prebuilt Artic distribution.
+Artic is MIT licensed: https://github.com/humlab-speech/artic
+Source: https://github.com/humlab-speech/artic @ 8c6ba4e5
+Built: 2026-10-04T16:46:17Z
+demoDBs/ is intentionally excluded; the reviewer sessions disable it.

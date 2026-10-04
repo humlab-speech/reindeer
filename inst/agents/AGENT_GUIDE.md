@@ -75,8 +75,9 @@ peek_signals(corp, extension = "fms")  # filter by extension
 manage_cache(corp, action = "check")   # check cache health
 manage_cache(corp, action = "clean")   # remove old cache files
 
-# Serve interactive annotation UI
-serve(corp)
+# Serve interactive annotation UI (Artic)
+annotate(corp)                         # edit the corpus
+review(corp, query(corp, "..."))       # review a segment-list playlist
 ```
 
 ### Signal Processing Pipeline

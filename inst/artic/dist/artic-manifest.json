@@ -1,0 +1,11 @@
+{
+  "name": "artic",
+  "version": "1.5.3-humlab-1.10.0",
+  "gitSha": "8c6ba4e5",
+  "builtAt": "2026-10-04T16:46:17Z",
+  "protocol": {
+    "name": "EMU-webApp-websocket-protocol",
+    "version": "0.0.2"
+  },
+  "features": ["bundleList", "timeAnchors", "generatorTracks", "fromIndexTracks"]
+}

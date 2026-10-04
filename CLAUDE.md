@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Speech signal processing with age/gender-appropriate parameters
 - Query optimization using direct SQLite access
 - Track data quantification and enrichment
-- Interactive annotation via EMU-webApp
+- Interactive annotation via Artic (`annotate()`/`review()`)
 
 The package uses modern S7 classes and data.table for performance, with extensive caching to handle computationally intensive operations on large speech corpora.
 
@@ -166,27 +166,34 @@ Functions are called from `R/RcppExports.R` and used in corpus configuration uti
 
 ### Interactive Annotation System
 
-`R/reindeer_serve.R` provides a web-based annotation interface:
+`R/reindeer_serve.R` implements the Artic session engine (`.artic_session()`);
+`R/reindeer_annotate.R` exposes the verbs:
 
-- **`serve(corpus)`**: Launch EMU-webApp for interactive annotation
-  - Serves revised EMU-webApp from `/Users/frkkan96/Documents/src/EMU-webApp/dist/`
-  - HTTP server on port 17890 (configurable)
-  - WebSocket server for real-time communication (protocol v0.0.2)
-  - Supports bundle/session filtering and segment list restrictions
-  - RStudio Viewer integration
+- **`annotate(corpus, ...)`**: open the corpus in Artic in editing mode.
+- **`review(corpus, seglist, ...)`**: open a segment list as a playlist of
+  time anchors (query result, `extended_segment_list`, or data.frame).
+- HTTP server on port 17890 (configurable); WebSocket protocol v0.0.2.
+- Artic dist resolution and provisioning live in `R/artic_dist.R`
+  (`find_artic()`, `install_artic()`, `artic_info()`); the pinned build is
+  vendored under `inst/artic/dist` by `tools/sync-artic-dist.R`.
+- Overlays (`R/artic_playlist.R`) enable editing and saveBundle in memory;
+  `_DBconfig.json` is never written on serve.
 
 **Usage**:
 ```r
 corp <- corpus("path/to/db_emuDB")
-serve(corp)  # Opens EMU-webApp in browser
+annotate(corp)                                  # edit the corpus
+review(corp, query(corp, "Phonetic == t"))      # playlist review
 # Make annotations, then close or call httpuv::stopAllServers()
 ```
 
 **Key features**:
-- Filter bundles: `serve(corp, sessionPattern = "Session.*", bundlePattern = "msajc.*")`
-- Serve query results: `serve(corp, seglist = query(corp, "Phonetic == t"))`
-- Custom port: `serve(corp, port = 8080)`
-- Debug mode: `serve(corp, debug = TRUE, debugLevel = 2)`
+- Filter bundles: `annotate(corp, sessionPattern = "Session.*", bundlePattern = "msajc.*")`
+- Playlist review: `review(corp, seglist = query(corp, "Phonetic == t"))`
+- Track overlays: `review(corp, quantify(segs, dsp_function = superassp::forest))`
+- Custom port: `annotate(corp, port = 8080)`
+- Debug mode: `annotate(corp, debug = TRUE, debugLevel = 2)`
+- Old names `serve()`/`serve_app()` are hard stubs pointing here.
 
 ## Key Design Patterns
 

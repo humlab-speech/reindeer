@@ -22,7 +22,7 @@
 #' set_specOverlay(ae,"default","FORMANTS")
 #' #Set the RMS amplitude track as overlays on the waveform (oscillogram)
 #' set_osciOverlay(ae,"default","rms")
-#' serve(ae)
+#' annotate(ae)
 #'
 #' @noRd
 set_specOverlay <- function(emuDBhandle,perspective,trackname){

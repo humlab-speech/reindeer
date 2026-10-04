@@ -1,3 +1,46 @@
+# reindeer 2.2.0
+
+## Breaking changes
+
+- **`serve()` and `serve_app()` are replaced by `annotate()` and `review()`.**
+  The old names remain exported but abort with a `reindeer_moved_error` that
+  points at the replacements: `serve(corp)` -> `annotate(corp)`, and
+  `serve(corp, seglist = ...)` -> `review(corp, seglist)`. `annotate()`
+  dispatches on a `corpus` and forwards every other call verbatim to
+  `ggplot2::annotate()`, so both verbs coexist.
+- **The web app served is now Artic** (a fork of EMU-webApp), not an
+  EMU-webApp checkout. reindeer resolves a dist via
+  `options(reindeer.artic.dir)`, `ARTIC_DIR`, the copy bundled in
+  `inst/artic/dist`, the `install_artic()` cache, or a sibling
+  `../artic/dist`; `reindeer.emuWebApp.dir`/`EMU_WEBAPP_DIR` are no longer
+  read. `install_artic()` fetches or copies an alternative build. A review
+  playlist requires a build advertising `bundleList` and `timeAnchors`.
+- `annotate()` and `review()` apply editing restrictions and button
+  configuration **in memory only**; the corpus `_DBconfig.json` is no longer
+  written on serve. Artic's default config hides the save button, so the
+  overlay enables `saveBundle` (and passes a `clear` button) to prevent edits
+  being discarded on bundle change.
+
+## New features
+
+- **`review(corpus, seglist, ...)`**: turns a `segment_list`,
+  `extended_segment_list`, `lazy_segment_list`, or data.frame into an Artic
+  playlist. One time anchor per segment, played in row order
+  (`dplyr::arrange()` controls order); sessions/bundles grouped for the
+  sidebar; optional `label` per anchor; unknown bundles and foreign
+  `db_uuid`s are rejected. `tracks` overlays registered SSFF tracks
+  (defaults to an `extended_segment_list`'s `dsp_columns`) when the files
+  exist for every playlist bundle.
+- **`install_artic()` / `artic_info()`**: provision and inspect the Artic
+  build; downloads are checksum-verified and cached under
+  `tools::R_user_dir("reindeer", "cache")`.
+- `bundleListName` now actually serves the named bundle list (previously only
+  its `comment`/`finishedEditing` write-back was wired up).
+- Bundles with registered SSFF tracks that have no file on disk now load with
+  a warning instead of failing the whole bundle.
+- Static serving covers Artic's asset types (`.mjs`, `.wasm`, fonts, media);
+  a busy port reports a classed error suggesting `httpuv::randomPort()`.
+
 # reindeer 2.0.1
 
 ## Bug fixes

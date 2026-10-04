@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   width="32"
+   height="32"
+   viewBox="0 0 32 32"
+   version="1.1"
+   id="svg-artic-dark"
+   sodipodi:docname="artic_crystal_icon_dark.svg"
+   inkscape:version="1.2">
+  <sodipodi:namedview
+     id="namedview-dark"
+     pagecolor="#1f3347"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="16"
+     inkscape:cx="16"
+     inkscape:cy="16"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer-crystal"
+     showgrid="false" />
+  <defs
+     id="defs-dark" />
+  <metadata
+     id="metadata-dark">
+    <rdf:RDF>
+      <cc:Work rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title>Artic crystal icon (dark background)</dc:title>
+        <dc:description>Ice crystal logo mark for the Artic package. White strokes with orange accent, designed for dark backgrounds such as app toolbars.</dc:description>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Crystal"
+     inkscape:groupmode="layer"
+     id="layer-crystal"
+     transform="translate(16,16)">
+    <g
+       id="group-main-arms"
+       inkscape:label="Main arms"
+       fill="none"
+       stroke="#ffffff"
+       stroke-width="1.5"
+       stroke-linecap="round">
+      <line x1="0" y1="-14" x2="0" y2="14" id="arm-vertical" />
+      <line x1="-12" y1="-7" x2="12" y2="7" id="arm-diag1" />
+      <line x1="-12" y1="7" x2="12" y2="-7" id="arm-diag2" />
+    </g>
+    <g
+       id="group-branches"
+       inkscape:label="Branches"
+       fill="none"
+       stroke="#ffffff"
+       stroke-width="1"
+       stroke-linecap="round">
+      <line x1="0" y1="-5" x2="-3" y2="-8" id="b-top-inner-l" />
+      <line x1="0" y1="-5" x2="3" y2="-8" id="b-top-inner-r" />
+      <line x1="0" y1="-10" x2="-2.5" y2="-12.5" id="b-top-outer-l" />
+      <line x1="0" y1="-10" x2="2.5" y2="-12.5" id="b-top-outer-r" />
+      <line x1="0" y1="5" x2="-3" y2="8" id="b-bot-inner-l" />
+      <line x1="0" y1="5" x2="3" y2="8" id="b-bot-inner-r" />
+      <line x1="0" y1="10" x2="-2.5" y2="12.5" id="b-bot-outer-l" />
+      <line x1="0" y1="10" x2="2.5" y2="12.5" id="b-bot-outer-r" />
+      <line x1="4.5" y1="-2.5" x2="5.5" y2="-6.5" id="b-ur-inner-u" />
+      <line x1="4.5" y1="-2.5" x2="7.5" y2="-1" id="b-ur-inner-d" />
+      <line x1="9" y1="-5" x2="8" y2="-9" id="b-ur-outer-u" />
+      <line x1="9" y1="-5" x2="12" y2="-3.5" id="b-ur-outer-d" />
+      <line x1="-4.5" y1="2.5" x2="-5.5" y2="6.5" id="b-ll-inner-d" />
+      <line x1="-4.5" y1="2.5" x2="-7.5" y2="1" id="b-ll-inner-u" />
+      <line x1="-9" y1="5" x2="-8" y2="9" id="b-ll-outer-d" />
+      <line x1="-9" y1="5" x2="-12" y2="3.5" id="b-ll-outer-u" />
+      <line x1="-4.5" y1="-2.5" x2="-7.5" y2="-1" id="b-ul-inner-d" />
+      <line x1="-4.5" y1="-2.5" x2="-5.5" y2="-6.5" id="b-ul-inner-u" />
+      <line x1="-9" y1="-5" x2="-12" y2="-3.5" id="b-ul-outer-d" />
+      <line x1="-9" y1="-5" x2="-8" y2="-9" id="b-ul-outer-u" />
+      <line x1="4.5" y1="2.5" x2="7.5" y2="1" id="b-lr-inner-u" />
+      <line x1="4.5" y1="2.5" x2="5.5" y2="6.5" id="b-lr-inner-d" />
+      <line x1="9" y1="5" x2="12" y2="3.5" id="b-lr-outer-u" />
+      <line x1="9" y1="5" x2="8" y2="9" id="b-lr-outer-d" />
+    </g>
+    <polygon
+       id="center-hexagon"
+       inkscape:label="Orange center"
+       points="0,-3 2.6,-1.5 2.6,1.5 0,3 -2.6,1.5 -2.6,-1.5"
+       fill="#F0581A"
+       stroke="none" />
+  </g>
+</svg>

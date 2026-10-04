@@ -1,0 +1,6 @@
+{
+  "version": "1.5.3-humlab-1.10.0",
+  "gitSha": "8c6ba4e5",
+  "features": ["bundleList", "timeAnchors", "generatorTracks", "fromIndexTracks"],
+  "manifest": "dist/artic-manifest.json"
+}

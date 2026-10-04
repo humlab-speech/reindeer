@@ -25,8 +25,8 @@ companion package.
 }
 \details{
 \itemize{
-\item \code{enrich_egg} is removed outright (its \code{eggstract::enrich_with_egg}
-target never existed). Use \code{\link[=quantify_egg]{quantify_egg()}} instead.
+\item \code{enrich_egg} is removed outright (its \code{enrich_with_egg} target in
+eggstract never existed). Use \code{\link[=quantify_egg]{quantify_egg()}} instead.
 \item \code{enrich()} is removed outright; corpus-level DSP now goes through
 \code{\link[=quantify]{quantify()}} (\code{quantify(corp, .using = fn)}), segment-level metadata
 joins through \code{\link[=biographize]{biographize()}}, segment-level DSP through \code{\link[=quantify]{quantify()}}.
