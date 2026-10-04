@@ -59,11 +59,14 @@ parse_eql_query <- function(query_string) {
     # A dangling operator (`[A == x ^]`) would otherwise be read as part of
     # an unquoted label, since split_on_operator() requires an operand on
     # each side.
-    dangling <- regexpr("^\\s*(\\^|->|&|\\|)|\\s(\\^|->|&|\\|)\\s*$", inner)
+    dangling <- regexpr("^\\s*(\\^|->|&|\\|)|\\s(\\^|->|&|\\|)\\s*$", inner, perl = TRUE)
     if (dangling > 0) {
+      # Point at the operator itself: offset of whichever group matched,
+      # +1 for the stripped `[`.
+      op_pos <- max(attr(dangling, "capture.start"))
       .query_abort(c(
         "Operator is missing an operand.",
-        .eql_caret(query_string, pos = dangling + 1L, label = "Query:")
+        .eql_caret(query_string, pos = op_pos + 1L, label = "Query:")
       ))
     }
 
@@ -157,7 +160,8 @@ parse_simple_query <- function(query_string) {
       trimws(scope_matches[6])
     }
     alternatives <- NULL
-    if (operator %in% c("==", "!=") && grepl("\\|", value)) {
+    # Quoted values are literal, as in emuR: `Bundle == 'a|b'` is one name.
+    if (operator %in% c("==", "!=") && scope_matches[6] != "" && grepl("\\|", value)) {
       alternatives <- trimws(strsplit(value, "\\|")[[1]])
       value <- alternatives[1]
     }
@@ -235,9 +239,10 @@ parse_simple_query <- function(query_string) {
   }
 
   # Check for label alternatives (pipe-separated): m | n | p
-  # Only for == and != operators (not regex)
+  # Only for unquoted == and != values (not regex); quoted values are
+  # literal labels, as in emuR: `Phonetic == 'p|t'` matches the label "p|t".
   alternatives <- NULL
-  if (operator %in% c("==", "=", "!=") && grepl("\\|", value)) {
+  if (operator %in% c("==", "=", "!=") && matches[7] != "" && grepl("\\|", value)) {
     alternatives <- trimws(strsplit(value, "\\|")[[1]])
     value <- alternatives[1]  # Keep first as primary
   }

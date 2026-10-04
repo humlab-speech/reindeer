@@ -13,7 +13,11 @@
   label group from the DBconfig (attribute level first, then database
   level), matching `emuR::query()`. Previously it silently returned 0 rows.
 - A dangling operator (`[Phonetic == t ^]`) is now a parse error instead of
-  being read as part of the label.
+  being read as part of the label; the error caret points at the operator.
+- **Quoted values are literal.** `Phonetic == 'p|t'` matches the label
+  `p|t` instead of being split into alternatives, matching `emuR::query()`.
+  Same for `Session`/`Bundle` scope filters. Unquoted `p|t` still means
+  alternatives.
 
 # reindeer 2.0.0
 

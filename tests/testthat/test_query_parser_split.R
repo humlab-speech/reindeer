@@ -94,3 +94,27 @@ test_that("regex anchors in dominance give same rows as unanchored-left variant"
   b <- query(s$path, "[Syllable == S ^ #Phoneme =~ ^a]")
   expect_equal(nrow(a), nrow(b))
 })
+
+test_that("quoted values are literal labels, not alternatives", {
+  p <- parse_eql_query("Phonetic == 'p|t'")
+  expect_equal(p$value, "p|t")
+  expect_null(p$alternatives)
+  p <- parse_eql_query("Bundle == 'a|b'")
+  expect_equal(p$value, "a|b")
+  expect_null(p$alternatives)
+  expect_equal(parse_eql_query("Phonetic == p|t")$alternatives, c("p", "t"))
+})
+
+test_that("quoted label list matches emuR (literal)", {
+  s <- ae_parity()
+  expect_same_rows("Phonetic == 'p|t'", s)
+})
+
+test_that("dangling-operator caret points at the operator", {
+  for (q in c("[Phonetic == t ^]", "[Phonetic == t  -> ]", "[^ Phonetic == t]")) {
+    cnd <- tryCatch(parse_eql_query(q), error = function(e) e)
+    caret_line <- cnd$body[[length(cnd$body)]]
+    caret_col <- nchar(sub("\\^.*$", "", sub("^ {7}", "", caret_line))) + 1L
+    expect_true(substr(q, caret_col, caret_col) %in% c("^", "-"), label = q)
+  }
+})
