@@ -138,7 +138,7 @@ query <- function(emuDB, eql, ...) {
   if (lazy) {
     # Return lazy segment list without executing query
     # Build base SQL query but don't execute - returns list(sql, params)
-    parsed <- parse_eql_query(eql)
+    parsed <- .parse_eql_for_db(eql, db_path)
 
     # One connection threaded through all sub-builders avoids per-branch
     # connection churn on nested EQL (e.g. `[A & [B -> C]]` previously spawned
@@ -467,7 +467,7 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
   on.exit(DBI::dbDisconnect(con))
 
   tryCatch({
-    parsed <- parse_eql_query(query_string)
+    parsed <- .parse_eql_for_db(query_string, db_path)
     
     result <- switch(parsed$type,
       "simple" = execute_simple_query_corrected(db_path, parsed, con = con),

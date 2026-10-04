@@ -56,6 +56,17 @@ parse_eql_query <- function(query_string) {
   if (grepl("^\\[.*\\]$", query_string)) {
     inner <- substr(query_string, 2, nchar(query_string) - 1)
 
+    # A dangling operator (`[A == x ^]`) would otherwise be read as part of
+    # an unquoted label, since split_on_operator() requires an operand on
+    # each side.
+    dangling <- regexpr("^\\s*(\\^|->|&|\\|)|\\s(\\^|->|&|\\|)\\s*$", inner)
+    if (dangling > 0) {
+      .query_abort(c(
+        "Operator is missing an operand.",
+        .eql_caret(query_string, pos = dangling + 1L, label = "Query:")
+      ))
+    }
+
     # Try operators in precedence order using bracket-aware splitting
     # Conjunction/disjunction first, then sequence, then dominance
     if (!is.null(split_on_operator(inner, "&"))) {
@@ -79,6 +90,47 @@ parse_eql_query <- function(query_string) {
   } else {
     return(parse_simple_query(query_string))
   }
+}
+
+# Expand label-group names in `==` / `!=` predicates, as emuR does.
+# Attribute-level groups win over database-level ones; a group name shadows a
+# literal label of the same name. Regex operators are left untouched.
+resolve_label_groups <- function(parsed, config) {
+  if (!is.null(parsed$left))  parsed$left  <- resolve_label_groups(parsed$left, config)
+  if (!is.null(parsed$right)) parsed$right <- resolve_label_groups(parsed$right, config)
+  if (!identical(parsed$type, "simple") || !parsed$operator %in% c("==", "=", "!=")) {
+    return(parsed)
+  }
+
+  groups <- config$labelGroups
+  for (lvl in config$levelDefinitions) {
+    for (attr_def in lvl$attributeDefinitions) {
+      if (identical(attr_def$name, parsed$attribute)) {
+        groups <- c(attr_def$labelGroups, groups)
+      }
+    }
+  }
+  if (!length(groups)) return(parsed)
+  group_values <- stats::setNames(lapply(groups, function(g) unlist(g$values)),
+                                  vapply(groups, `[[`, "", "name"))
+
+  labels <- if (is.null(parsed$alternatives)) parsed$value else parsed$alternatives
+  # `[[` on a name list takes the first match, i.e. the attribute-level group.
+  expanded <- unique(unlist(lapply(labels, function(l) {
+    if (l %in% names(group_values)) group_values[[l]] else l
+  })))
+  if (identical(expanded, labels)) return(parsed)
+
+  parsed$value <- expanded[1]
+  parsed$alternatives <- if (length(expanded) > 1) expanded else NULL
+  parsed
+}
+
+# Parse EQL and resolve label groups from the DBconfig next to the cache.
+.parse_eql_for_db <- function(query_string, db_path) {
+  parsed <- parse_eql_query(query_string)
+  config <- tryCatch(load_DBconfig(dirname(db_path)), error = function(e) NULL)
+  if (is.null(config)) parsed else resolve_label_groups(parsed, config)
 }
 
 parse_simple_query <- function(query_string) {
@@ -297,36 +349,51 @@ parse_disjunction_query <- function(query_string) {
   ))
 }
 
-# Helper to split on operator accounting for nested brackets
-# Supports multi-char operators like "->"
+# Helper to split on a top-level query operator (&, |, ->, ^).
+#
+# The operator characters also occur inside values: label alternatives
+# (`p|t|k`), regexes (`=~ ^a|b`), and plain labels (`R&B`). A candidate is
+# therefore only accepted when it sits outside brackets and quotes, the left
+# side does not end in a comparison operator or `|` (so `=~ ^a` is a regex
+# anchor), and the right side starts a new operand. Bare level names count as
+# operands only for `->` and `^`; for `|` and `&` they would be
+# indistinguishable from a label (`p|t`, `R&B`).
+.eql_operand_start <- "^\\s*(#?[A-Za-z_]+(:[A-Za-z_]+)?\\s*(==|!=|=~|!~|=)|\\[|(Start|End|Medial|Num)\\()"
+.eql_bare_operand <- "^\\s*#?[A-Za-z_]+(:[A-Za-z_]+)?\\s*$"
+
 split_on_operator <- function(string, operator) {
   bracket_depth <- 0
-  op_pos <- -1
+  quote_char <- ""
   chars <- strsplit(string, "")[[1]]
+  n <- length(chars)
   op_len <- nchar(operator)
 
   for (i in seq_along(chars)) {
-    if (chars[i] == "[") {
+    ch <- chars[i]
+    if (nzchar(quote_char)) {
+      if (ch == quote_char) quote_char <- ""
+    } else if (ch %in% c("'", "\"") &&
+               grepl("[=~]\\s*$", substr(string, 1, i - 1))) {
+      # Quotes open a value only right after a comparison operator, so an
+      # apostrophe inside an unquoted label (`don't`) is left alone.
+      quote_char <- ch
+    } else if (ch == "[") {
       bracket_depth <- bracket_depth + 1
-    } else if (chars[i] == "]") {
+    } else if (ch == "]") {
       bracket_depth <- bracket_depth - 1
-    } else if (bracket_depth == 0 && i + op_len - 1 <= length(chars)) {
-      candidate <- paste0(chars[i:(i + op_len - 1)], collapse = "")
-      if (candidate == operator) {
-        op_pos <- i
-        break
+    } else if (bracket_depth == 0 && i + op_len - 1 <= n &&
+               substr(string, i, i + op_len - 1) == operator) {
+      left <- substr(string, 1, i - 1)
+      right <- substr(string, i + op_len, nchar(string))
+      if (!nzchar(trimws(left)) || grepl("[=~|]\\s*$", left)) next
+      if (grepl(.eql_operand_start, right) ||
+          (operator %in% c("->", "^") && grepl(.eql_bare_operand, right))) {
+        return(c(left, right))
       }
     }
   }
 
-  if (op_pos == -1) {
-    return(NULL)
-  }
-
-  left <- substr(string, 1, op_pos - 1)
-  right <- substr(string, op_pos + op_len, nchar(string))
-
-  return(c(left, right))
+  NULL
 }
 
 parse_function_query <- function(query_string) {

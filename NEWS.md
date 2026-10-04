@@ -1,3 +1,20 @@
+# reindeer 2.0.1
+
+## Bug fixes
+
+- **EQL parser no longer splits on operator characters inside values.**
+  `[Phonetic == p|t|k -> Phonetic == H]` was cut at the first `|` and read
+  as a disjunction; regexes containing `|`, a `^` anchor in the left operand
+  of a dominance query (`[Phoneme =~ ^a ^ Syllable == S]`), and labels such
+  as `R&B` failed the same way. A top-level `&`, `|`, `->` or `^` now counts
+  as an operator only outside quotes and when a new operand follows it.
+  Query-level disjunction (`[Phonetic == t | Phonetic == k]`) is unchanged.
+- **Label groups are resolved.** `Phonetic == stop` now expands the `stop`
+  label group from the DBconfig (attribute level first, then database
+  level), matching `emuR::query()`. Previously it silently returned 0 rows.
+- A dangling operator (`[Phonetic == t ^]`) is now a parse error instead of
+  being read as part of the label.
+
 # reindeer 2.0.0
 
 ## Breaking changes
