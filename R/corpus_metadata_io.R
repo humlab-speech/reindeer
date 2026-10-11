@@ -27,6 +27,25 @@
   invisible(TRUE)
 }
 
+#' Read a metadata file, aborting with a classed error naming it if malformed
+#' @noRd
+.read_metadata_file <- function(path) {
+  tryCatch(
+    read_json_fast(path, simplifyVector = TRUE),
+    error = function(e) {
+      cli::cli_abort(
+        c("Cannot parse metadata file {.path {path}}.", "x" = conditionMessage(e)),
+        class = c("reindeer_metadata_error", "reindeer_error"))
+    })
+}
+
+#' Existing metadata at one level: METADATA.json, else the legacy file, else empty
+#' @noRd
+.read_level_metadata <- function(dir, legacy_name) {
+  f <- .resolve_metadata_file(dir, legacy_name)
+  if (is.na(f)) list() else as.list(.read_metadata_file(f))
+}
+
 corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, metadata_list) {
   if (!is.list(metadata_list) || is.null(names(metadata_list))) {
     cli::cli_abort("Metadata must be a named list")
@@ -66,12 +85,9 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
   db_meta_file <- file.path(corpus_obj@basePath,
                             metadata.filename)
   
-  # Read existing
-  if (file.exists(db_meta_file)) {
-    existing <- jsonlite::read_json(db_meta_file, simplifyVector = TRUE)
-  } else {
-    existing <- list()
-  }
+  # Read existing (METADATA.json, or the legacy <name>.meta_json it will shadow)
+  existing <- .read_level_metadata(
+    corpus_obj@basePath, sub("_emuDB$", "", basename(corpus_obj@basePath)))
   
   # Merge
   updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
@@ -119,12 +135,8 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
       metadata.filename
     )
     
-    # Read existing
-    if (file.exists(session_meta_file)) {
-      existing <- jsonlite::read_json(session_meta_file, simplifyVector = TRUE)
-    } else {
-      existing <- list()
-    }
+    # Read existing (METADATA.json, or the legacy file it will shadow)
+    existing <- .read_level_metadata(dirname(session_meta_file), session_name)
     
     # Merge
     updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
@@ -178,12 +190,8 @@ set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, met
       metadata.filename
     )
     
-    # Read existing
-    if (file.exists(bundle_meta_file)) {
-      existing <- jsonlite::read_json(bundle_meta_file, simplifyVector = TRUE)
-    } else {
-      existing <- list()
-    }
+    # Read existing (METADATA.json, or the legacy file it will shadow)
+    existing <- .read_level_metadata(dirname(bundle_meta_file), bundle_name)
     
     # Merge
     updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
