@@ -93,6 +93,39 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     error = function(e) "unknown")
 }
 
+#' Bump to invalidate every existing quantify cache entry.
+#' @noRd
+.cache_schema <- 2L
+
+#' Identity of a DSP routine for cache keys
+#'
+#' Independent of the name the caller used: the package and its version (for
+#' namespace functions) plus a digest of formals and body. `f <- forest` and
+#' `forest` are the same routine; `forest` and `ksv` never are.
+#' @noRd
+.fn_identity <- function(fn) {
+  if (!is.function(fn)) return(paste(as.character(fn), collapse = "|"))
+  env <- environment(fn)
+  pkg <- if (!is.null(env) && isNamespace(env)) getNamespaceName(env) else NA_character_
+  ver <- if (is.na(pkg)) NA_character_ else as.character(utils::packageVersion(pkg))
+  # A closure's behaviour also depends on the variables it captured (e.g.
+  # probe_dsp(1) vs probe_dsp(2)): include those the body mentions.
+  captured <- NULL
+  if (is.na(pkg) && !is.null(env) && !identical(env, globalenv())) {
+    used <- intersect(all.names(body(fn)), ls(env, all.names = TRUE))
+    captured <- mget(sort(used), envir = env)
+    captured <- captured[!vapply(captured, is.function, logical(1))]
+  }
+  digest::digest(list(pkg, ver, formals(fn), body(fn), captured), algo = "xxhash64")
+}
+
+#' Signal file mtime + size, one string per file
+#' @noRd
+.file_stamp <- function(paths) {
+  info <- file.info(paths)
+  paste(as.numeric(info$mtime), info$size, sep = ":")
+}
+
 #' Cache key components for a quantify result
 #'
 #' The `.at` digest and the DSP identity are loop-invariant for a call; the
@@ -103,9 +136,13 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 #'   name; deriving it from the argument would capture the local variable name
 #'   instead, which is how every entry ended up labelled "dsp_function".
 #' @noRd
-.precompute_cache_key_parts <- function(dsp_name, params, .at = NULL) {
+.precompute_cache_key_parts <- function(dsp_name, params, .at = NULL, fn_id = NULL) {
   list(
-    dsp_name = if (is.null(dsp_name) || !nzchar(dsp_name)) "unknown" else dsp_name,
+    # The caller's name for the routine is cosmetic; identity is what keys.
+    dsp_name = paste0(
+      if (!is.null(fn_id)) fn_id
+      else if (is.null(dsp_name) || !nzchar(dsp_name)) "unknown" else dsp_name,
+      "#v", .cache_schema),
     params_digest = digest::digest(params, algo = "xxhash64"),
     at_digest = if (is.null(.at)) "NA" else digest::digest(.at, algo = "xxhash64")
   )
@@ -539,13 +576,17 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     # per row: effective DSP params now vary by bundle (Age/Gender), so it is
     # no longer loop-invariant. Everything else (dsp name, .at) is hoisted.
     if (use_cache && !is.null(cache_conn)) {
-      key_pre <- .precompute_cache_key_parts(dsp_name, list(), .at)
+      key_pre <- .precompute_cache_key_parts(dsp_name, list(), .at,
+                                             fn_id = .fn_identity(dsp_function))
       dt_valid[, seg_params_digest := vapply(seg_params, function(p) {
         digest::digest(p, algo = "xxhash64")
       }, character(1))]
+      stamps <- stats::setNames(.file_stamp(unique(dt_valid$signal_file)),
+                                unique(dt_valid$signal_file))
       dt_valid[, cache_key := paste(
         session, bundle, as.character(start), as.character(end),
         key_pre$dsp_name, seg_params_digest, key_pre$at_digest,
+        stamps[signal_file],
         sep = "_"
       )]
       

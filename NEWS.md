@@ -6,6 +6,12 @@
   executor, every later segment's result moved up one row (or the call
   crashed). Failed segments are now dropped alone.
 
+- `quantify(.use_cache = TRUE)`: the cache key now includes the routine's
+  identity (package, version, formals, body, captured variables), the signal
+  file's mtime and size, and a schema version. Previously replacing a WAV file
+  or re-binding a name to a different function returned stale cached results.
+  Existing cache entries miss once.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is
