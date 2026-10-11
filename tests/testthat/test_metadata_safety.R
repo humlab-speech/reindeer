@@ -136,3 +136,25 @@ test_that("bracket selectors match whole names and accept empty assignment", {
   m <- as.data.frame(get_metadata(fx$corp))
   expect_true(all(m$Tag[m$session == "0000"] == "t"))
 })
+
+test_that("Excel import is all-or-nothing and keeps numeric types", {
+  skip_if_no_emuR()
+  skip_if_not_installed("openxlsx")
+  fx <- meta_fixture()
+  mk <- function(bundles) {
+    f <- tempfile(fileext = ".xlsx")
+    openxlsx::write.xlsx(list(bundles = bundles,
+                              sessions = data.frame(session = character()),
+                              database = data.frame()), f)
+    f
+  }
+  bad <- mk(data.frame(session = c("0000", "0000"), bundle = c("msajc003", "nope"),
+                       Age = c(31, 32)))
+  expect_error(import_metadata(fx$corp, bad), class = "reindeer_metadata_error")
+  expect_false(file.exists(file.path(bundle_dir(fx), "METADATA.json")))
+
+  good <- mk(data.frame(session = "0000", bundle = "msajc003", Age = 31.5))
+  import_metadata(fx$corp, good)
+  written <- jsonlite::read_json(file.path(bundle_dir(fx), "METADATA.json"))
+  expect_equal(written$Age, 31.5)
+})

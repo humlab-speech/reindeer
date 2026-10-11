@@ -149,55 +149,54 @@ import_metadata <- function(corpus_obj, Excelfile) {
   
   # Read all sheets
   bundle_meta <- openxlsx::read.xlsx(Excelfile, sheet = "bundles", detectDates = TRUE)
-  session_meta <- openxlsx::read.xlsx(Excelfile, sheet = "sessions", detectDates = TRUE)
+  session_meta <- suppressWarnings(
+    openxlsx::read.xlsx(Excelfile, sheet = "sessions", detectDates = TRUE))
   
   tryCatch({
-    db_meta <- openxlsx::read.xlsx(Excelfile, sheet = "database", detectDates = TRUE)
+    db_meta <- suppressWarnings(  # "No data found" = empty sheet, which is fine
+      openxlsx::read.xlsx(Excelfile, sheet = "database", detectDates = TRUE))
   }, error = function(e) {
     db_meta <<- data.frame()
   })
   
+  if (is.null(db_meta)) db_meta <- data.frame()
+  if (is.null(session_meta)) session_meta <- data.frame(session = character())
+  if (is.null(bundle_meta)) bundle_meta <- data.frame(session = character(), bundle = character())
+
+  # Plan every write first and validate the whole workbook: a bad row must
+  # abort before the first file is touched (all-or-nothing).
+  ops <- list()
+  clean <- function(df, drop) {
+    lst <- as.list(df[, !names(df) %in% drop, drop = FALSE])
+    lst[!vapply(lst, function(v) length(v) == 0L || is.na(v[1]), logical(1))]
+  }
+  for (i in seq_len(nrow(bundle_meta))) {
+    ops[[length(ops) + 1L]] <- list(
+      level = "bundle", session = bundle_meta$session[i], bundle = bundle_meta$bundle[i],
+      meta = clean(bundle_meta[i, , drop = FALSE], c("session", "bundle")))
+  }
+  for (i in seq_len(nrow(session_meta))) {
+    ops[[length(ops) + 1L]] <- list(
+      level = "session", session = session_meta$session[i], bundle = NULL,
+      meta = clean(session_meta[i, , drop = FALSE], "session"))
+  }
+  if (nrow(db_meta) > 0) {
+    ops[[length(ops) + 1L]] <- list(level = "database", session = NULL, bundle = NULL,
+                                    meta = clean(db_meta[1, , drop = FALSE], character()))
+  }
+  ops <- Filter(function(o) length(o$meta) > 0, ops)
+  .validate_import_plan(corpus_obj, ops, bundle_meta, session_meta, Excelfile)
+
   # Bulk import: suppress per-row FAIR regeneration, then regenerate once at
   # the end so hundreds of add_metadata() calls don't each rewrite artifacts.
   old_suppress <- getOption("reindeer._auto_cmdi_suppress", FALSE)
   options(reindeer._auto_cmdi_suppress = TRUE)
   on.exit(options(reindeer._auto_cmdi_suppress = old_suppress), add = TRUE)
 
-  # Process bundle metadata
-  for (i in seq_len(nrow(bundle_meta))) {
-    session <- bundle_meta$session[i]
-    bundle <- bundle_meta$bundle[i]
-
-    meta_list <- as.list(bundle_meta[i, !names(bundle_meta) %in% c("session", "bundle")])
-    meta_list <- meta_list[!is.na(meta_list)]
-
-    if (length(meta_list) > 0) {
-      add_metadata(corpus_obj, meta_list, session = session, bundle = bundle)
-    }
+  for (o in ops) {
+    add_metadata(corpus_obj, o$meta, session = o$session, bundle = o$bundle)
   }
 
-  # Process session metadata
-  for (i in seq_len(nrow(session_meta))) {
-    session <- session_meta$session[i]
-
-    meta_list <- as.list(session_meta[i, !names(session_meta) %in% c("session")])
-    meta_list <- meta_list[!is.na(meta_list)]
-
-    if (length(meta_list) > 0) {
-      add_metadata(corpus_obj, meta_list, session = session)
-    }
-  }
-
-  # Process database metadata
-  if (nrow(db_meta) > 0) {
-    meta_list <- as.list(db_meta[1, ])
-    meta_list <- meta_list[!is.na(meta_list)]
-
-    if (length(meta_list) > 0) {
-      add_metadata(corpus_obj, meta_list)
-    }
-  }
-  
   # Rebuild cache
   cli::cli_alert_info("Rebuilding metadata cache...")
   gather_metadata(corpus_obj, verbose = FALSE)
@@ -209,6 +208,38 @@ import_metadata <- function(corpus_obj, Excelfile) {
   cli::cli_alert_success("Metadata imported from {.path {Excelfile}}")
 
   invisible(corpus_obj)
+}
+
+#' Check a planned Excel import against the corpus before anything is written
+#' @noRd
+.validate_import_plan <- function(corpus_obj, ops, bundle_meta, session_meta, file) {
+  fail <- function(msg) {
+    cli::cli_abort(c("Cannot import {.path {file}}; nothing was written.", "x" = msg),
+                   class = c("reindeer_metadata_error", "reindeer_error"))
+  }
+  if (!all(c("session", "bundle") %in% names(bundle_meta))) {
+    fail("Sheet {.val bundles} needs {.field session} and {.field bundle} columns.")
+  }
+  if (!"session" %in% names(session_meta)) {
+    fail("Sheet {.val sessions} needs a {.field session} column.")
+  }
+  con <- get_corpus_connection(corpus_obj)
+  known_b <- list_bundles_from_cache(con, corpus_obj@.uuid)
+  known_s <- unique(known_b$session)
+  for (o in ops) {
+    if (o$level != "database") {
+      if (is.na(o$session) || !o$session %in% known_s) {
+        fail("Unknown session {.val {o$session}}.")
+      }
+    }
+    if (o$level == "bundle" &&
+        !any(known_b$session == o$session & known_b$name == o$bundle)) {
+      fail("Unknown bundle {.val {o$session}/{o$bundle}}.")
+    }
+    .validate_against_schema(.jsonable_metadata(o$meta), "metadata.schema.json",
+                             file_path = file, write = TRUE)
+  }
+  invisible(TRUE)
 }
 
 #' Add metadata programmatically
