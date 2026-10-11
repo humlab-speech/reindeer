@@ -192,15 +192,10 @@ create_session_and_bundle <- function(corpus_obj, session_name, bundle_name, ver
     )
 
     # Add session to cache
+    # (the corpus' shared handle: never closed here)
     con <- get_corpus_connection(corpus_obj)
-    tryCatch({
-      DBI::dbExecute(con, sprintf(
-        "INSERT OR IGNORE INTO session (db_uuid, name) VALUES ('%s', '%s')",
-        corpus_obj@.uuid, session_name
-      ))
-    }, finally = {
-      DBI::dbDisconnect(con)
-    })
+    DBI::dbExecute(con, "INSERT OR IGNORE INTO session (db_uuid, name) VALUES (?, ?)",
+                   params = list(corpus_obj@.uuid, session_name))
   }
   
   # Create bundle directory
@@ -238,19 +233,12 @@ create_session_and_bundle <- function(corpus_obj, session_name, bundle_name, ver
   )
   
   # Add bundle to cache
-  con <- get_corpus_connection(corpus_obj)
-  tryCatch({
-    DBI::dbExecute(con, sprintf(
-      "INSERT OR IGNORE INTO bundle (db_uuid, session, name, annotates, sample_rate, md5_annot_json) 
-       VALUES ('%s', '%s', '%s', '', 16000, '%s')",
-      corpus_obj@.uuid, 
-      session_name, 
-      bundle_name,
-      as.character(tools::md5sum(annot_file))
-    ))
-  }, finally = {
-    DBI::dbDisconnect(con)
-  })
+  con <- get_corpus_connection(corpus_obj)  # shared handle: never closed here
+  DBI::dbExecute(con,
+    "INSERT OR IGNORE INTO bundle (db_uuid, session, name, annotates, sample_rate, md5_annot_json)
+     VALUES (?, ?, ?, '', 16000, ?)",
+    params = list(corpus_obj@.uuid, session_name, bundle_name,
+                  as.character(tools::md5sum(annot_file))))
   
   if (verbose) {
     cli::cli_alert_success("Created {.field {session_name}}/{.field {bundle_name}}")

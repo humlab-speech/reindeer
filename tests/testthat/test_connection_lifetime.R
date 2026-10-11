@@ -32,3 +32,15 @@ test_that("close_connection() is idempotent and leaves the corpus usable", {
   expect_true(DBI::dbIsValid(con))
   expect_gt(nrow(DBI::dbGetQuery(con, "SELECT uuid FROM emu_db LIMIT 1")), 0)
 })
+
+test_that("session/bundle creation and schema validation keep the shared connection open", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  con <- get_corpus_connection(corp)
+  create_session_and_bundle(corp, "tricky'session", "b1", verbose = FALSE)
+  expect_true(DBI::dbIsValid(con))
+  suppressWarnings(validate_corpus(corp))
+  expect_true(DBI::dbIsValid(con))
+  s <- list_sessions_from_cache(con, corp@.uuid)$name
+  expect_true("tricky'session" %in% s)
+})

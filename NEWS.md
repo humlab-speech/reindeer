@@ -71,6 +71,11 @@
   etc.) records its steps and triggers the loss warning.
   Known gap: `bind_rows(s, s)` on two segment lists still errors (WP5.1).
 
+- Connections: session/bundle creation and schema validation no longer close
+  the corpus' shared SQLite handle; the finalizer is registered before any
+  work that can fail when opening a corpus; creation SQL uses bound
+  parameters (a session name with a quote no longer breaks it).
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

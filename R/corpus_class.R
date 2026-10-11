@@ -170,6 +170,11 @@ corpus <- S7::new_class(
     # This allows [<-.corpus to work, taking precedence over S7's subsettability check
     class(corpus_obj) <- c("corpus", class(corpus_obj))
 
+    # Registered before any work that can fail (cache open, metadata parse):
+    # nothing else closes the SQLite handle, and an abort below would
+    # otherwise leak it until the process exits.
+    .register_connection_finalizer(corpus_obj)
+
     # Gather metadata after object creation
     con <- get_or_create_connection(corpus_obj)
     initialize_metadata_schema(con)
@@ -192,10 +197,6 @@ corpus <- S7::new_class(
         }
       )
     }
-
-    # Nothing else closes the SQLite handle; without this the connection lives
-    # until the process exits and RSQLite's own finalizer warns about it.
-    .register_connection_finalizer(corpus_obj)
 
     corpus_obj
   },

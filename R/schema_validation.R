@@ -151,8 +151,7 @@ validate_corpus <- function(corpus_obj) {
     )
   }
 
-  con <- get_connection(corpus_obj)
-  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  con <- get_connection(corpus_obj)  # the corpus' shared handle: never closed here
   uuid <- get_db_uuid(corpus_obj)
 
   sessions <- list_sessions_from_cache(con, uuid)
