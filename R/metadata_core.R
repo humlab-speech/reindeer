@@ -308,11 +308,12 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?", params = list(db_uuid))
 
     if (length(db_meta) > 0) {
-      process_metadata_list(con, db_uuid, NULL, NULL, db_meta, "database")
+      process_metadata_list(con, db_uuid, NULL, NULL, db_meta, "database", transaction = FALSE)
     }
     for (i in seq_len(nrow(sessions))) {
       if (length(session_meta[[i]]) > 0) {
-        process_metadata_list(con, db_uuid, sessions$name[i], NULL, session_meta[[i]], "session")
+        process_metadata_list(con, db_uuid, sessions$name[i], NULL, session_meta[[i]], "session",
+                              transaction = FALSE)
       }
     }
 
@@ -377,7 +378,8 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
 #' Process and insert metadata list into appropriate table - OPTIMIZED BULK INSERT
 #' @keywords internal
 #' @noRd
-process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, level) {
+process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, level,
+                                  transaction = TRUE) {
   
   if (length(meta_list) == 0) return(invisible(NULL))
   
@@ -405,7 +407,7 @@ process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, leve
     field_types[i] <- field_info$type
   }
   
-  DBI::dbWithTransaction(con, {
+  .maybe_tx(con, transaction, {
     # Register all fields at once
     for (i in seq_along(field_names)) {
       register_metadata_field(con, field_names[i], field_types[i])
@@ -442,6 +444,12 @@ process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, leve
     }
     DBI::dbExecute(con, sql, params = params)
   })
+}
+
+#' Evaluate `code` in a transaction unless the caller already holds one
+#' @noRd
+.maybe_tx <- function(con, transaction, code) {
+  if (transaction) DBI::dbWithTransaction(con, code) else code
 }
 
 #' Resolve one field's storage types across all bundles to a single type
