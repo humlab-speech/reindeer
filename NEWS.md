@@ -1,8 +1,8 @@
-# reindeer 2.4.0
+# reindeer 2.5.0
 
-EQL and navigation parity with emuR: 80 of 80 golden queries match (unsorted
-rows, 1e-9). SEGMENT times shift by half a sample (see below) and quantify
-caches miss once. Numbers from 2.3.0's work package list follow.
+This release folds in the 2.3.0 (silent-wrong-result fixes), 2.4.0 (80 of 80 emuR
+parity; SEGMENT times shift by half a sample and quantify caches miss once) and
+2.5.0 (power and latency; see `benchmarking/RESULTS_2.5.0.md`) work packages.
 
 ## Performance
 
