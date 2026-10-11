@@ -75,6 +75,7 @@ Collate:
     'addin_edit_metadata.R'
     'annot_sync.R'
     'annotation_io.R'
+    'annotations_io.R'
     'artic_dist.R'
     'artic_playlist.R'
     'cache_size_management.R'

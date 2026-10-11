@@ -66,3 +66,19 @@ test_that("write_textgrid escapes embedded quotes", {
   has_quoted <- any(grepl('say "hi"', back$label, fixed = TRUE))
   expect_true(has_quoted)
 })
+
+test_that("read/write_annotations dispatch on extension and share one schema", {
+  skip_if_no_emuR()
+  corp <- create_shared_ae_corpus()
+  segs <- collect(query(corp, "Phonetic == t"))[1:5, ]
+  for (ext in c("TextGrid", "eaf")) {
+    f <- withr::local_tempfile(fileext = paste0(".", ext))
+    write_annotations(segs, f)
+    back <- read_annotations(f)
+    expect_named(back, c("level", "labels", "start", "end"))
+    expect_equal(back$labels, segs$labels)
+    expect_equal(back$start, segs$start, tolerance = 1)    # ms (EAF rounds to 1 ms)
+  }
+  expect_error(read_annotations("x.csv"), "Unsupported")
+  expect_error(write_annotations(segs, "x.csv"), "Unsupported")
+})
