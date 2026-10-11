@@ -55,14 +55,12 @@ test_that("ascend_to() lands on the requested level and covers every input", {
   # Ascending can merge several inputs into one parent, never the reverse.
   expect_lte(nrow(syl), nrow(segs))
 
-  # Every parent is at least as long as the longest child it came from.
-  parent_len <- vapply(split(syl, paste(syl$session, syl$bundle, syl$start_item_id)),
-                       function(d) max(d$end - d$start), numeric(1))
-  child_len <- vapply(split(segs, paste(segs$session, segs$bundle)),
-                      function(d) max(d$end - d$start), numeric(1))
-  for (key in intersect(names(parent_len), names(child_len))) {
-    expect_gte(parent_len[[key]], 0)
-  }
+  # emuR ground truth for the number of parents (one row per parent item).
+  skip("A7: WP3.2 (multi-hop ascend not emuR-equivalent yet)")
+  ae <- load_shared_ae_handle()
+  emu_syl <- suppressMessages(emuR::requery_hier(
+    ae, emuR::query(ae, "Phoneme =~ .+", verbose = FALSE), "Syllable", verbose = FALSE))
+  expect_equal(nrow(syl), nrow(emu_syl))
 })
 
 test_that("descend_to() lands on the requested level", {
