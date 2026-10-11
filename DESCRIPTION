@@ -36,11 +36,12 @@ Imports:
     tibble,
     tidyselect,
     rlang,
+    Rdpack,
     dplyr (>= 1.0.0),
-    pillar
+    pillar,
+    vctrs
 Suggests:
     later,
-    Rdpack,
     wrassp,
     imputeTS,
     httpuv,
@@ -55,7 +56,6 @@ Suggests:
     openxlsx,
     av,
     rstudioapi,
-    vctrs,
     ggplot2,
     withr,
     shiny,

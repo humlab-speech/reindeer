@@ -8,7 +8,7 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
 
 - `library(reindeer)` loads 16 namespaces instead of 25 (0.48 s -> 0.28 s): the
   ggplot2 `autoplot` methods are registered lazily when ggplot2 is loaded, and
-  Rdpack (Rd macros only) moved to Suggests.
+  Rdpack (Rd macros only) is no longer imported at load time.
 
 - FAIR artifact regeneration is gated by a content hash only: writing metadata
   that did not change rewrites no file (504 bundles: 0.64 s -> 0.05 s; a real

@@ -16,7 +16,7 @@ copies from `tools/make-synthetic-corpus.R`). Measured 2026-10-11 with
 | same, re-run | full recompute | 0.07 s | ~0.1 s | yes |
 | `scout()` 25k segments | 39 s | 0.70 s (25,300 segments) | < 1 s | yes |
 | Metadata write + FAIR regeneration, 504 bundles, unchanged | 0.64 s | 0.06 s, no file rewritten | ~0 | yes |
-| Exports / Imports | 68 / 25 | 65 / 17 | 26 / 15 | no (Phase 5 / D1) |
+| Exports / Imports | 68 / 25 | 65 / 18 | 26 / 15 | no (Phase 5 / D1) |
 | Tarball | 10.9 MB | 6.4 MB | ~6.4 MB | yes |
 
 ## Misses, explained
@@ -33,5 +33,5 @@ copies from `tools/make-synthetic-corpus.R`). Measured 2026-10-11 with
   analysed once (forest on the full recording). The target assumed fewer files
   per call; for 7 bundles the whole-file cost dominates. `.mode = "window"`
   trades this the other way.
-- **Exports 63, Imports 17.** The export consolidation is Phase 5; Imports are
-  17 because dplyr and pillar moved in (D1).
+- **Exports 65, Imports 18.** The export consolidation is Phase 5; Imports are
+  18 because dplyr, pillar (D1) and vctrs (used at load) are Imports; Rdpack stays an Import for the Rd macros.
