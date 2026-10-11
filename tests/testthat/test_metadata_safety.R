@@ -62,3 +62,36 @@ test_that("a field mixing numbers and text becomes character", {
   expect_type(m$Grade, "character")
   expect_equal(m$Grade[m$bundle == "msajc010"], "n/a")
 })
+
+test_that("reopening a corpus sees external METADATA.json edits", {
+  skip_if_no_emuR()
+  fx <- meta_fixture()
+  add_metadata(fx$corp, list(Speaker = "old"), session = fx$ses, bundle = fx$bndl)
+  path <- fx$corp@basePath
+  f <- file.path(bundle_dir(fx), "METADATA.json")
+  jsonlite::write_json(list(Speaker = "new"), f, auto_unbox = TRUE)
+  Sys.setFileTime(f, Sys.time() + 10)
+  rm(fx); gc()
+  again <- corpus(path, verbose = FALSE)
+  m <- as.data.frame(get_metadata(again))
+  expect_equal(m$Speaker[m$bundle == "msajc003"], "new")
+})
+
+test_that("our own writes do not trigger a needless rescan", {
+  skip_if_no_emuR()
+  fx <- meta_fixture()
+  add_metadata(fx$corp, list(Speaker = "x"), session = fx$ses, bundle = fx$bndl)
+  con <- get_corpus_connection(fx$corp)
+  expect_false(reindeer:::.metadata_needs_refresh(con, fx$corp@basePath, fx$corp@.uuid))
+})
+
+test_that("an external edit made after our write is still detected", {
+  skip_if_no_emuR()
+  fx <- meta_fixture()
+  add_metadata(fx$corp, list(Speaker = "x"), session = fx$ses, bundle = fx$bndl)
+  f <- file.path(bundle_dir(fx), "METADATA.json")
+  jsonlite::write_json(list(Speaker = "ext"), f, auto_unbox = TRUE)
+  Sys.setFileTime(f, Sys.time() + 10)
+  con <- get_corpus_connection(fx$corp)
+  expect_true(reindeer:::.metadata_needs_refresh(con, fx$corp@basePath, fx$corp@.uuid))
+})

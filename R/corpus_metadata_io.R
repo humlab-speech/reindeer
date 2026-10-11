@@ -63,18 +63,35 @@ corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, 
     validate_name(bundle_pattern, "Bundle name", allow_regex = TRUE)
   }
   
-  if (is_session_all && is_bundle_all) {
-    # Database level
-    set_metadata_database(corpus_obj, metadata_list)
-  } else if (!is_session_all && is_bundle_all) {
-    # Session level
-    set_metadata_session(corpus_obj, session_pattern, metadata_list)
-  } else if (!is_session_all && !is_bundle_all) {
-    # Bundle level
-    set_metadata_bundle(corpus_obj, session_pattern, bundle_pattern, metadata_list)
-  } else {
-    cli::cli_abort("Invalid pattern combination: bundle requires session")
-  }
+  .with_metadata_gate(corpus_obj, {
+    if (is_session_all && is_bundle_all) {
+      # Database level
+      set_metadata_database(corpus_obj, metadata_list)
+    } else if (!is_session_all && is_bundle_all) {
+      # Session level
+      set_metadata_session(corpus_obj, session_pattern, metadata_list)
+    } else if (!is_session_all && !is_bundle_all) {
+      # Bundle level
+      set_metadata_bundle(corpus_obj, session_pattern, bundle_pattern, metadata_list)
+    } else {
+      cli::cli_abort("Invalid pattern combination: bundle requires session")
+    }
+  })
+}
+
+#' Run a metadata write and record its own file mtimes
+#'
+#' If the cache matched the files before the write, the post-write snapshot is
+#' recorded so our own edit does not look like an external one. If it was
+#' already stale (someone edited a file behind our back) the snapshot is left
+#' alone, so the next gather still rescans and sees that edit.
+#' @noRd
+.with_metadata_gate <- function(corpus_obj, expr) {
+  con <- get_corpus_connection(corpus_obj)
+  fresh <- !.metadata_needs_refresh(con, corpus_obj@basePath, corpus_obj@.uuid)
+  force(expr)
+  if (fresh) .metadata_record_mtime(con, corpus_obj@basePath, corpus_obj@.uuid)
+  invisible(NULL)
 }
 
 #' Set database-level metadata

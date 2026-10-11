@@ -293,6 +293,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   bundles <- list_bundles_from_cache(con, db_uuid)
   
   if (nrow(bundles) == 0) {
+    .metadata_record_mtime(con, basePath, db_uuid)
     if (verbose) cli::cli_alert_success("Metadata gathering complete")
     return(invisible(corpus_obj))
   }
@@ -315,6 +316,7 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
   existing_bundles <- bundles[exists_idx, ]
   
   if (length(existing_files) == 0) {
+    .metadata_record_mtime(con, basePath, db_uuid)
     if (verbose) {
       cli::cli_progress_done()
       cli::cli_alert_success("Metadata gathering complete (no bundle metadata found)")

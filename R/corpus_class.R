@@ -174,21 +174,10 @@ corpus <- S7::new_class(
     con <- get_or_create_connection(corpus_obj)
     initialize_metadata_schema(con)
 
-    # Gather metadata from METADATA.json / legacy .meta_json files - skip
-    # in quick mode if the metadata cache is already populated
-    if (quick) {
-      has_metadata <- tryCatch({
-        n <- DBI::dbGetQuery(con, "SELECT COUNT(*) as n FROM metadata_bundle")$n
-        n > 0
-      }, error = function(e) FALSE)
-      if (!has_metadata) {
-        gather_metadata(corpus_obj, verbose = verbose)
-      } else if (verbose) {
-        cli::cli_alert_info("Quick mode: reusing cached metadata")
-      }
-    } else {
-      gather_metadata(corpus_obj, verbose = verbose)
-    }
+    # Sync metadata from METADATA.json / legacy .meta_json files. The mtime
+    # gate inside gather_metadata() makes this a no-op when nothing changed,
+    # and picks up edits made outside R since the corpus was last opened.
+    gather_metadata(corpus_obj, verbose = verbose)
 
     # Auto-regenerate FAIR artifacts when the dirty bit was flipped by an
     # earlier metadata write. Gated by an option so power users can disable
