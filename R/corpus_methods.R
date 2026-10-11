@@ -5,6 +5,11 @@ NULL
 # CORPUS SUBSETTING OPERATORS - corpus[i, j]
 # ==============================================================================
 
+#' Anchor a session/bundle selector so it must match the whole name
+#' (regular expressions still work: "00.*" matches "0000" and "0001").
+#' @noRd
+.full_match <- function(x) if (identical(x, ".*")) x else paste0("^(", x, ")$")
+
 # Define implementation functions for S7 methods
 # These will be registered in .onLoad() to ensure proper dispatch
 
@@ -12,9 +17,10 @@ NULL
 #' @keywords internal
 #' @noRd
 .subset_corpus <- function(x, i, j, ..., drop = FALSE) {
-  # Handle various indexing patterns
-  session_pattern <- if (!missing(i) && !is.null(i)) i else ".*"
-  bundle_pattern <- if (!missing(j) && !is.null(j)) j else ".*"
+  # Handle various indexing patterns. Names match in full (anchored), so
+  # corp["0000", ] never also selects session "00001"; regex still works.
+  session_pattern <- if (!missing(i) && !is.null(i)) .full_match(i) else ".*"
+  bundle_pattern <- if (!missing(j) && !is.null(j)) .full_match(j) else ".*"
   
   # If only one index provided and not named, it could be bundle name
   if (!missing(i) && missing(j)) {
@@ -22,14 +28,14 @@ NULL
     con <- get_corpus_connection(x)
     sessions <- list_sessions_from_cache(con, x@.uuid)
     
-    # If i matches any session name, treat as session pattern
-    if (any(grepl(i, sessions$name, ignore.case = TRUE))) {
-      session_pattern <- i
+    # If i fully matches any session name, treat as session pattern
+    if (any(grepl(.full_match(i), sessions$name))) {
+      session_pattern <- .full_match(i)
       bundle_pattern <- ".*"
     } else {
       # Otherwise treat as bundle pattern across all sessions
       session_pattern <- ".*"
-      bundle_pattern <- i
+      bundle_pattern <- .full_match(i)
     }
   }
   
@@ -65,10 +71,15 @@ NULL
 #'
 #' @export
 `[<-.corpus` <- function(x, i, j, ..., value) {
+  i <- if (missing(i) || is.null(i)) NULL else .full_match(i)
+  j <- if (missing(j) || is.null(j)) NULL else .full_match(j)
   # Determine what type of assignment this is
   if (is.list(value) && !is.null(names(value))) {
     # Metadata assignment
     corpus_assign_metadata(x, i, j, value)
+  } else if (is.list(value) && length(value) == 0L) {
+    # corp["S", ] <- list(): nothing to write (explicitly a no-op)
+    return(invisible(x))
   } else if (is.character(value)) {
     # Media file import
     corpus_import_media(x, i, j, value)

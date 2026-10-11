@@ -110,3 +110,29 @@ test_that("a malformed metadata file aborts, names the file, keeps the cache", {
   m <- as.data.frame(get_metadata(fx$corp))
   expect_equal(m$Speaker[m$bundle == fx$bndl], "good")
 })
+
+test_that("reset.before.add refreshes the cache, not only the file", {
+  skip_if_no_emuR()
+  fx <- meta_fixture()
+  add_metadata(fx$corp, list(Old = "yes"), session = fx$ses, bundle = fx$bndl)
+  add_metadata(fx$corp, list(New = "yes"), session = fx$ses, bundle = fx$bndl,
+               reset.before.add = TRUE)
+  m <- as.data.frame(get_metadata(fx$corp))
+  row <- m[m$bundle == fx$bndl, ]
+  expect_false("Old" %in% names(m) && !is.na(row$Old))
+  expect_equal(row$New, "yes")
+})
+
+test_that("bracket selectors match whole names and accept empty assignment", {
+  skip_if_no_emuR()
+  fx <- meta_fixture()
+  # Add a second session whose name starts with the first's.
+  extra <- file.path(fx$corp@basePath, "00001_ses")
+  dir.create(file.path(extra, "x_bndl"), recursive = TRUE)
+  expect_equal(unique(reindeer:::get_metadata_for_patterns(
+    fx$corp, reindeer:::.full_match("0000"), ".*")$session), "0000")
+  expect_no_error(fx$corp["0000", ] <- list())
+  fx$corp["0000", ] <- list(Tag = "t")
+  m <- as.data.frame(get_metadata(fx$corp))
+  expect_true(all(m$Tag[m$session == "0000"] == "t"))
+})

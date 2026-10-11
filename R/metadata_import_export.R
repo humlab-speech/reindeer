@@ -340,6 +340,19 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 #' @noRd
 clear_metadata <- function(corpus_obj, session, bundle, level) {
   basePath <- corpus_obj@basePath
+
+  # Keep the cache in step with the file we are about to delete.
+  con <- get_corpus_connection(corpus_obj)
+  uuid <- corpus_obj@.uuid
+  switch(level,
+    database = DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?",
+                              params = list(uuid)),
+    session = DBI::dbExecute(con,
+      "DELETE FROM metadata_session WHERE db_uuid = ? AND session = ?",
+      params = list(uuid, session)),
+    bundle = DBI::dbExecute(con,
+      "DELETE FROM metadata_bundle WHERE db_uuid = ? AND session = ? AND bundle = ?",
+      params = list(uuid, session, bundle)))
   
   if (level == "database") {
     # Delete METADATA.json from database root
