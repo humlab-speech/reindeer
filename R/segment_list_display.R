@@ -17,7 +17,7 @@
   # Header
   cli::cli_rule(
     left = cli::style_bold("segment_list"),
-    right = "{cli::col_silver('{nrow(x)} segment{?s}')}"
+    right = cli::col_silver(cli::pluralize("{nrow(x)} segment{?s}"))
   )
 
   if (nrow(x) == 0) {
@@ -206,7 +206,7 @@ glimpse_segment_list_impl <- function(x, width = NULL, ...) {
   # Header
   cli::cli_rule(
     left = cli::style_bold("extended_segment_list"),
-    right = "{cli::col_silver('{nrow(x)} row{?s}')}"
+    right = cli::col_silver(cli::pluralize("{nrow(x)} row{?s}"))
   )
 
   if (nrow(x) == 0) {

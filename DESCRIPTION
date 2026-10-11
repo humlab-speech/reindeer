@@ -36,7 +36,9 @@ Imports:
     RSQLite,
     tibble,
     tidyselect,
-    rlang
+    rlang,
+    dplyr (>= 1.0.0),
+    pillar
 Suggests:
     wrassp,
     imputeTS,
@@ -52,7 +54,6 @@ Suggests:
     openxlsx,
     av,
     rstudioapi,
-    dplyr (>= 1.0.0),
     vctrs,
     ggplot2,
     withr,

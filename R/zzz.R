@@ -64,6 +64,18 @@
                      .lazy_as_tibble, envir = asNamespace("tibble"))
   }
 
+  # collect()/glimpse() are dplyr/pillar generics; S3 dispatch on the S7
+  # classes' namespaced names needs explicit registration.
+  registerS3method("collect", "reindeer::lazy_segment_list",
+                   .collect_lazy_segment_list, envir = asNamespace("dplyr"))
+  pn <- asNamespace("pillar")
+  registerS3method("glimpse", "reindeer::corpus", glimpse_corpus_impl, envir = pn)
+  registerS3method("glimpse", "reindeer::segment_list", glimpse_segment_list_impl, envir = pn)
+  registerS3method("glimpse", "reindeer::extended_segment_list",
+                   glimpse_extended_segment_list_impl, envir = pn)
+  registerS3method("glimpse", "reindeer::lazy_segment_list",
+                   glimpse_lazy_segment_list_impl, envir = pn)
+
   # dplyr verbs on lazy_segment_list: collect-and-delegate
   if (requireNamespace("dplyr", quietly = TRUE)) {
     dn <- asNamespace("dplyr")

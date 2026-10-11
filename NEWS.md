@@ -19,6 +19,11 @@
   (previously all SQL steps ran before all deferred ones), and lazy
   `ascend_to()`/`descend_to()` SQL no longer has the link direction swapped.
 
+- `collect()` and `glimpse()` are now the dplyr/pillar generics, re-exported,
+  instead of reindeer's own generics that masked them. dplyr and `pillar`
+  move to Imports (Imports: 17). Print headers no longer show an unrendered
+  `{nrow(x)} row{?s}`.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

@@ -213,9 +213,9 @@ test_that("is_lazy returns FALSE for non-lazy objects", {
 # collect() default method
 # ==============================================================================
 
-test_that("collect.default errors on non-segment objects", {
-  expect_error(collect(42), regexp = "lazy_segment_list|segment_list")
-  expect_error(collect(data.frame()), regexp = "lazy_segment_list|segment_list")
+test_that("collect() follows dplyr semantics for non-lazy objects", {
+  expect_error(collect(42))
+  expect_identical(collect(data.frame()), data.frame())
 })
 
 # ==============================================================================

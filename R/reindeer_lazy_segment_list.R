@@ -102,30 +102,22 @@ lazy_segment_list <- S7::new_class(
 
 #' Collect/Materialize a Lazy Segment List
 #'
-#' Forces execution of the query chain and returns a regular segment_list.
+#' `collect()` is [dplyr::collect()], re-exported. On a `lazy_segment_list` it
+#' executes the query plan and returns a regular `segment_list`; on a
+#' `segment_list` or tibble it returns the object unchanged.
 #'
-#' @param lazy_sl A lazy_segment_list object
-#' @param verbose Logical, whether to print SQL query
-#' @return A segment_list object
+#' @param x A `lazy_segment_list`, `segment_list` or data frame.
+#' @param ... Unused, for the generic.
+#' @param verbose Logical, whether to print the SQL query.
+#' @return A `segment_list` object.
+#' @importFrom dplyr collect
 #' @export
-collect <- function(lazy_sl, verbose = FALSE) {
-  UseMethod("collect")
-}
+dplyr::collect
 
-#' @export
-#' @noRd
-collect.default <- function(lazy_sl, verbose = FALSE) {
-  # S7 classes use namespaced names ("reindeer::lazy_segment_list"), so S3
-
-  # dispatch on "lazy_segment_list" never fires. Handle it here.
-  if (S7::S7_inherits(lazy_sl, lazy_segment_list)) {
-    return(collect_lazy_impl(lazy_sl, verbose = verbose))
-  }
-  # If already a regular segment_list, return as-is
-  if (S7::S7_inherits(lazy_sl, segment_list)) {
-    return(lazy_sl)
-  }
-  cli::cli_abort("collect() requires a lazy_segment_list or segment_list object")
+# Registered on dplyr::collect for the S7 class in .onLoad (S3 dispatch on
+# the namespaced class name "reindeer::lazy_segment_list").
+.collect_lazy_segment_list <- function(x, ..., verbose = FALSE) {
+  collect_lazy_impl(x, verbose = verbose)
 }
 
 #' @keywords internal
