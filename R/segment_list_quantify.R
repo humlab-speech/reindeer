@@ -94,8 +94,8 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   .workers <- NULL
   .optimize <- TRUE
 
-  # Input validation with assertthat
-  assertthat::assert_that(
+  # Input validation 
+  .assert(
     S7::S7_inherits(object, segment_list),
     msg = "object must be a segment_list"
   )
@@ -106,14 +106,14 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     ), class = c("reindeer_track_validation_error", "reindeer_error"))
   }
 
-  assertthat::assert_that(
+  .assert(
     is.function(dsp_function) || is.character(dsp_function),
     msg = "dsp_function must be a function or character string"
   )
-  assertthat::assert_that(
-    assertthat::is.flag(.use_metadata),
-    assertthat::is.flag(.verbose),
-    assertthat::is.flag(.use_cache),
+  .assert(
+    .is_flag(.use_metadata),
+    .is_flag(.verbose),
+    .is_flag(.use_cache),
     msg = "Logical flags must be TRUE or FALSE"
   )
 
@@ -140,11 +140,11 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
   # Validate .at parameter
   if (!is.null(.at)) {
-    assertthat::assert_that(
+    .assert(
       is.numeric(.at),
       msg = ".at must be numeric"
     )
-    assertthat::assert_that(
+    .assert(
       all(.at >= 0 & .at <= 1),
       msg = ".at values must be between 0 and 1"
     )
@@ -162,7 +162,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   }
 
   # Get mediafileExtension from config
-  media_ext <- corpus_obj@config$mediafileExtension %||% "wav"
+  media_ext <- corpus_obj@config$mediafileExtension %or_empty% "wav"
 
   # Get metadata if requested
   metadata_by_bundle <- NULL
@@ -265,7 +265,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
 
     # Setup persistent cache if requested
     cache_conn <- if (.use_cache) {
-      resolved_cache_dir <- .cache_dir %||% corpus_obj@.cache_dir
+      resolved_cache_dir <- .cache_dir %or_empty% corpus_obj@.cache_dir
       .get_persistent_cache_connection(resolved_cache_dir)
     } else {
       NULL
@@ -428,8 +428,8 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
   }
 
   dbConfig <- load_DBconfig(corpus_obj)
-  all_tracks <- dbConfig$ssffTrackDefinitions %||% list()
-  all_names <- vapply(all_tracks, function(t) t$name %||% "", character(1))
+  all_tracks <- dbConfig$ssffTrackDefinitions %or_empty% list()
+  all_names <- vapply(all_tracks, function(t) t$name %or_empty% "", character(1))
 
   unknown <- setdiff(track_names, all_names)
   if (length(unknown) > 0) {
@@ -457,7 +457,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
   }
 
   seg_df <- as.data.frame(object)
-  media_ext <- corpus_obj@config$mediafileExtension %||% "wav"
+  media_ext <- corpus_obj@config$mediafileExtension %or_empty% "wav"
   time_points <- as.list(.at)
 
   results <- list()
@@ -477,7 +477,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
 
         row_data <- NULL
         if (length(track_file) == 1L && file.exists(track_file)) {
-          col_arg <- if (!is.null(track_def$from)) track_def$from else track_def$columnName %||% tn
+          col_arg <- if (!is.null(track_def$from)) track_def$from else track_def$columnName %or_empty% tn
           track_data <- tryCatch(
             superassp::read_track(track_file, begin = begin, end = end, tracks = col_arg),
             error = function(e) NULL
@@ -508,7 +508,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
                                     full.names = TRUE)
           if (length(signal_file) != 1L) next
           computed <- tryCatch(
-            do.call(dsp_fun, c(list(listOfFiles = signal_file), gen$args %||% list(),
+            do.call(dsp_fun, c(list(listOfFiles = signal_file), gen$args %or_empty% list(),
                                list(toFile = FALSE, verbose = FALSE))),
             error = function(e) NULL
           )
@@ -525,7 +525,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
               cli::cli_abort("Recomputed {.val {tn}} has no {.val sampleRate} attribute; cannot align it to the segment's time.")
             }
             sample_rate <- attr(computed, "sampleRate")
-            start_time  <- attr(computed, "startTime") %||% 0
+            start_time  <- attr(computed, "startTime") %or_empty% 0
             frame_idx <- round((begin - start_time) * sample_rate) + 1L
             frame_idx <- max(1L, min(nrow(mat), frame_idx))
             row_data <- as.data.frame(mat[frame_idx, , drop = FALSE])

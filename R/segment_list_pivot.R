@@ -271,13 +271,13 @@ pivot_tracks_wider <- function(long,
   if (all(required %in% names(out)) &&
         is.character(db_uuid) && length(db_uuid) == 1L) {
     out <- segment_list(out, db_uuid = db_uuid,
-                        db_path = db_path %||% "")
+                        db_path = db_path %or_empty% "")
   }
   out
 }
 
-# Null-coalesce; rlang has %||%, but we don't import it elsewhere here.
-`%||%` <- function(x, y) if (is.null(x)) y else x
+# Null-coalesce; rlang has %or_empty%, but we don't import it elsewhere here.
+`%or_empty%` <- function(x, y) if (is.null(x)) y else x
 
 #' Print method for track_long tibbles
 #'

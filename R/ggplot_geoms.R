@@ -42,7 +42,7 @@ geom_formant_trajectory <- function(mapping = NULL, data = NULL,
     layer_data <- NULL
   }
   ggplot2::geom_line(
-    mapping = mapping %||% ggplot2::aes(
+    mapping = mapping %or_empty% ggplot2::aes(
       x = .data$rel_time, y = .data$value,
       color = .data$track, group = .data$.seg_id
     ),
@@ -69,7 +69,7 @@ geom_label_tier <- function(mapping = NULL, data = NULL, tier_y = 0, ...) {
   }
   list(
     ggplot2::geom_segment(
-      mapping = mapping %||% ggplot2::aes(
+      mapping = mapping %or_empty% ggplot2::aes(
         x = .data$start, xend = .data$end,
         y = tier_y, yend = tier_y
       ),
@@ -111,7 +111,7 @@ geom_pitch_track <- function(mapping = NULL, data = NULL, ...) {
     layer_data <- NULL
   }
   ggplot2::geom_line(
-    mapping = mapping %||% ggplot2::aes(
+    mapping = mapping %or_empty% ggplot2::aes(
       x = .data$rel_time, y = .data$value, group = .data$.seg_id
     ),
     data = if (!is.null(layer_data)) layer_data else data,

@@ -211,7 +211,7 @@ NULL
         name = track$name,
         columnName = track$columnName,
         fileExtension = track$fileExtension,
-        fileFormat = track$format %||% "ssff"
+        fileFormat = track$format %or_empty% "ssff"
       )
     }))
     
@@ -237,7 +237,7 @@ NULL
       tibble::tibble(
         name = level$name,
         type = level$type,
-        nrOfAttrDefs = length(level$attributeDefinitions %||% list()),
+        nrOfAttrDefs = length(level$attributeDefinitions %or_empty% list()),
         attrDefNames = attr_defs
       )
     }))

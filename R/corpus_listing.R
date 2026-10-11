@@ -141,7 +141,7 @@
   if (is.null(perspectives) || length(perspectives) == 0) {
     return(tibble::tibble(name = character()))
   }
-  names <- vapply(perspectives, function(p) p$name %||% "", character(1))
+  names <- vapply(perspectives, function(p) p$name %or_empty% "", character(1))
   tibble::tibble(name = names)
 }
 
@@ -164,9 +164,9 @@
     ))
   }
   tibble::tibble(
-    name = vapply(tracks, function(t) t$name %||% "", character(1)),
-    columnName = vapply(tracks, function(t) t$columnName %||% "", character(1)),
-    fileExtension = vapply(tracks, function(t) t$fileExtension %||% "", character(1))
+    name = vapply(tracks, function(t) t$name %or_empty% "", character(1)),
+    columnName = vapply(tracks, function(t) t$columnName %or_empty% "", character(1)),
+    fileExtension = vapply(tracks, function(t) t$fileExtension %or_empty% "", character(1))
   )
 }
 
@@ -181,7 +181,7 @@
 #' @noRd
 .get_ssff_tracks_in_use <- function(config) {
   if (is.null(config$ssffTrackDefinitions)) return(character(0))
-  vapply(config$ssffTrackDefinitions, function(t) t$name %||% "", character(1))
+  vapply(config$ssffTrackDefinitions, function(t) t$name %or_empty% "", character(1))
 }
 
 #' Validate that an object is a corpus or emuDBhandle
@@ -234,7 +234,7 @@ peek_signals <- function(corpus_obj, extension = NULL) {
     cli::cli_abort("{.arg corpus_obj} must be a {.cls corpus} object")
   }
 
-  ext <- extension %||% corpus_obj@config$mediafileExtension %||% "wav"
+  ext <- extension %or_empty% corpus_obj@config$mediafileExtension %or_empty% "wav"
   basePath <- corpus_obj@basePath
 
   con <- get_or_create_connection(corpus_obj)

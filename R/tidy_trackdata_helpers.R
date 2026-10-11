@@ -188,7 +188,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     # once and slicing is deliberately not done: the windowed superassp API
     # ties analysis context to the requested window, so a whole-file pass
     # would change boundary-adjacent results.
-    params_file <- file_segs$seg_params[[1]] %||% dsp_params
+    params_file <- file_segs$seg_params[[1]] %or_empty% dsp_params
     dsp_call_base <- c(
       list(listOfFiles = signal_file),
       params_file,
@@ -672,13 +672,6 @@ get_corpus_cached <- function(.segments, .from = NULL) {
                                  media_ext, .at = NULL, .verbose = FALSE,
                                  dsp_name = NULL) {
   
-  if (!requireNamespace("future", quietly = TRUE)) {
-    cli::cli_warn("Package {.pkg future} not available, falling back to sequential processing")
-    return(.process_segments_vectorized(seg_df, corpus_obj, dsp_function, dsp_params,
-                                       media_ext, .at, .verbose, use_cache = FALSE,
-                                       dsp_name = dsp_name))
-  }
-  
   # Split segments by file for optimal I/O
   seg_df$signal_file <- file.path(
     corpus_obj@basePath,
@@ -700,7 +693,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     
     # Process segments from this file. Invariant call args built once per
     # file (single-bundle file group); only the per-segment window varies.
-    params_file <- file_segs$seg_params[[1]] %||% dsp_params
+    params_file <- file_segs$seg_params[[1]] %or_empty% dsp_params
     dsp_call_base <- c(
       list(listOfFiles = signal_file),
       params_file,

@@ -20,6 +20,13 @@
   `inst/examples`, `inst/templates`, `aeflac.tar.xz` and
   `demo_corpus(format=)`; `default_parameters.xlsx` moved to `data-raw/`.
   Source tarball 9.6 MB -> 6.4 MB. Pre-1.0 NEWS moved to `dev/NEWS-archive.md`.
+- Imports reduced from 25 to 15: assertthat (own `.assert()` checks, classed
+  `reindeer_validation_error`), base64enc and RcppSimdJson (jsonlite),
+  furrr/future/Rcpp (WP1.2/1.4). wrassp (own WAV-header duration reader, which
+  also stops CMDI duration reads failing silently), imputeTS, httpuv and
+  jsonvalidate are now Suggests, checked with `rlang::check_installed()`.
+  The null-or-empty coalescing operator is renamed `%or_empty%` so it no longer
+  shadows `rlang::%||%`.
 - Policy: a removed name is a classed stub for one minor release, then deleted.
 
 # reindeer 2.2.0

@@ -252,7 +252,7 @@ corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, med
   if (length(media_spec) == 1) {
     # Simple case: just a file path
     file_path <- media_spec
-    channel_map[[corpus_obj@config$mediafileExtension %||% "wav"]] <- 1
+    channel_map[[corpus_obj@config$mediafileExtension %or_empty% "wav"]] <- 1
   } else {
     # Complex case: channel mappings
     # Find the file path (should be the only element that exists as a file)
@@ -273,7 +273,7 @@ corpus_import_media <- function(corpus_obj, session_pattern, bundle_pattern, med
       if (!is.null(elem)) {
         if (elem == file_path) {
           # This is the file path - assign to mediafileExtension
-          channel_map[[corpus_obj@config$mediafileExtension %||% "wav"]] <- channel_num
+          channel_map[[corpus_obj@config$mediafileExtension %or_empty% "wav"]] <- channel_num
         } else {
           # This is a track extension
           channel_map[[elem]] <- channel_num
@@ -308,7 +308,7 @@ import_media_to_bundle <- function(corpus_obj, session_name, bundle_name,
   }
   
   # Get target extension from config or default to wav
-  target_ext <- corpus_obj@config$mediafileExtension %||% "wav"
+  target_ext <- corpus_obj@config$mediafileExtension %or_empty% "wav"
   
   # Create bundle directory if it doesn't exist
   bundle_dir <- file.path(

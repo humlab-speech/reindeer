@@ -30,3 +30,12 @@ test_that("create_cmdi_metadata accepts emuDBhandle class", {
     "config"
   )
 })
+
+test_that(".wav_duration matches wrassp", {
+  skip_if_not_installed("wrassp")
+  skip_if_no_emuR()
+  f <- list.files(create_isolated_ae_db(), "msajc003\\.wav$", recursive = TRUE, full.names = TRUE)[1]
+  x <- wrassp::read.AsspDataObj(f)
+  expect_equal(reindeer:::.wav_duration(f), attr(x, "endRecord") / attr(x, "sampleRate"),
+               tolerance = 1e-3)
+})

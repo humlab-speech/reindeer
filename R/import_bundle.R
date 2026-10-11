@@ -57,7 +57,7 @@ import_bundle <- function(corpus_obj, session, bundle, media,
 #' @noRd
 .replay_registered_tracks_for_bundle <- function(corpus_obj, session, bundle, verbose = TRUE) {
   dbConfig <- load_DBconfig(corpus_obj)
-  track_defs <- dbConfig$ssffTrackDefinitions %||% list()
+  track_defs <- dbConfig$ssffTrackDefinitions %or_empty% list()
 
   failures <- character(0)
   for (track_def in track_defs) {
@@ -83,7 +83,7 @@ import_bundle <- function(corpus_obj, session, bundle, media,
            bundlePattern = paste0("^", bundle, "$"),
            .metadata_fields = c("Gender", "Age"),
            .verbose = verbose),
-      gen$args %||% list()
+      gen$args %or_empty% list()
     ))
 
     result <- tryCatch({
@@ -131,7 +131,7 @@ import_bundle <- function(corpus_obj, session, bundle, media,
 import_session <- function(corpus_obj, session, bundles,
                            metadata = list(), tracks = TRUE, verbose = TRUE) {
   for (spec in bundles) {
-    bundle_metadata <- utils::modifyList(metadata, spec$metadata %||% list())
+    bundle_metadata <- utils::modifyList(metadata, spec$metadata %or_empty% list())
     tryCatch({
       import_bundle(corpus_obj, session, spec$bundle, media = spec$media,
                     metadata = bundle_metadata, tracks = tracks, verbose = verbose)

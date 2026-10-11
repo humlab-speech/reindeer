@@ -107,7 +107,7 @@
     # tier xmin, xmax, count
     n_items <- suppressWarnings(as.integer(lines[i + 4L]))
     j <- i + 5L
-    for (k in seq_len(n_items %||% 0L)) {
+    for (k in seq_len(n_items %or_empty% 0L)) {
       if (type == "IntervalTier") {
         x1 <- suppressWarnings(as.numeric(lines[j]))
         x2 <- suppressWarnings(as.numeric(lines[j + 1L]))

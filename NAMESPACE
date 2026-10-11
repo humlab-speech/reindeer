@@ -88,10 +88,6 @@ importFrom(data.table,
   setkeyv,
   setnames
 )
-importFrom(httpuv,
-  startServer,
-  stopAllServers
-)
 importFrom(stats,
   end,
   median,

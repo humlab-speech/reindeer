@@ -40,8 +40,8 @@
       txt  <- xml2::xml_text(xml2::xml_find_first(a, ".//ANNOTATION_VALUE"))
       rows[[length(rows) + 1L]] <- list(
         tier = tier_id,
-        parent = parent %||% NA_character_,
-        linguistic_type = ling %||% NA_character_,
+        parent = parent %or_empty% NA_character_,
+        linguistic_type = ling %or_empty% NA_character_,
         start = ms_lookup[[ref1]],
         end = ms_lookup[[ref2]],
         label = txt

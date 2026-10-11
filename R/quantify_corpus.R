@@ -96,8 +96,8 @@ NULL
 #' @noRd
 .upsert_ssff_track_definition <- function(corpus_obj, track_def, overwrite = FALSE) {
   dbConfig <- load_DBconfig(corpus_obj)
-  existing <- dbConfig$ssffTrackDefinitions %||% list()
-  existing_names <- vapply(existing, function(t) t$name %||% "", character(1))
+  existing <- dbConfig$ssffTrackDefinitions %or_empty% list()
+  existing_names <- vapply(existing, function(t) t$name %or_empty% "", character(1))
 
   idx <- match(track_def$name, existing_names)
   if (!is.na(idx)) {
@@ -167,7 +167,7 @@ NULL
 
   display_tracks <- attr(.using, "tracks")
   if (is.null(display_tracks)) display_tracks <- dsp_fun_name
-  dsp_ext <- attr(.using, "ext") %||% fileExtension
+  dsp_ext <- attr(.using, "ext") %or_empty% fileExtension
   if (is.null(dsp_ext)) {
     cli::cli_abort(c(
       "Cannot determine a file extension for {.fn {dsp_fun_name}}.",
@@ -239,7 +239,7 @@ NULL
 
   cache_conn <- NULL
   if (.use_cache) {
-    resolved_cache_dir <- .cache_dir %||% corpus_obj@.cache_dir
+    resolved_cache_dir <- .cache_dir %or_empty% corpus_obj@.cache_dir
     cache_conn <- .get_persistent_cache_connection(resolved_cache_dir, verbose = .verbose)
   }
 
@@ -291,7 +291,7 @@ NULL
   if (!is.null(cache_conn)) {
     miss_keys <- unique(vapply(
       Filter(function(x) isTRUE(x$success) && !isTRUE(x$cached), results),
-      function(x) x$cache_key %||% NA_character_, character(1)))
+      function(x) x$cache_key %or_empty% NA_character_, character(1)))
     miss_keys <- miss_keys[!is.na(miss_keys)]
     if (length(miss_keys) > 0) {
       .set_persistent_cache_batch(

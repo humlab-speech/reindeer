@@ -198,7 +198,7 @@ query <- function(emuDB, eql, ...) {
 #' @keywords internal
 #' @noRd
 build_base_sql <- function(db_path, parsed, opts = list(), con = NULL) {
-  result_level <- opts$result_level %||% NULL
+  result_level <- opts$result_level %or_empty% NULL
 
   # Build SQL based on query type - all builders return list(sql, params).
   # `con` is threaded through so nested builders share a single connection;
@@ -277,8 +277,8 @@ build_scope_filter_sql <- function(db_path, parsed) {
 build_simple_query_sql <- function(db_path, parsed, con = NULL) {
   level <- parsed$level
   operator <- parsed$operator
-  pattern <- parsed$pattern %||% parsed$value
-  attribute <- parsed$attribute %||% level
+  pattern <- parsed$pattern %or_empty% parsed$value
+  attribute <- parsed$attribute %or_empty% level
 
   # Attribute -> level resolution: queries like `Text == "always"` reference
   # the *attribute* "Text" which lives on level "Word" (or wherever defined).

@@ -23,29 +23,25 @@ Encoding: UTF-8
 LazyData: true
 Imports:
     S7 (>= 0.1.0),
-    base64enc,
     digest,
     jsonlite,
     data.table,
     stats,
     Rdpack,
     utils,
-    assertthat,
-    future,
     future.apply,
     cli,
     xml2,
-    wrassp,
-    imputeTS,
     DBI,
     RSQLite,
-    RcppSimdJson,
     tibble,
     tidyselect,
-    rlang,
-    httpuv,
-    jsonvalidate
+    rlang
 Suggests:
+    wrassp,
+    imputeTS,
+    httpuv,
+    jsonvalidate,
     testthat (>= 3.0.0),
     emuR,
     qs2,
@@ -79,6 +75,7 @@ Collate:
     'artic_dist.R'
     'artic_playlist.R'
     'cache_size_management.R'
+    'checks.R'
     'companion_eggstract.R'
     'conditions.R'
     'corpus_class.R'

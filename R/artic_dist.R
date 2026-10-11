@@ -46,7 +46,7 @@
   if (is.null(man)) {
     return(character())
   }
-  as.character(unlist(man$features %||% list(), use.names = FALSE))
+  as.character(unlist(man$features %or_empty% list(), use.names = FALSE))
 }
 
 #' Is a directory a usable Artic dist?
@@ -212,7 +212,7 @@ install_artic <- function(ref = NULL, url = NULL, local = NULL, sha256 = NULL,
       .artic_abort("{.path {local}} is not a built Artic dist (no index.html).")
     }
     id <- basename(normalizePath(local, mustWork = FALSE))
-    dest <- dest %||% file.path(.artic_cache_root(), id)
+    dest <- dest %or_empty% file.path(.artic_cache_root(), id)
     if (dir.exists(dest) && !overwrite) {
       .artic_abort(c(
         "Destination {.path {dest}} already exists.",
@@ -240,8 +240,8 @@ install_artic <- function(ref = NULL, url = NULL, local = NULL, sha256 = NULL,
     ))
   }
 
-  id <- ref %||% (pin$version %||% basename(url))
-  dest <- dest %||% file.path(.artic_cache_root(), id)
+  id <- ref %or_empty% (pin$version %or_empty% basename(url))
+  dest <- dest %or_empty% file.path(.artic_cache_root(), id)
   if (dir.exists(dest) && !overwrite) {
     .artic_abort(c(
       "Destination {.path {dest}} already exists.",

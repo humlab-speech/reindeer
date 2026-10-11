@@ -105,8 +105,8 @@ create_cmdi_metadata <- function(corpus,
   # Annotation tier names (for AnnotationTypes) and corpus size (for Size),
   # sourced from the loaded DB config and the bundle listing.
   db_metadata$annotation_levels <- {
-    lv <- vapply(db_config$levelDefinitions %||% list(),
-                 function(l) l$name %||% NA_character_, character(1))
+    lv <- vapply(db_config$levelDefinitions %or_empty% list(),
+                 function(l) l$name %or_empty% NA_character_, character(1))
     lv[!is.na(lv) & nzchar(lv)]
   }
   db_metadata$n_bundles <- tryCatch(nrow(.list_bundles(corpus)),
@@ -118,13 +118,13 @@ create_cmdi_metadata <- function(corpus,
   if (!is.null(md0) && nrow(md0) > 0) {
     flat <- as.list(md0[1, ])
     pick <- function(x) if (.nz(x)) as.character(x) else NULL
-    db_metadata$project      <- db_metadata$project      %||% pick(flat$Project)
-    db_metadata$funder       <- db_metadata$funder       %||% pick(flat$Funder)
-    db_metadata$website      <- db_metadata$website      %||% pick(flat$Website)
-    db_metadata$country      <- db_metadata$country      %||% pick(flat$Country)
-    db_metadata$country_code <- db_metadata$country_code %||% pick(flat$CountryCode)
-    db_metadata$licence      <- db_metadata$licence      %||% pick(flat$Licence) %||% pick(flat$License)
-    db_metadata$availability <- db_metadata$availability %||% pick(flat$Availability)
+    db_metadata$project      <- db_metadata$project      %or_empty% pick(flat$Project)
+    db_metadata$funder       <- db_metadata$funder       %or_empty% pick(flat$Funder)
+    db_metadata$website      <- db_metadata$website      %or_empty% pick(flat$Website)
+    db_metadata$country      <- db_metadata$country      %or_empty% pick(flat$Country)
+    db_metadata$country_code <- db_metadata$country_code %or_empty% pick(flat$CountryCode)
+    db_metadata$licence      <- db_metadata$licence      %or_empty% pick(flat$Licence) %or_empty% pick(flat$License)
+    db_metadata$availability <- db_metadata$availability %or_empty% pick(flat$Availability)
   }
 
   # Collect metadata from .meta_json files
@@ -216,11 +216,10 @@ collect_database_metadata <- function(db_handle, db_config, verbose = TRUE) {
     
     if (file.exists(wav_file)) {
       tryCatch({
-        info <- wrassp::read.AsspDataObj(wav_file, begin = 0, end = 1, attributes = TRUE)
-        duration_sec <- attr(info, "endRecord") / attr(info, "sampleRate")
-        total_duration_sec <- total_duration_sec + duration_sec
+        total_duration_sec <- total_duration_sec + .wav_duration(wav_file)
       }, error = function(e) {
-        # Skip if can't read
+        cli::cli_warn("Could not read duration of {.path {wav_file}}: {conditionMessage(e)}",
+                      class = "reindeer_cmdi_warning")
       })
     }
   }
@@ -328,7 +327,7 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
     if (file.exists(session_meta_file)) {
       meta <- jsonlite::fromJSON(session_meta_file, simplifyVector = FALSE)
       if (!is.null(meta$participant)) {
-        participant_id <- meta$participant$id %||% session_name
+        participant_id <- meta$participant$id %or_empty% session_name
         participants[[participant_id]] <- meta$participant
       }
     }
@@ -343,7 +342,7 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
       if (file.exists(bundle_meta_file)) {
         meta <- jsonlite::fromJSON(bundle_meta_file, simplifyVector = FALSE)
         if (!is.null(meta$participant)) {
-          participant_id <- meta$participant$id %||% bundle_name
+          participant_id <- meta$participant$id %or_empty% bundle_name
           participants[[participant_id]] <- meta$participant
         }
       }
@@ -354,8 +353,8 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
     cat("  Found metadata for", length(participants), "participants\n")
     
     # Summary statistics
-    ages <- sapply(participants, function(p) p$age %||% NA)
-    genders <- sapply(participants, function(p) p$gender %||% NA)
+    ages <- sapply(participants, function(p) p$age %or_empty% NA)
+    genders <- sapply(participants, function(p) p$gender %or_empty% NA)
     
     ages <- ages[!is.na(ages)]
     genders <- genders[!is.na(genders)]
@@ -386,7 +385,7 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
   n <- length(participants)
   ages <- suppressWarnings(as.numeric(unlist(lapply(participants, function(p) p$age))))
   ages <- ages[!is.na(ages)]
-  sexes <- tolower(unlist(lapply(participants, function(p) p$gender %||% p$sex)))
+  sexes <- tolower(unlist(lapply(participants, function(p) p$gender %or_empty% p$sex)))
   sexes <- sexes[nzchar(sexes)]
   sex_tab <- if (length(sexes)) table(sexes) else integer(0)
   list(
@@ -406,7 +405,7 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
 #' @keywords internal
 #' @noRd
 .map_annotation_type <- function(level_name) {
-  ln <- tolower(level_name %||% "")
+  ln <- tolower(level_name %or_empty% "")
   if (grepl("phonetic", ln)) "Phonetics"
   else if (grepl("phonem|phonolog", ln)) "Phonology"
   else if (grepl("lemma", ln)) "Lemma"
@@ -437,11 +436,11 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
       "https://infra.clarin.eu/CMDI/1.2/xsd/cmd-envelop.xsd",
       profile_ns, profile_xsd))
   h <- xml2::xml_add_child(doc, "cmd:Header")
-  xml2::xml_add_child(h, "cmd:MdCreator", creator %||% "reindeer")
+  xml2::xml_add_child(h, "cmd:MdCreator", creator %or_empty% "reindeer")
   xml2::xml_add_child(h, "cmd:MdCreationDate", format(Sys.time(), "%Y-%m-%d"))
-  xml2::xml_add_child(h, "cmd:MdSelfLink", self_link %||% "")
+  xml2::xml_add_child(h, "cmd:MdSelfLink", self_link %or_empty% "")
   xml2::xml_add_child(h, "cmd:MdProfile", profile_id)
-  xml2::xml_add_child(h, "cmd:MdCollectionDisplayName", display_name %||% "")
+  xml2::xml_add_child(h, "cmd:MdCollectionDisplayName", display_name %or_empty% "")
   res <- xml2::xml_add_child(doc, "cmd:Resources")
   rpl <- xml2::xml_add_child(res, "cmd:ResourceProxyList")
   xml2::xml_add_child(res, "cmd:JournalFileProxyList")
@@ -497,7 +496,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
   } else NULL
   actors <- if (!is.null(scope_md) && nrow(scope_md) > 0) {
     unname(.participants_from_metadata(scope_md))
-  } else list(list(id = bundle %||% session))
+  } else list(list(id = bundle %or_empty% session))
 
   recording_units <- lapply(seq_len(nrow(bl)), function(i) {
     bn   <- bl$name[i]
@@ -510,7 +509,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
 
   display <- if (is.null(bundle)) session else paste0(session, "/", bundle)
   skel <- .cmdi_new_doc(profile_id,
-                        self_link %||% paste0("urn:uuid:", db_name, ":", display),
+                        self_link %or_empty% paste0("urn:uuid:", db_name, ":", display),
                         "reindeer", display)
 
   # Resources: audio + EAF per recording, plus any child metadata records.
@@ -525,7 +524,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
                           "Resource", "text/x-eaf+xml")
     }
   }
-  for (cm in child_metadata %||% character(0)) {
+  for (cm in child_metadata %or_empty% character(0)) {
     k <- k + 1L
     .add_resource_proxy(skel$rpl, paste0("md", k), basename(cm), "Metadata")
   }
@@ -544,7 +543,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
 #' @keywords internal
 #' @noRd
 .map_sex <- function(gender) {
-  g <- tolower(gender %||% "")
+  g <- tolower(gender %or_empty% "")
   if (g %in% c("male", "m")) "Male"
   else if (g %in% c("female", "f")) "Female"
   else "Unknown"
@@ -581,7 +580,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
 
   A(ms, "Name", session_display)
   A(ms, "NumberOfSpeakers", max(1L, length(actor_rows)))
-  A(ms, "Corpus", corpus_title %||% "Corpus")          # names the parent corpus
+  A(ms, "Corpus", corpus_title %or_empty% "Corpus")          # names the parent corpus
   A(ms, "Environment", "unknown")                      # enum
   A(ms, "RecordingDate", format(Sys.Date(), "%Y-%m-%d"))
 
@@ -598,7 +597,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
     if (.nz(a$id))         A(act, "Name", a$id)
     age <- suppressWarnings(as.numeric(a$age))
     if (!is.na(age))       A(act, "Age", age)            # xs:decimal
-    A(act, "Sex", .map_sex(a$gender %||% a$sex))         # enum
+    A(act, "Sex", .map_sex(a$gender %or_empty% a$sex))         # enum
     if (.nz(a$education))  A(act, "Education", a$education)
     if (.nz(a$profession)) A(act, "Profession", a$profession)
     if (.nz(a$dialect))    A(act, "Dialect", a$dialect)
@@ -640,7 +639,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
 #' @keywords internal
 #' @noRd
 .cmdi_profile_id <- function(profile) {
-  profile <- profile %||% "media-corpus"
+  profile <- profile %or_empty% "media-corpus"
   switch(profile,
     "media-corpus"      = "clarin.eu:cr1:p_1387365569699",
     "speech-corpus"     = "clarin.eu:cr1:p_1392642184799",
@@ -774,13 +773,13 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
 
   # Add Header
   header <- xml2::xml_add_child(doc, "cmd:Header")
-  xml2::xml_add_child(header, "cmd:MdCreator", author %||% "PLACEHOLDER_AUTHOR")
+  xml2::xml_add_child(header, "cmd:MdCreator", author %or_empty% "PLACEHOLDER_AUTHOR")
   xml2::xml_add_child(header, "cmd:MdCreationDate",
                      format(Sys.time(), "%Y-%m-%d"))
   # MdSelfLink: a persistent identifier for this record. Prefer a caller-
   # supplied PID; fall back to a urn:uuid built from the database UUID so the
   # element is never empty (CLARIN B-centres require it).
-  self <- self_link %||% (if (!is.null(db_uuid) && nzchar(db_uuid))
+  self <- self_link %or_empty% (if (!is.null(db_uuid) && nzchar(db_uuid))
                           paste0("urn:uuid:", db_uuid) else NULL)
   if (!is.null(self)) {
     xml2::xml_add_child(header, "cmd:MdSelfLink", self)
@@ -812,7 +811,7 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
 
   # Metadata proxies for child records (session CMDIs) form the collection
   # hierarchy that a repository harvester follows corpus -> session -> bundle.
-  for (cm in child_metadata %||% character(0)) {
+  for (cm in child_metadata %or_empty% character(0)) {
     rp <- xml2::xml_add_child(resource_proxy_list, "cmd:ResourceProxy",
                               id = paste0("rp", proxy_id))
     xml2::xml_add_child(rp, "cmd:ResourceType", "Metadata")
@@ -870,7 +869,7 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
     if (is.null(text)) xml2::xml_add_child(parent, paste0("cmdp:", name))
     else xml2::xml_add_child(parent, paste0("cmdp:", name), as.character(text))
   }
-  title <- corpus_title %||% "Unnamed speech corpus"
+  title <- corpus_title %or_empty% "Unnamed speech corpus"
   demo  <- .aggregate_demographics(participant_metadata)
 
   # Distinct subject languages from participants (else undetermined).
@@ -902,20 +901,20 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
   A(gi, "ResourceClass", "SpeechCorpus")                       # enum
   loc <- A(gi, "Location")
   ctry <- A(loc, "Country")
-  A(ctry, "CountryName", db_metadata$country %||% "Unspecified")
-  A(ctry, "CountryCoding", db_metadata$country_code %||% "SE") # ISO-3166 enum
+  A(ctry, "CountryName", db_metadata$country %or_empty% "Unspecified")
+  A(ctry, "CountryCoding", db_metadata$country_code %or_empty% "SE") # ISO-3166 enum
   A(gi, "ModalityInfo")                                        # empty valid
   gi_desc <- A(gi, "Descriptions")
-  A(gi_desc, "Description", corpus_description %||% "Speech corpus.")
+  A(gi_desc, "Description", corpus_description %or_empty% "Speech corpus.")
   for (k in names(extra)) {
     A(gi_desc, "Description", paste0(k, ": ", paste(extra[[k]], collapse = "; ")))
   }
 
   ## Access (required) ------------------------------------------------------
   ac <- A(root, "Access")
-  A(ac, "Availability", availability %||% db_metadata$availability %||% "Unspecified")
+  A(ac, "Availability", availability %or_empty% db_metadata$availability %or_empty% "Unspecified")
   A(ac, "DistributionMedium", "download")
-  A(ac, "Licence", license %||% db_metadata$licence %||% "Unspecified")
+  A(ac, "Licence", license %or_empty% db_metadata$licence %or_empty% "Unspecified")
   acc <- A(ac, "Contact")
   if (.nz(author)) A(acc, "Person", author)
   if (.nz(contact_email)) A(acc, "Email", contact_email)
@@ -930,14 +929,14 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
   if (.nz(institution)) A(crc, "Organisation", institution)
 
   ## Project (optional) -----------------------------------------------------
-  proj_name <- db_metadata$project %||% NULL
+  proj_name <- db_metadata$project %or_empty% NULL
   if (.nz(proj_name) || .nz(db_metadata$funder) || .nz(db_metadata$website)) {
     pj <- A(root, "Project")
-    A(pj, "ProjectName", proj_name %||% "Unspecified")
-    A(pj, "ProjectTitle", proj_name %||% "Unspecified")
+    A(pj, "ProjectName", proj_name %or_empty% "Unspecified")
+    A(pj, "ProjectTitle", proj_name %or_empty% "Unspecified")
     if (.nz(db_metadata$funder)) A(pj, "Funder", db_metadata$funder)
-    A(pj, "Url", db_metadata$website %||% "http://example.org")
-    A(pj, "Institution", institution %||% "Unspecified")
+    A(pj, "Url", db_metadata$website %or_empty% "http://example.org")
+    A(pj, "Institution", institution %or_empty% "Unspecified")
   }
 
   ## SubjectLanguages (required) -------------------------------------------
@@ -967,7 +966,7 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
     at <- A(at_wrap, "AnnotationType"); A(at, "AnnotationType", lv)      # enum leaf
   }
   sz <- A(scs, "Size"); tsz <- A(sz, "TotalSize")
-  A(tsz, "Number", db_metadata$n_bundles %||% length(participant_metadata) %||% 0)
+  A(tsz, "Number", db_metadata$n_bundles %or_empty% length(participant_metadata) %or_empty% 0)
   A(tsz, "SizeUnit", "bundles")
 
   ## Participants (required) -----------------------------------------------
@@ -1013,12 +1012,12 @@ generate_cmdi_xml <- function(profile, db_name, db_uuid, corpus_title,
 
   gi <- xml2::xml_add_child(coll, "cmdp:GeneralInfo")               # required
   # GeneralInfo sequence order: Name, Title, ID, Version, Owner, PublicationYear
-  xml2::xml_add_child(gi, "cmdp:Name", corpus_title %||% "Unnamed corpus")  # required (text)
+  xml2::xml_add_child(gi, "cmdp:Name", corpus_title %or_empty% "Unnamed corpus")  # required (text)
   if (.nz(corpus_title)) xml2::xml_add_child(gi, "cmdp:Title", corpus_title)
-  owner <- author %||% institution
+  owner <- author %or_empty% institution
   if (.nz(owner)) xml2::xml_add_child(gi, "cmdp:Owner", owner)
   # PublicationYear is xs:gYear -> only a bare 4-digit year is valid.
-  yr <- db_metadata$publication_year %||% format(Sys.Date(), "%Y")
+  yr <- db_metadata$publication_year %or_empty% format(Sys.Date(), "%Y")
   if (grepl("^[0-9]{4}$", as.character(yr))) {
     xml2::xml_add_child(gi, "cmdp:PublicationYear", as.character(yr))
   }
@@ -1054,7 +1053,7 @@ add_speech_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
   xml2::xml_add_child(general_info, "cmd:Name", corpus_title)
   xml2::xml_add_child(general_info, "cmd:ID", db_uuid)
   xml2::xml_add_child(general_info, "cmd:Description", 
-                     corpus_description %||% "PLACEHOLDER_CORPUS_DESCRIPTION")
+                     corpus_description %or_empty% "PLACEHOLDER_CORPUS_DESCRIPTION")
   
   # Access
   access <- xml2::xml_add_child(parent, "cmd:Access")
@@ -1111,7 +1110,7 @@ add_speech_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
   subject_languages <- xml2::xml_add_child(parent, "cmd:SubjectLanguages")
   
   # Extract unique languages from participant metadata
-  languages <- unique(sapply(participant_metadata, function(p) p$language %||% NA))
+  languages <- unique(sapply(participant_metadata, function(p) p$language %or_empty% NA))
   languages <- languages[!is.na(languages)]
   
   if (length(languages) > 0) {
@@ -1151,7 +1150,7 @@ add_speech_corpus_components <- function(parent, db_name, db_uuid, corpus_title,
     for (participant in participant_metadata) {
       part_elem <- xml2::xml_add_child(participants_comp, "cmd:Participant")
       xml2::xml_add_child(part_elem, "cmd:ParticipantID", 
-                         participant$id %||% "unknown")
+                         participant$id %or_empty% "unknown")
       
       if (!is.null(participant$age)) {
         xml2::xml_add_child(part_elem, "cmd:Age", as.character(participant$age))
@@ -1199,4 +1198,30 @@ format_duration <- function(seconds) {
   minutes <- floor((seconds %% 3600) / 60)
   secs <- floor(seconds %% 60)
   sprintf("%02d:%02d:%02d", hours, minutes, secs)
+}
+
+
+#' Duration in seconds of a RIFF/WAVE file, from its header only
+#' @noRd
+.wav_duration <- function(path) {
+  con <- file(path, "rb")
+  on.exit(close(con))
+  if (!identical(readChar(con, 4, useBytes = TRUE), "RIFF")) cli::cli_abort("not a RIFF file")
+  readBin(con, "integer", 1L, size = 4L, endian = "little")
+  if (!identical(readChar(con, 4, useBytes = TRUE), "WAVE")) cli::cli_abort("not a WAVE file")
+  byte_rate <- NA_real_
+  repeat {
+    id <- readChar(con, 4, useBytes = TRUE)
+    if (length(id) == 0L || !nzchar(id)) cli::cli_abort("no data chunk")
+    size <- readBin(con, "integer", 1L, size = 4L, endian = "little")
+    if (identical(id, "fmt ")) {
+      body <- readBin(con, "raw", size)
+      byte_rate <- readBin(body[9:12], "integer", 1L, size = 4L, endian = "little")
+    } else if (identical(id, "data")) {
+      if (is.na(byte_rate) || byte_rate <= 0) cli::cli_abort("data chunk before fmt chunk")
+      return(size / byte_rate)
+    } else {
+      seek(con, size + size %% 2L, origin = "current")
+    }
+  }
 }

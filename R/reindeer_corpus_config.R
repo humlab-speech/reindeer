@@ -60,7 +60,7 @@ load_DBconfig <- function(obj) {
     cli::cli_abort("{.path {dbCfgPath}} does not exist. Check 'name' entry in DBconfig file.")
   }
 
-  # Use optimized JSON reading with RcppSimdJson
+  # Read the config
   DBconfig <- read_json_fast(dbCfgPath, simplifyVector = FALSE)
 
   # Validate against schema (soft-warn unless reindeer.schema_strict is TRUE)

@@ -60,24 +60,24 @@ corpus <- S7::new_class(
   constructor = function(path, verbose = FALSE, create = FALSE,
                          sync_eaf = NULL, sync_cmdi = NULL,
                          cache_dir = NULL, quick = TRUE) {
-    # Input validation with assertthat
-    assertthat::assert_that(
+    # Input validation 
+    .assert(
       !is.null(path),
       length(path) > 0,
       msg = "path cannot be NULL or empty"
     )
-    assertthat::assert_that(
-      assertthat::is.flag(verbose),
+    .assert(
+      .is_flag(verbose),
       msg = "verbose must be TRUE or FALSE"
     )
-    assertthat::assert_that(
-      assertthat::is.flag(create),
+    .assert(
+      .is_flag(create),
       msg = "create must be TRUE or FALSE"
     )
 
     if (is.character(path)) {
-      assertthat::assert_that(
-        assertthat::is.string(path),
+      .assert(
+        .is_string(path),
         msg = "path must be a single character string"
       )
       
@@ -105,7 +105,7 @@ corpus <- S7::new_class(
         }
       } else {
         # Path exists - validate it's a proper _emuDB
-        assertthat::assert_that(
+        .assert(
           endsWith(basename(path), "_emuDB"),
           msg = "Database directory should end with '_emuDB'"
         )
@@ -146,7 +146,7 @@ corpus <- S7::new_class(
     config <- load_DBconfig(basePath)
 
     # Resolve cache directory
-    resolved_cache_dir <- cache_dir %||% file.path(basePath, ".quantify_cache")
+    resolved_cache_dir <- cache_dir %or_empty% file.path(basePath, ".quantify_cache")
 
     if (!is.null(sync_eaf) || !is.null(sync_cmdi)) {
       cli::cli_warn(

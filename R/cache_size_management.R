@@ -288,7 +288,7 @@ check_all_cache_sizes <- function(corpus_obj,
   # Check quantify cache
   quantify_info <- check_quantify_cache_size(corpus_obj, verbose = verbose)
 
-  total_size <- quantify_info$size_bytes %||% 0
+  total_size <- quantify_info$size_bytes %or_empty% 0
 
   if (verbose) {
     cli::cli_alert_info("Total cache size: {.val {format_bytes(total_size)}}")
@@ -621,7 +621,7 @@ inspect_cache <- function(corpus_obj, verbose = TRUE) {
   }
   files <- list_cache_files(corpus_obj, cache_type = "all")
   if (verbose) {
-    total_bytes <- sum(files$size_bytes %||% 0)
+    total_bytes <- sum(files$size_bytes %or_empty% 0)
     cli::cli_alert_info(
       "Quantify cache: {nrow(files)} file{?s}, {format_bytes(total_bytes)}"
     )
@@ -681,8 +681,8 @@ manage_cache <- function(corpus,
                         cache_type = c("all", "quantify"),
                         dry_run = TRUE) {
 
-  # Input validation with assertthat
-  assertthat::assert_that(
+  # Input validation 
+  .assert(
     S7::S7_inherits(corpus, reindeer::corpus),
     msg = "corpus must be a corpus object"
   )
@@ -690,12 +690,12 @@ manage_cache <- function(corpus,
   action <- match.arg(action)
   cache_type <- match.arg(cache_type)
 
-  assertthat::assert_that(
-    assertthat::is.count(days_old),
+  .assert(
+    .is_count(days_old),
     msg = "days_old must be a positive integer"
   )
-  assertthat::assert_that(
-    assertthat::is.flag(dry_run),
+  .assert(
+    .is_flag(dry_run),
     msg = "dry_run must be TRUE or FALSE"
   )
 

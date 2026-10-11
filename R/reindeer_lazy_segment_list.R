@@ -450,7 +450,7 @@ apply_descend_transform <- function(query, level) {
     
     cli::cli_h2("Query Plan")
     
-    n_transforms <- length(object@query_parts$transforms %||% list())
+    n_transforms <- length(object@query_parts$transforms %or_empty% list())
     cli::cli_text("Transforms: {.val {n_transforms}}")
     
     if (n_transforms > 0) {
@@ -484,7 +484,7 @@ glimpse_lazy_segment_list_impl <- function(x, ...) {
   } else {
     cli::cli_h2("lazy_segment_list {cli::col_silver('[not materialized]')}")
     cli::cli_text("Query: {substr(x@query_parts$base$sql, 1, 80)}...")
-    cli::cli_text("Transforms: {length(x@query_parts$transforms %||% list())}")
+    cli::cli_text("Transforms: {length(x@query_parts$transforms %or_empty% list())}")
     cli::cli_text("")
     cli::cli_text("{.emph Call {.fn collect} to execute}")
   }

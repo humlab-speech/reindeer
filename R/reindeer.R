@@ -37,8 +37,9 @@ utils::globalVariables(c(
   "to_id", "type", "weight", "windowSize"
 ))
 
-# Null coalescing operator (internal, no roxygen to avoid Rd name issue)
-`%||%` <- function(x, y) {
+# Null-or-empty coalescing (x if non-NULL and length > 0, else y). Kept distinct
+# from rlang::%||%, which only tests for NULL.
+`%or_empty%` <- function(x, y) {
   if (is.null(x) || length(x) == 0) y else x
 }
 

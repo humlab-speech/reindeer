@@ -82,7 +82,7 @@ browse_corpus_gadget <- function(corpus = NULL, height = 600) {
       cat("Bundles:   ", summary$n_bundles, "\n")
       cat("Levels:    ", summary$n_levels, "\n")
       cat("Tracks:    ", summary$n_ssff_tracks, "\n")
-      cat("Duration:  ", summary$total_duration_hms %||% "(unknown)", "\n")
+      cat("Duration:  ", summary$total_duration_hms %or_empty% "(unknown)", "\n")
     })
     output$bundle_info <- shiny::renderPrint({
       shiny::req(input$session, input$bundle)

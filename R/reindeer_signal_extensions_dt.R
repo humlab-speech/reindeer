@@ -171,6 +171,7 @@ process_unspecified_data <- function(defaults, impute, defaultsEstimatedSampleSi
 
   # Impute if requested
   if (impute) {
+    rlang::check_installed("imputeTS", reason = "to impute DSPP parameters.")
     impute_expr <- quote(lapply(.SD, function(x) {
       if (any(is.na(x)) && sum(!is.na(x)) > 2) {
         tryCatch({

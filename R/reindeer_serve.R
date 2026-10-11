@@ -8,7 +8,6 @@
 # the WebSocket server answers the protocol commands for DBconfig, bundle
 # lists (including review time anchors), bundles, and save-back.
 
-#' @importFrom httpuv startServer stopAllServers
 .artic_session <- function(corpus,
                            bundle_entries = NULL,
                            dbconfig_overlay = NULL,
@@ -24,6 +23,8 @@
                            debugLevel = 0,
                            appDir = NULL,
                            require_artic = character()) {
+
+  rlang::check_installed("httpuv", reason = "to serve the Artic annotation app.")
 
   # Set debug level
   if (debug && debugLevel == 0) {
@@ -352,7 +353,7 @@
             }
             ssffFiles[[length(ssffFiles) + 1]] <- list(
               encoding = "BASE64",
-              data = base64enc::base64encode(mfData),
+              data = jsonlite::base64_enc(mfData),
               fileExtension = ssffFileExt
             )
           }
@@ -435,7 +436,7 @@
               if (debugLevel > 3) {
                 cli::cli_alert_info("Writing SSFF track to file: {sp}")
               }
-              ssffTrackBin <- base64enc::base64decode(ssffFile[["data"]])
+              ssffTrackBin <- jsonlite::base64_dec(ssffFile[["data"]])
               ssffCon <- tryCatch(file(sp, "wb"), error = function(e) {
                 err <<- e
               })

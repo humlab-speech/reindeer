@@ -18,12 +18,12 @@
 #' @keywords internal
 #' @noRd
 validate_name <- function(name, type = "name", allow_regex = FALSE) {
-  assertthat::assert_that(
-    assertthat::is.string(name),
+  .assert(
+    .is_string(name),
     msg = sprintf("%s must be a single character string", type)
   )
   
-  assertthat::assert_that(
+  .assert(
     nchar(name) > 0,
     msg = sprintf("%s cannot be empty", type)
   )

@@ -138,10 +138,10 @@
 #' @keywords internal
 #' @noRd
 .artic_time_levels <- function(cfg) {
-  defs <- cfg$levelDefinitions %||% list()
+  defs <- cfg$levelDefinitions %or_empty% list()
   vapply(
     Filter(function(d) !identical(d$type, "ITEM"), defs),
-    function(d) as.character(d$name %||% ""),
+    function(d) as.character(d$name %or_empty% ""),
     character(1)
   )
 }
@@ -204,8 +204,8 @@
   # Our values win over both the corpus config and Artic's defaults: editing is
   # the point of annotate()/review(), and saveBundle must be on or Artic drops
   # unsaved edits when the playlist moves to the next bundle.
-  ea$restrictions <- utils::modifyList(ea$restrictions %||% list(), .artic_edit_restrictions())
-  ea$activeButtons <- utils::modifyList(ea$activeButtons %||% list(), .artic_edit_buttons())
+  ea$restrictions <- utils::modifyList(ea$restrictions %or_empty% list(), .artic_edit_restrictions())
+  ea$activeButtons <- utils::modifyList(ea$activeButtons %or_empty% list(), .artic_edit_buttons())
 
   if (is.null(ea$perspectives) || length(ea$perspectives) == 0L) {
     ea$perspectives <- list(.artic_default_perspective(cfg))
@@ -215,7 +215,7 @@
     if (is.null(p$signalCanvases)) {
       p$signalCanvases <- list(order = list(), assign = list(), contourLims = list())
     }
-    if (length(p$signalCanvases$order %||% list()) == 0L) {
+    if (length(p$signalCanvases$order %or_empty% list()) == 0L) {
       p$signalCanvases$order <- list("OSCI", "SPEC")
     }
     if (is.null(p$signalCanvases$assign)) {
@@ -224,7 +224,7 @@
     if (is.null(p$levelCanvases)) {
       p$levelCanvases <- list(order = list())
     }
-    if (length(p$levelCanvases$order %||% list()) == 0L) {
+    if (length(p$levelCanvases$order %or_empty% list()) == 0L) {
       p$levelCanvases$order <- as.list(.artic_time_levels(cfg))
     }
     if (is.null(p$twoDimCanvases)) {
@@ -249,8 +249,8 @@
     return(character())
   }
   cfg <- load_DBconfig(get_emuDBhandle(corpus))
-  defs <- cfg$ssffTrackDefinitions %||% list()
-  known <- vapply(defs, function(d) as.character(d$name %||% ""), character(1))
+  defs <- cfg$ssffTrackDefinitions %or_empty% list()
+  known <- vapply(defs, function(d) as.character(d$name %or_empty% ""), character(1))
   unknown <- setdiff(tracks, known)
   if (length(unknown) > 0L) {
     cli::cli_warn(c(
@@ -270,11 +270,11 @@
     return(tracks)
   }
   cfg <- load_DBconfig(get_emuDBhandle(corpus))
-  defs <- cfg$ssffTrackDefinitions %||% list()
+  defs <- cfg$ssffTrackDefinitions %or_empty% list()
   basePath <- corpus@basePath
   keep <- vapply(tracks, function(tn) {
     d <- Filter(function(x) identical(as.character(x$name), tn), defs)[[1]]
-    fe <- as.character(d$fileExtension %||% "")
+    fe <- as.character(d$fileExtension %or_empty% "")
     if (!nzchar(fe)) {
       return(FALSE)
     }
@@ -310,13 +310,13 @@
   } else if (is.numeric(perspective)) {
     as.integer(perspective)
   } else {
-    match(perspective, vapply(pers, function(p) as.character(p$name %||% ""), character(1)))
+    match(perspective, vapply(pers, function(p) as.character(p$name %or_empty% ""), character(1)))
   }
   if (is.na(idx) || idx < 1L || idx > length(pers)) {
     cli::cli_warn("Perspective {.val {perspective}} not found; tracks not overlaid.")
     return(cfg)
   }
-  assign <- pers[[idx]]$signalCanvases$assign %||% list()
+  assign <- pers[[idx]]$signalCanvases$assign %or_empty% list()
   for (tn in tracks) {
     exists <- any(vapply(assign, function(a) {
       identical(as.character(a$ssffTrackName), tn) &&
