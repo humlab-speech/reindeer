@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeer_psychoacoustics.R
 \name{erb}
 \alias{erb}
-\title{Convert frequency (Hz) to Equivalent Rectangular Bandwidth (ERB) number}
+\title{Convert frequency (Hz) to ERB number (deprecated)}
 \usage{
 erb(f)
 }
@@ -13,21 +13,19 @@ erb(f)
 Numeric vector of ERB-numbers.
 }
 \description{
-Maps physical frequencies (Hz) to the number of ERBs below them, using
-the rectangular-bandpass model of human auditory filters from
-\insertCite{Moore:1982ha}{reindeer}. Useful for psychoacoustic
-analyses where the perceptual scale matters more than the raw Hz.
+Moved to the superassp package. This wrapper calls
+\code{superassp::ucnv_hz_to_erb(f, method = "moore1983")} and will be removed in
+reindeer 3.0.0.
 }
-\examples{
-erb(c(500, 1000, 2000, 4000))
-# ERB vs Bark scale
-f <- seq(50, 8000, 50)
-plot(f, erb(f), type = "l", ylab = "ERB / Bark")
-lines(f, emuR::bark(f), lty = 2)
+\section{Bug fixed}{
+
+Up to and including reindeer 2.2.0 this function returned wrong values: it
+applied the Moore & Glasberg (1983) constants, which are defined for
+frequency in kHz, to frequency in Hz, so the result was almost constant
+(\code{erb(c(500, 1000, 2000))} gave 42.7, 42.8, 42.9 instead of 10.3, 15.3,
+20.9).
 }
-\references{
-\insertAllCited{}
-}
+
 \seealso{
 \code{\link[=semitones]{semitones()}}
 }

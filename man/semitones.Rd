@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeer_psychoacoustics.R
 \name{semitones}
 \alias{semitones}
-\title{Convert frequency (Hz) to semitones}
+\title{Convert frequency (Hz) to semitones (deprecated)}
 \usage{
 semitones(x, ref = 16.3516)
 }
@@ -15,20 +15,9 @@ semitones(x, ref = 16.3516)
 Numeric vector of semitone values.
 }
 \description{
-Maps frequency values (in Hz) to semitones above a reference frequency.
-The default reference is C\eqn{_0} (16.35160 Hz), which matches the
-base frequency used by a Phonogram
-\insertCite{Schutte.1983.10.1159/000265703}{reindeer}. For Praat-
-compatible output pass \code{ref = 1}, \code{100}, \code{200}, or \code{440}.
-}
-\examples{
-# Semitones relative to 100 Hz (Praat-style)
-semitones(c(200, 400, 800), ref = 100)
-# Phonogram range C0..C4 expressed in semitones
-semitones(261.6256)
-}
-\references{
-\insertAllCited{}
+Moved to the superassp package. This wrapper calls
+\code{superassp::ucnv_hz_to_semitone(x, ref_freq = ref)} and will be removed in
+reindeer 3.0.0.
 }
 \seealso{
 \code{\link[=erb]{erb()}}

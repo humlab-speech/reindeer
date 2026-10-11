@@ -76,6 +76,11 @@
   work that can fail when opening a corpus; creation SQL uses bound
   parameters (a session name with a quote no longer breaks it).
 
+- **`erb()` returned wrong values in every release up to 2.2.0** (kHz constants
+  applied to Hz; the result was almost constant). `erb()` and `semitones()`
+  now call `superassp::ucnv_hz_to_erb()` / `ucnv_hz_to_semitone()`, warn that
+  they have moved, and will be removed in 3.0.0.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is
