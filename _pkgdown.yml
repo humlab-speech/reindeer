@@ -9,6 +9,9 @@ template:
     border-radius: 0.5rem
     btn-border-radius: 0.25rem
   opengraph:
+    image:
+      src: man/figures/logo.png
+      alt: "reindeer: speech corpora in a nordic climate"
     twitter:
       creator: "@humlab"
       card: summary
@@ -38,24 +41,6 @@ navbar:
       icon: fas fa-home
       href: index.html
       aria-label: Home
-    reference:
-      text: Reference
-      href: reference/index.html
-    articles:
-      text: Articles
-      menu:
-        - text: Getting Started
-          href: articles/getting_started.html
-        - text: Metadata Management
-          href: articles/metadata_management.html
-        - text: Cache Management
-          href: articles/cache_management.html
-        - text: Lazy Pipelines and Pipe-Loss Debugging
-          href: articles/lazy_and_provenance.html
-        - text: Interactive Annotation
-          href: articles/interactive_annotation.html
-        - text: End-to-end pipeline
-          href: articles/end_to_end_pipeline.html
     news:
       text: News
       href: news/index.html
@@ -65,152 +50,141 @@ navbar:
       aria-label: GitHub repository
 
 reference:
-  - title: "Corpus"
-    desc: "Open, describe, and validate an EMU-SDMS corpus."
+  - title: "Open a corpus"
+    desc: "Open, create and try out an EMU-SDMS corpus."
     contents:
       - corpus
-      - describe_corpus
-      - validate_corpus
-      - peek_signals
       - demo_corpus
-      - get_corpus_cached
+      - import_media
 
   - title: "Query"
-    desc: "EMU Query Language and segment-list classes."
+    desc: "Find segments with the EMU Query Language and move around the hierarchy."
     contents:
       - query
+      - scout
+      - move_to
       - segment_list
-      - extended_segment_list
       - lazy_segment_list
       - is_segment_list
       - as_segment_list
 
-  - title: "Measurement"
-    desc: "DSP measurement with speaker-aware parameters."
+  - title: "Measure"
+    desc: "Speaker-aware signal measurement and reshaping the results."
     contents:
       - quantify
       - dsp_parameters
-      - derive_dsp_parameters
+      - pivot_tracks_longer
+      - pivot_tracks_wider
+      - segment_cols
+      - track_cols
+      - biographize
 
   - title: "Metadata"
-    desc: "Three-level speaker metadata: write, read, round-trip."
+    desc: "Three-level speaker and recording metadata."
     contents:
       - set_metadata
       - get_metadata
-      - load_metadata
       - export_metadata
-      - biographize
 
-  - title: "Navigation"
-    desc: "Move through the annotation hierarchy."
-    contents:
-      - scout
-      - ascend_to
-      - descend_to
-
-  - title: "Cache"
-    desc: "Inspect and prune the persistent measurement cache."
-    contents:
-      - inspect_cache
-      - manage_cache
-      - check_cache_size
-
-  - title: "Provenance"
-    desc: "Per-step row accounting for pipe-loss debugging."
+  - title: "Pipe-loss accounting"
+    desc: "See which rows each step dropped."
     contents:
       - provenance
       - dropped
-      - dropped_rows
 
-  - title: "Tidy reshaping and column helpers"
-    desc: "Pivot tracks, nest segments, and select column groups."
-    contents:
-      - pivot_tracks_longer
-      - pivot_tracks_wider
-      - nest_by_session
-      - nest_by_bundle
-      - nest_by_speaker
-      - segment_cols
-      - metadata_cols
-      - track_cols
-      - signal_cols
-
-  - title: "Interoperability"
-    desc: "Read and write ELAN and Praat TextGrid annotations."
-    contents:
-      - read_eaf
-      - write_eaf
-      - read_textgrid
-      - write_textgrid
-
-  - title: "FAIR / CMDI artifacts"
-    desc: "Standards-compliant archival metadata."
-    contents:
-      - create_cmdi_metadata
-      - validate_cmdi
-
-  - title: "Companion packages"
-    desc: >
-      Glue for eggstract that needs reindeer's own
-      corpus/quantify()/cache machinery, not just the companion's API.
-    contents:
-      - quantify_egg
-
-  - title: "Psychoacoustic helpers"
-    desc: "Frequency-scale conversions used in DSP."
-    contents:
-      - semitones
-      - erb
-
-  - title: "Visualization"
-    desc: >
-      ggplot2 layers and autoplot methods for reindeer's own tidy
-      post-measurement shape (segment_list / track_long from
-      pivot_tracks_longer()). Raw-signal plotting (spectrograms,
-      EGG wavegrams) is out of scope here — see superassp and
-      eggstract's geom_wavegram()/geom_egg_signal().
-    contents:
-      - geom_formant_trajectory
-      - geom_pitch_track
-      - geom_label_tier
-
-  - title: "Interactive annotation"
-    desc: "Open a corpus in the Artic annotation web app."
+  - title: "Annotate"
+    desc: "Edit and review in the Artic web app; exchange annotations with ELAN and Praat."
     contents:
       - annotate
-      - review
-      - install_artic
+      - read_annotations
+      - write_annotations
+
+  - title: "Describe and archive"
+    desc: "README, CITATION.cff, DataCite, JSON-LD and CMDI from the corpus's metadata."
+    contents:
+      - describe_corpus
+
+  - title: "Caches"
+    contents:
+      - clear_cache
+
+  - title: "Data"
+    contents:
+      - DSPP
+
+  - title: "Deprecated (removed in 3.0.0)"
+    desc: "Still work; each page names its replacement."
+    contents:
+      - add_metadata
       - artic_info
+      - ascend_to
+      - descend_to
       - browse_corpus_gadget
+      - check_cache_size
+      - create_cmdi_metadata
+      - derive_dsp_parameters
+      - dropped_rows
       - edit_metadata_gadget
+      - erb
+      - semitones
+      - extended_segment_list
+      - is_extended_segment_list
+      - gather_metadata
+      - load_metadata
+      - get_corpus_cached
+      - geom_formant_trajectory
+      - geom_label_tier
+      - geom_pitch_track
+      - import_bundle
+      - import_session
+      - import_metadata
+      - inspect_cache
+      - install_artic
+      - manage_cache
+      - metadata_cols
+      - signal_cols
+      - nest_by_bundle
+      - nest_by_session
+      - nest_by_speaker
+      - peek_signals
+      - quantify_egg
+      - read_eaf
+      - read_textgrid
+      - write_eaf
+      - write_textgrid
+      - review
+      - validate_cmdi
+      - validate_corpus
+      - deprecated-serve
 
   - title: internal
     contents:
       - reindeer
-      - add_metadata
-      - gather_metadata
-      - import_metadata
-      - DSPP
+      - reexports
       - deprecated-moved-functions
-      - deprecated-serve
+      - reindeer-query-parser
       - quantify.lazy_segment_list
       - print.bundle_list
+      - print.extended_segment_list
       - print.lazy_segment_list
       - print.segment_list
+      - print.track_long
+      - summary.extended_segment_list
       - summary.lazy_segment_list
       - summary.segment_list
       - "[<-.corpus"
 
 articles:
-  - title: "Getting started"
+  - title: "Start here"
     navbar: ~
     contents:
       - getting_started
-
-  - title: "Workflows"
+      - querying
+      - speaker_aware
+  - title: "Working with a corpus"
     contents:
-      - metadata_management
-      - cache_management
-      - lazy_and_provenance
-      - interactive_annotation
-      - end_to_end_pipeline
+      - metadata
+      - building_a_corpus
+      - annotating
+      - interoperability
+      - archiving

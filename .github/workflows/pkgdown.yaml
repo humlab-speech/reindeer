@@ -45,9 +45,12 @@ jobs:
           # dplyr is the one Suggests the ungated chunks require, so both
           # are installed on top of the hard dependencies to publish the
           # vignettes with real DSP output.
-          extra-packages: any::pkgdown, any::knitr, any::rmarkdown, any::dplyr, github::humlab-speech/superassp, local::.
+          extra-packages: any::pkgdown, any::knitr, any::rmarkdown, any::dplyr, any::ggplot2, any::openxlsx, github::humlab-speech/superassp, local::.
           needs: website
           dependencies: '"hard"'
+
+      - name: Keep developer notes off the site
+        run: rm -f CLAUDE.md
 
       - name: Build site
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)

@@ -6,6 +6,10 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
 
 ## Interface
 
+- Website: reference index grouped by workflow (deprecated names in their own
+  section), generated article menu, social-card image. Reference pages now have
+  runnable examples on `demo_corpus()` and name the columns they return.
+
 - Vignettes rewritten as eight workflow guides: getting_started, querying,
   speaker_aware, metadata, building_a_corpus, archiving, interoperability,
   annotating. Every chunk runs; a test knits them and fails on empty output.
