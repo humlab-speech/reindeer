@@ -177,3 +177,16 @@ test_that("Artic helpers: query parsing, safe path parts, annotation indices", {
   expect_equal(p$items$seq_idx, 1:2)
   expect_equal(p$labels$label_idx, c(1L, 1L, 2L))
 })
+
+test_that("annotate(segment_list) opens a review playlist for the segments' corpus", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  segs <- collect(query(corp, "Phonetic == t"))
+  seen <- NULL
+  testthat::local_mocked_bindings(
+    .artic_session = function(corpus, ...) { seen <<- list(...); invisible(TRUE) },
+    .package = "reindeer")
+  suppressMessages(annotate(segs))
+  expect_true(!is.null(seen$bundle_entries))
+  expect_gt(length(seen$bundle_entries), 0L)
+})

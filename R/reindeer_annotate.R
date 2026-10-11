@@ -14,8 +14,9 @@
 #' ggplot2, so both verbs keep working regardless of attach order. With
 #' \pkg{conflicted}, prefer \code{reindeer::annotate} explicitly.
 #'
-#' @param geom A \code{corpus} (editing session) or, for ggplot2, the geom to
-#'   annotate with.
+#' @param geom A \code{corpus} (editing session), a \code{segment_list} (opens
+#'   as a review playlist, like [review()], with the corpus taken from it) or,
+#'   for ggplot2, the geom to annotate with.
 #' @param ... For a corpus: \code{sessionPattern}, \code{bundlePattern},
 #'   \code{host}, \code{port}, \code{autoOpenURL},
 #'   \code{browser}, \code{useViewer}, \code{appDir}, \code{debug},
@@ -32,6 +33,11 @@
 annotate <- function(geom = NULL, ...) {
   if (S7::S7_inherits(geom, corpus)) {
     return(.artic_session(geom, dbconfig_overlay = .artic_edit_overlay, ...))
+  }
+  # A segment list opens as a playlist; its corpus is recovered from it.
+  if (is_segment_list(geom)) {
+    seg <- if (S7::S7_inherits(geom, lazy_segment_list)) dplyr::collect(geom) else geom
+    return(review(get_corpus_cached(seg), seg, ...))
   }
   .require_ggplot2()
   ggplot2::annotate(geom = geom, ...)

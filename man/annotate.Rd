@@ -7,8 +7,9 @@
 annotate(geom = NULL, ...)
 }
 \arguments{
-\item{geom}{A \code{corpus} (editing session) or, for ggplot2, the geom to
-annotate with.}
+\item{geom}{A \code{corpus} (editing session), a \code{segment_list} (opens
+as a review playlist, like \code{\link[=review]{review()}}, with the corpus taken from it) or,
+for ggplot2, the geom to annotate with.}
 
 \item{...}{For a corpus: \code{sessionPattern}, \code{bundlePattern},
 \code{host}, \code{port}, \code{autoOpenURL},
