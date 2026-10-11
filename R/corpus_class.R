@@ -16,11 +16,9 @@
 #' @param sync_eaf,sync_cmdi Deprecated and ignored; auto-sync has been
 #'   removed.
 #' @param verbose Print progress while loading. Default `FALSE`.
-#' @param quick Reuse the existing cache when present (default `TRUE`).
-#'   Set `FALSE` to force a full cache + metadata rebuild on open, for
-#'   example after manually editing a `METADATA.json` or annotation file.
-#'   To re-sync metadata selectively without reopening, use
-#'   [load_metadata()] / [gather_metadata()].
+#' @param quick Deprecated and ignored. The cache is synced incrementally on
+#'   every open (only bundles whose annotation file changed are re-read), and
+#'   metadata files are re-scanned when their mtime changed.
 #' @param cache_dir Override the quantify/enrich cache directory.
 #'   Default `<basePath>/.quantify_cache`.
 #' @return A `corpus` object. The S7 class exposes the following
@@ -59,7 +57,12 @@ corpus <- S7::new_class(
   ),
   constructor = function(path, verbose = FALSE, create = FALSE,
                          sync_eaf = NULL, sync_cmdi = NULL,
-                         cache_dir = NULL, quick = TRUE) {
+                         cache_dir = NULL, quick = NULL) {
+    if (!is.null(quick)) {
+      cli::cli_warn(
+        "{.arg quick} is ignored: the cache is always synced incrementally on open.",
+        class = "reindeer_deprecated")
+    }
     # Input validation 
     .assert(
       !is.null(path),
@@ -113,13 +116,9 @@ corpus <- S7::new_class(
         dbName <- sub("_emuDB$", "", basename(basePath))
       }
 
-      # Build/update cache (skip if quick mode and cache already exists)
-      cache_file <- file.path(basePath, paste0(dbName, database.cache.suffix))
-      if (quick && file.exists(cache_file)) {
-        if (verbose) cli::cli_alert_info("Quick mode: reusing existing cache")
-      } else {
-        build_emuDB_cache(basePath, verbose = verbose)
-      }
+      # Create or incrementally update the cache: only bundles whose file
+      # changed since the last open are re-read.
+      sync_emuDB_cache(basePath, verbose = verbose)
 
       # Gather metadata into cache
       if (verbose) {
@@ -131,13 +130,7 @@ corpus <- S7::new_class(
       dbName <- handle$dbName
       basePath <- handle$basePath
 
-      # Ensure cache exists (in quick mode, skip rebuild if cache present)
-      cache_file <- file.path(basePath, paste0(dbName, database.cache.suffix))
-      if (!file.exists(cache_file)) {
-        build_emuDB_cache(basePath, verbose = verbose)
-      } else if (!quick) {
-        build_emuDB_cache(basePath, verbose = verbose)
-      }
+      sync_emuDB_cache(basePath, verbose = verbose)
     } else {
       cli::cli_abort("Invalid input: expected path or emuDBhandle")
     }

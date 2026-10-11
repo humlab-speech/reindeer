@@ -62,11 +62,11 @@ load_shared_ae_handle <- function() {
 
 #' Create a shared ae corpus (S7 object)
 #'
-#' @param quick Logical, whether to skip cache rebuild
+#' @param quick Ignored (kept so old callers keep working).
 #' @return A reindeer corpus object
 create_shared_ae_corpus <- function(quick = TRUE) {
   ae_path <- get_shared_ae_path()
-  reindeer::corpus(ae_path, verbose = FALSE, quick = quick)
+  reindeer::corpus(ae_path, verbose = FALSE)
 }
 
 #' Create an isolated ae corpus (for tests that mutate data)

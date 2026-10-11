@@ -35,6 +35,16 @@ caches miss once. Numbers from 2.3.0's work package list follow.
   passes 500 MB. Results of routines that are not sliceable tracks are cached
   per segment as before. Pass `.use_cache = FALSE` to opt out.
 
+- Opening a corpus syncs the SQLite cache incrementally: a bundle is re-read
+  only if its `_annot.json` mtime/size changed AND its md5 differs; added and
+  removed bundles are picked up; the cache is no longer deleted and rebuilt on
+  every open. One vectorised `_annot.json` parser replaces the three previous
+  ones. 700 bundles: first open 153 s -> ~3.7 s (files in the OS cache; the
+  remaining time is JSON parsing + inserts), reopen 0.17 s, reopen after one
+  external edit 0.1-0.7 s and it sees the edit. `corpus(quick=)` is ignored
+  with a warning. `annotate()`/`review()` saves update the cache through the
+  same sync instead of a hand-rolled bundle upsert.
+
 ## EQL / emuR parity
 
 - One compiler: eager `query(lazy = FALSE)` now compiles the same SQL as the

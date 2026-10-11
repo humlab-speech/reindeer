@@ -484,26 +484,10 @@
             if (inherits(res, "error")) {
               err <- res
             } else {
-              newMD5annotJSON <- as.character(tools::md5sum(annotFilePath))
-              bundleAnnotDFs <- .parse_annot_json(as.character(json))
-              for (tbl_name in c("items", "labels", "links")) {
-                if (nrow(bundleAnnotDFs[[tbl_name]]) > 0) {
-                  bundleAnnotDFs[[tbl_name]]$db_uuid <- emuDBhandle$UUID
-                  bundleAnnotDFs[[tbl_name]]$session <- bundleSession
-                  bundleAnnotDFs[[tbl_name]]$bundle <- bundleName
-                }
-              }
-              # Cache update is all-or-nothing.
+              # The cache catches up with the file we just wrote: only this
+              # bundle's stamp changed, so only it is re-read.
               dbRes <- tryCatch({
-                DBI::dbWithTransaction(emuDBhandle$connection, {
-                  .remove_bundle_from_db(emuDBhandle$connection, bundleSession, bundleName)
-                  .add_bundle_to_db(emuDBhandle$connection, emuDBhandle$UUID,
-                                    bundleSession, bundleName,
-                                    bundleAnnotDFs$annotates, bundleAnnotDFs$sampleRate,
-                                    newMD5annotJSON)
-                  .store_bundle_annot(emuDBhandle$connection, bundleAnnotDFs,
-                                      bundleSession, bundleName)
-                })
+                sync_emuDB_cache(emuDBhandle$basePath)
                 NULL
               }, error = function(e) e)
               if (inherits(dbRes, "error")) err <- dbRes

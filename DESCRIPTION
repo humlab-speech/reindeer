@@ -72,6 +72,7 @@ Config/testthat/edition: 3
 Collate:
     'addin_browse_corpus.R'
     'addin_edit_metadata.R'
+    'annot_sync.R'
     'annotation_io.R'
     'artic_dist.R'
     'artic_playlist.R'

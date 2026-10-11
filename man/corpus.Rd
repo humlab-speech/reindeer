@@ -11,7 +11,7 @@ corpus(
   sync_eaf = NULL,
   sync_cmdi = NULL,
   cache_dir = NULL,
-  quick = TRUE
+  quick = NULL
 )
 }
 \arguments{
@@ -29,11 +29,9 @@ removed.}
 \item{cache_dir}{Override the quantify/enrich cache directory.
 Default \verb{<basePath>/.quantify_cache}.}
 
-\item{quick}{Reuse the existing cache when present (default \code{TRUE}).
-Set \code{FALSE} to force a full cache + metadata rebuild on open, for
-example after manually editing a \code{METADATA.json} or annotation file.
-To re-sync metadata selectively without reopening, use
-\code{\link[=load_metadata]{load_metadata()}} / \code{\link[=gather_metadata]{gather_metadata()}}.}
+\item{quick}{Deprecated and ignored. The cache is synced incrementally on
+every open (only bundles whose annotation file changed are re-read), and
+metadata files are re-scanned when their mtime changed.}
 }
 \value{
 A \code{corpus} object. The S7 class exposes the following

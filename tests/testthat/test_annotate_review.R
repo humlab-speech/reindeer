@@ -172,7 +172,7 @@ test_that("Artic helpers: query parsing, safe path parts, annotation indices", {
       list(id = 2, sampleStart = 10, sampleDur = 10, labels = list(
         list(name = "W", value = "b"), list(name = "X", value = "c"))))))),
     auto_unbox = TRUE)
-  p <- reindeer:::.parse_annot_json(as.character(json))
+  p <- reindeer:::parse_annot_json(as.character(json), "u", "s", "b")
   expect_equal(p$items$seq_idx, 1:2)
   expect_equal(p$labels$label_idx, c(1L, 1L, 2L))
 })
