@@ -71,7 +71,6 @@ export(validate_cmdi)
 export(validate_corpus)
 export(write_eaf)
 export(write_textgrid)
-importFrom(Rcpp,sourceCpp)
 importFrom(Rdpack,reprompt)
 importFrom(S7,
   "method<-",
@@ -109,4 +108,3 @@ importFrom(utils,
   object.size,
   tail
 )
-useDynLib(reindeer, .registration = TRUE)

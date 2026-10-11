@@ -38,7 +38,6 @@ Imports:
     xml2,
     wrassp,
     imputeTS,
-    Rcpp,
     DBI,
     RSQLite,
     RcppSimdJson,
@@ -74,9 +73,7 @@ Depends:
     R (>= 4.1.0)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
-LinkingTo: Rcpp
 Collate:
-    'RcppExports.R'
     'addin_browse_corpus.R'
     'addin_edit_metadata.R'
     'annotation_io.R'

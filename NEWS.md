@@ -5,6 +5,8 @@
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is
   deleted. `corpus(sync_eaf=, sync_cmdi=)` now warn (class
   `reindeer_deprecated`) and are ignored; the arguments go in a later release.
+- The C++ layer (`src/`, Rcpp, `useDynLib`) and ~440 lines of dead DBconfig
+  helpers are deleted; the package no longer compiles anything.
 - Policy: a removed name is a classed stub for one minor release, then deleted.
 
 # reindeer 2.2.0
