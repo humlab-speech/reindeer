@@ -185,3 +185,16 @@ test_that("annotate(segment_list) opens a review playlist for the segments' corp
   expect_true(!is.null(seen$bundle_entries))
   expect_gt(length(seen$bundle_entries), 0L)
 })
+
+test_that("a second annotate() replaces the first server and unload leaves none (F2.5)", {
+  skip_if_not_installed("httpuv")
+  app <- stub_artic()
+  corp <- create_isolated_ae_corpus()
+  withr::defer(httpuv::stopAllServers())
+  open_it <- function() annotate(corp, app_dir = app, port = httpuv::randomPort(),
+                                 auto_open_url = "", use_viewer = FALSE)
+  open_it(); open_it()
+  expect_length(httpuv::listServers(), 1L)
+  reindeer:::.onUnload(NULL)
+  expect_length(httpuv::listServers(), 0L)
+})

@@ -1,3 +1,8 @@
+# reindeer 3.1.0
+
+- Opening a large corpus is about 35 % cheaper in CPU (700 bundles: 3.3 s to 2.2 s): annotation files are parsed into plain lists instead of one data.table per level (`benchmarking/RESULTS_3.1.0.md`).
+- `annotate()` tears its server down on replace and on unload (tested).
+
 # reindeer 3.0.1
 
 - Metadata validation now validates what the API stores: flat `Age` (number or

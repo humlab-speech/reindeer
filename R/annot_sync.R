@@ -22,6 +22,8 @@ parse_annot_json <- function(text, db_uuid = "", session_name = "", bundle_name 
   int <- function(items, field) {
     vapply(items, function(x) { v <- x[[field]]; if (is.null(v)) NA_integer_ else as.integer(v) }, 1L)
   }
+  # Plain lists per level, one rbindlist at the end: building a data.table per
+  # level and per bundle dominated the parse (700 bundles: ~1 s in setalloccol).
   items <- list()
   labels <- list()
   for (lv in a[["levels"]]) {
@@ -29,33 +31,31 @@ parse_annot_json <- function(text, db_uuid = "", session_name = "", bundle_name 
     n <- length(it)
     if (n == 0L) next
     ids <- int(it, "id")
-    items[[length(items) + 1L]] <- data.table::data.table(
-      item_id = ids, level = lv[["name"]], type = lv[["type"]], seq_idx = seq_len(n),
+    items[[length(items) + 1L]] <- list(
+      db_uuid = rep(db_uuid, n), session = rep(session_name, n), bundle = rep(bundle_name, n),
+      item_id = ids, level = rep(lv[["name"]], n), type = rep(lv[["type"]], n),
+      seq_idx = seq_len(n), sample_rate = rep(sample_rate, n),
       sample_point = int(it, "samplePoint"), sample_start = int(it, "sampleStart"),
       sample_dur = int(it, "sampleDur"))
     lab <- lapply(it, `[[`, "labels")
     lens <- lengths(lab)
     if (sum(lens) > 0L) {
       flat <- unlist(lab, recursive = FALSE, use.names = FALSE)
-      labels[[length(labels) + 1L]] <- data.table::data.table(
+      m <- sum(lens)
+      labels[[length(labels) + 1L]] <- list(
+        db_uuid = rep(db_uuid, m), session = rep(session_name, m), bundle = rep(bundle_name, m),
         item_id = rep(ids, lens), label_idx = sequence(lens),
         name = vapply(flat, function(l) as.character(l[["name"]]), ""),
         label = vapply(flat, function(l) { v <- l[["value"]]; if (is.null(v)) "" else as.character(v) }, ""))
     }
   }
   items <- if (length(items)) data.table::rbindlist(items) else data.table::data.table(
-    item_id = integer(), level = character(), type = character(), seq_idx = integer(),
+    db_uuid = character(), session = character(), bundle = character(), item_id = integer(),
+    level = character(), type = character(), seq_idx = integer(), sample_rate = numeric(),
     sample_point = integer(), sample_start = integer(), sample_dur = integer())
   labels <- if (length(labels)) data.table::rbindlist(labels) else data.table::data.table(
+    db_uuid = character(), session = character(), bundle = character(),
     item_id = integer(), label_idx = integer(), name = character(), label = character())
-  items[, `:=`(db_uuid = db_uuid, session = session_name, bundle = bundle_name,
-               sample_rate = sample_rate)]
-  data.table::setcolorder(items, c("db_uuid", "session", "bundle", "item_id", "level", "type",
-                                   "seq_idx", "sample_rate", "sample_point", "sample_start",
-                                   "sample_dur"))
-  labels[, `:=`(db_uuid = db_uuid, session = session_name, bundle = bundle_name)]
-  data.table::setcolorder(labels, c("db_uuid", "session", "bundle", "item_id", "label_idx",
-                                    "name", "label"))
 
   lk <- a[["links"]]
   links <- if (length(lk) > 0L) {
