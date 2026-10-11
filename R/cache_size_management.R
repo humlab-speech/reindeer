@@ -783,7 +783,8 @@ clear_cache <- function(corpus, older_than = NULL, dry_run = FALSE) {
   if (!S7::S7_inherits(corpus, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus} must be a corpus")
   }
-  days <- if (is.null(older_than)) -1 else  # -1: cutoff in the future = everything if (inherits(older_than, "difftime")) {
+  # NULL = everything: a negative age puts the cutoff in the future.
+  days <- if (is.null(older_than)) -1 else if (inherits(older_than, "difftime")) {
     as.numeric(older_than, units = "days")
   } else if (is.numeric(older_than) && length(older_than) == 1L && older_than >= 0) {
     older_than
