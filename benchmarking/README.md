@@ -45,7 +45,6 @@ Creates `vignettes/query_benchmarks.html` with visualizations and analysis.
 | `benchmark_metadata.R` | Metadata retrieval benchmarks |
 | `benchmark_performance_targets.R` | Regression targets for CI |
 | `benchmark_dspp.R` | DSP parameter computation (data.table vs dplyr) |
-| `benchmark_serialization.R` | Cache serialization (qs vs base R) |
 | `benchmark_quantify.R` | Signal quantification benchmarks |
 | `benchmark_simulation.R` | Simulation infrastructure benchmarks |
 | `benchmark_json.R` | JSON parsing (RcppSimdJson vs jsonlite) |

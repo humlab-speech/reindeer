@@ -97,7 +97,6 @@ run_section("PERFORMANCE TARGETS", "benchmarking/benchmark_performance_targets.R
 # ==============================================================================
 
 run_section("DSPP: dplyr vs data.table", "benchmarking/benchmark_dspp.R")
-run_section("SERIALIZATION: base vs qs", "benchmarking/benchmark_serialization.R")
 run_section("JSON: jsonlite vs RcppSimdJson", "benchmarking/benchmark_json.R")
 run_section("SIMULATION INFRASTRUCTURE", "benchmarking/benchmark_simulation.R")
 run_section("QUANTIFY INTERNALS", "benchmarking/benchmark_quantify.R")
