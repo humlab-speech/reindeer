@@ -7,55 +7,6 @@
 # emuR annotation I/O functions used in serve().
 #
 
-#' Read a bundle list file
-#'
-#' Reads a bundle list JSON file from the database basePath.
-#' Bundle lists are stored as \code{<basePath>/<name>_bundleList.json}.
-#'
-#' @param basePath Database basePath
-#' @param name Bundle list name (e.g., "default")
-#' @return tibble with columns: session, name, comment, finishedEditing
-#' @keywords internal
-#' @noRd
-.read_bundle_list <- function(basePath, name) {
-  bl_path <- file.path(basePath, paste0(name, "_bundleList.json"))
-
-  empty <- tibble::tibble(
-    session = character(),
-    name = character(),
-    comment = character(),
-    finishedEditing = logical()
-  )
-
-  if (!file.exists(bl_path)) {
-    return(empty)
-  }
-
-  result <- jsonlite::read_json(bl_path, simplifyVector = TRUE)
-
-  if (is.null(result) || length(result) == 0) {
-    return(empty)
-  }
-
-  tibble::as_tibble(result)
-}
-
-#' Write a bundle list file
-#'
-#' Writes bundle list data to a JSON file in the database basePath.
-#'
-#' @param basePath Database basePath
-#' @param name Bundle list name
-#' @param data tibble/data.frame with bundle list data
-#' @return Invisible path to written file
-#' @keywords internal
-#' @noRd
-.write_bundle_list <- function(basePath, name, data) {
-  bl_path <- file.path(basePath, paste0(name, "_bundleList.json"))
-  jsonlite::write_json(data, bl_path, auto_unbox = TRUE, pretty = TRUE)
-  invisible(bl_path)
-}
-
 #' Load bundle annotation data frames from SQLite
 #'
 #' Retrieves items, labels, and links for a specific bundle from the
@@ -137,7 +88,8 @@
     level_type <- level$type
 
     if (!is.null(level$items)) {
-      for (item in level$items) {
+      for (item_pos in seq_along(level$items)) {
+        item <- level$items[[item_pos]]
         item_row <- data.frame(
           db_uuid = "",
           session = "",
@@ -145,7 +97,7 @@
           item_id = item$id,
           level = level_name,
           type = level_type,
-          seq_idx = if (!is.null(item$seqIdx)) item$seqIdx else NA_integer_,
+          seq_idx = item_pos,  # _annot.json has no index field: position is the index
           sample_rate = sample_rate,
           sample_point = if (!is.null(item$samplePoint)) item$samplePoint else NA_integer_,
           sample_start = if (!is.null(item$sampleStart)) item$sampleStart else NA_integer_,
@@ -155,13 +107,14 @@
         items_list[[length(items_list) + 1L]] <- item_row
 
         if (!is.null(item$labels)) {
-          for (label in item$labels) {
+          for (label_pos in seq_along(item$labels)) {
+            label <- item$labels[[label_pos]]
             label_row <- data.frame(
               db_uuid = "",
               session = "",
               bundle = "",
               item_id = item$id,
-              label_idx = if (!is.null(label$labelIdx)) label$labelIdx else 0L,
+              label_idx = label_pos,
               name = label$name,
               label = if (!is.null(label$value)) label$value else "",
               stringsAsFactors = FALSE

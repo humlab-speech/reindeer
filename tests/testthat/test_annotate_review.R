@@ -152,3 +152,27 @@ test_that(".serve_file_response streams exactly the requested range", {
   expect_equal(.serve_file_response(f, "audio/x-wav", "bytes=500-600")$status, 416L)
   expect_equal(.serve_file_response(f, "audio/x-wav", "garbage")$status, 416L)
 })
+
+test_that("Artic helpers: query parsing, safe path parts, annotation indices", {
+  q <- reindeer:::.parse_query_string("?session=a%20b&bundle=x")
+  expect_equal(q$session, "a b")
+  expect_equal(q$bundle, "x")
+  expect_equal(reindeer:::.parse_query_string(""), list())
+
+  expect_true(reindeer:::.safe_part("msajc003"))
+  expect_false(reindeer:::.safe_part("../x"))
+  expect_false(reindeer:::.safe_part("a/b"))
+  expect_false(reindeer:::.safe_part(""))
+  expect_false(reindeer:::.safe_part(c("a", "b")))
+
+  json <- jsonlite::toJSON(list(
+    name = "b", annotates = "b.wav", sampleRate = 16000,
+    levels = list(list(name = "W", type = "SEGMENT", items = list(
+      list(id = 1, sampleStart = 0, sampleDur = 10, labels = list(list(name = "W", value = "a"))),
+      list(id = 2, sampleStart = 10, sampleDur = 10, labels = list(
+        list(name = "W", value = "b"), list(name = "X", value = "c"))))))),
+    auto_unbox = TRUE)
+  p <- reindeer:::.parse_annot_json(as.character(json))
+  expect_equal(p$items$seq_idx, 1:2)
+  expect_equal(p$labels$label_idx, c(1L, 1L, 2L))
+})

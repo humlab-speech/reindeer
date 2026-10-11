@@ -17,7 +17,7 @@
 #' @param geom A \code{corpus} (editing session) or, for ggplot2, the geom to
 #'   annotate with.
 #' @param ... For a corpus: \code{sessionPattern}, \code{bundlePattern},
-#'   \code{bundleListName}, \code{host}, \code{port}, \code{autoOpenURL},
+#'   \code{host}, \code{port}, \code{autoOpenURL},
 #'   \code{browser}, \code{useViewer}, \code{appDir}, \code{debug},
 #'   \code{debugLevel}. For ggplot2: forwarded to \code{ggplot2::annotate()}.
 #' @return Invisibly \code{TRUE} for a corpus. The server keeps running until
@@ -62,8 +62,6 @@ annotate <- function(geom = NULL, ...) {
 #'   \item{`perspective`}{Perspective to attach track overlays to (name or
 #'     index; defaults to the first perspective).}
 #'   \item{`canvas`}{Signal canvas to overlay tracks on (default `"SPEC"`).}
-#'   \item{`bundleListName`}{Optional bundle-list name used to persist
-#'     per-bundle \code{comment}/\code{finishedEditing} progress.}
 #'   \item{`appDir`}{Optional explicit Artic dist directory.}
 #' }
 #' @usage review(corpus, ...)
@@ -80,7 +78,7 @@ review <- S7::new_generic("review", "corpus")
 #' @export
 S7::method(review, corpus) <- function(corpus, seglist, tracks = NULL,
                                        perspective = NULL, canvas = "SPEC",
-                                       bundleListName = NULL, appDir = NULL, ...) {
+                                       appDir = NULL, ...) {
   playlist <- .build_review_playlist(seglist, corpus = corpus)
   resolved <- .artic_resolve_tracks(corpus, seglist, tracks)
   resolved <- .artic_tracks_available(corpus, resolved, playlist)
@@ -106,7 +104,6 @@ S7::method(review, corpus) <- function(corpus, seglist, tracks = NULL,
     corpus,
     bundle_entries = playlist,
     dbconfig_overlay = overlay,
-    bundleListName = bundleListName,
     appDir = appDir,
     require_artic = .artic_required_features(),
     ...

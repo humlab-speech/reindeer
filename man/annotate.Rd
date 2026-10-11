@@ -11,7 +11,7 @@ annotate(geom = NULL, ...)
 annotate with.}
 
 \item{...}{For a corpus: \code{sessionPattern}, \code{bundlePattern},
-\code{bundleListName}, \code{host}, \code{port}, \code{autoOpenURL},
+\code{host}, \code{port}, \code{autoOpenURL},
 \code{browser}, \code{useViewer}, \code{appDir}, \code{debug},
 \code{debugLevel}. For ggplot2: forwarded to \code{ggplot2::annotate()}.}
 }

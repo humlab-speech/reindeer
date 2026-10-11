@@ -55,6 +55,14 @@
   `quantify(corpus, .using=)` regenerates output files deleted since the cached
   run and its cache key now includes the routine's identity and file stamp.
 
+- Artic server (`annotate()`/`review()`): media and bundle requests refuse
+  session/bundle/extension values that could leave the bundle directory; the
+  query string is parsed locally (no shiny dependency at run time); saving a
+  bundle writes to a temp file and renames, and updates the cache in one
+  transaction (a failed write no longer touches the cache); annotations saved
+  from the editor get correct `seq_idx`/`label_idx` in the cache (they were
+  all NA/0). `bundleListName` was non-functional and is removed.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

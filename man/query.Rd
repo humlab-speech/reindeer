@@ -45,7 +45,7 @@ tibble-like \code{segment_list} ready for \code{\link[=quantify]{quantify()}} / 
 \details{
 Since v0.7 the query is \strong{deferred by default}: a \link{lazy_segment_list}
 is returned and the main result SQL fires when you access the rows
-(\code{nrow()}, \code{head()}, \code{$}, dplyr verbs, \code{\link[=collect]{collect()}} etc.). Deferral is
+(\code{nrow()}, \code{head()}, \code{$}, dplyr verbs, \code{\link[dplyr:collect]{collect()}} etc.). Deferral is
 partial: plan-time work still resolves level/attribute names and
 materialises compound sub-queries (sequences, dominance), so the query
 string is fully built at call time. Pass \code{lazy = FALSE} to force
@@ -94,7 +94,7 @@ query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)      # eager
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=scout]{scout()}}, \code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}, \code{\link[=collect]{collect()}},
+\code{\link[=scout]{scout()}}, \code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}, \code{\link[dplyr:collect]{collect()}},
 \code{\link[=provenance]{provenance()}}
 }
 \concept{query}

@@ -13,7 +13,6 @@
                            dbconfig_overlay = NULL,
                            sessionPattern = ".*",
                            bundlePattern = ".*",
-                           bundleListName = NULL,
                            host = "127.0.0.1",
                            port = 17890,
                            autoOpenURL = "http://127.0.0.1:17890/?autoConnect=true",
@@ -45,16 +44,9 @@
   # Bundle scope: a review playlist (pre-built entries with time anchors), a
   # saved bundle list, or the corpus bundle table filtered by patterns.
   entries <- if (!is.null(bundle_entries)) {
-    if (!is.null(bundleListName)) {
-      .artic_abort("{.arg bundle_entries} and {.arg bundleListName} are mutually exclusive.")
-    }
     bundle_entries
   } else {
-    bl <- if (!is.null(bundleListName)) {
-      .read_bundle_list(emuDBhandle$basePath, bundleListName)
-    } else {
-      .list_bundles(emuDBhandle)
-    }
+    bl <- .list_bundles(emuDBhandle)
     if (!is.null(sessionPattern) && sessionPattern != ".*") {
       bl <- bl[reindeer_regexprl(sessionPattern, bl[["session"]]), , drop = FALSE]
     }
@@ -85,10 +77,15 @@
   # Define HTTP request handler
   httpRequest <- function(req) {
     if (req$REQUEST_METHOD == "GET") {
-      queryStr <- shiny::parseQueryString(req$QUERY_STRING)
+      queryStr <- .parse_query_string(req$QUERY_STRING)
 
       # Handle media file requests
       if (!is.null(queryStr$session) && !is.null(queryStr$bundle)) {
+        if (!.safe_part(queryStr$session) || !.safe_part(queryStr$bundle) ||
+            !.safe_part(queryStr$fileExtension)) {
+          return(list(status = 403L, headers = list(`Content-Type` = "text/plain"),
+                      body = "Forbidden: Invalid path\r\n"))
+        }
         mediaFilePath <- file.path(
           emuDBhandle$basePath,
           paste0(queryStr$session, get_session_suffix()),
@@ -102,7 +99,7 @@
         return(res)
       } else {
         # Handle static file requests from EMU-webApp
-        path <- httpuv::decodeURIComponent(req$PATH_INFO)
+        path <- utils::URLdecode(req$PATH_INFO)
         Encoding(path) <- "UTF-8"
 
         # Prevent path traversal attacks - reject paths with ../ or absolute paths
@@ -195,6 +192,19 @@
       D <- if (is.raw(DATA)) rawToChar(DATA) else DATA
       D <- enc2utf8(D)
       jr <- jsonlite::fromJSON(D, simplifyVector = FALSE)
+
+      # Client-supplied names become path components: refuse anything that
+      # could leave the bundle directory.
+      to_check <- switch(as.character(jr[["type"]] %or_empty% ""),
+        GETBUNDLE = list(jr[["name"]], jr[["session"]]),
+        SAVEBUNDLE = c(list(jr[["data"]][["session"]],
+                            jr[["data"]][["annotation"]][["name"]]),
+                       lapply(jr[["data"]][["ssffFiles"]], function(f) f[["fileExtension"]])),
+        list())
+      if (!all(vapply(to_check, .safe_part, logical(1)))) {
+        sendError(ws, "Invalid session, bundle or file name", jr[["callbackID"]])
+        return(invisible(NULL))
+      }
 
       if (debugLevel >= 2) {
         cli::cli_alert_info("Received command from EMU-webApp: {jr[['type']]}")
@@ -462,47 +472,41 @@
               paste0(bundleName, get_annotation_suffix(), ".json")
             )
             json <- jsonlite::toJSON(bundleData, auto_unbox = TRUE, force = TRUE, pretty = TRUE)
-            res <- tryCatch(writeLines(json, annotFilePath, useBytes = TRUE), error = function(e) e)
+            # Write beside the target, then rename: a crash mid-write can never
+            # leave a truncated _annot.json behind.
+            tmpPath <- paste0(annotFilePath, ".tmp")
+            res <- tryCatch({
+              writeLines(json, tmpPath, useBytes = TRUE)
+              if (!file.rename(tmpPath, annotFilePath)) cli::cli_abort("Could not replace the annotation file.")
+              NULL
+            }, error = function(e) { unlink(tmpPath); e })
 
             if (inherits(res, "error")) {
               err <- res
-            }
-
-            # Update database
-            DBI::dbBegin(emuDBhandle$connection)
-            .remove_bundle_from_db(emuDBhandle$connection, bundleSession, bundleName)
-
-            newMD5annotJSON <- tools::md5sum(annotFilePath)
-            names(newMD5annotJSON) <- NULL
-
-            bundleAnnotDFs <- .parse_annot_json(as.character(json))
-            # Fill in db_uuid/session/bundle for parsed annotation DFs
-            for (tbl_name in c("items", "labels", "links")) {
-              if (nrow(bundleAnnotDFs[[tbl_name]]) > 0) {
-                bundleAnnotDFs[[tbl_name]]$db_uuid <- emuDBhandle$UUID
-                bundleAnnotDFs[[tbl_name]]$session <- bundleSession
-                bundleAnnotDFs[[tbl_name]]$bundle <- bundleName
+            } else {
+              newMD5annotJSON <- as.character(tools::md5sum(annotFilePath))
+              bundleAnnotDFs <- .parse_annot_json(as.character(json))
+              for (tbl_name in c("items", "labels", "links")) {
+                if (nrow(bundleAnnotDFs[[tbl_name]]) > 0) {
+                  bundleAnnotDFs[[tbl_name]]$db_uuid <- emuDBhandle$UUID
+                  bundleAnnotDFs[[tbl_name]]$session <- bundleSession
+                  bundleAnnotDFs[[tbl_name]]$bundle <- bundleName
+                }
               }
-            }
-            .add_bundle_to_db(emuDBhandle$connection,
-                              emuDBhandle$UUID,
-                              bundleSession,
-                              bundleName,
-                              bundleAnnotDFs$annotates,
-                              bundleAnnotDFs$sampleRate,
-                              newMD5annotJSON)
-            .store_bundle_annot(emuDBhandle$connection,
-                                bundleAnnotDFs,
-                                bundleSession,
-                                bundleName)
-            DBI::dbCommit(emuDBhandle$connection)
-
-            # Update bundle list if specified
-            if (!is.null(bundleListName)) {
-              bl <- .read_bundle_list(emuDBhandle$basePath, bundleListName)
-              bl[bl$session == bundleSession & bl$name == bundleName, ]$comment <- jr[["data"]][["comment"]]
-              bl[bl$session == bundleSession & bl$name == bundleName, ]$finishedEditing <- jr[["data"]][["finishedEditing"]]
-              .write_bundle_list(emuDBhandle$basePath, bundleListName, bl)
+              # Cache update is all-or-nothing.
+              dbRes <- tryCatch({
+                DBI::dbWithTransaction(emuDBhandle$connection, {
+                  .remove_bundle_from_db(emuDBhandle$connection, bundleSession, bundleName)
+                  .add_bundle_to_db(emuDBhandle$connection, emuDBhandle$UUID,
+                                    bundleSession, bundleName,
+                                    bundleAnnotDFs$annotates, bundleAnnotDFs$sampleRate,
+                                    newMD5annotJSON)
+                  .store_bundle_annot(emuDBhandle$connection, bundleAnnotDFs,
+                                      bundleSession, bundleName)
+                })
+                NULL
+              }, error = function(e) e)
+              if (inherits(dbRes, "error")) err <- dbRes
             }
           }
         }
@@ -798,4 +802,27 @@ get_emuDBhandle <- function(corpus) {
 
   class(handle) <- "emuDBhandle"
   return(handle)
+}
+
+
+#' Parse a URL query string into a named list (decoded)
+#' @noRd
+.parse_query_string <- function(qs) {
+  qs <- sub("^\\?", "", qs %or_empty% "")
+  if (!nzchar(qs)) return(list())
+  parts <- strsplit(strsplit(qs, "&", fixed = TRUE)[[1]], "=", fixed = TRUE)
+  parts <- Filter(function(p) length(p) >= 1L && nzchar(p[1]), parts)
+  dec <- function(x) utils::URLdecode(gsub("+", " ", x, fixed = TRUE))
+  out <- lapply(parts, function(p) if (length(p) >= 2L) dec(paste(p[-1], collapse = "=")) else "")
+  stats::setNames(out, vapply(parts, function(p) dec(p[1]), ""))
+}
+
+#' Is `x` safe to use as one path component (session, bundle, extension)?
+#'
+#' Client-supplied names are joined into file paths; anything that could climb
+#' out of the bundle directory is refused.
+#' @noRd
+.safe_part <- function(x) {
+  is.character(x) && length(x) == 1L && !is.na(x) && nzchar(x) &&
+    !grepl("[/\\\\]|\\.\\.|[[:cntrl:]]", x)
 }

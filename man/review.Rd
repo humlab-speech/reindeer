@@ -37,8 +37,6 @@ else none.}
 \item{\code{perspective}}{Perspective to attach track overlays to (name or
 index; defaults to the first perspective).}
 \item{\code{canvas}}{Signal canvas to overlay tracks on (default \code{"SPEC"}).}
-\item{\code{bundleListName}}{Optional bundle-list name used to persist
-per-bundle \code{comment}/\code{finishedEditing} progress.}
 \item{\code{appDir}}{Optional explicit Artic dist directory.}
 }
 }

@@ -24,7 +24,7 @@ the same \code{lazy_segment_list} with a deferred step appended).
 Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
 containing session and bundle columns. Call it directly when you want
 only the metadata join, or pass a \code{lazy_segment_list} to defer the join
-until \code{\link[=collect]{collect()}}.
+until \code{\link[dplyr:collect]{collect()}}.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
