@@ -26,6 +26,14 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
 - `export_metadata()` writes raw per-level values, so the workbook round-trips
   through `import_metadata()` without copying inherited values to every bundle.
 - `clear_cache(corpus, older_than = NULL, dry_run = FALSE)`.
+- `read_annotations()` / `write_annotations()`: ELAN or TextGrid by extension,
+  one schema (`level`, `labels`, `start`, `end` in ms).
+- `annotate(segment_list)` opens a review playlist (corpus taken from the
+  segments).
+- `import_media(corpus, files, session, metadata)`: vectorised, validated
+  before anything is written (per-file TextGrid/EAF import is not supported
+  yet). `scout(n < 0)`, `dsp_parameters()`, `segment_cols()`/`track_cols()` and
+  `autoplot(type =)` already existed.
 
 ## Performance
 

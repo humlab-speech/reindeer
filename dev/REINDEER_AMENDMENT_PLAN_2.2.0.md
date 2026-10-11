@@ -488,6 +488,7 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 4.6 | done | WP4.6 |
 | 4.7 | done (gate 4 green; RESULTS_2.5.0.md; 2.5.0) | WP4.7 |
 | 5.1 | done (S7 `package = NULL` experiment skipped: 60+ uses of the namespaced class names) | WP5.1 |
-| 5.2–5.5 | open | |
+| 5.2 | done (import_media annotations= and quantify absorbing quantify_egg deferred) | WP5.2 |
+| 5.3–5.5 | open | |
 | 6.1–6.4 | open | |
 | 7 | open | |

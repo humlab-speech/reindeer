@@ -142,3 +142,66 @@ import_session <- function(corpus_obj, session, bundles,
 
   invisible(corpus_obj)
 }
+
+#' Import media files into a session, one bundle per file
+#'
+#' Each file becomes a bundle named after the file (without extension) in
+#' `session`, which is created if needed. Registered signal tracks are
+#' generated for the new bundles. All files are checked before anything is
+#' written: they must exist, have distinct, filesystem-safe names, and must
+#' not already be bundles of the session.
+#'
+#' @param corpus A [corpus()].
+#' @param files Character vector of audio file paths.
+#' @param session Session name.
+#' @param metadata `NULL`; a named list applied to every bundle; or a data
+#'   frame with a `bundle` column (one row per file) of per-bundle metadata.
+#' @param annotations Reserved for per-file TextGrid/EAF import; must be
+#'   `NULL` for now.
+#' @param tracks Generate the corpus' registered tracks for the new bundles
+#'   (default `TRUE`).
+#' @param verbose Print progress.
+#' @return A tibble of `session`, `bundle`, `file`, invisibly.
+#' @examplesIf interactive()
+#' corp <- corpus("my_emuDB", create = TRUE)
+#' import_media(corp, c("a.wav", "b.wav"), session = "S1",
+#'              metadata = list(Gender = "f"))
+#' @export
+import_media <- function(corpus, files, session, metadata = NULL,
+                         annotations = NULL, tracks = TRUE, verbose = FALSE) {
+  if (!S7::S7_inherits(corpus, reindeer::corpus)) {
+    cli::cli_abort("{.arg corpus} must be a corpus")
+  }
+  if (!is.null(annotations)) {
+    cli::cli_abort("{.arg annotations} is not supported yet; import the media first, then annotate.")
+  }
+  files <- as.character(files)
+  fail <- function(msg) cli::cli_abort(msg, class = c("reindeer_import_error", "reindeer_error"))
+  if (length(files) == 0L) fail("No files to import.")
+  missing <- files[!file.exists(files)]
+  if (length(missing) > 0L) fail(c("Files not found:", stats::setNames(missing, rep("x", length(missing)))))
+  bundles <- tools::file_path_sans_ext(basename(files))
+  if (anyDuplicated(bundles)) fail("Two files would become the same bundle name.")
+  if (!all(vapply(c(session, bundles), .safe_part, logical(1)))) {
+    fail("Session and file names must not contain path separators or '..'.")
+  }
+  existing <- list_bundles_from_cache(get_corpus_connection(corpus), corpus@.uuid)
+  clash <- bundles[bundles %in% existing$name[existing$session == session]]
+  if (length(clash) > 0L) fail(c("Bundles already exist in this session:", stats::setNames(clash, rep("x", length(clash)))))
+
+  per_bundle <- function(b) {
+    if (is.null(metadata)) return(list())
+    if (is.data.frame(metadata)) {
+      row <- metadata[metadata$bundle == b, setdiff(names(metadata), c("session", "bundle")), drop = FALSE]
+      if (nrow(row) == 0L) return(list())
+      row <- as.list(row[1, , drop = FALSE])
+      return(row[!vapply(row, function(v) is.na(v[1]), logical(1))])
+    }
+    as.list(metadata)
+  }
+  for (i in seq_along(files)) {
+    import_bundle(corpus, session, bundles[i], media = files[i],
+                  metadata = per_bundle(bundles[i]), tracks = tracks, verbose = verbose)
+  }
+  invisible(tibble::tibble(session = session, bundle = bundles, file = files))
+}

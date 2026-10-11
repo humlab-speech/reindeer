@@ -32,7 +32,7 @@ test_that("import_bundle replays registered track generators for the new bundle 
   src_wav <- sigs$full_path[2]
 
   quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   existing_rms <- sub("\\.wav$", ".rms", existing_full_path)
   expect_true(file.exists(existing_rms))
@@ -53,7 +53,7 @@ test_that("import_bundle with tracks = FALSE creates the bundle but generates no
   src_wav <- sigs$full_path[1]
 
   quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   import_bundle(ae, "NoTrackSession", "NoTrackBundle", media = src_wav,
                 tracks = FALSE, verbose = FALSE)
@@ -68,7 +68,7 @@ test_that("import_bundle generates tracks with DSP defaults when metadata is mis
   src_wav <- sigs$full_path[1]
 
   quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   expect_no_error(
     import_bundle(ae, "NoMetaSession", "NoMetaBundle", media = src_wav,
@@ -134,4 +134,26 @@ test_that("import_session continues importing remaining bundles after one fails"
 
   expect_true(dir.exists(file.path(ae@basePath, "Session10_ses", "Good1_bndl")))
   expect_true(dir.exists(file.path(ae@basePath, "Session10_ses", "Good2_bndl")))
+})
+
+test_that("import_media() imports many files, checks them first, applies metadata", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  wavs <- list.files(corp@basePath, "msajc003\\.wav$", recursive = TRUE, full.names = TRUE)
+  src <- withr::local_tempdir()
+  a <- file.path(src, "newA.wav"); b <- file.path(src, "newB.wav")
+  file.copy(wavs[1], a); file.copy(wavs[1], b)
+
+  expect_error(import_media(corp, c(a, file.path(src, "nope.wav")), session = "9999"),
+               class = "reindeer_import_error")
+  expect_false(dir.exists(file.path(corp@basePath, "9999_ses")))   # nothing written
+
+  res <- import_media(corp, c(a, b), session = "9999",
+                      metadata = data.frame(bundle = c("newA", "newB"), Speaker = c("x", "y")))
+  expect_equal(res$bundle, c("newA", "newB"))
+  m <- as.data.frame(get_metadata(corp))
+  expect_equal(m$Speaker[m$bundle == "newB"], "y")
+  expect_true(file.exists(file.path(corp@basePath, "9999_ses", "newA_bndl", "newA.wav")))
+  expect_error(import_media(corp, a, session = "9999"), class = "reindeer_import_error")
+  expect_error(import_media(corp, a, session = "S", annotations = "x.TextGrid"), "not supported")
 })

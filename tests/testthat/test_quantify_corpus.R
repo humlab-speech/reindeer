@@ -83,7 +83,7 @@ test_that("quantify.corpus compute-and-register writes files and registers a tra
   ae <- create_isolated_ae_corpus()
 
   result <- quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-                     .verbose = FALSE, .parallel = FALSE)
+                     .verbose = FALSE)
 
   expect_true(S7::S7_inherits(result, reindeer::corpus))
 
@@ -105,7 +105,7 @@ test_that("quantify.corpus compute-and-register writes files and registers a tra
 test_that("quantify.corpus registers one track per DSP output column group", {
   ae <- create_isolated_ae_corpus()
 
-  quantify(ae, .using = .fake_formant_dsp, .verbose = FALSE, .parallel = FALSE)
+  quantify(ae, .using = .fake_formant_dsp, .verbose = FALSE)
 
   cfg <- reindeer:::load_DBconfig(ae)
   track_names <- vapply(cfg$ssffTrackDefinitions, function(t) t$name, character(1))
@@ -117,15 +117,15 @@ test_that("quantify.corpus registers one track per DSP output column group", {
 
 test_that("quantify.corpus errors on a name collision without overwrite", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, .using = .fake_rms_dsp, .verbose = FALSE, .parallel = FALSE)
+  quantify(ae, .using = .fake_rms_dsp, .verbose = FALSE)
 
   expect_error(
-    quantify(ae, .using = .fake_rms_dsp, .verbose = FALSE, .parallel = FALSE),
+    quantify(ae, .using = .fake_rms_dsp, .verbose = FALSE),
     class = "reindeer_error"
   )
 
   expect_no_error(
-    quantify(ae, .using = .fake_rms_dsp, .verbose = FALSE, .parallel = FALSE,
+    quantify(ae, .using = .fake_rms_dsp, .verbose = FALSE,
              overwrite = TRUE)
   )
 })
@@ -134,7 +134,7 @@ test_that("quantify.corpus honours an explicit name for a single-track DSP funct
   ae <- create_isolated_ae_corpus()
 
   quantify(ae, .using = .fake_rms_dsp, name = "Intensity",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   cfg <- reindeer:::load_DBconfig(ae)
   track_names <- vapply(cfg$ssffTrackDefinitions, function(t) t$name, character(1))
@@ -152,7 +152,7 @@ test_that("quantify.corpus runs end-to-end with a real superassp function (smoke
   # real superassp function's formals, real attr() reads, real do.call
   # dispatch) runs to completion and registers something.
   expect_no_error(
-    quantify(ae, .using = superassp::trk_rms, .verbose = FALSE, .parallel = FALSE)
+    quantify(ae, .using = superassp::trk_rms, .verbose = FALSE)
   )
   cfg <- reindeer:::load_DBconfig(ae)
   # The ae demo corpus ships two pre-existing ssffTrackDefinitions ("dft",

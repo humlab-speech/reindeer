@@ -29,15 +29,13 @@ test_that("the cache is honoured in every size band", {
 
   for (n in c(5L, 50L, 150L)) {
     segs_n <- fx$segs[seq_len(n), ]
-    first <- quantify(segs_n, dsp, .use_cache = TRUE,
-                      .parallel = FALSE, .verbose = FALSE)
+    first <- quantify(segs_n, dsp, .use_cache = TRUE, .verbose = FALSE)
     expect_true(".cache_status" %in% names(first),
                 info = paste0("no cache accounting at n = ", n))
     expect_true(any(first$.cache_status == "miss"),
                 info = paste0("nothing was computed at n = ", n))
 
-    warm <- quantify(segs_n, dsp, .use_cache = TRUE,
-                     .parallel = FALSE, .verbose = FALSE)
+    warm <- quantify(segs_n, dsp, .use_cache = TRUE, .verbose = FALSE)
     expect_true(all(warm$.cache_status == "hit"),
                 info = paste0("warm call missed at n = ", n))
   }
@@ -47,12 +45,10 @@ test_that("cache keys distinguish DSP functions", {
   fx <- cache_fixture()
   segs_n <- fx$segs[seq_len(150L), ]
 
-  first <- quantify(segs_n, probe_dsp(1), .use_cache = TRUE,
-                    .parallel = FALSE, .verbose = FALSE)
+  first <- quantify(segs_n, probe_dsp(1), .use_cache = TRUE, .verbose = FALSE)
   expect_equal(unique(first$probe), 1)
 
-  second <- quantify(segs_n, probe_dsp(2), .use_cache = TRUE,
-                     .parallel = FALSE, .verbose = FALSE)
+  second <- quantify(segs_n, probe_dsp(2), .use_cache = TRUE, .verbose = FALSE)
   expect_equal(unique(second$probe), 2)
 })
 
@@ -69,16 +65,14 @@ test_that("changing speaker metadata invalidates only the affected rows", {
     data.frame(probe = rep(nominalF1, length(listOfFiles)))
   }
 
-  first <- quantify(segs_n, norm_dsp, .use_cache = TRUE,
-                    .parallel = FALSE, .verbose = FALSE)
+  first <- quantify(segs_n, norm_dsp, .use_cache = TRUE, .verbose = FALSE)
 
   bndl <- fx$segs$bundle[1]
   sess <- fx$segs$session[1]
   set_metadata(fx$corp, list(Age = 7, Gender = "Male"),
                session = sess, bundle = bndl)
 
-  after <- quantify(segs_n, norm_dsp, .use_cache = TRUE,
-                    .parallel = FALSE, .verbose = FALSE)
+  after <- quantify(segs_n, norm_dsp, .use_cache = TRUE, .verbose = FALSE)
 
   affected <- after$session == sess & after$bundle == bndl
   expect_true(any(affected))

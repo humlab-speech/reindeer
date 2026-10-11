@@ -77,7 +77,7 @@ test_that("quantify works with fake DSP function", {
     )
   }
 
-  result <- quantify(seg_list, fake_dsp, .parallel = FALSE, .verbose = FALSE)
+  result <- quantify(seg_list, fake_dsp, .verbose = FALSE)
 
   expect_true(is.data.frame(result))
   expect_gt(nrow(result), 0)
@@ -111,7 +111,6 @@ test_that("quantify works with .at parameter for time points", {
 
   result <- quantify(seg_list, fake_dsp_track,
                      .at = c(0.25, 0.5, 0.75),
-                     .parallel = FALSE,
                      .verbose = FALSE)
 
   n_segs <- nrow(seg_list)
@@ -132,7 +131,7 @@ test_that("quantify handles empty segment list", {
     data.frame(value = 1)
   }
 
-  result <- quantify(seg_list, fake_dsp, .parallel = FALSE, .verbose = FALSE)
+  result <- quantify(seg_list, fake_dsp, .verbose = FALSE)
 
   expect_true(is.data.frame(result))
   expect_equal(nrow(result), 0)
@@ -184,7 +183,6 @@ test_that("quantify with metadata derivation works", {
 
   result <- quantify(seg_list, fake_dsp_with_params,
                      .use_metadata = TRUE,
-                     .parallel = FALSE,
                      .verbose = FALSE)
 
   expect_true("gender_used" %in% names(result))
@@ -213,11 +211,9 @@ test_that("quantify parallel processing works", {
   }
 
   result_parallel <- quantify(seg_list, fake_dsp,
-                              .parallel = TRUE,
                               .workers = 2,
                               .verbose = FALSE)
   result_sequential <- quantify(seg_list, fake_dsp,
-                                .parallel = FALSE,
                                 .verbose = FALSE)
 
   expect_gt(nrow(result_parallel), 0)
@@ -262,7 +258,6 @@ test_that("quantify preserves segment ordering", {
                                      db_uuid = seg_list@db_uuid,
                                      db_path = seg_list@db_path),
                      fake_dsp,
-                     .parallel = FALSE,
                      .verbose = FALSE)
 
   expect_equal(result$start_item_id, seg_list_subset$start_item_id)
@@ -286,7 +281,6 @@ test_that("quantify handles list output from DSP", {
   }
 
   result <- quantify(seg_list, fake_dsp_list,
-                     .parallel = FALSE,
                      .verbose = FALSE)
 
   expect_true(is.data.frame(result))
@@ -297,11 +291,11 @@ test_that("quantify handles list output from DSP", {
 test_that("quantify(segs, character_name) reads back a registered, already-computed track", {
   ae <- create_isolated_ae_corpus()
   quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
-  result <- quantify(segs, "RMS", .at = 0.5, .verbose = FALSE, .parallel = FALSE)
+  result <- quantify(segs, "RMS", .at = 0.5, .verbose = FALSE)
 
   expect_true(is.data.frame(result))
   expect_gt(nrow(result), 0)
@@ -311,13 +305,13 @@ test_that("quantify(segs, character_name) reads back a registered, already-compu
 test_that("quantify(segs, character vector) reads back multiple registered tracks", {
   ae <- create_isolated_ae_corpus()
   quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
   quantify(ae, .using = wrassp::ksvF0, name = "F0", fileExtension = "f0",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
-  result <- quantify(segs, c("RMS", "F0"), .at = 0.5, .verbose = FALSE, .parallel = FALSE)
+  result <- quantify(segs, c("RMS", "F0"), .at = 0.5, .verbose = FALSE)
 
   expect_true(any(grepl("^RMS", names(result))))
   expect_true(any(grepl("^F0", names(result))))
@@ -328,7 +322,7 @@ test_that("quantify(segs, character_name) errors on an unregistered track", {
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
   expect_error(
-    quantify(segs, "NoSuchTrack", .verbose = FALSE, .parallel = FALSE),
+    quantify(segs, "NoSuchTrack", .verbose = FALSE),
     class = "reindeer_error"
   )
 })
@@ -352,7 +346,7 @@ test_that("quantify(segs, character_name) falls back to compute when the on-the-
   # the character path must recompute via the stored recipe rather than error.
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
-  result <- quantify(segs, "rms_recipe", .at = 0.5, .verbose = FALSE, .parallel = FALSE)
+  result <- quantify(segs, "rms_recipe", .at = 0.5, .verbose = FALSE)
   expect_true(is.data.frame(result))
   expect_gt(nrow(result), 0)
 
@@ -368,7 +362,7 @@ test_that("quantify(segs, character_name) falls back to compute when the on-the-
   # in-bundle position) would actually show up.
   same_bundle <- segs[segs$bundle == segs$bundle[1], ][1:2, ]
   same_bundle@db_path <- ae@basePath
-  result2 <- quantify(same_bundle, "rms_recipe", .at = 0.5, .verbose = FALSE, .parallel = FALSE)
+  result2 <- quantify(same_bundle, "rms_recipe", .at = 0.5, .verbose = FALSE)
   expect_true(nrow(result2) < 2 || length(unique(result2$rms_recipe)) > 1)
 })
 
@@ -377,32 +371,32 @@ test_that("quantify(segs, character_name) falls back to compute when the on-the-
 test_that("quantify(segs, character_name) requires .at (Fix 1 / C1)", {
   ae <- create_isolated_ae_corpus()
   quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
 
   expect_error(
-    quantify(segs, "RMS", .verbose = FALSE, .parallel = FALSE),
+    quantify(segs, "RMS", .verbose = FALSE),
     class = "reindeer_quantify_missing_at_error"
   )
 
   # And that it still works once .at is supplied.
   expect_no_error(
-    quantify(segs, "RMS", .at = 0.5, .verbose = FALSE, .parallel = FALSE)
+    quantify(segs, "RMS", .at = 0.5, .verbose = FALSE)
   )
 })
 
 test_that("quantify(segs, character_name) rejects DSP-style extra arguments (Fix 6A / I4)", {
   ae <- create_isolated_ae_corpus()
   quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
-           .verbose = FALSE, .parallel = FALSE)
+           .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
 
   expect_error(
-    quantify(segs, "RMS", .at = 0.5, windowSize = 20, .verbose = FALSE, .parallel = FALSE),
+    quantify(segs, "RMS", .at = 0.5, windowSize = 20, .verbose = FALSE),
     class = "reindeer_quantify_unused_arg_error"
   )
 })
@@ -425,7 +419,7 @@ test_that("quantify(segs, character_name) fallback honours from/index instead of
   segs@db_path <- ae@basePath
   seg <- as.data.frame(segs)[1, ]
 
-  result <- quantify(segs, "B", .at = 0.5, .verbose = FALSE, .parallel = FALSE)
+  result <- quantify(segs, "B", .at = 0.5, .verbose = FALSE)
   expect_true("B" %in% names(result))
 
   # Independently recompute the same frame both ways and confirm the
@@ -467,7 +461,7 @@ test_that("quantify(segs, character_name) fallback aborts when the recomputed re
   # deliberately unclassed in the brief's snippet -- match on message,
   # not class.
   expect_error(
-    quantify(segs, "NoRate", .at = 0.5, .verbose = FALSE, .parallel = FALSE),
+    quantify(segs, "NoRate", .at = 0.5, .verbose = FALSE),
     "sampleRate"
   )
 })
@@ -497,7 +491,7 @@ test_that("quantify(segs, character_name) warns when some segment/time-point com
   # testthat (it calls message() internally), not a base "warning" --
   # confirmed empirically; expect_warning() does not catch it.
   expect_message(
-    result <- quantify(segs2, "FallbackWarn", .at = 0.5, .verbose = FALSE, .parallel = FALSE),
+    result <- quantify(segs2, "FallbackWarn", .at = 0.5, .verbose = FALSE),
     "segment/time-point combination"
   )
   expect_equal(nrow(result), 3L)
