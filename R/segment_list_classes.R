@@ -55,7 +55,11 @@ segment_list <- S7::new_class(
   parent = .tbl_df_S3_class,
   properties = list(
     db_uuid = S7::class_character,
-    db_path = S7::class_character
+    db_path = S7::class_character,
+    # Set by quantify(): the routine and the columns it added. Empty for a
+    # plain query result.
+    dsp_function = S7::class_character,
+    dsp_columns = S7::class_character
   ),
   validator = function(self) {
     # Required columns from emuR::query() results
@@ -86,112 +90,6 @@ segment_list <- S7::new_class(
       return("'db_uuid', 'session', and 'bundle' must be character")
     }
 
-    NULL
-  },
-  constructor = function(data, db_uuid = NULL, db_path = NULL) {
-    # Always wrap in tibble so S7 sees the tbl_df/tbl/data.frame class chain
-    if (!inherits(data, "tbl_df")) {
-      data <- tibble::as_tibble(data)
-    }
-
-    # Extract db_uuid from data if not provided
-    if (is.null(db_uuid) && "db_uuid" %in% names(data)) {
-      db_uuid_vals <- unique(data$db_uuid)
-      if (length(db_uuid_vals) > 1) {
-        cli::cli_warn("Multiple db_uuids found; using first")
-        db_uuid <- as.character(db_uuid_vals[1])
-      } else {
-        db_uuid <- as.character(db_uuid_vals[1])
-      }
-    }
-
-    if (is.null(db_uuid) || length(db_uuid) == 0) {
-      db_uuid <- ""
-    }
-
-    if (is.null(db_path) || length(db_path) == 0) {
-      db_path <- ""
-    }
-
-    S7::new_object(
-      .parent = data,
-      db_uuid = as.character(db_uuid),
-      db_path = as.character(db_path)
-    )
-  }
-)
-
-#' Convert data.frame to segment_list
-#'
-#' @param x data.frame or compatible object
-#' @param db_uuid Database UUID
-#' @param db_path Database path
-#' @return A segment_list object
-#' @export
-as_segment_list <- function(x, db_uuid = NULL, db_path = NULL) {
-  if (S7::S7_inherits(x, segment_list)) {
-    return(x)
-  }
-  segment_list(x, db_uuid = db_uuid, db_path = db_path)
-}
-
-#' Check if object is a segment_list
-#' @param x Object to test
-#' @return Logical
-#' @export
-is_segment_list <- function(x) {
-  S7::S7_inherits(x, segment_list)
-}
-
-#' Extended Segment List S7 Class
-#'
-#' An S7 class representing a segment list with DSP-derived measurements.
-#' Returned by [quantify()]. Inherits everything from `segment_list` (and from
-#' `tbl_df` / `tbl` / `data.frame`), so dplyr verbs and the tidyverse
-#' work transparently.
-#'
-#' @param data A data.frame with segment_list columns plus DSP measurement columns
-#' @param db_uuid Character; the database UUID
-#' @param db_path Character; path to the database directory
-#' @param dsp_function Character; name of the DSP function used
-#' @param dsp_columns Character vector of column names added by DSP processing
-#' @return An \code{extended_segment_list} object (inherits from segment_list).
-#'   Adds two read-only S7 properties on top of `segment_list`:
-#'   * `@dsp_function` - character; the name of the DSP function whose
-#'     output extended this list (e.g. `"superassp::trk_formant_forest"`).
-#'   * `@dsp_columns` - character vector; the columns the DSP function
-#'     added (e.g. `c("F1", "F2", "F3", "B1", "B2", "B3")`). Use this
-#'     to programmatically discover the new measurement columns.
-#'   When [quantify()] is called with `.use_cache = TRUE`, the data
-#'   frame also gains a `.cache_status` column with values `"hit"` /
-#'   `"miss"`.
-#'
-#' @section Structure:
-#' An `extended_segment_list` contains every column of the originating
-#' [segment_list][reindeer::segment_list] (see its `Structure`
-#' section), plus one column per DSP output (the names depend on
-#' `dsp_function` - look at `@dsp_columns` to see them). When
-#' [quantify()] was called with a vector `.at`, an extra `.time_point`
-#' column records the relative time each row was sampled at.
-#'
-#' @examplesIf interactive()
-#' corp <- demo_corpus()
-#' segs <- query(corp, "Phonetic == t", lazy = FALSE)
-#' extended <- quantify(segs, superassp::trk_formant_forest)
-#'
-#' extended@dsp_function     # which DSP fn produced the new columns
-#' extended@dsp_columns      # which columns it added
-#'
-#' @export
-extended_segment_list <- S7::new_class(
-  "extended_segment_list",
-  parent = segment_list,
-  properties = list(
-    dsp_function = S7::class_character,
-    dsp_columns = S7::class_character
-  ),
-  validator = function(self) {
-    # Inherits validation from segment_list
     NULL
   },
   constructor = function(data, db_uuid = NULL, db_path = NULL,
@@ -230,11 +128,51 @@ extended_segment_list <- S7::new_class(
   }
 )
 
-#' Check if object is an extended_segment_list
+#' Convert data.frame to segment_list
+#'
+#' @param x data.frame or compatible object
+#' @param db_uuid Database UUID
+#' @param db_path Database path
+#' @return A segment_list object
+#' @export
+as_segment_list <- function(x, db_uuid = NULL, db_path = NULL) {
+  if (S7::S7_inherits(x, segment_list)) {
+    return(x)
+  }
+  segment_list(x, db_uuid = db_uuid, db_path = db_path)
+}
+
+#' Check if object is a segment_list
 #' @param x Object to test
 #' @return Logical
-#' @keywords internal
-#' @noRd
+#' @export
+is_segment_list <- function(x) {
+  S7::S7_inherits(x, segment_list) || S7::S7_inherits(x, lazy_segment_list)
+}
+
+#' Segment list with DSP measurements (compatibility constructor)
+#'
+#' `extended_segment_list` is no longer a separate class: a [segment_list]
+#' that carries `quantify()` output has non-empty `@dsp_function` and
+#' `@dsp_columns`. This constructor builds such a segment_list and will be
+#' removed in a later release.
+#'
+#' @param data A data frame with the segment columns plus measurements.
+#' @param db_uuid,db_path As for [segment_list()].
+#' @param dsp_function Name of the routine that produced the measurements.
+#' @param dsp_columns Names of the measurement columns.
+#' @return A [segment_list].
+#' @export
+extended_segment_list <- function(data, db_uuid = NULL, db_path = NULL,
+                                  dsp_function = "", dsp_columns = character(0)) {
+  segment_list(data, db_uuid = db_uuid, db_path = db_path,
+               dsp_function = dsp_function, dsp_columns = dsp_columns)
+}
+
+#' Does this segment list carry DSP measurements?
+#' @param x Any object.
+#' @return `TRUE` for a [segment_list] with `@dsp_function` or `@dsp_columns`.
+#' @export
 is_extended_segment_list <- function(x) {
-  S7::S7_inherits(x, extended_segment_list)
+  S7::S7_inherits(x, segment_list) && (nzchar(x@dsp_function) || length(x@dsp_columns) > 0L)
 }

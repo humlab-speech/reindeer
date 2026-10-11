@@ -24,7 +24,7 @@
 
 # Internal: autoplot for a plain segment_list (no DSP). Only the labels view
 # is supported here because there are no track columns to plot.
-.autoplot_segment_list <- function(object, type = c("labels", "spectrogram"),
+.autoplot_plain_segment_list <- function(object, type = c("labels", "spectrogram"),
                                     ...) {
   .require_ggplot2()
   type <- match.arg(type)
@@ -58,7 +58,15 @@
                   title = "segment_list labels")
 }
 
-# Internal: autoplot for an extended_segment_list. Routes to one of:
+# Internal: autoplot for a segment_list. Plain query results get the label
+# view; segment lists carrying quantify() output are routed by track type.
+.autoplot_segment_list <- function(object, ...) {
+  if (S7::S7_inherits(object, lazy_segment_list)) object <- dplyr::collect(object)
+  if (is_extended_segment_list(object)) .autoplot_extended_segment_list(object, ...)
+  else .autoplot_plain_segment_list(object, ...)
+}
+
+# Internal: autoplot for a segment_list with measurements. Routes to one of:
 #   formants  - per-segment F1..Fn trajectories
 #   pitch     - per-segment F0 / pitch trajectory
 #   labels    - label tier view (same as segment_list)
@@ -75,10 +83,10 @@
       paste0("Spectrogram view requires raw signal access via {.pkg superassp}; ",
              "falling back to labels view.")
     )
-    return(.autoplot_segment_list(object, type = "labels", ...))
+    return(.autoplot_plain_segment_list(object, type = "labels", ...))
   }
   if (type == "labels") {
-    return(.autoplot_segment_list(object, type = "labels", ...))
+    return(.autoplot_plain_segment_list(object, type = "labels", ...))
   }
 
   long <- pivot_tracks_longer(object, .keep_metadata = TRUE)

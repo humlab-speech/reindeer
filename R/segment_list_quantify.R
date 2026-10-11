@@ -290,7 +290,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     "labels", "start", "end", "db_uuid", "session", "bundle",
     "start_item_id", "end_item_id", "level", "attribute",
     "start_item_seq_idx", "end_item_seq_idx", "type",
-    "sample_start", "sample_end", "sample_rate", "signal_file",
+    "sample_start", "sample_end", "sample_rate", "signal_file", ".cache_status",
     "file_exists", "cache_key", "cached_result", "file_group_id",
     "seg_params", "seg_params_digest",
     "result"

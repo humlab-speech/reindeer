@@ -2,7 +2,7 @@
 % Please edit documentation in R/segment_list_classes.R
 \name{extended_segment_list}
 \alias{extended_segment_list}
-\title{Extended Segment List S7 Class}
+\title{Segment list with DSP measurements (compatibility constructor)}
 \usage{
 extended_segment_list(
   data,
@@ -13,53 +13,20 @@ extended_segment_list(
 )
 }
 \arguments{
-\item{data}{A data.frame with segment_list columns plus DSP measurement columns}
+\item{data}{A data frame with the segment columns plus measurements.}
 
-\item{db_uuid}{Character; the database UUID}
+\item{db_uuid, db_path}{As for \code{\link[=segment_list]{segment_list()}}.}
 
-\item{db_path}{Character; path to the database directory}
+\item{dsp_function}{Name of the routine that produced the measurements.}
 
-\item{dsp_function}{Character; name of the DSP function used}
-
-\item{dsp_columns}{Character vector of column names added by DSP processing}
+\item{dsp_columns}{Names of the measurement columns.}
 }
 \value{
-An \code{extended_segment_list} object (inherits from segment_list).
-Adds two read-only S7 properties on top of \code{segment_list}:
-\itemize{
-\item \verb{@dsp_function} - character; the name of the DSP function whose
-output extended this list (e.g. \code{"superassp::trk_formant_forest"}).
-\item \verb{@dsp_columns} - character vector; the columns the DSP function
-added (e.g. \code{c("F1", "F2", "F3", "B1", "B2", "B3")}). Use this
-to programmatically discover the new measurement columns.
-When \code{\link[=quantify]{quantify()}} is called with \code{.use_cache = TRUE}, the data
-frame also gains a \code{.cache_status} column with values \code{"hit"} /
-\code{"miss"}.
-}
+A \link{segment_list}.
 }
 \description{
-An S7 class representing a segment list with DSP-derived measurements.
-Returned by \code{\link[=quantify]{quantify()}}. Inherits everything from \code{segment_list} (and from
-\code{tbl_df} / \code{tbl} / \code{data.frame}), so dplyr verbs and the tidyverse
-work transparently.
-}
-\section{Structure}{
-
-An \code{extended_segment_list} contains every column of the originating
-\link{segment_list} (see its \code{Structure}
-section), plus one column per DSP output (the names depend on
-\code{dsp_function} - look at \verb{@dsp_columns} to see them). When
-\code{\link[=quantify]{quantify()}} was called with a vector \code{.at}, an extra \code{.time_point}
-column records the relative time each row was sampled at.
-}
-
-\examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- demo_corpus()
-segs <- query(corp, "Phonetic == t", lazy = FALSE)
-extended <- quantify(segs, superassp::trk_formant_forest)
-
-extended@dsp_function     # which DSP fn produced the new columns
-extended@dsp_columns      # which columns it added
-\dontshow{\}) # examplesIf}
+\code{extended_segment_list} is no longer a separate class: a \link{segment_list}
+that carries \code{quantify()} output has non-empty \verb{@dsp_function} and
+\verb{@dsp_columns}. This constructor builds such a segment_list and will be
+removed in a later release.
 }

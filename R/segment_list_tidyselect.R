@@ -21,7 +21,7 @@
   candidates <- setdiff(nms, required)
 
   # If data is an extended_segment_list, trust its @dsp_columns slot.
-  if (S7::S7_inherits(data, extended_segment_list)) {
+  if (is_extended_segment_list(data)) {
     declared <- tryCatch(data@dsp_columns, error = function(e) character())
     declared <- intersect(declared, candidates)
     if (length(declared) > 0) return(declared)

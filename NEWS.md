@@ -4,6 +4,17 @@ This release folds in the 2.3.0 (silent-wrong-result fixes), 2.4.0 (80 of 80 emu
 parity; SEGMENT times shift by half a sample and quantify caches miss once) and
 2.5.0 (power and latency; see `benchmarking/RESULTS_2.5.0.md`) work packages.
 
+## Interface
+
+- `extended_segment_list` is no longer a class. A `segment_list` that carries
+  `quantify()` output has `@dsp_function` / `@dsp_columns` set;
+  `is_extended_segment_list()` tests for that, and `extended_segment_list()` is
+  a compatibility constructor returning a `segment_list`. One print, summary,
+  glimpse and autoplot path for both; dplyr/vctrs hooks keep the dsp props.
+  `is_segment_list()` is TRUE for lazy plans, and `pivot_tracks_longer()` and
+  `autoplot()` collect a lazy plan first. `.cache_status` is no longer listed
+  as a measurement column.
+
 ## Performance
 
 - `library(reindeer)` loads 16 namespaces instead of 25 (0.48 s -> 0.28 s): the

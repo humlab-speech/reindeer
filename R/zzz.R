@@ -18,8 +18,6 @@
   # to the data.frame/tibble methods in installed packages.
   S7::method(print, segment_list) <- .print_segment_list
   S7::method(summary, segment_list) <- .summary_segment_list
-  S7::method(print, extended_segment_list) <- .print_extended_segment_list
-  S7::method(summary, extended_segment_list) <- .summary_extended_segment_list
   S7::method(print, lazy_segment_list) <- .print_lazy_segment_list
   S7::method(summary, lazy_segment_list) <- .summary_lazy_segment_list
   S7::method(print, bundle_list) <- .print_bundle_list
@@ -34,17 +32,11 @@
                      .vec_proxy_segment_list, envir = asNamespace("vctrs"))
     registerS3method("vec_restore", "reindeer::segment_list",
                      .vec_restore_segment_list, envir = asNamespace("vctrs"))
-    registerS3method("vec_proxy", "reindeer::extended_segment_list",
-                     .vec_proxy_extended_segment_list, envir = asNamespace("vctrs"))
-    registerS3method("vec_restore", "reindeer::extended_segment_list",
-                     .vec_restore_extended_segment_list, envir = asNamespace("vctrs"))
   }
 
   # Bracket subsetting - enforces required-cols downcast for select-like ops
   registerS3method("[", "reindeer::segment_list",
                    .bracket_segment_list, envir = asNamespace(pkgname))
-  registerS3method("[", "reindeer::extended_segment_list",
-                   .bracket_extended_segment_list, envir = asNamespace(pkgname))
 
   # Auto-collect methods for lazy_segment_list: any data-bearing access
   # triggers materialisation and delegates to the resulting segment_list.
@@ -71,8 +63,6 @@
   pn <- asNamespace("pillar")
   registerS3method("glimpse", "reindeer::corpus", glimpse_corpus_impl, envir = pn)
   registerS3method("glimpse", "reindeer::segment_list", glimpse_segment_list_impl, envir = pn)
-  registerS3method("glimpse", "reindeer::extended_segment_list",
-                   glimpse_extended_segment_list_impl, envir = pn)
   registerS3method("glimpse", "reindeer::lazy_segment_list",
                    glimpse_lazy_segment_list_impl, envir = pn)
 
@@ -106,16 +96,14 @@
   # (and only if) ggplot2 gets loaded.
   vctrs::s3_register("ggplot2::autoplot", "reindeer::segment_list",
                      .autoplot_segment_list)
-  vctrs::s3_register("ggplot2::autoplot", "reindeer::extended_segment_list",
-                     .autoplot_extended_segment_list)
+  vctrs::s3_register("ggplot2::autoplot", "reindeer::lazy_segment_list",
+                     .autoplot_segment_list)
 
   # dplyr is in Suggests; register reconstruct hooks only if available so
   # filter()/mutate()/select()/arrange() preserve segment_list class + props.
   if (requireNamespace("dplyr", quietly = TRUE)) {
     registerS3method("dplyr_reconstruct", "reindeer::segment_list",
                      .dplyr_reconstruct_segment_list, envir = asNamespace("dplyr"))
-    registerS3method("dplyr_reconstruct", "reindeer::extended_segment_list",
-                     .dplyr_reconstruct_extended_segment_list, envir = asNamespace("dplyr"))
 
     # *_join methods that record a join-specific provenance step (verb name
     # in {left,right,inner,full,anti,semi}_join) and fire the loss warning
@@ -124,10 +112,6 @@
     cls <- "reindeer::segment_list"
     registerS3method("rename",   cls, .rename_segment_list,   envir = dn)
     registerS3method("group_by", cls, .group_by_segment_list, envir = dn)
-    registerS3method("rename",   "reindeer::extended_segment_list",
-                     .rename_extended_segment_list, envir = dn)
-    registerS3method("group_by", "reindeer::extended_segment_list",
-                     .group_by_extended_segment_list, envir = dn)
     registerS3method("left_join",  cls, .left_join_segment_list,  envir = dn)
     registerS3method("right_join", cls, .right_join_segment_list, envir = dn)
     registerS3method("inner_join", cls, .inner_join_segment_list, envir = dn)

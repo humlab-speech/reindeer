@@ -487,6 +487,7 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 4.5 | done (700 bundles 153 s -> 3.7 s, target 2 s missed; reopen 0.17 s) | WP4.5 |
 | 4.6 | done | WP4.6 |
 | 4.7 | done (gate 4 green; RESULTS_2.5.0.md; 2.5.0) | WP4.7 |
-| 5.1–5.5 | open | |
+| 5.1 | done (S7 `package = NULL` experiment skipped: 60+ uses of the namespaced class names) | WP5.1 |
+| 5.2–5.5 | open | |
 | 6.1–6.4 | open | |
 | 7 | open | |

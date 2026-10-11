@@ -447,8 +447,8 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
       data = as.data.frame(result),
       db_uuid = segs_tbl@db_uuid,
       db_path = segs_tbl@db_path,
-      dsp_function = if (S7::S7_inherits(segs_tbl, extended_segment_list)) segs_tbl@dsp_function else "",
-      dsp_columns = if (S7::S7_inherits(segs_tbl, extended_segment_list)) segs_tbl@dsp_columns else character(0)
+      dsp_function = if (is_extended_segment_list(segs_tbl)) segs_tbl@dsp_function else "",
+      dsp_columns = if (is_extended_segment_list(segs_tbl)) segs_tbl@dsp_columns else character(0)
     )
   }
 

@@ -71,6 +71,7 @@ pivot_tracks_longer <- function(seg,
                                  values_to = "value",
                                  time_to = "rel_time",
                                  .keep_metadata = TRUE) {
+  if (S7::S7_inherits(seg, lazy_segment_list)) seg <- dplyr::collect(seg)
   if (!is.data.frame(seg)) {
     cli::cli_abort("{.arg seg} must be a segment_list or data.frame")
   }

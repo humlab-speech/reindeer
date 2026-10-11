@@ -20,7 +20,7 @@
   groups <- split(seq_len(nrow(proxy)), proxy[[by]], drop = TRUE)
   parts <- lapply(groups, function(idx) {
     slice <- proxy[idx, , drop = FALSE]
-    if (S7::S7_inherits(seg, extended_segment_list)) {
+    if (is_extended_segment_list(seg)) {
       extended_segment_list(
         slice,
         db_uuid = seg@db_uuid,
@@ -118,7 +118,7 @@ nest_by_bundle <- function(seg, .key = "data") {
   groups <- split(seq_len(nrow(proxy)), key, drop = TRUE)
   parts <- lapply(groups, function(idx) {
     slice <- proxy[idx, , drop = FALSE]
-    if (S7::S7_inherits(seg, extended_segment_list)) {
+    if (is_extended_segment_list(seg)) {
       extended_segment_list(
         slice,
         db_uuid = seg@db_uuid,

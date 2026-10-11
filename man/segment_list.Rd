@@ -4,7 +4,13 @@
 \alias{segment_list}
 \title{Segment List S7 Class}
 \usage{
-segment_list(data, db_uuid = NULL, db_path = NULL)
+segment_list(
+  data,
+  db_uuid = NULL,
+  db_path = NULL,
+  dsp_function = "",
+  dsp_columns = character(0)
+)
 }
 \arguments{
 \item{data}{A data.frame, tibble, or compatible object with the required

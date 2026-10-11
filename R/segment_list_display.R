@@ -9,6 +9,7 @@
 #' @param width Width of the printed table
 #' @name print.segment_list
 .print_segment_list <- function(x, ..., n = NULL, width = NULL) {
+  if (is_extended_segment_list(x)) return(.print_extended_segment_list(x, ..., n = n, width = width))
   # Determine number of rows to show
   if (is.null(n)) {
     n <- getOption("pillar.print_max", 10)
@@ -70,6 +71,7 @@
 #' @param ... Additional arguments (unused)
 #' @name summary.segment_list
 .summary_segment_list <- function(object, ...) {
+  if (is_extended_segment_list(object)) return(.summary_extended_segment_list(object, ...))
   cli::cli_h1("Segment List Summary")
 
   # Database info
@@ -148,6 +150,7 @@
 
 # Implementation function for segment_list
 glimpse_segment_list_impl <- function(x, width = NULL, ...) {
+  if (is_extended_segment_list(x)) return(glimpse_extended_segment_list_impl(x, width = width, ...))
   cli::cli_h2("segment_list [{nrow(x)} \u00d7 {ncol(x)}]")
 
   if (nrow(x) == 0) {
@@ -205,7 +208,7 @@ glimpse_segment_list_impl <- function(x, width = NULL, ...) {
 
   # Header
   cli::cli_rule(
-    left = cli::style_bold("extended_segment_list"),
+    left = cli::style_bold("segment_list (with measurements)"),
     right = cli::col_silver(cli::pluralize("{nrow(x)} row{?s}"))
   )
 
@@ -353,7 +356,7 @@ glimpse_segment_list_impl <- function(x, width = NULL, ...) {
 
 # Implementation function for extended_segment_list
 glimpse_extended_segment_list_impl <- function(x, width = NULL, ...) {
-  cli::cli_h2("extended_segment_list [{nrow(x)} \u00d7 {ncol(x)}]")
+  cli::cli_h2("segment_list with measurements [{nrow(x)} \u00d7 {ncol(x)}]")
 
   if (nrow(x) == 0) {
     cli::cli_alert_warning("Empty")
