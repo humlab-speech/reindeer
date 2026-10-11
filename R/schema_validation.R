@@ -120,6 +120,7 @@
 #' validate_corpus(corp)
 #' @export
 validate_corpus <- function(corpus_obj) {
+  .deprecated_alias("validate_corpus", "describe_corpus", parent.frame())
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     .schema_abort("Input must be a {.cls corpus} object")
   }

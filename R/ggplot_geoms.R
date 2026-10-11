@@ -25,6 +25,7 @@
 #' @export
 geom_formant_trajectory <- function(mapping = NULL, data = NULL,
                                      formants = 1:3, ...) {
+  .deprecated_alias("geom_formant_trajectory", "autoplot", parent.frame())
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     .companion_abort("ggplot2", purpose = "geom_formant_trajectory")
   }
@@ -64,6 +65,7 @@ geom_formant_trajectory <- function(mapping = NULL, data = NULL,
 #' @return A list of ggplot2 `Layer` objects.
 #' @export
 geom_label_tier <- function(mapping = NULL, data = NULL, tier_y = 0, ...) {
+  .deprecated_alias("geom_label_tier", "autoplot", parent.frame())
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     .companion_abort("ggplot2", purpose = "geom_label_tier")
   }
@@ -94,6 +96,7 @@ geom_label_tier <- function(mapping = NULL, data = NULL, tier_y = 0, ...) {
 #' @return A `Layer` object.
 #' @export
 geom_pitch_track <- function(mapping = NULL, data = NULL, ...) {
+  .deprecated_alias("geom_pitch_track", "autoplot", parent.frame())
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     .companion_abort("ggplot2", purpose = "geom_pitch_track")
   }

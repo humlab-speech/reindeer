@@ -149,6 +149,7 @@
 #' head(tg)
 #' @export
 read_textgrid <- function(path, encoding = "UTF-8") {
+  .deprecated_alias("read_textgrid", "read_annotations", parent.frame())
   if (!file.exists(path)) {
     cli::cli_abort("File not found: {.path {path}}")
   }
@@ -221,6 +222,7 @@ read_textgrid <- function(path, encoding = "UTF-8") {
 #' @export
 write_textgrid <- function(seg, path, levels = NULL,
                             short = FALSE, encoding = "UTF-8") {
+  .deprecated_alias("write_textgrid", "write_annotations", parent.frame())
   if (!is.data.frame(seg)) {
     cli::cli_abort("{.arg seg} must be a data.frame")
   }

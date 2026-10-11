@@ -73,6 +73,7 @@ quantify_egg <- function(seg, corpus = NULL,
                           .using = NULL,
                           ..., .at = NULL,
                           .require_egg_flag = TRUE) {
+  .deprecated_alias("quantify_egg", "quantify", parent.frame())
   if (!requireNamespace("eggstract", quietly = TRUE)) {
     .companion_abort("eggstract", purpose = "EGG-track quantification")
   }

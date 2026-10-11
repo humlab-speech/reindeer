@@ -491,6 +491,6 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 5.2 | done (import_media annotations= and quantify absorbing quantify_egg deferred) | WP5.2 |
 | 5.3 | done | WP5.3 |
 | 5.4 | done (snake_case + deprecation aliases; dots checks on query/annotate/review) | WP5.4 |
-| 5.5 | open | |
+| 5.5 | done (Gate 5: 71 exports, 38 deprecated for removal in 3.0) | WP5.5 |
 | 6.1–6.4 | open | |
 | 7 | open | |

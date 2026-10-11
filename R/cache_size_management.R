@@ -141,6 +141,7 @@ check_cache_size <- function(cache_path,
                               warn_threshold = "500 MB",
                               max_threshold = "2 GB",
                               verbose = TRUE) {
+  .deprecated_alias("check_cache_size", "summary() on the corpus (checked automatically)", parent.frame())
 
   # Parse thresholds if strings
   if (is.character(warn_threshold)) {
@@ -616,6 +617,7 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #' inspect_cache(corp)
 #' @export
 inspect_cache <- function(corpus_obj, verbose = TRUE) {
+  .deprecated_alias("inspect_cache", "summary() on the corpus", parent.frame())
   if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
   }
@@ -680,6 +682,7 @@ manage_cache <- function(corpus,
                         days_old = 30,
                         cache_type = c("all", "quantify"),
                         dry_run = TRUE) {
+  .deprecated_alias("manage_cache", "clear_cache", parent.frame())
 
   # Input validation 
   .assert(

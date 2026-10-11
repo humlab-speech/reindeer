@@ -74,6 +74,7 @@
 #' segs |> biographize(corp) |> nest_by_speaker()
 #' @export
 nest_by_speaker <- function(seg, .key = "data", speaker_col = NULL) {
+  .deprecated_alias("nest_by_speaker", "tidyr::nest", parent.frame())
   if (is.null(speaker_col)) {
     candidates <- c("Speaker", "SpeakerID", "speaker", "speaker_id")
     hits <- intersect(candidates, names(seg))
@@ -94,6 +95,7 @@ nest_by_speaker <- function(seg, .key = "data", speaker_col = NULL) {
 #' @return A tibble with one row per session.
 #' @export
 nest_by_session <- function(seg, .key = "data") {
+  .deprecated_alias("nest_by_session", "tidyr::nest", parent.frame())
   .nest_by(seg, "session", .key = .key, verb = "nest_by_session")
 }
 
@@ -106,6 +108,7 @@ nest_by_session <- function(seg, .key = "data") {
 #' @return A tibble with one row per (session, bundle) combination.
 #' @export
 nest_by_bundle <- function(seg, .key = "data") {
+  .deprecated_alias("nest_by_bundle", "tidyr::nest", parent.frame())
   if (!all(c("session", "bundle") %in% names(seg))) {
     cli::cli_abort("segment_list missing {.field session} or {.field bundle}")
   }

@@ -220,6 +220,7 @@ initialize_metadata_schema <- function(con) {
 #' @seealso [load_metadata()], [set_metadata()], [get_metadata()]
 #' @export
 gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
+  .deprecated_alias("gather_metadata", "nothing: metadata syncs automatically", parent.frame())
 
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("Input must be a corpus object")

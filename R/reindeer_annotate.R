@@ -80,7 +80,10 @@ annotate <- function(geom = NULL, ...) {
 #' review(corp, quantify(segs, dsp_function = superassp::trk_formant_forest))
 #' @seealso [annotate()], [query()], [quantify()]
 #' @export
-review <- S7::new_generic("review", "corpus")
+review <- S7::new_generic("review", "corpus", fun = function(corpus, ...) {
+  .deprecated_alias("review", "annotate", parent.frame())
+  S7::S7_dispatch()
+})
 
 #' @export
 S7::method(review, corpus) <- function(corpus, seglist, tracks = NULL,

@@ -170,6 +170,7 @@ find_artic <- function(appDir = NULL, require = character(), quiet = FALSE) {
 #' artic_info()
 #' @export
 artic_info <- function(appDir = NULL) {
+  .deprecated_alias("artic_info", NA, parent.frame())
   path <- find_artic(appDir = appDir, quiet = TRUE)
   man <- .artic_read_manifest(path)
   list(
@@ -203,6 +204,7 @@ artic_info <- function(appDir = NULL) {
 #' @export
 install_artic <- function(ref = NULL, url = NULL, local = NULL, sha256 = NULL,
                           dest = NULL, overwrite = FALSE, quiet = FALSE) {
+  .deprecated_alias("install_artic", NA, parent.frame())
   if (!is.null(local) && !is.null(url)) {
     .artic_abort("{.arg local} and {.arg url} are mutually exclusive.")
   }

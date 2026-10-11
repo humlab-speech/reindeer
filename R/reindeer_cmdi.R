@@ -70,6 +70,7 @@ create_cmdi_metadata <- function(corpus,
                                   child_metadata = NULL,
                                   include_placeholders = TRUE,
                                   verbose = TRUE) {
+  .deprecated_alias("create_cmdi_metadata", "describe_corpus", parent.frame())
   
   # Check if corpus is emuDB handle or reindeer corpus object
   if (inherits(corpus, "emuDBhandle")) {
@@ -690,6 +691,7 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
 #' @seealso [create_cmdi_metadata()], [describe_corpus()].
 #' @export
 validate_cmdi <- function(path, xsd = NULL, online = FALSE) {
+  .deprecated_alias("validate_cmdi", "describe_corpus", parent.frame())
   if (!file.exists(path)) {
     cli::cli_abort("CMDI file not found: {.path {path}}")
   }

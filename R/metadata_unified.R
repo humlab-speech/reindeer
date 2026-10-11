@@ -30,6 +30,7 @@ load_metadata <- function(corpus_obj,
                           path = NULL,
                           verbose = TRUE,
                           parallel = TRUE) {
+  .deprecated_alias("load_metadata", "nothing: metadata syncs automatically", parent.frame())
   source <- match.arg(source)
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")

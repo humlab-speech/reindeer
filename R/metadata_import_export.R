@@ -136,6 +136,7 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
 #'
 #' @export
 import_metadata <- function(corpus_obj, Excelfile) {
+  .deprecated_alias("import_metadata", "set_metadata", parent.frame())
   
   if (!file.exists(Excelfile)) {
     cli::cli_abort("File {.path {Excelfile}} does not exist")
@@ -262,6 +263,7 @@ import_metadata <- function(corpus_obj, Excelfile) {
 #' @rdname set_metadata
 add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL,
                         reset.before.add = FALSE) {
+  .deprecated_alias("add_metadata", "set_metadata", parent.frame())
 
   if (!is.null(bundle) && is.null(session)) {
     cli::cli_abort("Bundle requires session")

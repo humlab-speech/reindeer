@@ -337,6 +337,7 @@ ascend_to <- S7::new_generic("ascend_to", ".segments", fun = function(.segments,
                                                                         .from = NULL,
                                                                         .quiet = TRUE,
                                                                         collect = TRUE) {
+  .deprecated_alias("ascend_to", "move_to", parent.frame())
   S7::S7_dispatch()
 })
 
@@ -559,6 +560,7 @@ descend_to <- S7::new_generic("descend_to", ".segments", fun = function(.segment
                                                                           .from = NULL,
                                                                           .quiet = TRUE,
                                                                           collect = TRUE) {
+  .deprecated_alias("descend_to", "move_to", parent.frame())
   S7::S7_dispatch()
 })
 

@@ -66,6 +66,7 @@
 #' eaf <- read_eaf("elan/example.eaf")
 #' @export
 read_eaf <- function(path) {
+  .deprecated_alias("read_eaf", "read_annotations", parent.frame())
   if (!file.exists(path)) {
     cli::cli_abort("File not found: {.path {path}}")
   }
@@ -174,6 +175,7 @@ read_eaf <- function(path) {
 #' @export
 write_eaf <- function(seg, path, levels = NULL,
                        media_url = NULL, author = "reindeer") {
+  .deprecated_alias("write_eaf", "write_annotations", parent.frame())
   if (!is.data.frame(seg)) {
     cli::cli_abort("{.arg seg} must be a data.frame")
   }

@@ -229,6 +229,7 @@ dropped <- function(seg, step = NULL) {
 #' dropped_rows(segs)
 #' @export
 dropped_rows <- function(seg) {
+  .deprecated_alias("dropped_rows", "provenance", parent.frame())
   prov <- provenance(seg)
   if (nrow(prov) == 0L) {
     return(tibble::tibble(

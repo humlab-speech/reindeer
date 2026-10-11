@@ -165,6 +165,7 @@ is_segment_list <- function(x) {
 #' @export
 extended_segment_list <- function(data, db_uuid = NULL, db_path = NULL,
                                   dsp_function = "", dsp_columns = character(0)) {
+  .deprecated_alias("extended_segment_list", "segment_list", parent.frame())
   segment_list(data, db_uuid = db_uuid, db_path = db_path,
                dsp_function = dsp_function, dsp_columns = dsp_columns)
 }

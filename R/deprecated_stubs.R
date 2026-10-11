@@ -68,3 +68,68 @@ serve_app <- function(corpus, ...) {
     "i" = "For a segment-list playlist: use {.fn review}."
   ), class = c("reindeer_moved_error", "reindeer_error"))
 }
+
+# ============================================================================
+# Soft deprecation of names replaced by the consolidated interface
+# ============================================================================
+#
+# The old exports keep working and return exactly what their replacement
+# returns (they share the implementation). A call from outside the package
+# warns once per session with class `reindeer_deprecated`; calls from inside
+# reindeer (and its tests) stay silent. They are removed in 3.0.0.
+
+# old name -> what to use instead
+.deprecated_exports <- c(
+  add_metadata = "set_metadata",
+  artic_info = NA,
+  install_artic = NA,
+  ascend_to = "move_to",
+  descend_to = "move_to",
+  check_cache_size = "summary() on the corpus (checked automatically)",
+  create_cmdi_metadata = "describe_corpus",
+  dropped_rows = "provenance",
+  extended_segment_list = "segment_list",
+  gather_metadata = "nothing: metadata syncs automatically",
+  load_metadata = "nothing: metadata syncs automatically",
+  geom_formant_trajectory = "autoplot",
+  geom_label_tier = "autoplot",
+  geom_pitch_track = "autoplot",
+  import_bundle = "import_media",
+  import_session = "import_media",
+  import_metadata = "set_metadata",
+  inspect_cache = "summary() on the corpus",
+  manage_cache = "clear_cache",
+  metadata_cols = "segment_cols",
+  signal_cols = "track_cols",
+  nest_by_bundle = "tidyr::nest",
+  nest_by_session = "tidyr::nest",
+  nest_by_speaker = "tidyr::nest",
+  peek_signals = "summary() on the corpus",
+  quantify_egg = "quantify",
+  read_eaf = "read_annotations",
+  read_textgrid = "read_annotations",
+  write_eaf = "write_annotations",
+  write_textgrid = "write_annotations",
+  review = "annotate",
+  validate_cmdi = "describe_corpus",
+  validate_corpus = "describe_corpus"
+)
+
+.deprecated_alias <- function(old, new, caller) {
+  # Calls from inside reindeer (its own code and tests run in the namespace)
+  # stay silent; `reindeer.deprecation_always` only lifts the once-per-session limit.
+  always <- isTRUE(getOption("reindeer.deprecation_always", FALSE))
+  if (identical(topenv(caller), asNamespace("reindeer"))) {
+    return(invisible())
+  }
+  msg <- c(
+    "{.fn {old}} is deprecated and will be removed in reindeer 3.0.0.",
+    "i" = if (is.na(new)) "It has no replacement: the Artic app is vendored with the package."
+          else if (grepl("[ ]", new)) paste0("Use ", new, " instead.")
+          else paste0("Use {.fn ", new, "} instead."))
+  rlang::warn(
+    cli::format_inline(msg[1]), body = cli::format_inline(msg[-1]),
+    class = c("reindeer_deprecated", "reindeer_warning"),
+    .frequency = if (always) "always" else "once", .frequency_id = paste0("reindeer_dep_", old))
+  invisible()
+}

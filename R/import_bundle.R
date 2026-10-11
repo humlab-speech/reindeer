@@ -30,6 +30,7 @@ NULL
 #' @export
 import_bundle <- function(corpus_obj, session, bundle, media,
                           metadata = list(), tracks = TRUE, verbose = TRUE) {
+  .deprecated_alias("import_bundle", "import_media", parent.frame())
   create_session_and_bundle(corpus_obj, session, bundle, verbose = verbose)
 
   if (length(metadata) > 0) {
@@ -130,6 +131,7 @@ import_bundle <- function(corpus_obj, session, bundle, media,
 #' @export
 import_session <- function(corpus_obj, session, bundles,
                            metadata = list(), tracks = TRUE, verbose = TRUE) {
+  .deprecated_alias("import_session", "import_media", parent.frame())
   for (spec in bundles) {
     bundle_metadata <- utils::modifyList(metadata, spec$metadata %or_empty% list())
     tryCatch({

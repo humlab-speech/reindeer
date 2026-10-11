@@ -15,6 +15,24 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
   `autoplot()` collect a lazy plan first. `.cache_status` is no longer listed
   as a measurement column.
 
+## Deprecations (removed in 3.0.0)
+
+These exports are replaced by the consolidated interface. They still work, share
+their implementation with the replacement (same result), and warn once per
+session with class `reindeer_deprecated` when called from outside the package:
+`add_metadata`, `import_metadata`, `load_metadata`, `gather_metadata` ->
+`set_metadata` / automatic sync; `ascend_to`, `descend_to` -> `move_to`;
+`import_bundle`, `import_session` -> `import_media`; `read_eaf`, `read_textgrid`
+-> `read_annotations`; `write_eaf`, `write_textgrid` -> `write_annotations`;
+`review` -> `annotate`; `quantify_egg` -> `quantify`; `validate_corpus`,
+`validate_cmdi`, `create_cmdi_metadata` -> `describe_corpus`; `manage_cache`,
+`inspect_cache`, `check_cache_size`, `peek_signals` -> `clear_cache` /
+`summary(corpus)`; `dropped_rows` -> `provenance`; `metadata_cols`,
+`signal_cols` -> `segment_cols` / `track_cols`; `nest_by_*` -> `tidyr::nest`;
+`geom_*` -> `autoplot`; `extended_segment_list` -> `segment_list`;
+`install_artic`, `artic_info` (no replacement); `serve`, `serve_app`,
+`semitones`, `erb` as announced earlier.
+
 ## Argument conventions
 
 - snake_case arguments: `query(corpus, eql, session_pattern =, bundle_pattern =)`,

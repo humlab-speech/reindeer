@@ -67,6 +67,7 @@ segment_cols <- function() {
 #' segs |> dplyr::select(metadata_cols())
 #' @export
 metadata_cols <- function() {
+  .deprecated_alias("metadata_cols", "segment_cols", parent.frame())
   data <- tidyselect::peek_data(fn = "metadata_cols")
   required <- intersect(.required_segment_cols(), names(data))
   tracks <- .detect_track_cols(data)
@@ -101,6 +102,7 @@ track_cols <- function(pattern = NULL) {
 #' @return Character vector of column names.
 #' @export
 signal_cols <- function() {
+  .deprecated_alias("signal_cols", "track_cols", parent.frame())
   data <- tidyselect::peek_data(fn = "signal_cols")
   required <- intersect(.required_segment_cols(), names(data))
   candidates <- setdiff(names(data), required)
