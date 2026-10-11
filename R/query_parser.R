@@ -300,56 +300,7 @@ parse_function_query <- function(query_string) {
   list(level = level, attribute = attribute)
 }
 
-# Simple query execution
-execute_simple_query_corrected <- function(db_path, parsed_query, con = NULL) {
-  own_con <- is.null(con)
-  if (own_con) {
-    con <- .open_query_connection(db_path)
-    on.exit(DBI::dbDisconnect(con))
-  }
 
-  level <- extract_level_from_query(parsed_query)
-  attribute <- if (!is.null(parsed_query$attribute)) parsed_query$attribute else level
-
-  # Resolve attribute-as-level
-  resolved <- .resolve_level_attribute(con, level, attribute)
-  level <- resolved$level
-  # Update the parsed query's attribute for condition extraction
-  parsed_query$attribute <- resolved$attribute
-  parsed_query$level <- resolved$level
-
-  cond <- extract_condition_from_query(parsed_query)
-
-  sql <- sprintf("
-    SELECT DISTINCT
-      i.db_uuid, i.session, i.bundle, i.item_id,
-      i.level, i.type, i.seq_idx, i.sample_rate,
-      i.sample_point, i.sample_start, i.sample_dur,
-      l.label, l.name as attribute
-    FROM items i
-    INNER JOIN labels l ON i.db_uuid = l.db_uuid
-      AND i.session = l.session
-      AND i.bundle = l.bundle
-      AND i.item_id = l.item_id
-    WHERE i.level = ? AND %s
-    ORDER BY i.session, i.bundle, i.seq_idx",
-    cond$sql
-  )
-
-  return(DBI::dbGetQuery(con, sql, params = c(list(level), cond$params)))
-}
-
-# Sequence query execution
-execute_sequence_query_corrected <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
-  own_con <- is.null(con)
-  if (own_con) {
-    con <- .open_query_connection(db_path)
-    on.exit(DBI::dbDisconnect(con))
-  }
-  q <- build_sequence_query_sql_impl(db_path, parsed_query, result_level, con = con)
-  if (is.null(q)) return(create_empty_result())
-  DBI::dbGetQuery(con, q$sql, params = q$params)
-}
 
 # Sentinel SQL that returns zero rows with the standard column shape.
 # Used when an in-build sub-query materialises empty.
@@ -368,14 +319,19 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
 # composite key in a single deduplicated IN list instead of a per-row
 # 4-column OR list, keeping the SQL compact and still self-contained so the
 # lazy path can defer it. Values are bound via dbQuoteLiteral (no injection).
-.match_items_condition <- function(con, db_uuid, session, bundle, item_id) {
-  sep <- "\x1f"
-  sep_lit <- DBI::dbQuoteLiteral(con, sep)
-  lhs <- paste(c("i.db_uuid", "i.session", "i.bundle", "i.item_id"),
-               collapse = paste0(" || ", sep_lit, " || "))
-  keys <- unique(paste(db_uuid, session, bundle, item_id, sep = sep))
-  sprintf("(%s) IN (%s)", lhs,
-          paste(DBI::dbQuoteLiteral(con, keys), collapse = ", "))
+.subquery_match <- function(db_path, query, con) {
+  # Compound operands are embedded as sub-selects (nothing is executed while
+  # compiling): rows of `i` whose identity appears in the operand's result.
+  # The operand's level is derived from the query tree, not from its rows.
+  q <- build_base_sql(db_path, query, list(), con = con)
+  if (is.null(q)) return(NULL)
+  list(
+    sql = paste0("(i.db_uuid, i.session, i.bundle, i.item_id) IN (",
+                 "SELECT db_uuid, session, bundle, item_id FROM (", q$sql, "))"),
+    params = q$params,
+    level = .resolve_level_attribute(con, extract_level_from_query(query),
+                                     extract_level_from_query(query))
+  )
 }
 
 # Build SQL for a sequence query. Returns list(sql, params) ready for
@@ -383,7 +339,7 @@ execute_sequence_query_corrected <- function(db_path, parsed_query, result_level
 # returned no rows (caller should treat as empty result).
 #
 # Sub-query handling: any non-simple branch is materialised here via
-# execute_subquery() (Option B from the implementation plan); the resulting
+# sub-selects (see .subquery_match()); the resulting
 # item IDs are embedded as quoted literals. The OUTER sequence query
 # remains a single SQL statement that the lazy path can defer to collect().
 # @keywords internal
@@ -411,27 +367,18 @@ build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = 
   right_cond <- NULL
 
   if (left_query$type != "simple") {
-    left_preexec <- execute_subquery(db_path, left_query, con = con)
-    if (nrow(left_preexec) == 0) return(NULL)
-    # Derive actual level from pre-executed results
-    if ("level" %in% names(left_preexec)) {
-      left_level <- left_preexec$level[1]
-      left_resolved <- .resolve_level_attribute(con, left_level, left_level)
-      left_level <- left_resolved$level
-      left_attr_default <- left_resolved$attribute
-    }
+    left_preexec <- .subquery_match(db_path, left_query, con)
+    if (is.null(left_preexec)) return(NULL)
+    left_level <- left_preexec$level$level
+    left_attr_default <- left_preexec$level$attribute
   } else {
     left_cond <- extract_condition_from_query(left_query)
   }
   if (right_query$type != "simple") {
-    right_preexec <- execute_subquery(db_path, right_query, con = con)
-    if (nrow(right_preexec) == 0) return(NULL)
-    if ("level" %in% names(right_preexec)) {
-      right_level <- right_preexec$level[1]
-      right_resolved <- .resolve_level_attribute(con, right_level, right_level)
-      right_level <- right_resolved$level
-      right_attr_default <- right_resolved$attribute
-    }
+    right_preexec <- .subquery_match(db_path, right_query, con)
+    if (is.null(right_preexec)) return(NULL)
+    right_level <- right_preexec$level$level
+    right_attr_default <- right_preexec$level$attribute
   } else {
     right_cond <- extract_condition_from_query(right_query)
   }
@@ -473,15 +420,9 @@ build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = 
   # Returns list(sql = "...", params = list(...))
   build_match_where <- function(level, cond, preexec) {
     if (!is.null(preexec)) {
-      # Pre-executed: match items against the materialised IDs via a compact
-      # composite-key IN (deduplicated) instead of a per-row OR list.
-      id_col <- if ("item_id" %in% names(preexec)) "item_id" else names(preexec)[grep("item_id", names(preexec))[1]]
-      match_sql <- .match_items_condition(
-        con, preexec$db_uuid, preexec$session, preexec$bundle, preexec[[id_col]]
-      )
       return(list(
-        sql = paste0("i.level = ? AND ", match_sql),
-        params = list(level)
+        sql = paste0("i.level = ? AND ", preexec$sql),
+        params = c(list(level), preexec$params)
       ))
     } else {
       return(list(
@@ -658,17 +599,6 @@ build_sequence_query_sql_impl <- function(db_path, parsed_query, result_level = 
   list(sql = sql, params = all_params)
 }
 
-# Dominance query execution - the key fix
-execute_dominance_query_corrected <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
-  own_con <- is.null(con)
-  if (own_con) {
-    con <- .open_query_connection(db_path)
-    on.exit(DBI::dbDisconnect(con))
-  }
-  q <- build_dominance_query_sql_impl(db_path, parsed_query, result_level, con = con)
-  if (is.null(q)) return(create_empty_result())
-  DBI::dbGetQuery(con, q$sql, params = q$params)
-}
 
 # Build SQL for a dominance query. Returns list(sql, params) or NULL if a
 # non-simple sub-query was pre-executed and returned no rows. Sub-query
@@ -708,18 +638,22 @@ build_dominance_query_sql_impl <- function(db_path, parsed_query, result_level =
     return(NULL)
   }
 
-  # For non-simple sub-queries, pre-execute to get item IDs
+  # A sequence operand is a span of items, not an item: dominance over spans
+  # has its own (all-in-SQL) compilation.
+  if (identical(left_query$type, "sequence") || identical(right_query$type, "sequence")) {
+    return(build_span_dominance_sql(db_path, parsed_query, result_level, con))
+  }
+
+  # Compound operands are embedded as sub-selects.
   left_item_ids <- NULL
   right_item_ids <- NULL
   if (left_query$type != "simple") {
-    left_result <- execute_subquery(db_path, left_query, con = con)
-    if (nrow(left_result) == 0) return(NULL)
-    left_item_ids <- left_result
+    left_item_ids <- .subquery_match(db_path, left_query, con)
+    if (is.null(left_item_ids)) return(NULL)
   }
   if (right_query$type != "simple") {
-    right_result <- execute_subquery(db_path, right_query, con = con)
-    if (nrow(right_result) == 0) return(NULL)
-    right_item_ids <- right_result
+    right_item_ids <- .subquery_match(db_path, right_query, con)
+    if (is.null(right_item_ids)) return(NULL)
   }
 
   build_corrected_dominance_sql(
@@ -728,90 +662,9 @@ build_dominance_query_sql_impl <- function(db_path, parsed_query, result_level =
   )
 }
 
-# Function query execution
-execute_function_query_corrected <- function(db_path, parsed_query, con = NULL) {
-  own_con <- is.null(con)
-  if (own_con) {
-    con <- .open_query_connection(db_path)
-    on.exit(DBI::dbDisconnect(con))
-  }
-  
-  func_name <- parsed_query$func_name
-  level1 <- parsed_query$level1
-  level2 <- parsed_query$level2
-  operator <- parsed_query$operator
-  value <- as.numeric(parsed_query$value)
-  position <- parsed_query$position  # May be NULL
 
-  # Resolve attribute names to actual level names (e.g. "Text" → "Word")
-  level1 <- .resolve_level_attribute(con, level1, level1)$level
-  level2 <- .resolve_level_attribute(con, level2, level2)$level
 
-  if (func_name %in% c("Start", "End", "Medial")) {
-    return(execute_position_function(con, func_name, level1, level2, operator, value, position,
-                                     hier = get_hierarchy_info(dirname(db_path))))
-  } else if (func_name == "Num") {
-    return(execute_count_function(con, level1, level2, operator, value,
-                                  hier = get_hierarchy_info(dirname(db_path))))
-  } else {
-    .query_abort("Unknown function: {.val {func_name}}")
-  }
-}
 
-# Conjunction query execution (AND)
-execute_conjunction_query <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
-  # Execute both sub-queries using shared connection
-  left_result <- execute_subquery(db_path, parsed_query$left, con = con)
-  right_result <- execute_subquery(db_path, parsed_query$right, con = con)
-  
-  # Find intersection based on item_id
-  # Items must match in both result sets (same db_uuid, session, bundle, item_id)
-  result <- merge(
-    left_result, right_result,
-    by = c("db_uuid", "session", "bundle", "item_id"),
-    suffixes = c("", ".right")
-  )
-  
-  # Keep only the columns from left result (or merge intelligently)
-  keep_cols <- c("db_uuid", "session", "bundle", "item_id", "level", "type",
-                 "seq_idx", "sample_rate", "sample_point", "sample_start",
-                 "sample_dur", "label", "attribute")
-  
-  result <- result[, intersect(names(result), keep_cols), drop = FALSE]
-  
-  return(result)
-}
-
-# Disjunction query execution (OR)
-execute_disjunction_query <- function(db_path, parsed_query, result_level = NULL, con = NULL) {
-  # Execute both sub-queries using shared connection
-  left_result <- execute_subquery(db_path, parsed_query$left, con = con)
-  right_result <- execute_subquery(db_path, parsed_query$right, con = con)
-  
-  # Union the results (remove duplicates)
-  result <- unique(rbind(left_result, right_result))
-  
-  # Sort by session, bundle, seq_idx for consistency
-  if (nrow(result) > 0) {
-    result <- result[order(result$session, result$bundle, result$seq_idx), ]
-  }
-  
-  return(result)
-}
-
-# Helper to execute a sub-query
-execute_subquery <- function(db_path, parsed_query, con = NULL) {
-  result <- switch(parsed_query$type,
-    "simple" = execute_simple_query_corrected(db_path, parsed_query, con = con),
-    "sequence" = execute_sequence_query_corrected(db_path, parsed_query, NULL, con = con),
-    "dominance" = execute_dominance_query_corrected(db_path, parsed_query, NULL, con = con),
-    "function" = execute_function_query_corrected(db_path, parsed_query, con = con),
-    "conjunction" = execute_conjunction_query(db_path, parsed_query, NULL, con = con),
-    "disjunction" = execute_disjunction_query(db_path, parsed_query, NULL, con = con),
-    .query_abort("Unknown query type in subquery: {.val {parsed_query$type}}")
-  )
-  return(result)
-}
 
 # Helper functions
 extract_condition_from_query <- function(query) {
@@ -926,29 +779,10 @@ build_corrected_dominance_sql <- function(con, left_query, right_query, left_lev
   all_params <- list()
 
   # Build conditions: parameterized for simple queries, dbQuoteLiteral for pre-executed
-  if (is.null(left_item_ids)) {
-    left_cond <- extract_condition_from_query(left_query)
-  } else {
-    # Pre-executed: match items via a compact composite-key IN.
-    left_cond <- list(
-      sql = .match_items_condition(con, left_item_ids$db_uuid,
-                                   left_item_ids$session,
-                                   left_item_ids$bundle,
-                                   left_item_ids$item_id),
-      params = list()
-    )
-  }
-  if (is.null(right_item_ids)) {
-    right_cond <- extract_condition_from_query(right_query)
-  } else {
-    right_cond <- list(
-      sql = .match_items_condition(con, right_item_ids$db_uuid,
-                                   right_item_ids$session,
-                                   right_item_ids$bundle,
-                                   right_item_ids$item_id),
-      params = list()
-    )
-  }
+  left_cond <- if (is.null(left_item_ids)) extract_condition_from_query(left_query) else
+    list(sql = left_item_ids$sql, params = left_item_ids$params)
+  right_cond <- if (is.null(right_item_ids)) extract_condition_from_query(right_query) else
+    list(sql = right_item_ids$sql, params = right_item_ids$params)
 
   # Get attribute for final label display - use result_level to pick side,
   # then extract_attribute_from_query handles function/dominance/compound queries
@@ -1310,17 +1144,7 @@ build_count_function_sql <- function(parent_level, child_level, operator, value,
   )
 }
 
-execute_position_function <- function(con, func_name, parent_level, child_level, operator, value, position = NULL, hier = NULL) {
-  q <- build_position_function_sql(func_name, parent_level, child_level,
-                                   operator, value, position, hier = hier)
-  DBI::dbGetQuery(con, q$sql, params = q$params)
-}
 
-# Count function
-execute_count_function <- function(con, parent_level, child_level, operator, value, hier = NULL) {
-  q <- build_count_function_sql(parent_level, child_level, operator, value, hier = hier)
-  DBI::dbGetQuery(con, q$sql, params = q$params)
-}
 
 # Hierarchy functions
 get_hierarchy_info <- function(db_dir) {
@@ -1604,4 +1428,147 @@ create_empty_emuRsegs <- function() {
   empty_df <- tibble::as_tibble(empty_df)
   class(empty_df) <- c("emuRsegs", class(empty_df))
   return(empty_df)
+}
+
+# ---------------------------------------------------------------------------
+# Dominance with sequence operands
+#
+# A sequence result is a SPAN of consecutive items on one level, not a single
+# item. A span on the dominating side dominates whatever any of its items
+# dominates; a span on the dominated side is dominated by an item only if the
+# item dominates ALL of its members. Compiled entirely in SQL: each operand
+# becomes a `units` relation (one row per item or span), expanded to its
+# member items, joined through the hierarchy, and mapped back to units.
+# ---------------------------------------------------------------------------
+
+.dominance_operand <- function(db_path, query, con, tag) {
+  level <- .resolve_level_attribute(con, extract_level_from_query(query),
+                                    extract_level_from_query(query))
+  if (query$type == "sequence") {
+    plain <- query
+    plain$left$projection <- FALSE
+    plain$right$projection <- FALSE
+    span <- build_base_sql(db_path, plain, list(), con = con)
+    if (is.null(span)) return(NULL)
+    proj <- if (isTRUE(query$left$projection)) "start" else if (isTRUE(query$right$projection)) "end" else "both"
+    return(list(
+      tag = tag, level = level$level, attribute = level$attribute, kind = "span", proj = proj,
+      span_sql = span$sql, span_params = span$params,
+      units_sql = paste0("SELECT db_uuid, session, bundle, item_id AS unit_id, end_item_id AS unit_end FROM (",
+                         span$sql, ")"),
+      units_params = span$params))
+  }
+  if (query$type == "simple") {
+    cond <- extract_condition_from_query(query)
+    return(list(
+      tag = tag, level = level$level, attribute = level$attribute, kind = "item",
+      units_sql = paste0(
+        "SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id AS unit_id, i.item_id AS unit_end ",
+        "FROM items i INNER JOIN labels l ON i.db_uuid = l.db_uuid AND i.session = l.session ",
+        "AND i.bundle = l.bundle AND i.item_id = l.item_id WHERE i.level = ? AND ", cond$sql),
+      units_params = c(list(level$level), cond$params)))
+  }
+  sub <- build_base_sql(db_path, query, list(), con = con)
+  if (is.null(sub)) return(NULL)
+  list(
+    tag = tag, level = level$level, attribute = level$attribute, kind = "item",
+    units_sql = paste0("SELECT db_uuid, session, bundle, item_id AS unit_id, item_id AS unit_end FROM (",
+                       sub$sql, ")"),
+    units_params = sub$params)
+}
+
+build_span_dominance_sql <- function(db_path, parsed_query, result_level, con) {
+  left <- .dominance_operand(db_path, parsed_query$left, con, "l")
+  right <- .dominance_operand(db_path, parsed_query$right, con, "r")
+  if (is.null(left) || is.null(right)) return(NULL)
+
+  hier <- get_hierarchy_info(dirname(db_path))
+  path <- find_dominance_path(hier, left$level, right$level)
+  if (length(path$path) < 2L || !all(path$directions == "down" | path$directions == "up")) {
+    .query_abort("No dominance path between {.val {left$level}} and {.val {right$level}}")
+  }
+  left_is_parent <- all(path$directions == "down")
+  parent_level <- if (left_is_parent) left$level else right$level
+  child_level <- if (left_is_parent) right$level else left$level
+  lcol <- if (left_is_parent) "parent_id" else "child_id"
+  rcol <- if (left_is_parent) "child_id" else "parent_id"
+
+  members <- function(o) sprintf("
+    %s_members AS (
+      SELECT u.db_uuid, u.session, u.bundle, u.unit_id, u.unit_end, m.item_id AS item_id
+      FROM %s_units u
+      JOIN items a ON a.db_uuid = u.db_uuid AND a.session = u.session
+        AND a.bundle = u.bundle AND a.item_id = u.unit_id
+      JOIN items b ON b.db_uuid = u.db_uuid AND b.session = u.session
+        AND b.bundle = u.bundle AND b.item_id = u.unit_end
+      JOIN items m ON m.db_uuid = u.db_uuid AND m.session = u.session
+        AND m.bundle = u.bundle AND m.level = a.level
+        AND m.seq_idx BETWEEN a.seq_idx AND b.seq_idx
+    )", o$tag, o$tag)
+
+  # The dominated (child) side must be dominated as a whole: every member of
+  # its span by the same parent unit. The parent side needs only one member.
+  ctag <- if (left_is_parent) "r" else "l"
+  cm <- if (left_is_parent) "rm" else "lm"
+
+  ctes <- c(
+    sprintf("l_units AS (%s)", left$units_sql),
+    sprintf("r_units AS (%s)", right$units_sql),
+    members(left), members(right),
+    sprintf("
+    pairs AS (
+      SELECT p.db_uuid, p.session, p.bundle, p.item_id AS parent_id, c.item_id AS child_id
+      %s
+      WHERE p.level = '%s' AND c.level = '%s'
+    )", .hier_from_clause(parent_level, child_level, hier), parent_level, child_level),
+    sprintf("
+    unit_pairs AS (
+      SELECT lm.db_uuid, lm.session, lm.bundle, lm.unit_id AS l_unit, lm.unit_end AS l_end,
+             rm.unit_id AS r_unit, rm.unit_end AS r_end
+      FROM pairs pr
+      JOIN l_members lm ON lm.db_uuid = pr.db_uuid AND lm.session = pr.session
+        AND lm.bundle = pr.bundle AND lm.item_id = pr.%s
+      JOIN r_members rm ON rm.db_uuid = pr.db_uuid AND rm.session = pr.session
+        AND rm.bundle = pr.bundle AND rm.item_id = pr.%s
+      GROUP BY lm.db_uuid, lm.session, lm.bundle, lm.unit_id, lm.unit_end, rm.unit_id, rm.unit_end
+      HAVING COUNT(DISTINCT %s.item_id) = (
+        SELECT COUNT(*) FROM %s_members c2
+        WHERE c2.db_uuid = %s.db_uuid AND c2.session = %s.session
+          AND c2.bundle = %s.bundle AND c2.unit_id = %s.unit_id)
+    )", lcol, rcol, cm, ctag, cm, cm, cm, cm))
+  params <- c(left$units_params, right$units_params)
+
+  # Which operand supplies the result rows (same rule as plain dominance).
+  res_left <- if (is.null(result_level)) {
+    !(isTRUE(parsed_query$right$projection) && !isTRUE(parsed_query$left$projection))
+  } else result_level == left$level
+  res <- if (res_left) left else right
+  unit <- if (res_left) "l_unit" else "r_unit"
+  unit_end <- if (res_left) "l_end" else "r_end"
+
+  head <- paste("WITH", paste(ctes, collapse = ",\n"))
+  if (res$kind == "span" && res$proj == "both") {
+    sql <- paste0(head, "
+      SELECT s.* FROM (", res$span_sql, ") s
+      WHERE (s.db_uuid, s.session, s.bundle, s.item_id) IN (
+        SELECT db_uuid, session, bundle, ", unit, " FROM unit_pairs)
+      ORDER BY s.session, s.bundle, s.seq_idx")
+    params <- c(params, res$span_params)
+  } else {
+    pick <- if (res$kind == "span" && res$proj == "end") unit_end else unit
+    sql <- paste0(head, "
+      SELECT DISTINCT i.db_uuid, i.session, i.bundle, i.item_id,
+        i.level, i.type, i.seq_idx, i.sample_rate,
+        i.sample_point, i.sample_start, i.sample_dur,
+        l.label, l.name as attribute
+      FROM unit_pairs up
+      INNER JOIN items i ON i.db_uuid = up.db_uuid AND i.session = up.session
+        AND i.bundle = up.bundle AND i.item_id = up.", pick, "
+      INNER JOIN labels l ON i.db_uuid = l.db_uuid AND i.session = l.session
+        AND i.bundle = l.bundle AND i.item_id = l.item_id AND l.name = ?
+      WHERE i.level = ?
+      ORDER BY i.session, i.bundle, i.seq_idx")
+    params <- c(params, list(res$attribute, res$level))
+  }
+  list(sql = sql, params = params)
 }

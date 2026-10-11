@@ -1,6 +1,19 @@
-# reindeer 2.3.0
+# reindeer 2.4.0
+
+EQL and navigation parity with emuR: 80 of 80 golden queries match (unsorted
+rows, 1e-9). SEGMENT times shift by half a sample (see below) and quantify
+caches miss once. Numbers from 2.3.0's work package list follow.
 
 ## EQL / emuR parity
+
+- One compiler: eager `query(lazy = FALSE)` now compiles the same SQL as the
+  lazy path and runs it; the duplicate eager executors are deleted. Compound
+  operands are embedded as sub-selects instead of being executed (and pasted
+  back as literal id lists) while compiling.
+- Dominance with a sequence operand follows emuR's span semantics: a span
+  dominates what any of its items dominates; a dominated span must be
+  dominated as a whole. `[[#Phonetic == n -> Phonetic == t] ^ Syllable == W]`
+  and `[[Syllable == S -> Syllable == W] ^ Phonetic == @]` now match emuR.
 
 - SEGMENT times now follow emuR: start is half a sample before the first sample
   and end half a sample after the last (`(sample_start - 0.5)/sr`,

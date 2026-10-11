@@ -464,25 +464,6 @@ build_function_query_sql <- function(db_path, parsed, con = NULL) {
   q
 }
 
-#' Eager scope-filter executor - reuses the lazy SQL builder
-#' @keywords internal
-#' @noRd
-execute_scope_filter_eager <- function(db_path, parsed, con = NULL) {
-  q <- build_scope_filter_sql(db_path, parsed)
-  if (is.null(con)) {
-    con <- .open_query_connection(db_path)
-    on.exit(DBI::dbDisconnect(con))
-  }
-  df <- if (length(q$params) == 0L) {
-    DBI::dbGetQuery(con, q$sql)
-  } else {
-    DBI::dbGetQuery(con, q$sql, params = q$params)
-  }
-  if ("labels" %in% names(df) && !"label" %in% names(df)) {
-    names(df)[names(df) == "labels"] <- "label"
-  }
-  df
-}
 
 build_conjunction_query_sql <- function(db_path, parsed, result_level = NULL, con = NULL) {
   left_result <- build_base_sql(db_path, parsed$left, list(result_level = result_level), con = con)
@@ -514,30 +495,29 @@ build_disjunction_query_sql <- function(db_path, parsed, result_level = NULL, co
   )
 }
 
-# Main execution dispatcher
+# Eager execution = compile (the same SQL builders the lazy path uses) + run.
 execute_query <- function(db_path, query_string, result_level = NULL) {
-  # Open a single connection and thread it through all sub-executors
   con <- .open_query_connection(db_path)
   on.exit(DBI::dbDisconnect(con))
 
   tryCatch({
     parsed <- .parse_eql_for_db(query_string, db_path)
-    
-    result <- switch(parsed$type,
-      "simple" = execute_simple_query_corrected(db_path, parsed, con = con),
-      "scope_filter" = execute_scope_filter_eager(db_path, parsed, con = con),
-      "sequence" = execute_sequence_query_corrected(db_path, parsed, result_level, con = con),
-      "dominance" = execute_dominance_query_corrected(db_path, parsed, result_level, con = con),
-      "function" = execute_function_query_corrected(db_path, parsed, con = con),
-      "conjunction" = execute_conjunction_query(db_path, parsed, result_level, con = con),
-      "disjunction" = execute_disjunction_query(db_path, parsed, result_level, con = con),
-      .query_abort("Unknown query type: {.val {parsed$type}}")
-    )
-    
+    q <- build_base_sql(db_path, parsed, list(result_level = result_level), con = con)
+    result <- if (is.null(q)) {
+      create_empty_result()
+    } else if (length(q$params) == 0L) {
+      DBI::dbGetQuery(con, q$sql)
+    } else {
+      DBI::dbGetQuery(con, q$sql, params = q$params)
+    }
+    if ("labels" %in% names(result) && !"label" %in% names(result)) {
+      names(result)[names(result) == "labels"] <- "label"
+    }
+
     # Deduce times for ITEM-type levels before formatting
     result <- deduce_item_times(result, db_path)
     return(format_as_emuRsegs(result))
-    
+
   }, error = function(e) {
     .query_abort(c(
       "Query execution failed",
@@ -546,5 +526,3 @@ execute_query <- function(db_path, query_string, result_level = NULL) {
     ), parent = e)
   })
 }
-
-# Query parser

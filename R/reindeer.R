@@ -18,6 +18,8 @@ NULL
 
 # Suppress R CMD check NOTEs for data.table/NSE variables
 utils::globalVariables(c(
+  "sample_point", "end_item_id", "attribute", "offset", "n", "pos", "ref_pos",
+  "seg_offset", "seg_attribute", "row_id", "step", "label",
   ".", ".cache_status", ".data", "seg_params", "seg_params_digest",
   "..dsp_param_names", "..dsp_params", "..prep_param_names",
   "..prep_params", "..result_cols",
