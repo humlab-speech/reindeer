@@ -1,3 +1,21 @@
+#' Raw per-level metadata as a wide, typed table (one row per scope)
+#' @noRd
+.raw_level_wide <- function(con, sql, db_uuid, keys, scopes) {
+  long <- DBI::dbGetQuery(con, sql, params = list(db_uuid))
+  out <- as.data.frame(scopes, stringsAsFactors = FALSE)
+  if (nrow(long) == 0L) return(out)
+  types <- tapply(long$field_type, long$field_name, .resolve_field_type)
+  wide <- as.data.frame(data.table::dcast(
+    data.table::as.data.table(long), stats::as.formula(paste(paste(keys, collapse = " + "), "~ field_name")),
+    value.var = "field_value", fun.aggregate = function(x) x[1]))
+  for (f in setdiff(names(wide), keys)) {
+    wide[[f]] <- switch(types[[f]],
+      numeric = as.numeric(wide[[f]]), integer = as.integer(wide[[f]]),
+      logical = as.logical(wide[[f]]), wide[[f]])
+  }
+  merge(out, wide, by = keys, all.x = TRUE, sort = FALSE)[, c(keys, setdiff(names(wide), keys)), drop = FALSE]
+}
+
 #' Export metadata to Excel file
 #'
 #' Creates a multi-sheet Excel workbook with bundle, session, and database
@@ -25,11 +43,14 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
   con <- get_connection(corpus_obj)
   db_uuid <- get_db_uuid(corpus_obj)
   
-  # OPTIMIZATION: Use the optimized get_metadata which does everything in one query
-  bundle_metadata <- get_metadata(corpus_obj)
-  
-  # Convert to data.frame for openxlsx
-  bundle_metadata <- as.data.frame(bundle_metadata)
+  # RAW bundle-level values only: inherited (session/database) values live on
+  # their own sheets, so the workbook round-trips through import_metadata()
+  # without copying inherited values down to every bundle.
+  bundle_metadata <- .raw_level_wide(
+    con, "SELECT session, bundle, field_name, field_value, field_type FROM metadata_bundle WHERE db_uuid = ?",
+    db_uuid, c("session", "bundle"),
+    DBI::dbGetQuery(con, "SELECT session, name AS bundle FROM bundle WHERE db_uuid = ? ORDER BY session, name",
+                    params = list(db_uuid)))
   
   # Ensure mandatory columns exist
   for (col in mandatory) {
@@ -38,33 +59,10 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
     }
   }
   
-  # OPTIMIZATION: Get session metadata with a single query
-  session_meta_long <- data.table::setDT(DBI::dbGetQuery(con, "
-    SELECT 
-      s.name as session,
-      ms.field_name,
-      ms.field_value
-    FROM session s
-    LEFT JOIN metadata_session ms 
-      ON ms.db_uuid = s.db_uuid AND ms.session = s.name
-    WHERE s.db_uuid = ?
-  ", params = list(db_uuid)))
-  
-  if (nrow(session_meta_long) > 0 && !all(is.na(session_meta_long$field_name))) {
-    # Convert to wide format
-    session_metadata <- data.table::dcast(
-      session_meta_long[!is.na(field_name)],
-      session ~ field_name,
-      value.var = "field_value",
-      fun.aggregate = function(x) x[1]
-    )
-    session_metadata <- as.data.frame(session_metadata)
-  } else {
-    # Just session names
-    sessions <- list_sessions_from_cache(con, db_uuid)
-    session_metadata <- data.frame(session = sessions$name)
-  }
-  
+  session_metadata <- .raw_level_wide(
+    con, "SELECT session, field_name, field_value, field_type FROM metadata_session WHERE db_uuid = ?",
+    db_uuid, "session", data.frame(session = list_sessions_from_cache(con, db_uuid)$name))
+
   # Ensure mandatory columns in session metadata
   for (col in mandatory) {
     if (!col %in% names(session_metadata)) {

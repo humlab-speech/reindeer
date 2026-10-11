@@ -189,3 +189,25 @@ test_that("set_metadata() takes a list, a data.frame or a workbook path", {
   set_metadata(corp, data.frame(Funder = "F"))
   expect_true(all(as.data.frame(get_metadata(corp))$Funder == "F"))
 })
+
+test_that("export_metadata() writes raw per-level values and round-trips", {
+  skip_if_no_emuR(); skip_if_not_installed("openxlsx")
+  a <- create_isolated_ae_corpus()
+  add_metadata(a, list(Project = "P"))
+  add_metadata(a, list(Age = 31.5, Gender = "f"), session = "0000")
+  add_metadata(a, list(Quality = "good"), session = "0000", bundle = "msajc003")
+  f <- tempfile(fileext = ".xlsx")
+  export_metadata(a, f)
+  sheets <- openxlsx::getSheetNames(f)
+  expect_setequal(sheets, c("bundles", "sessions", "database"))
+  b <- openxlsx::read.xlsx(f, "bundles")
+  expect_false("Age" %in% names(b) && any(!is.na(b$Age)))     # inherited, not copied down
+  expect_equal(b$Quality[b$bundle == "msajc003"], "good")
+
+  b2 <- create_isolated_ae_corpus()
+  import_metadata(b2, f)
+  m1 <- as.data.frame(get_metadata(a)); m2 <- as.data.frame(get_metadata(b2))
+  expect_equal(m2[order(m2$bundle), sort(names(m2))], m1[order(m1$bundle), sort(names(m1))],
+               ignore_attr = TRUE)
+  expect_equal(unique(m2$Age), 31.5)
+})
