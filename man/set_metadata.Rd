@@ -18,7 +18,8 @@ set_metadata(
   x,
   session = NULL,
   bundle = NULL,
-  reset.before.add = FALSE,
+  reset = FALSE,
+  reset.before.add = NULL,
   metadataList = NULL
 )
 }
@@ -34,12 +35,14 @@ level.}
 \item{bundle}{Optional bundle name. When given, \code{session} must also
 be provided; together they identify a bundle-level scope.}
 
-\item{reset.before.add}{Logical; if \code{TRUE}, clear existing fields at
-the given scope before writing.}
+\item{reset.before.add}{Clear existing metadata at this level first (default: FALSE)}
 
 \item{x}{What to write: a named list of field/value pairs; a data.frame
 (with \code{session}/\code{bundle} columns, one row per scope, applied all-or-nothing);
 or the path of a workbook written by \code{\link[=export_metadata]{export_metadata()}}.}
+
+\item{reset}{Logical; if \code{TRUE}, clear existing fields at the given scope
+before writing. (\code{reset.before.add} is the deprecated spelling.)}
 }
 \value{
 The corpus object, invisibly

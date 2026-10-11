@@ -352,7 +352,7 @@ NULL
 #'     column that itself holds more than one value per frame).}
 #'   \item{`overwrite`}{Replace an existing same-`name` track definition
 #'     instead of erroring. Default `FALSE`.}
-#'   \item{`sessionPattern`, `bundlePattern`}{Regex filters over which
+#'   \item{`session_pattern`, `bundle_pattern`}{Regex filters over which
 #'     bundles to process. Default `".*"` (all).}
 #'   \item{`.verbose`, `.parallel`, `.workers`, `.use_cache`,
 #'     `.cache_dir`, `.cache_format`}{As for the segment_list method
@@ -362,12 +362,12 @@ NULL
 #' @name quantify.corpus
 S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
                                          name = NULL,
-                                         columnName = NULL,
-                                         fileExtension = NULL,
+                                         column_name = NULL,
+                                         file_extension = NULL,
                                          from = NULL, index = NULL,
                                          overwrite = FALSE,
-                                         sessionPattern = ".*",
-                                         bundlePattern = ".*",
+                                         session_pattern = ".*",
+                                         bundle_pattern = ".*",
                                          .metadata_fields = c("Gender", "Age"),
                                          .signal_extension = NULL,
                                          .force = FALSE,
@@ -378,6 +378,17 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
                                          .cache_dir = NULL,
                                          .cache_format = c("auto", "qs", "rds")) {
   .warn_ignored_parallel_args(.parallel = .parallel, .workers = .workers)
+  # Old camelCase spellings land in `...`; map them instead of passing them on
+  # to the DSP routine as parameters.
+  dots <- .rename_args(list(...), c(sessionPattern = "session_pattern",
+                                    bundlePattern = "bundle_pattern",
+                                    columnName = "column_name",
+                                    fileExtension = "file_extension"), "quantify")
+  for (nm in intersect(names(dots), c("session_pattern", "bundle_pattern",
+                                      "column_name", "file_extension"))) {
+    assign(nm, dots[[nm]])
+    dots[[nm]] <- NULL
+  }
   if (!is.null(.using) && (!is.null(from) || !is.null(index))) {
     cli::cli_abort(c(
       "Cannot supply both {.arg .using} and {.arg from}/{.arg index}.",
@@ -390,9 +401,9 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
     dsp_fun_name <- deparse(substitute(.using))
     .quantify_corpus_compute(
       corpus_obj = object, .using = .using, dsp_fun_name = dsp_fun_name,
-      user_params = list(...), name = name, columnName = columnName,
-      fileExtension = fileExtension, overwrite = overwrite,
-      sessionPattern = sessionPattern, bundlePattern = bundlePattern,
+      user_params = dots, name = name, columnName = column_name,
+      fileExtension = file_extension, overwrite = overwrite,
+      sessionPattern = session_pattern, bundlePattern = bundle_pattern,
       .metadata_fields = .metadata_fields, .signal_extension = .signal_extension,
       .force = .force, .verbose = .verbose,
       .use_cache = .use_cache, .cache_dir = .cache_dir,
@@ -400,9 +411,9 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
     )
   } else {
     .quantify_corpus_connect(
-      corpus_obj = object, name = name, columnName = columnName,
-      fileExtension = fileExtension, from = from, index = index,
-      overwrite = overwrite, dots = list(...)
+      corpus_obj = object, name = name, columnName = column_name,
+      fileExtension = file_extension, from = from, index = index,
+      overwrite = overwrite, dots = dots
     )
   }
 }

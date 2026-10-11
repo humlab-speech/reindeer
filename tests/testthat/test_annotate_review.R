@@ -90,8 +90,8 @@ test_that("annotate() opens a session against a stub dist", {
   withr::defer(httpuv::stopAllServers())
 
   expect_no_error(
-    annotate(corp, appDir = app, port = httpuv::randomPort(),
-             autoOpenURL = "", useViewer = FALSE)
+    annotate(corp, app_dir = app, port = httpuv::randomPort(),
+             auto_open_url = "", use_viewer = FALSE)
   )
   expect_false(is.null(getOption("reindeer.serve_handle")))
 })
@@ -104,8 +104,8 @@ test_that("review() opens a session with a playlist", {
   withr::defer(httpuv::stopAllServers())
 
   expect_no_error(
-    review(corp, segs, appDir = app, port = httpuv::randomPort(),
-           autoOpenURL = "", useViewer = FALSE)
+    review(corp, segs, app_dir = app, port = httpuv::randomPort(),
+           auto_open_url = "", use_viewer = FALSE)
   )
 })
 

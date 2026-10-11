@@ -37,7 +37,7 @@ else none.}
 \item{\code{perspective}}{Perspective to attach track overlays to (name or
 index; defaults to the first perspective).}
 \item{\code{canvas}}{Signal canvas to overlay tracks on (default \code{"SPEC"}).}
-\item{\code{appDir}}{Optional explicit Artic dist directory.}
+\item{\code{app_dir}}{Optional explicit Artic dist directory.}
 }
 }
 

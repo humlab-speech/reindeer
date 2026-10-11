@@ -490,6 +490,7 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 5.1 | done (S7 `package = NULL` experiment skipped: 60+ uses of the namespaced class names) | WP5.1 |
 | 5.2 | done (import_media annotations= and quantify absorbing quantify_egg deferred) | WP5.2 |
 | 5.3 | done | WP5.3 |
-| 5.4–5.5 | open | |
+| 5.4 | done (snake_case + deprecation aliases; dots checks on query/annotate/review) | WP5.4 |
+| 5.5 | open | |
 | 6.1–6.4 | open | |
 | 7 | open | |

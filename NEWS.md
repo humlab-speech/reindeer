@@ -15,6 +15,18 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
   `autoplot()` collect a lazy plan first. `.cache_status` is no longer listed
   as a measurement column.
 
+## Argument conventions
+
+- snake_case arguments: `query(corpus, eql, session_pattern =, bundle_pattern =)`,
+  `annotate()`/`review()` (`session_pattern`, `bundle_pattern`, `auto_open_url`,
+  `use_viewer`, `app_dir`, `debug_level`), `quantify(corpus, ..., column_name =,
+  file_extension =, session_pattern =, bundle_pattern =)`, `set_metadata(...,
+  reset =)`. The old spellings (`emuDB`, `sessionPattern`, `reset.before.add`,
+  `metadataList`, ...) still work and warn with class `reindeer_deprecated`.
+  Unknown options to `query()`, `annotate()` and `review()` are an error; legacy
+  names to `quantify(corpus)` are no longer passed to the DSP routine as
+  parameters.
+
 ## Automatic bookkeeping
 
 - FAIR artifacts (README, CITATION.cff, datacite, JSON-LD, CMDI) are now

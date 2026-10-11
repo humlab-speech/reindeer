@@ -290,7 +290,7 @@ test_that("quantify handles list output from DSP", {
 
 test_that("quantify(segs, character_name) reads back a registered, already-computed track", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
+  quantify(ae, .using = wrassp::rmsana, name = "RMS", file_extension = "rms",
            .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
@@ -304,9 +304,9 @@ test_that("quantify(segs, character_name) reads back a registered, already-compu
 
 test_that("quantify(segs, character vector) reads back multiple registered tracks", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
+  quantify(ae, .using = wrassp::rmsana, name = "RMS", file_extension = "rms",
            .verbose = FALSE)
-  quantify(ae, .using = wrassp::ksvF0, name = "F0", fileExtension = "f0",
+  quantify(ae, .using = wrassp::ksvF0, name = "F0", file_extension = "f0",
            .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
@@ -339,7 +339,7 @@ test_that("quantify(segs, dsp_function) rejects mixed character/non-character in
 
 test_that("quantify(segs, character_name) falls back to compute when the on-the-fly recipe is registered but file is missing", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, name = "rms_recipe", fileExtension = "rms",
+  quantify(ae, name = "rms_recipe", file_extension = "rms",
            generator = list(`function` = "rmsana", package = "wrassp",
                             version = as.character(utils::packageVersion("wrassp"))))
   # No files were actually written (connect-existing, documentation-only) —
@@ -370,7 +370,7 @@ test_that("quantify(segs, character_name) falls back to compute when the on-the-
 
 test_that("quantify(segs, character_name) requires .at (Fix 1 / C1)", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
+  quantify(ae, .using = wrassp::rmsana, name = "RMS", file_extension = "rms",
            .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
@@ -389,7 +389,7 @@ test_that("quantify(segs, character_name) requires .at (Fix 1 / C1)", {
 
 test_that("quantify(segs, character_name) rejects DSP-style extra arguments (Fix 6A / I4)", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
+  quantify(ae, .using = wrassp::rmsana, name = "RMS", file_extension = "rms",
            .verbose = FALSE)
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
@@ -412,7 +412,7 @@ test_that("quantify(segs, character_name) fallback honours from/index instead of
   # could not actually resolve via generator$package/generator$function
   # (a locally-defined fake function has no namespace to `get()` it from).
   ae <- create_isolated_ae_corpus()
-  quantify(ae, name = "B", from = "B[Hz]", index = 1L, fileExtension = "nonexistent_ext",
+  quantify(ae, name = "B", from = "B[Hz]", index = 1L, file_extension = "nonexistent_ext",
            generator = list(`function` = "trk_formant_forest", package = "superassp"))
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
@@ -450,7 +450,7 @@ test_that("quantify(segs, character_name) fallback aborts when the recomputed re
   # routine whose recomputed result carries no sampleRate attribute",
   # without inventing an unresolvable local fixture (see the sibling test
   # above for why a local closure won't do for this branch).
-  quantify(ae, name = "NoRate", fileExtension = "nonexistent_ext2",
+  quantify(ae, name = "NoRate", file_extension = "nonexistent_ext2",
            generator = list(`function` = "list", package = "base"))
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
@@ -468,7 +468,7 @@ test_that("quantify(segs, character_name) fallback aborts when the recomputed re
 
 test_that("quantify(segs, character_name) warns when some segment/time-point combinations produce no measurement (Fix 6B / I4)", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, name = "FallbackWarn", fileExtension = "nonexistent_ext3",
+  quantify(ae, name = "FallbackWarn", file_extension = "nonexistent_ext3",
            generator = list(`function` = "rmsana", package = "wrassp",
                             version = as.character(utils::packageVersion("wrassp"))))
 

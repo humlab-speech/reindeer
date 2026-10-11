@@ -82,7 +82,7 @@ attr(.fake_formant_dsp, "suggestCaching") <- FALSE
 test_that("quantify.corpus compute-and-register writes files and registers a track (real DSP)", {
   ae <- create_isolated_ae_corpus()
 
-  result <- quantify(ae, .using = wrassp::rmsana, name = "RMS", fileExtension = "rms",
+  result <- quantify(ae, .using = wrassp::rmsana, name = "RMS", file_extension = "rms",
                      .verbose = FALSE)
 
   expect_true(S7::S7_inherits(result, reindeer::corpus))
@@ -171,7 +171,7 @@ test_that("quantify.corpus runs end-to-end with a real superassp function (smoke
 test_that("quantify.corpus connect-existing (fileExtension) registers without computing", {
   ae <- create_isolated_ae_corpus()
 
-  result <- quantify(ae, name = "rms", columnName = "rms", fileExtension = "rms")
+  result <- quantify(ae, name = "rms", column_name = "rms", file_extension = "rms")
 
   expect_true(S7::S7_inherits(result, reindeer::corpus))
   cfg <- reindeer:::load_DBconfig(ae)
@@ -187,7 +187,7 @@ test_that("quantify.corpus connect-existing (from/index) addresses a sub-column"
   ae <- create_isolated_ae_corpus()
 
   quantify(ae, name = "F1", from = "F[Hz]", index = 1L,
-           columnName = "F[Hz]", fileExtension = "fms")
+           column_name = "F[Hz]", file_extension = "fms")
 
   cfg <- reindeer:::load_DBconfig(ae)
   track_names <- vapply(cfg$ssffTrackDefinitions, function(t) t$name, character(1))
@@ -199,7 +199,7 @@ test_that("quantify.corpus connect-existing (from/index) addresses a sub-column"
 test_that("quantify.corpus connect-existing requires name", {
   ae <- create_isolated_ae_corpus()
   expect_error(
-    quantify(ae, fileExtension = "rms"),
+    quantify(ae, file_extension = "rms"),
     class = "reindeer_error"
   )
 })
@@ -215,7 +215,7 @@ test_that("quantify.corpus connect-existing requires fileExtension xor from+inde
 
 test_that("quantify.corpus connect-existing records an explicit documentation-only generator", {
   ae <- create_isolated_ae_corpus()
-  quantify(ae, name = "rms", fileExtension = "rms",
+  quantify(ae, name = "rms", file_extension = "rms",
            generator = list(`function` = "external_tool", package = NA, version = "1.0"))
 
   cfg <- reindeer:::load_DBconfig(ae)
@@ -228,7 +228,7 @@ test_that("a cache hit regenerates a deleted output file", {
   skip_if_no_emuR(); skip_if_not_installed("wrassp")
   corp <- create_isolated_ae_corpus()
   q <- function(...) quantify(corp, .using = wrassp::rmsana, name = "RMS",
-                              fileExtension = "rms", .verbose = FALSE,
+                              file_extension = "rms", .verbose = FALSE,
                               .use_cache = TRUE, ...)
   q()
   outs <- list.files(corp@basePath, "\\.rms$", recursive = TRUE, full.names = TRUE)

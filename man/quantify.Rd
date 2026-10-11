@@ -103,7 +103,7 @@ on-disk SSFF column label within the underlying file (e.g.
 column that itself holds more than one value per frame).}
 \item{\code{overwrite}}{Replace an existing same-\code{name} track definition
 instead of erroring. Default \code{FALSE}.}
-\item{\code{sessionPattern}, \code{bundlePattern}}{Regex filters over which
+\item{\code{session_pattern}, \code{bundle_pattern}}{Regex filters over which
 bundles to process. Default \code{".*"} (all).}
 \item{\code{.verbose}, \code{.parallel}, \code{.workers}, \code{.use_cache},
 \code{.cache_dir}, \code{.cache_format}}{As for the segment_list method

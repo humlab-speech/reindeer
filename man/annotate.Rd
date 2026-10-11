@@ -11,10 +11,10 @@ annotate(geom = NULL, ...)
 as a review playlist, like \code{\link[=review]{review()}}, with the corpus taken from it) or,
 for ggplot2, the geom to annotate with.}
 
-\item{...}{For a corpus: \code{sessionPattern}, \code{bundlePattern},
-\code{host}, \code{port}, \code{autoOpenURL},
-\code{browser}, \code{useViewer}, \code{appDir}, \code{debug},
-\code{debugLevel}. For ggplot2: forwarded to \code{ggplot2::annotate()}.}
+\item{...}{For a corpus: \code{session_pattern}, \code{bundle_pattern},
+\code{host}, \code{port}, \code{auto_open_url},
+\code{browser}, \code{use_viewer}, \code{app_dir}, \code{debug},
+\code{debug_level}. The camelCase spellings still work with a warning. For ggplot2: forwarded to \code{ggplot2::annotate()}.}
 }
 \value{
 Invisibly \code{TRUE} for a corpus. The server keeps running until
@@ -37,7 +37,7 @@ ggplot2, so both verbs keep working regardless of attach order. With
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- corpus("path/to/db_emuDB")
 annotate(corp)
-annotate(corp, sessionPattern = "Session.*")
+annotate(corp, session_pattern = "Session.*")
 \dontshow{\}) # examplesIf}
 }
 \seealso{

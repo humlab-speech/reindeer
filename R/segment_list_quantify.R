@@ -376,7 +376,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
   if (length(unknown) > 0) {
     cli::cli_abort(c(
       "Unregistered track name{?s}: {.val {unknown}}.",
-      "i" = "Register with {.code quantify(corpus, .using = fn)} or {.code quantify(corpus, name = ..., fileExtension = ...)} first.",
+      "i" = "Register with {.code quantify(corpus, .using = fn)} or {.code quantify(corpus, name = ..., file_extension = ...)} first.",
       "i" = "Currently registered: {.val {all_names}}."
     ), class = c("reindeer_unknown_track_error", "reindeer_error"))
   }

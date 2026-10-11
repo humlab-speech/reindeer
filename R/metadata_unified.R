@@ -75,8 +75,8 @@ load_metadata <- function(corpus_obj,
 #'   level.
 #' @param bundle Optional bundle name. When given, `session` must also
 #'   be provided; together they identify a bundle-level scope.
-#' @param reset.before.add Logical; if `TRUE`, clear existing fields at
-#'   the given scope before writing.
+#' @param reset Logical; if `TRUE`, clear existing fields at the given scope
+#'   before writing. (`reset.before.add` is the deprecated spelling.)
 #' @return The corpus object, invisibly.
 #' @family metadata
 #' @seealso [get_metadata()] for the matching reader, [load_metadata()]
@@ -90,8 +90,16 @@ load_metadata <- function(corpus_obj,
 #'              session = "0000", bundle = "msajc003")            # bundle
 #' @export
 set_metadata <- function(corpus_obj, x, session = NULL, bundle = NULL,
-                         reset.before.add = FALSE, metadataList = NULL) {
-  if (!is.null(metadataList)) x <- metadataList         # old argument name
+                         reset = FALSE, reset.before.add = NULL, metadataList = NULL) {
+  if (!is.null(metadataList)) {                          # old argument names
+    .rename_args(list(metadataList = 1), c(metadataList = "x"), "set_metadata")
+    x <- metadataList
+  }
+  if (!is.null(reset.before.add)) {
+    .rename_args(list(reset.before.add = 1), c(reset.before.add = "reset"), "set_metadata")
+    reset <- reset.before.add
+  }
+  reset.before.add <- reset
   if (is.character(x) && length(x) == 1L) {              # an exported workbook
     return(import_metadata(corpus_obj, x))
   }

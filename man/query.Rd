@@ -4,10 +4,10 @@
 \alias{query}
 \title{Query a corpus with EMU Query Language (EQL)}
 \usage{
-query(emuDB, eql, ...)
+query(corpus, eql, ...)
 }
 \arguments{
-\item{emuDB}{A \code{corpus} (preferred), a path to an \verb{_emuDB} directory,
+\item{corpus}{A \code{corpus} (preferred), a path to an \verb{_emuDB} directory,
 or an existing \code{emuDBhandle}.}
 
 \item{eql}{An EQL expression. Examples:

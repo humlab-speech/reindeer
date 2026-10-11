@@ -13,7 +13,7 @@
 #' string is fully built at call time. Pass `lazy = FALSE` to force
 #' immediate execution.
 #'
-#' @param emuDB A `corpus` (preferred), a path to an `_emuDB` directory,
+#' @param corpus A `corpus` (preferred), a path to an `_emuDB` directory,
 #'   or an existing `emuDBhandle`.
 #' @param eql An EQL expression. Examples:
 #'   `"Phonetic == t"`, `"Phonetic =~ [aeiou]"`,
@@ -64,11 +64,14 @@
 #' query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]") # sequence
 #' query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)      # eager
 #' @export
-query <- function(emuDB, eql, ...) {
+query <- function(corpus, eql, ...) {
+  dots <- .rename_args(list(...), c(emuDB = "corpus", sessionPattern = "session_pattern",
+                                    bundlePattern = "bundle_pattern"), "query")
+  if (missing(corpus) && !is.null(dots$corpus)) { corpus <- dots$corpus; dots$corpus <- NULL }
   # Handle corpus objects
-  if (S7::S7_inherits(emuDB, reindeer::corpus)) {
-    base_path <- emuDB@basePath
-    db_name <- emuDB@dbName
+  if (S7::S7_inherits(corpus, reindeer::corpus)) {
+    base_path <- corpus@basePath
+    db_name <- corpus@dbName
     
     # Try both naming conventions
     db_path1 <- file.path(base_path, paste0(db_name, "_emuDB.sqlite"))
@@ -84,15 +87,15 @@ query <- function(emuDB, eql, ...) {
     
     database_dir <- base_path
     
-  } else if (is.character(emuDB)) {
-    # emuDB is a path to the database directory
+  } else if (is.character(corpus)) {
+    # corpus is a path to the database directory
     # Extract the database name from the path (remove _emuDB suffix if present)
-    base_name <- basename(emuDB)
+    base_name <- basename(corpus)
     db_name <- sub("_emuDB$", "", base_name)
     
     # Try both naming conventions
-    db_path1 <- file.path(emuDB, paste0(db_name, "_emuDB.sqlite"))
-    db_path2 <- file.path(emuDB, paste0(db_name, database.cache.suffix))
+    db_path1 <- file.path(corpus, paste0(db_name, "_emuDB.sqlite"))
+    db_path2 <- file.path(corpus, paste0(db_name, database.cache.suffix))
     
     if (file.exists(db_path1)) {
       db_path <- db_path1
@@ -102,14 +105,14 @@ query <- function(emuDB, eql, ...) {
       .query_abort("SQLite database not found at: {.path {db_path1}} or {.path {db_path2}}")
     }
     
-    database_dir <- emuDB
+    database_dir <- corpus
     
   } else {
-    base_path <- attr(emuDB, "basePath")
-    db_name <- attr(emuDB, "dbName")
+    base_path <- attr(corpus, "basePath")
+    db_name <- attr(corpus, "dbName")
     
     if (is.null(base_path) || is.null(db_name)) {
-      .query_abort("Invalid emuDB object: missing basePath or dbName attributes")
+      .query_abort("Invalid corpus object: missing basePath or dbName attributes")
     }
     
     db_path1 <- file.path(base_path, paste0(db_name, "_emuDB.sqlite"))
@@ -132,11 +135,10 @@ query <- function(emuDB, eql, ...) {
   
   # Lazy is the default as of v0.7.0; auto-collect S3 methods preserve
   # data-access behaviour for callers that expect a materialised segment_list.
-  dots <- list(...)
   .check_query_options(dots)
   lazy <- if ("lazy" %in% names(dots)) dots$lazy else TRUE
-  session_pat <- dots$sessionPattern
-  bundle_pat <- dots$bundlePattern
+  session_pat <- dots$session_pattern
+  bundle_pat <- dots$bundle_pattern
   
   if (lazy) {
     # Return lazy segment list without executing query
@@ -157,7 +159,7 @@ query <- function(emuDB, eql, ...) {
     db_uuid <- if (nrow(db_uuid_result) > 0) db_uuid_result$uuid[1] else ""
     
     # Create corpus object if we have one
-    corpus_obj <- if (S7::S7_inherits(emuDB, reindeer::corpus)) emuDB else NULL
+    corpus_obj <- if (S7::S7_inherits(corpus, reindeer::corpus)) corpus else NULL
     
     return(lazy_segment_list(
       corpus = corpus_obj,
@@ -202,7 +204,7 @@ query <- function(emuDB, eql, ...) {
 #' implemented: a non-default value aborts instead of being silently ignored.
 #' @noRd
 .check_query_options <- function(dots) {
-  known <- c("lazy", "result_level", "sessionPattern", "bundlePattern",
+  known <- c("lazy", "result_level", "session_pattern", "bundle_pattern",
              "calcTimes", "timeRefSegmentLevel", "resultType")
   unknown <- setdiff(names(dots), known)
   if (length(unknown) > 0 || (length(dots) > 0 && is.null(names(dots)))) {
@@ -218,7 +220,7 @@ query <- function(emuDB, eql, ...) {
   if (!is.null(dots$resultType)) {
     .query_abort("{.arg resultType} is not supported; {.fn query} returns a segment_list.")
   }
-  for (a in c("sessionPattern", "bundlePattern")) {
+  for (a in c("session_pattern", "bundle_pattern")) {
     if (!is.null(dots[[a]]) && !(is.character(dots[[a]]) && length(dots[[a]]) == 1L)) {
       .query_abort("{.arg {a}} must be a single regular expression.")
     }

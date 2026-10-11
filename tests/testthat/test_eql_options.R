@@ -9,13 +9,13 @@ test_that("single `=` behaves like `==`, quoted alternatives work", {
   expect_equal(n("Phonetic == 'm'"), n("Phonetic == m"))
 })
 
-test_that("sessionPattern/bundlePattern restrict the result (lazy and eager)", {
+test_that("session_pattern/bundle_pattern restrict the result (lazy and eager)", {
   skip_if_no_emuR()
   corp <- create_shared_ae_corpus()
   for (lazy in c(TRUE, FALSE)) {
-    none <- as.data.frame(collect(query(corp, "Phonetic == t", sessionPattern = "nomatch", lazy = lazy)))
+    none <- as.data.frame(collect(query(corp, "Phonetic == t", session_pattern = "nomatch", lazy = lazy)))
     expect_equal(nrow(none), 0L)
-    one <- as.data.frame(collect(query(corp, "Phonetic == t", bundlePattern = "^msajc003$", lazy = lazy)))
+    one <- as.data.frame(collect(query(corp, "Phonetic == t", bundle_pattern = "^msajc003$", lazy = lazy)))
     expect_gt(nrow(one), 0L)
     expect_true(all(one$bundle == "msajc003"))
   }
