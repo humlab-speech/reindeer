@@ -171,3 +171,21 @@ test_that("biographize() needs no corpus argument and keeps input row order", {
   lz <- biographize(query(corp, "Phonetic == t"))
   expect_equal(nrow(collect(lz)), nrow(segs))
 })
+
+test_that("set_metadata() takes a list, a data.frame or a workbook path", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  set_metadata(corp, list(Project = "p"))
+  set_metadata(corp, data.frame(session = "0000", bundle = c("msajc003", "msajc010"),
+                                Quality = c("good", "poor")))
+  m <- as.data.frame(get_metadata(corp))
+  expect_equal(m$Quality[m$bundle == "msajc010"], "poor")
+  # all-or-nothing: an unknown bundle aborts before anything is written
+  expect_error(set_metadata(corp, data.frame(session = "0000", bundle = c("msajc012", "nope"),
+                                             Rating = 1:2)),
+               class = "reindeer_metadata_error")
+  expect_false("Rating" %in% names(as.data.frame(get_metadata(corp))))
+  # database level from a one-row table
+  set_metadata(corp, data.frame(Funder = "F"))
+  expect_true(all(as.data.frame(get_metadata(corp))$Funder == "F"))
+})

@@ -66,7 +66,10 @@ load_metadata <- function(corpus_obj,
 #' `set_metadata()` for backwards compatibility.
 #'
 #' @param corpus_obj A corpus object.
-#' @param metadataList Named list of field/value pairs to write.
+#' @param x What to write: a named list of field/value pairs; a data.frame
+#'   (with `session`/`bundle` columns, one row per scope, applied all-or-nothing);
+#'   or the path of a workbook written by [export_metadata()].
+#' @param metadataList Deprecated spelling of `x`.
 #' @param session Optional session name. Required to write at session
 #'   level, and required (together with `bundle`) to write at bundle
 #'   level.
@@ -86,10 +89,46 @@ load_metadata <- function(corpus_obj,
 #' set_metadata(corp, list(Quality = "Good"),
 #'              session = "0000", bundle = "msajc003")            # bundle
 #' @export
-set_metadata <- function(corpus_obj, metadataList,
-                         session = NULL, bundle = NULL,
-                         reset.before.add = FALSE) {
-  add_metadata(corpus_obj, metadataList,
-               session = session, bundle = bundle,
-               reset.before.add = reset.before.add)
+set_metadata <- function(corpus_obj, x, session = NULL, bundle = NULL,
+                         reset.before.add = FALSE, metadataList = NULL) {
+  if (!is.null(metadataList)) x <- metadataList         # old argument name
+  if (is.character(x) && length(x) == 1L) {              # an exported workbook
+    return(import_metadata(corpus_obj, x))
+  }
+  if (!is.data.frame(x)) {
+    return(add_metadata(corpus_obj, x, session = session, bundle = bundle,
+                        reset.before.add = reset.before.add))
+  }
+
+  # data.frame: one row per scope. `session` + `bundle` columns -> bundle
+  # level, `session` only -> session level, neither -> database level (first
+  # row). The whole table is checked before anything is written.
+  keys <- intersect(c("session", "bundle"), names(x))
+  level <- if (all(c("session", "bundle") %in% names(x))) "bundle"
+           else if ("session" %in% names(x)) "session" else "database"
+  if (level == "database" && nrow(x) != 1L) {
+    cli::cli_abort(c("A metadata table without {.field session}/{.field bundle} columns must have one row.",
+                     "x" = "Got {nrow(x)} rows."),
+                   class = c("reindeer_metadata_error", "reindeer_error"))
+  }
+  ops <- lapply(seq_len(nrow(x)), function(i) {
+    row <- as.list(x[i, setdiff(names(x), keys), drop = FALSE])
+    row <- row[!vapply(row, function(v) length(v) == 0L || is.na(v[1]), logical(1))]
+    list(level = level, session = if (level != "database") x$session[i],
+         bundle = if (level == "bundle") x$bundle[i], meta = row)
+  })
+  ops <- Filter(function(o) length(o$meta) > 0L, ops)
+  .validate_import_plan(corpus_obj, ops,
+                        bundle_meta = data.frame(session = character(), bundle = character()),
+                        session_meta = data.frame(session = character()), file = "<data.frame>")
+  old <- getOption("reindeer._auto_cmdi_suppress", FALSE)
+  options(reindeer._auto_cmdi_suppress = TRUE)
+  on.exit(options(reindeer._auto_cmdi_suppress = old), add = TRUE)
+  for (o in ops) {
+    add_metadata(corpus_obj, o$meta, session = o$session, bundle = o$bundle,
+                 reset.before.add = reset.before.add)
+  }
+  options(reindeer._auto_cmdi_suppress = old)
+  .auto_describe(corpus_obj)
+  invisible(corpus_obj)
 }

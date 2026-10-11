@@ -15,16 +15,17 @@ add_metadata(
 
 set_metadata(
   corpus_obj,
-  metadataList,
+  x,
   session = NULL,
   bundle = NULL,
-  reset.before.add = FALSE
+  reset.before.add = FALSE,
+  metadataList = NULL
 )
 }
 \arguments{
 \item{corpus_obj}{A corpus object.}
 
-\item{metadataList}{Named list of field/value pairs to write.}
+\item{metadataList}{Deprecated spelling of \code{x}.}
 
 \item{session}{Optional session name. Required to write at session
 level, and required (together with \code{bundle}) to write at bundle
@@ -35,6 +36,10 @@ be provided; together they identify a bundle-level scope.}
 
 \item{reset.before.add}{Logical; if \code{TRUE}, clear existing fields at
 the given scope before writing.}
+
+\item{x}{What to write: a named list of field/value pairs; a data.frame
+(with \code{session}/\code{bundle} columns, one row per scope, applied all-or-nothing);
+or the path of a workbook written by \code{\link[=export_metadata]{export_metadata()}}.}
 }
 \value{
 The corpus object, invisibly
