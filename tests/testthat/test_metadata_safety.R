@@ -158,3 +158,16 @@ test_that("Excel import is all-or-nothing and keeps numeric types", {
   written <- jsonlite::read_json(file.path(bundle_dir(fx), "METADATA.json"))
   expect_equal(written$Age, 31.5)
 })
+
+test_that("biographize() needs no corpus argument and keeps input row order", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  add_metadata(corp, list(Gender = "f"))
+  segs <- collect(query(corp, "Phonetic == t"))
+  rev_segs <- segs[rev(seq_len(nrow(segs))), ]
+  out <- biographize(rev_segs)
+  expect_equal(out$start, rev_segs$start)
+  expect_true(all(out$Gender == "f"))
+  lz <- biographize(query(corp, "Phonetic == t"))
+  expect_equal(nrow(collect(lz)), nrow(segs))
+})

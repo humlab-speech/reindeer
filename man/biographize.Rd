@@ -4,13 +4,18 @@
 \alias{biographize}
 \title{Enrich query results with metadata}
 \usage{
-biographize(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm = "sha1")
+biographize(
+  segs_tbl,
+  corpus_obj = NULL,
+  compute_digests = FALSE,
+  algorithm = "sha1"
+)
 }
 \arguments{
 \item{segs_tbl}{A \code{segment_list}, \code{lazy_segment_list}, or data.frame with
 session and bundle columns. A lazy input defers the join until \code{collect()}.}
 
-\item{corpus_obj}{A corpus object}
+\item{corpus_obj}{Optional corpus object; by default the corpus the segments came from.}
 
 \item{compute_digests}{Compute file checksums before joining (default: FALSE)}
 

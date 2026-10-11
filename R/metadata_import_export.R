@@ -403,7 +403,7 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #'
 #' @param segs_tbl A `segment_list`, `lazy_segment_list`, or data.frame with
 #'   session and bundle columns. A lazy input defers the join until `collect()`.
-#' @param corpus_obj A corpus object
+#' @param corpus_obj Optional corpus object; by default the corpus the segments came from.
 #' @param compute_digests Compute file checksums before joining (default: FALSE)
 #' @param algorithm Hash algorithm for digests (default: "sha1")
 #' @return An \code{extended_segment_list} with metadata columns appended (or
@@ -416,7 +416,18 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
 #' enriched <- biographize(segs, corp)
 #'
 #' @export
-biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm = "sha1") {
+biographize <- function(segs_tbl, corpus_obj = NULL, compute_digests = FALSE, algorithm = "sha1") {
+
+  # The corpus a segment list came from is recoverable from it.
+  if (is.null(corpus_obj)) {
+    corpus_obj <- if (S7::S7_inherits(segs_tbl, lazy_segment_list) && !is.null(segs_tbl@corpus)) {
+      segs_tbl@corpus
+    } else if (S7::S7_inherits(segs_tbl, lazy_segment_list)) {
+      get_corpus_cached(segment_list(data.frame(), db_path = dirname(segs_tbl@db_path)))
+    } else {
+      get_corpus_cached(segs_tbl)
+    }
+  }
 
   # Lazy input: defer the metadata join until collect(), keeping the chain
   # lazy (query |> quantify |> biographize |> collect). The collect() loop
@@ -438,8 +449,16 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
   # Get metadata
   metadata <- get_metadata(corpus_obj)
   
-  # Join with segment list
-  result <- merge(segs_tbl, metadata, by = c("session", "bundle"), all.x = TRUE)
+  # Left join that keeps the input row order (merge() sorts by the keys).
+  idx <- match(paste(segs_tbl$session, segs_tbl$bundle, sep = "\x01"),
+               paste(metadata$session, metadata$bundle, sep = "\x01"))
+  meta <- as.data.frame(metadata)[idx, setdiff(names(metadata), c("session", "bundle")), drop = FALSE]
+  x <- as.data.frame(segs_tbl)
+  clash <- intersect(names(x), names(meta))
+  names(x)[names(x) %in% clash] <- paste0(names(x)[names(x) %in% clash], ".x")
+  names(meta)[names(meta) %in% clash] <- paste0(names(meta)[names(meta) %in% clash], ".y")
+  rownames(meta) <- NULL
+  result <- cbind(x, meta)
 
   # Preserve S7 class (and db_uuid/db_path) after join
   if (S7::S7_inherits(segs_tbl, segment_list)) {
