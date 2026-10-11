@@ -7,6 +7,10 @@
   `reindeer_deprecated`) and are ignored; the arguments go in a later release.
 - The C++ layer (`src/`, Rcpp, `useDynLib`) and ~440 lines of dead DBconfig
   helpers are deleted; the package no longer compiles anything.
+- Dead code deleted: `emuR_perspectives.R`, unused JSON/metadata helpers,
+  internal `retreat()` and its lazy transform, `emu_ae()`/`ae()` aliases, the
+  lookup of a non-existent bundled CMDI XSD. Stubs past their window removed:
+  `enrich()`, `enrich_egg()`, `st()` (use `semitones()`).
 - Policy: a removed name is a classed stub for one minor release, then deleted.
 
 # reindeer 2.2.0

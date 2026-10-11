@@ -2,12 +2,9 @@
 % Please edit documentation in R/reindeer_psychoacoustics.R
 \name{semitones}
 \alias{semitones}
-\alias{st}
 \title{Convert frequency (Hz) to semitones}
 \usage{
 semitones(x, ref = 16.3516)
-
-st(x, ref = 16.3516)
 }
 \arguments{
 \item{x}{Numeric vector of frequency values in Hz.}

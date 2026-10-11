@@ -666,13 +666,6 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
          "profiles/", profile_id, "/xsd")
 }
 
-#' Path to a bundled CMD envelope XSD, if present under inst/cmdi/
-#' @keywords internal
-#' @noRd
-.cmdi_bundled_envelope_xsd <- function() {
-  p <- system.file("cmdi", "cmd-envelop.xsd", package = "reindeer")
-  if (nzchar(p)) p else NULL
-}
 
 #' Validate a generated CMDI record
 #'
@@ -734,7 +727,7 @@ validate_cmdi <- function(path, xsd = NULL, online = FALSE) {
   structural <- length(problems) == 0
 
   xsd_ok <- NA
-  local_xsd <- xsd %||% .cmdi_bundled_envelope_xsd()
+  local_xsd <- xsd
   if (!is.null(local_xsd) && file.exists(local_xsd)) {
     xsd_ok <- tryCatch(
       isTRUE(as.logical(xml2::xml_validate(doc, xml2::read_xml(local_xsd)))),

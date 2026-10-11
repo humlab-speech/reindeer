@@ -21,12 +21,6 @@ semitones <- function(x, ref = 16.35160) {
   12 * log(x / ref) / log(2)
 }
 
-#' @rdname semitones
-#' @export
-st <- function(x, ref = 16.35160) {
-  .Deprecated("semitones", package = "reindeer")
-  semitones(x, ref = ref)
-}
 
 
 

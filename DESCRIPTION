@@ -93,7 +93,6 @@ Collate:
     'reindeer_signal_extensions_dt.R'
     'dsp_parameter_derivation.R'
     'dsp_parameters_public.R'
-    'emuR_perspectives.R'
     'ggplot_autoplot.R'
     'ggplot_geoms.R'
     'reindeer_corpus_config.R'

@@ -352,24 +352,6 @@ scout_dt <- function(.segments,
   return(result)
 }
 
-#' Retreat Backward in Sequence
-#'
-#' Convenience function for moving backward. Simply calls scout with negative offset.
-#'
-#' @param .segments segment_list or lazy_segment_list object
-#' @param steps_backward Integer; number of steps to move backward (positive value)
-#' @param ... Additional arguments passed to scout()
-#'
-#' @return segment_list (or lazy_segment_list if collect=FALSE)
-#' @keywords internal
-#'
-#' @examplesIf interactive()
-#' # Use scout() with a negative step instead:
-#' prev_phone <- scout(segments, steps_forward = -1)
-#' @noRd
-retreat <- function(.segments, steps_backward, ...) {
-  scout(.segments, steps_forward = -abs(steps_backward), ...)
-}
 
 #' Move up the annotation hierarchy
 #'

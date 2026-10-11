@@ -131,14 +131,6 @@ test_that("apply_scout_transform appends CTE with seq_idx offset", {
   expect_equal(result$params[[length(result$params)]], 2L)
 })
 
-test_that("apply_retreat_transform appends CTE with negative seq_idx offset", {
-  base <- make_base_query()
-  result <- apply_retreat_transform(base, n = 1)
-  expect_true(grepl("WITH base AS", result$sql))
-  expect_true(grepl("seq_idx = b\\.start_item_seq_idx - \\?", result$sql))
-  expect_equal(result$params[[length(result$params)]], 1L)
-})
-
 test_that("apply_ascend_transform uses links table and level filter", {
   base <- make_base_query()
   result <- apply_ascend_transform(base, level = "Syllable")
@@ -162,8 +154,6 @@ test_that("apply_transform dispatches correctly for known types", {
   base <- make_base_query()
   r1 <- apply_transform(base, list(type = "scout", n = 1))
   expect_true(grepl("end_item_seq_idx", r1$sql))
-  r2 <- apply_transform(base, list(type = "retreat", n = 1))
-  expect_true(grepl("start_item_seq_idx", r2$sql))
   r3 <- apply_transform(base, list(type = "ascend", level = "Word"))
   expect_true(grepl("to_id = i\\.item_id", r3$sql))
   r4 <- apply_transform(base, list(type = "descend", level = "Phonetic"))

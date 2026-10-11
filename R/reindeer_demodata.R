@@ -35,7 +35,3 @@ demo_corpus <- function(verbose = FALSE, format = c("wav", "flac")) {
   reindeer::corpus(file.path(demodir, "ae_emuDB"), verbose = verbose)
 }
 
-# Legacy internal aliases kept so existing examples and tests keep working.
-# Prefer demo_corpus() in new code.
-emu_ae <- function(verbose = FALSE) demo_corpus(verbose = verbose, format = "wav")
-ae     <- function(verbose = FALSE) demo_corpus(verbose = verbose, format = "flac")

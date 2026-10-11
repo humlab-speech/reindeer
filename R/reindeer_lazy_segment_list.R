@@ -222,7 +222,6 @@ apply_transform <- function(query, transform, verbose = FALSE) {
   
   switch(type,
     scout = apply_scout_transform(query, transform$n),
-    retreat = apply_retreat_transform(query, transform$n),
     ascend = apply_ascend_transform(query, transform$level),
     descend = apply_descend_transform(query, transform$level),
     cli::cli_abort("Unknown transform type: {.val {type}}")
@@ -264,36 +263,6 @@ apply_scout_transform <- function(query, n = 1) {
   list(sql = sql, params = c(query$params, list(n)))
 }
 
-#' Apply Retreat (Backward Sequence) Transform
-#'
-#' @param query list(sql, params) -- current query
-#' @param n integer -- number of steps backward
-#' @return list(sql, params) -- modified query
-#' @keywords internal
-#' @noRd
-apply_retreat_transform <- function(query, n = 1) {
-  n <- as.integer(n)
-  sql <- paste0(
-    "WITH base AS (", query$sql, ") ",
-    "SELECT i.*, ",
-    "  l.label AS labels, l.name AS attribute, ",
-    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
-    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
-    "FROM items i ",
-    "INNER JOIN base b ON ",
-    "  i.db_uuid = b.db_uuid AND ",
-    "  i.session = b.session AND ",
-    "  i.bundle = b.bundle AND ",
-    "  i.level = b.level AND ",
-    "  i.seq_idx = b.start_item_seq_idx - ? ",
-    "LEFT JOIN labels l ON ",
-    "  l.db_uuid = i.db_uuid AND ",
-    "  l.session = i.session AND ",
-    "  l.bundle = i.bundle AND ",
-    "  l.item_id = i.item_id AND ",
-    "  l.name = b.attribute")
-  list(sql = sql, params = c(query$params, list(n)))
-}
 
 #' Apply Ascend (Dominance Upward) Transform
 #'

@@ -91,7 +91,6 @@ reference:
     desc: "DSP measurement with speaker-aware parameters."
     contents:
       - quantify
-      - enrich
       - dsp_parameters
       - derive_dsp_parameters
 
@@ -193,7 +192,6 @@ reference:
       - add_metadata
       - gather_metadata
       - import_metadata
-      - st
       - DSPP
       - deprecated-moved-functions
       - deprecated-serve
