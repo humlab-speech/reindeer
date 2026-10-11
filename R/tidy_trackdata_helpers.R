@@ -172,6 +172,48 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   Filter(Negate(is.null), flat)
 }
 
+#' Run the DSP routine for every segment of ONE signal file
+#'
+#' `mode = "bundle"` analyses the whole file once with the bundle's speaker
+#' parameters and slices each segment's frames out of the result (frames keep
+#' their absolute `frame_time`). That avoids re-analysing the file per segment
+#' and the begin-of-file failures of windowed analysis. Routines that do not
+#' return a time-indexed track (tables, lists) fall back to `mode = "window"`,
+#' one call per segment, as does any failure of the whole-file call.
+#'
+#' @return A list with one element per segment (NULL where nothing came out).
+#' @noRd
+.run_dsp_group <- function(dsp_function, file, params, starts_ms, ends_ms,
+                           mode = "bundle", verbose = FALSE) {
+  base <- c(list(listOfFiles = file), params, list(toFile = FALSE, verbose = FALSE))
+  window <- function(i) {
+    tryCatch(
+      do.call(dsp_function, c(base, list(beginTime = starts_ms[i] / 1000,
+                                         endTime = ends_ms[i] / 1000))),
+      error = function(e) {
+        if (verbose) cli::cli_alert_warning("Error: {conditionMessage(e)}")
+        NULL
+      })
+  }
+  if (identical(mode, "bundle")) {
+    whole <- tryCatch(do.call(dsp_function, base), error = function(e) NULL)
+    # A real track carries its own time base; anything else is analysed per window.
+    if (inherits(whole, "AsspDataObj") && !is.null(attr(whole, "sampleRate")) &&
+        !is.null(attr(whole, "startTime"))) {
+      tab <- as.data.frame(whole)
+      tm <- suppressWarnings(as.numeric(tab[["frame_time"]]))
+      if (length(tm) == nrow(tab) && !anyNA(tm)) {
+        return(lapply(seq_along(starts_ms), function(i) {
+          keep <- tm >= starts_ms[i] / 1000 & tm <= ends_ms[i] / 1000
+          if (!any(keep)) return(NULL)
+          structure(tab[keep, , drop = FALSE], class = c("reindeer_track_slice", "data.frame"))
+        }))
+      }
+    }
+  }
+  lapply(seq_along(starts_ms), window)
+}
+
 #' Turn one DSP return value into a data frame, applying `.at`
 #'
 #' `.at` (fractions of the segment) selects the NEAREST frame of a track; no
@@ -179,8 +221,11 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 #' routine that returns a plain list or vector aborts instead of being ignored.
 #' @noRd
 .dsp_result_to_df <- function(result, .at = NULL) {
-  if (inherits(result, "AsspDataObj")) {
-    track_data <- as.data.frame(result)
+  if (inherits(result, "AsspDataObj") || inherits(result, "reindeer_track_slice")) {
+    track_data <- if (inherits(result, "AsspDataObj")) as.data.frame(result) else {
+      class(result) <- "data.frame"
+      result
+    }
     if (!is.null(.at)) {
       n_frames <- nrow(track_data)
       frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
@@ -218,83 +263,6 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   cbind(tibble::as_tibble(seg_df), tibble::as_tibble(result_df))
 }
 
-.process_by_file_batch <- function(seg_df, corpus_obj, dsp_function, dsp_params,
-                                   media_ext, .at = NULL, .verbose = FALSE) {
-  # Group by audio file
-  seg_df$signal_file <- file.path(
-    corpus_obj@basePath,
-    paste0(seg_df$session, "_ses"),
-    paste0(seg_df$bundle, "_bndl"),
-    paste0(seg_df$bundle, ".", media_ext)
-  )
-  
-  # Hoist file existence checks out of the per-group loop - one vectorised
-  # filesystem hit beats N system calls when batches cluster on the same
-  # missing files. Drops missing-file groups before the lapply runs.
-  unique_files <- unique(seg_df$signal_file)
-  exists_map <- stats::setNames(file.exists(unique_files), unique_files)
-  if (.verbose) {
-    missing_files <- names(exists_map)[!exists_map]
-    for (mf in missing_files) {
-      cli::cli_alert_warning("Signal file not found: {basename(mf)}")
-    }
-  }
-  seg_df <- seg_df[exists_map[seg_df$signal_file], , drop = FALSE]
-  if (nrow(seg_df) == 0L) return(list())
-
-  # Split by file
-  file_groups <- split(seg_df, seg_df$signal_file)
-
-  # Process each file's segments together
-  results <- lapply(file_groups, function(file_segs) {
-    signal_file <- unique(file_segs$signal_file)[1]
-    
-    # Process all segments from this file. The DSP call's invariant
-    # arguments (file path, params, toFile/verbose) are built once per file;
-    # only the per-segment time window is re-supplied. Decoding the signal
-    # once and slicing is deliberately not done: the windowed superassp API
-    # ties analysis context to the requested window, so a whole-file pass
-    # would change boundary-adjacent results.
-    params_file <- file_segs$seg_params[[1]] %or_empty% dsp_params
-    dsp_call_base <- c(
-      list(listOfFiles = signal_file),
-      params_file,
-      list(toFile = FALSE, verbose = FALSE)
-    )
-    segment_results <- lapply(seq_len(nrow(file_segs)), function(i) {
-      seg <- file_segs[i, , drop = FALSE]
-      
-      tryCatch({
-        result <- do.call(dsp_function, c(
-          dsp_call_base,
-          list(beginTime = seg$start / 1000, endTime = seg$end / 1000)
-        ))
-        
-        # Handle different result types
-        result_df <- .dsp_result_to_df(result, .at)
-        
-        # Add segment info
-        n_result_rows <- nrow(result_df)
-        seg_replicated <- seg[rep(1, n_result_rows), , drop = FALSE]
-        rownames(seg_replicated) <- NULL
-        
-        .bind_seg_and_result(seg_replicated, result_df)
-      }, error = function(e) {
-        if (inherits(e, "reindeer_quantify_error")) rlang::cnd_signal(e)
-        if (.verbose) {
-          cli::cli_alert_warning("Error processing segment: {conditionMessage(e)}")
-        }
-        NULL
-      })
-    })
-    
-    # Combine results from this file
-    Filter(Negate(is.null), segment_results)
-  })
-  
-  # Flatten nested list, one level only: see .flatten_segment_results()
-  .flatten_segment_results(results)
-}
 
 # ============================================================================
 # PHASE 2: Advanced Optimizations
@@ -565,7 +533,8 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 .process_segments_vectorized <- function(seg_df, corpus_obj, dsp_function, dsp_params,
                                          media_ext, .at = NULL, .verbose = FALSE,
                                          use_cache = TRUE, cache_conn = NULL,
-                                         cache_format = "auto", dsp_name = NULL) {
+                                         cache_format = "auto", dsp_name = NULL,
+                                         .mode = "bundle") {
   
   # Convert to data.table for faster operations
   dt <- data.table::as.data.table(seg_df)
@@ -638,31 +607,21 @@ get_corpus_cached <- function(.segments, .from = NULL) {
       # value is stored untouched: real DSP routines return AsspDataObj track
       # objects, and flattening them here would destroy the tracks.
       raw_results <- vector("list", nrow(dt_uncached))
-      for (g in unique(dt_uncached$file_group_id)) {
+      groups <- lapply(unique(dt_uncached$file_group_id), function(g) {
         idx <- which(dt_uncached$file_group_id == g)
-        file <- unique(dt_uncached$signal_file[idx])[1]
-        params_file <- dt_uncached$seg_params[[idx[1]]]
-        dsp_call_base <- c(
-          list(listOfFiles = file),
-          params_file,
-          list(toFile = FALSE, verbose = FALSE)
-        )
-        for (i in idx) {
-          # list(NULL) keeps the slot: `[[<-` with NULL would delete it and shift
-          # every later result onto the wrong row.
-          raw_results[i] <- list(tryCatch(
-            do.call(dsp_function, c(
-              dsp_call_base,
-              list(beginTime = dt_uncached$start[i] / 1000,
-                   endTime = dt_uncached$end[i] / 1000)
-            )),
-            error = function(e) {
-              if (.verbose) {
-                cli::cli_alert_warning("Error: {conditionMessage(e)}")
-              }
-              NULL
-            }))
-        }
+        list(idx = idx, file = dt_uncached$signal_file[idx[1]],
+             params = dt_uncached$seg_params[[idx[1]]],
+             starts = dt_uncached$start[idx], ends = dt_uncached$end[idx])
+      })
+      # One task per bundle file; the caller's future::plan() decides whether
+      # they run in parallel (default: sequential, in-process).
+      group_results <- future.apply::future_lapply(groups, function(gr) {
+        .run_dsp_group(dsp_function, gr$file, gr$params, gr$starts, gr$ends,
+                       mode = .mode, verbose = .verbose)
+      }, future.seed = TRUE)
+      for (k in seq_along(groups)) {
+        # `[<-` with list(NULL) keeps the slot of a failed segment
+        raw_results[groups[[k]]$idx] <- group_results[[k]]
       }
       dt_uncached[, result := raw_results]
 
@@ -708,67 +667,3 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     Filter(Negate(is.null), pieces)
 }
 
-#' Parallel audio file processing with true parallel I/O
-#' @noRd
-.process_parallel_io <- function(seg_df, corpus_obj, dsp_function, dsp_params,
-                                 media_ext, .at = NULL, .verbose = FALSE,
-                                 dsp_name = NULL) {
-  
-  # Split segments by file for optimal I/O
-  seg_df$signal_file <- file.path(
-    corpus_obj@basePath,
-    paste0(seg_df$session, "_ses"),
-    paste0(seg_df$bundle, "_bndl"),
-    paste0(seg_df$bundle, ".", media_ext)
-  )
-  
-  file_groups <- split(seg_df, seg_df$signal_file)
-  
-  # One task per file; the caller's future::plan() decides whether they run
-  # in parallel (default: sequential, in-process).
-  results <- future.apply::future_lapply(file_groups, function(file_segs) {
-    signal_file <- unique(file_segs$signal_file)[1]
-    
-    if (!file.exists(signal_file)) {
-      return(NULL)
-    }
-    
-    # Process segments from this file. Invariant call args built once per
-    # file (single-bundle file group); only the per-segment window varies.
-    params_file <- file_segs$seg_params[[1]] %or_empty% dsp_params
-    dsp_call_base <- c(
-      list(listOfFiles = signal_file),
-      params_file,
-      list(toFile = FALSE, verbose = FALSE)
-    )
-    lapply(seq_len(nrow(file_segs)), function(i) {
-      seg <- file_segs[i, , drop = FALSE]
-      
-      tryCatch({
-        result <- do.call(dsp_function, c(
-          dsp_call_base,
-          list(beginTime = seg$start / 1000, endTime = seg$end / 1000)
-        ))
-        
-        # Handle result formatting
-        result_df <- .dsp_result_to_df(result, .at)
-        
-        # Add segment info
-        n_result_rows <- nrow(result_df)
-        seg_replicated <- seg[rep(1, n_result_rows), , drop = FALSE]
-        rownames(seg_replicated) <- NULL
-        
-        .bind_seg_and_result(seg_replicated, result_df)
-      }, error = function(e) {
-        if (inherits(e, "reindeer_quantify_error")) rlang::cnd_signal(e)
-        if (.verbose) {
-          cli::cli_alert_warning("Error: {conditionMessage(e)}")
-        }
-        NULL
-      })
-    })
-  }, future.seed = TRUE)
-  
-  # Flatten one level only: see .flatten_segment_results()
-  .flatten_segment_results(results)
-}

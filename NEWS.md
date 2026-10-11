@@ -16,6 +16,16 @@ caches miss once. Numbers from 2.3.0's work package list follow.
   carries a marker and is overwritten; a hand-written one never is (the text
   goes to `README-generated.md`).
 
+- `quantify()` has ONE executor. By default (`.mode = "bundle"`) each bundle's
+  file is analysed once with that bundle's speaker parameters and every
+  segment's frames are sliced out; `.mode = "window"` keeps one call per
+  segment. Routines that don't return a time-indexed track still run per
+  segment. Cold `quantify()` of 253 segments (forest): 3.97 s -> 0.52 s; 67
+  vowels: 0.93 s -> 0.30 s. Median |dF1| between the two modes is within 5 Hz,
+  and begin-of-file segments no longer fail (ksv). The three older executors
+  (file-batch, parallel-IO, vectorised-with-loop) are gone; the cache is still
+  read and written per segment.
+
 ## EQL / emuR parity
 
 - One compiler: eager `query(lazy = FALSE)` now compiles the same SQL as the

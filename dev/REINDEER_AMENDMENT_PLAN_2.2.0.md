@@ -482,7 +482,8 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 3.4 | done (80/80 parity, zero skips; 2.4.0) | WP3.4 |
 | 4.1 | done (0.48 s -> 0.28 s, 25 -> 16 namespaces) | WP4.1 |
 | 4.2 | done (unchanged write 0.64 s -> 0.05 s) | WP4.2 |
-| 4.3–4.7 | open | |
+| 4.3 | done (253 segs 3.97 s -> 0.52 s) | WP4.3 |
+| 4.4–4.7 | open | |
 | 5.1–5.5 | open | |
 | 6.1–6.4 | open | |
 | 7 | open | |

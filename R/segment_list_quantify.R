@@ -40,6 +40,11 @@ NULL
 #'     follows the caller's [future::plan()]; the default is sequential.}
 #'   \item{`.verbose`}{Print a per-step progress summary.}
 #'   \item{`.optimize`}{Deprecated and ignored.}
+#'   \item{`.mode`}{`"bundle"` (default) analyses each bundle's whole file once
+#'     with that speaker's parameters and slices every segment out of the
+#'     result; `"window"` calls the routine once per segment on just its
+#'     window. Routines that do not return a time-indexed track always run
+#'     per segment.}
 #' }
 #' @details When `dsp_function` is a character vector of registered
 #'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,
@@ -86,7 +91,9 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .use_cache = FALSE,
                                                 .cache_dir = NULL,
                                                 .cache_format = c("auto", "qs", "rds"),
-                                                .optimize = NULL) {
+                                                .optimize = NULL,
+                                                .mode = c("bundle", "window")) {
+  .mode <- match.arg(.mode)
 
   .warn_ignored_parallel_args(.parallel = .parallel, .workers = .workers,
                               .optimize = .optimize)
@@ -219,56 +226,18 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
       class = c("reindeer_metadata_warning", "reindeer_warning"))
   }
 
-  # PHASE 2: Choose processing strategy based on optimize flag and available packages
-  # The vectorized executor is the only one that reads and writes the persistent
-  # cache, so a cache-enabled call routes there whatever its size. Previously a
-  # `.use_cache = TRUE` request for 21-100 segments was accepted and silently
-  # ignored, because that band used the parallel executor.
-  if ((.optimize && nrow(seg_df) > 100) || .use_cache) {
-    # Use vectorized processing for large datasets
-    if (.verbose) {
-      cli::cli_alert_info("Using optimized vectorized processing")
-    }
-
-    # Setup persistent cache if requested
-    cache_conn <- if (.use_cache) {
-      resolved_cache_dir <- .cache_dir %or_empty% corpus_obj@.cache_dir
-      .get_persistent_cache_connection(resolved_cache_dir)
-    } else {
-      NULL
-    }
-
-    # PHASE 2: Vectorized batch processing
-    results_list <- .process_segments_vectorized(
-      seg_df, corpus_obj, dsp_function, dsp_params_base,
-      media_ext, .at, .verbose, .use_cache, cache_conn, .cache_format,
-      dsp_name = dsp_name
-    )
-
-  } else if (.parallel && nrow(seg_df) > 20) {
-    # Use parallel I/O for medium to large datasets
-    if (.verbose) {
-      cli::cli_alert_info("Using parallel I/O processing")
-    }
-
-    # PHASE 2: Parallel I/O processing
-    results_list <- .process_parallel_io(
-      seg_df, corpus_obj, dsp_function, dsp_params_base,
-      media_ext, .at, .verbose
-    )
-
+  # One executor for every call: per bundle file, analyse once (or per window)
+  # and slice; the persistent cache is read and written per segment.
+  cache_conn <- if (.use_cache) {
+    .get_persistent_cache_connection(.cache_dir %or_empty% corpus_obj@.cache_dir)
   } else {
-    # Fall back to sequential processing for small datasets
-    if (.verbose) {
-      cli::cli_alert_info("Using sequential processing")
-    }
-
-    # PHASE 1: File-batch processing (already optimized)
-    results_list <- .process_by_file_batch(
-      seg_df, corpus_obj, dsp_function, dsp_params_base,
-      media_ext, .at, .verbose
-    )
+    NULL
   }
+  results_list <- .process_segments_vectorized(
+    seg_df, corpus_obj, dsp_function, dsp_params_base,
+    media_ext, .at, .verbose, .use_cache, cache_conn, .cache_format,
+    dsp_name = dsp_name, .mode = .mode
+  )
 
   if (.verbose) {
     cli::cli_progress_done()

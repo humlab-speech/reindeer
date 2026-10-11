@@ -48,7 +48,8 @@ test_that("quantify() |> scout() measures the input segments", {
   calls$n <- 0L
   counting <- function(listOfFiles, beginTime, endTime, toFile = FALSE,
                        verbose = FALSE, ...) {
-    calls$n <- calls$n + 1L
+    # The executor may first try a whole-file call (no window); count windows.
+    if (!missing(beginTime)) calls$n <- calls$n + 1L
     data.frame(marker = 1)
   }
   out <- collect(scout(quantify(fx$lz, counting), 1, collect = FALSE))

@@ -70,6 +70,11 @@ results.}
 follows the caller's \code{\link[future:plan]{future::plan()}}; the default is sequential.}
 \item{\code{.verbose}}{Print a per-step progress summary.}
 \item{\code{.optimize}}{Deprecated and ignored.}
+\item{\code{.mode}}{\code{"bundle"} (default) analyses each bundle's whole file once
+with that speaker's parameters and slices every segment out of the
+result; \code{"window"} calls the routine once per segment on just its
+window. Routines that do not return a time-indexed track always run
+per segment.}
 }
 }
 
