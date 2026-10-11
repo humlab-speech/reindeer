@@ -25,9 +25,6 @@
 
 #' @keywords internal
 .get_schema_validator <- function(schema_name) {
-  if (!requireNamespace("jsonvalidate", quietly = TRUE)) {
-    return(NULL)
-  }
   if (exists(schema_name, envir = .schema_validators, inherits = FALSE)) {
     return(get(schema_name, envir = .schema_validators))
   }
@@ -84,7 +81,7 @@
 .validate_against_schema <- function(json_text_or_obj, schema_name,
                                      file_path = NULL, write = FALSE) {
   v <- .get_schema_validator(schema_name)
-  if (is.null(v)) return(invisible(TRUE))   # no validator available
+  if (is.null(v)) return(invisible(TRUE))   # schema file missing
 
   json_text <- if (is.character(json_text_or_obj)) {
     paste(json_text_or_obj, collapse = "\n")

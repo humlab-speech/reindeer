@@ -57,3 +57,27 @@ test_that("bundle-table cache: warm re-run hits, and changing .at or the segment
   expect_equal(status(suppressWarnings(q(segs, .at = 0.25))), "hit")
   expect_equal(status(suppressWarnings(q(segs[1:10, ], .at = 0.5))), "hit")
 })
+
+test_that("closures differing only in a captured helper function get distinct keys (F1.2)", {
+  mk <- function(helper) {
+    force(helper)
+    function(x) helper(x) + 1
+  }
+  a <- mk(function(x) x * 2)
+  b <- mk(function(x) x * 3)
+  expect_false(identical(reindeer:::.fn_identity(a), reindeer:::.fn_identity(b)))
+  expect_identical(reindeer:::.fn_identity(a), reindeer:::.fn_identity(mk(function(x) x * 2)))
+})
+
+test_that("global-env routines depend on the globals and helpers they use (F1.2)", {
+  env <- globalenv()
+  on.exit(rm(list = c("..h", "..k"), envir = env), add = TRUE)
+  assign("..h", function(x) x + 1, env); assign("..k", 1, env)
+  f <- function(x) ..h(x) * ..k
+  environment(f) <- env
+  id1 <- reindeer:::.fn_identity(f)
+  assign("..k", 2, env)
+  expect_false(identical(id1, reindeer:::.fn_identity(f)))
+  assign("..k", 1, env); assign("..h", function(x) x + 2, env)
+  expect_false(identical(id1, reindeer:::.fn_identity(f)))
+})

@@ -44,7 +44,11 @@ NULL
 #'     with that speaker's parameters and slices every segment out of the
 #'     result; `"window"` calls the routine once per segment on just its
 #'     window. Routines that do not return a time-indexed track always run
-#'     per segment.}
+#'     per segment. The default matches emuR (whole-file tracks, sliced per
+#'     segment). Windowed analysis loses left context, so pitch, spectral and
+#'     intensity values differ from `"bundle"` (see `dev/WHOLE_FILE_FIDELITY.md`
+#'     in the source repository); formant routines such as
+#'     `trk_formant_forest` agree in both modes.}
 #' }
 #' @details When `dsp_function` is a character vector of registered
 #'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,

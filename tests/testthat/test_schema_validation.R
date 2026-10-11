@@ -144,3 +144,21 @@ test_that("ssffTrack schema still accepts a legacy track with no generator", {
   json <- jsonlite::toJSON(db_config, auto_unbox = TRUE, force = TRUE)
   expect_true(isTRUE(validator(as.character(json))))
 })
+
+test_that("flat Age/Gender are validated on write at every level (F1.1)", {
+  ae <- create_isolated_ae_corpus()
+  expect_error(set_metadata(ae, list(Age = "six")),
+               class = "reindeer_schema_error")
+  expect_error(set_metadata(ae, list(Gender = 3), session = "0000"),
+               class = "reindeer_schema_error")
+  expect_error(set_metadata(ae, list(Age = "six"), session = "0000",
+                            bundle = "msajc003"),
+               class = "reindeer_schema_error")
+  expect_no_error(set_metadata(ae, list(Age = 6, Gender = "Female")))
+  expect_no_error(set_metadata(ae, list(Age = "34")))
+})
+
+test_that("the metadata schema declares the draft its engine implements", {
+  f <- system.file("schemas", "metadata.schema.json", package = "reindeer")
+  expect_match(jsonlite::read_json(f)[["$schema"]], "draft-04")
+})

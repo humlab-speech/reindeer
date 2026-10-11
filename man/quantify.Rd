@@ -74,7 +74,11 @@ follows the caller's \code{\link[future:plan]{future::plan()}}; the default is s
 with that speaker's parameters and slices every segment out of the
 result; \code{"window"} calls the routine once per segment on just its
 window. Routines that do not return a time-indexed track always run
-per segment.}
+per segment. The default matches emuR (whole-file tracks, sliced per
+segment). Windowed analysis loses left context, so pitch, spectral and
+intensity values differ from \code{"bundle"} (see \code{dev/WHOLE_FILE_FIDELITY.md}
+in the source repository); formant routines such as
+\code{trk_formant_forest} agree in both modes.}
 }
 }
 

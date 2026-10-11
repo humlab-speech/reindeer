@@ -1,3 +1,18 @@
+# reindeer 3.0.1
+
+- Metadata validation now validates what the API stores: flat `Age` (number or
+  numeric string) and `Gender` (string) are checked on every write at database,
+  session and bundle level; `set_metadata(list(Age = "six"))` aborts with a
+  `reindeer_schema_error` naming the file. The schemas declare draft-04, the
+  draft their engine implements. `jsonvalidate` is now an Import, so
+  validation can no longer be skipped silently.
+- Quantify cache keys now include user-defined helper functions and global
+  variables a routine refers to, so editing a helper invalidates cached results.
+- `quantify(.mode =)` documentation and `dev/WHOLE_FILE_FIDELITY.md` record how
+  whole-file and windowed analysis differ per routine.
+- `tools/bench.R` regenerates `benchmarking/BASELINE_3.0.0.md`; scripts that
+  measured removed code were deleted.
+
 # reindeer 3.0.0
 
 The 2.2 amendment programme ends here. 2.3.0 fixed silent wrong results, 2.4.0

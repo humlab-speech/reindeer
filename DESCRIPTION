@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Reproducible Analysis of Speech Corpora
-Version: 3.0.0
+Version: 3.0.1
 Date: 2026-10-11
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -26,6 +26,7 @@ Imports:
     S7 (>= 0.1.0),
     digest,
     jsonlite,
+    jsonvalidate,
     data.table,
     stats,
     utils,
@@ -46,7 +47,6 @@ Suggests:
     wrassp,
     imputeTS,
     httpuv,
-    jsonvalidate,
     testthat (>= 3.0.0),
     emuR,
     qs2,

@@ -1,11 +1,13 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "http://json-schema.org/draft-04/schema#",
   "$id": "https://humlab-speech.github.io/reindeer/schemas/metadata.schema.json",
   "title": "reindeer METADATA.json",
   "description": "Schema for METADATA.json files at database, session, or bundle level. The schema enforces structure of canonical keys when present but accepts arbitrary user-defined fields (additionalProperties: true).",
   "type": "object",
   "additionalProperties": true,
   "properties": {
+    "Age": { "type": ["number", "null", "string"], "pattern": "^\\s*[0-9]+([.,][0-9]+)?\\s*$" },
+    "Gender": { "type": ["string", "null"] },
     "participant": {
       "type": "object",
       "additionalProperties": true,

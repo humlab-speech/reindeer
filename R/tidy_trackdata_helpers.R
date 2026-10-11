@@ -105,13 +105,24 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   env <- environment(fn)
   pkg <- if (!is.null(env) && isNamespace(env)) getNamespaceName(env) else NA_character_
   ver <- if (is.na(pkg)) NA_character_ else as.character(utils::packageVersion(pkg))
-  # A closure's behaviour also depends on the variables it captured (e.g.
-  # probe_dsp(1) vs probe_dsp(2)): include those the body mentions.
+  # A closure's behaviour also depends on what its body refers to outside the
+  # function: captured values (probe_dsp(1) vs probe_dsp(2)) and user-defined
+  # helper functions (digested one level deep: formals + body). Namespace and
+  # base functions are covered by package name + version of the callee.
   captured <- NULL
-  if (is.na(pkg) && !is.null(env) && !identical(env, globalenv())) {
-    used <- intersect(all.names(body(fn)), ls(env, all.names = TRUE))
-    captured <- mget(sort(used), envir = env)
-    captured <- captured[!vapply(captured, is.function, logical(1))]
+  if (is.na(pkg) && !is.null(env)) {
+    used <- sort(unique(all.names(body(fn))))
+    found <- mget(used, envir = env, inherits = TRUE, ifnotfound = list(NULL))
+    keep <- vapply(found, function(o) {
+      if (is.null(o)) return(FALSE)
+      if (!is.function(o)) return(TRUE)
+      e <- environment(o)
+      !is.null(e) && !isNamespace(e) && !identical(e, baseenv())
+    }, logical(1))
+    captured <- lapply(found[keep], function(o)
+      if (is.function(o)) list(formals(o), body(o)) else o)
+    # the locals of fn itself would also match by name; they are in body()
+    captured <- captured[setdiff(names(captured), names(formals(fn)))]
   }
   digest::digest(list(pkg, ver, formals(fn), body(fn), captured), algo = "xxhash64")
 }

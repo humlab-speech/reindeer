@@ -158,11 +158,16 @@ test_that("Type changes overwrite the previous value (idempotent upsert)", {
     add_metadata(ae, list(Age = 25), session = bundles$session[1], bundle = bundles$name[1])
     gather_metadata(ae, verbose = FALSE)
 
-    expect_no_error({
+    # F1.1: Age drives DSP norms, so a non-numeric Age is rejected on write
+    expect_error(
       add_metadata(ae, list(Age = "not a number"),
                   session = bundles$session[1],
-                  bundle = bundles$name[1])
-    })
+                  bundle = bundles$name[1]),
+      class = "reindeer_schema_error")
+    expect_no_error(
+      add_metadata(ae, list(Age = "25"),
+                  session = bundles$session[1],
+                  bundle = bundles$name[1]))
   }
 })
 
