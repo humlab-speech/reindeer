@@ -63,6 +63,14 @@
   from the editor get correct `seq_idx`/`label_idx` in the cache (they were
   all NA/0). `bundleListName` was non-functional and is removed.
 
+- Provenance: row growth (joins that multiply rows) is recorded in a new
+  `rows_added` column instead of a negative `rows_lost`; `right_join()`/
+  `full_join()` that create NA-keyed rows, and `rename()` of a required column,
+  now return a plain tibble instead of a broken `segment_list`; `group_by()`
+  keeps the log; navigation fused into the lazy SQL (`scout(collect = FALSE)`
+  etc.) records its steps and triggers the loss warning.
+  Known gap: `bind_rows(s, s)` on two segment lists still errors (WP5.1).
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

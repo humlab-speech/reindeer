@@ -131,7 +131,10 @@
   proxy <- .vec_proxy_segment_list(x)
   out <- .fn(proxy, y, by = by, copy = copy, suffix = suffix, ..., keep = keep)
   if (!is.data.frame(out)) return(out)
-  if (!all(.required_segment_cols() %in% names(out))) {
+  if (!all(.required_segment_cols() %in% names(out)) ||
+      anyNA(out[c("session", "bundle", "start", "end")])) {
+    # A segment needs its identity: rows with NA session/bundle/times (what
+    # right_join/full_join create for unmatched y rows) are not segments.
     return(tibble::as_tibble(out))
   }
   rebuilt <- segment_list(out, db_uuid = x@db_uuid, db_path = x@db_path)
@@ -171,3 +174,34 @@
   )
   .record_step(out, template, "dplyr_op", warn = FALSE)
 }
+
+# ---------------------------------------------------------------------------
+# rename / group_by / bind_rows hooks
+# ---------------------------------------------------------------------------
+
+# rename() does not pass through dplyr_reconstruct(), so renaming a required
+# column would leave a "segment_list" that no longer has its columns.
+.rename_segment_list <- function(.data, ...) {
+  out <- dplyr::rename(.vec_proxy_segment_list(.data), ...)
+  .dplyr_reconstruct_segment_list(out, .data)
+}
+.rename_extended_segment_list <- function(.data, ...) {
+  out <- dplyr::rename(.vec_proxy_extended_segment_list(.data), ...)
+  .dplyr_reconstruct_extended_segment_list(out, .data)
+}
+
+# group_by() returns a grouped tibble; carry the provenance log over so the
+# history survives grouping.
+.group_by_segment_list <- function(.data, ..., .add = FALSE, .drop = TRUE) {
+  out <- dplyr::group_by(.vec_proxy_segment_list(.data), ..., .add = .add, .drop = .drop)
+  prov <- attr(.data, "reindeer_provenance")
+  if (!is.null(prov)) attr(out, "reindeer_provenance") <- prov
+  out
+}
+.group_by_extended_segment_list <- function(.data, ..., .add = FALSE, .drop = TRUE) {
+  out <- dplyr::group_by(.vec_proxy_extended_segment_list(.data), ..., .add = .add, .drop = .drop)
+  prov <- attr(.data, "reindeer_provenance")
+  if (!is.null(prov)) attr(out, "reindeer_provenance") <- prov
+  out
+}
+

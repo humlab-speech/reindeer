@@ -19,6 +19,7 @@
     rows_in = integer(),
     rows_out = integer(),
     rows_lost = integer(),
+    rows_added = integer(),
     ts = as.POSIXct(character())
   )
 }
@@ -39,6 +40,7 @@
         rows_in = as.integer(prov$rows_in[i]),
         rows_out = as.integer(prov$rows_out[i]),
         rows_lost = as.integer(prov$rows_lost[i]),
+        rows_added = if ("rows_added" %in% names(prov)) as.integer(prov$rows_added[i]) else 0L,
         ts = prov$ts[i]
       )
     }))
@@ -68,6 +70,10 @@
       v <- e$rows_lost
       if (is.null(v)) NA_integer_ else as.integer(v)
     }, integer(1)),
+    rows_added = vapply(prov_list, function(e) {
+      v <- e$rows_added
+      if (is.null(v)) 0L else as.integer(v)
+    }, integer(1)),
     ts = do.call(c, lapply(prov_list, function(e) {
       if (is.null(e$ts)) as.POSIXct(NA) else e$ts
     }))
@@ -85,7 +91,9 @@
     call = call_str,
     rows_in = as.integer(rows_in),
     rows_out = as.integer(rows_out),
-    rows_lost = as.integer(rows_in) - as.integer(rows_out),
+    # Row growth (joins that multiply rows) is not a loss.
+    rows_lost = pmax(as.integer(rows_in) - as.integer(rows_out), 0L),
+    rows_added = pmax(as.integer(rows_out) - as.integer(rows_in), 0L),
     ts = Sys.time()
   )
   prov_list[[length(prov_list) + 1L]] <- new_entry
@@ -230,6 +238,7 @@ dropped_rows <- function(seg) {
       rows_in = integer(),
       rows_out = integer(),
       rows_lost = integer(),
+      rows_added = integer(),
       pct_lost = numeric()
     ))
   }
@@ -243,6 +252,7 @@ dropped_rows <- function(seg) {
     rows_in = prov$rows_in,
     rows_out = prov$rows_out,
     rows_lost = prov$rows_lost,
+    rows_added = prov$rows_added,
     pct_lost = round(pct, 1)
   )
 }

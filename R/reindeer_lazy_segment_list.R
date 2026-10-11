@@ -189,6 +189,27 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
   # regardless of whether the segment_list arrived eager or via collect().
   seg_list <- .seed_provenance(seg_list, "query", sys.call(-1L))
 
+  # Navigation steps fused into the SQL still get provenance entries (and the
+  # loss warning): count the base query, then record each step, with in/out
+  # counts known for the first and last only.
+  if (n_lead > 0L) {
+    base <- lead_parts$base
+    n_base <- DBI::dbGetQuery(
+      conn, paste0("SELECT COUNT(*) AS n FROM (", base$sql, ")"),
+      params = if (length(base$params) == 0) NULL else base$params)$n
+    prov <- .append_provenance_row(NULL, "query", sys.call(-1L), NA_integer_, n_base)
+    for (k in seq_len(n_lead)) {
+      verb <- switch(sql_steps[[k]]$type, ascend = "ascend_to",
+                     descend = "descend_to", sql_steps[[k]]$type)
+      prov <- .append_provenance_row(
+        prov, verb, NULL,
+        if (k == 1L) n_base else NA_integer_,
+        if (k == n_lead) nrow(seg_list) else NA_integer_)
+    }
+    attr(seg_list, "reindeer_provenance") <- prov
+    if (n_lead == 1L) .maybe_warn_loss(prov[[2]]$verb, n_base, nrow(seg_list))
+  }
+
   # Replay the remaining steps in declaration order on the materialized list.
   i_sql <- n_lead
   i_post <- 0L

@@ -124,6 +124,12 @@
     # so silent row-drops during joins become visible.
     dn <- asNamespace("dplyr")
     cls <- "reindeer::segment_list"
+    registerS3method("rename",   cls, .rename_segment_list,   envir = dn)
+    registerS3method("group_by", cls, .group_by_segment_list, envir = dn)
+    registerS3method("rename",   "reindeer::extended_segment_list",
+                     .rename_extended_segment_list, envir = dn)
+    registerS3method("group_by", "reindeer::extended_segment_list",
+                     .group_by_extended_segment_list, envir = dn)
     registerS3method("left_join",  cls, .left_join_segment_list,  envir = dn)
     registerS3method("right_join", cls, .right_join_segment_list, envir = dn)
     registerS3method("inner_join", cls, .inner_join_segment_list, envir = dn)
