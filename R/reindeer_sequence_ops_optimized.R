@@ -720,3 +720,47 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 
   return(result)
 }
+
+#' Move to another level of the annotation hierarchy
+#'
+#' Direction is inferred from the corpus hierarchy: if `level` lies above the
+#' segments' level the result is the parent (as [ascend_to()]), if it lies
+#' below it is the span of children (as [descend_to()]), exactly like
+#' `emuR::requery_hier()`.
+#'
+#' @param .segments A `segment_list` or lazy plan.
+#' @param level Target level name.
+#' @param .from Optional `corpus`.
+#' @param .quiet Suppress messages.
+#' @return A `segment_list`.
+#' @seealso [scout()] for moving along a level.
+#' @examplesIf interactive()
+#' corp <- demo_corpus()
+#' move_to(query(corp, "Phonetic == t"), "Syllable")   # up
+#' move_to(query(corp, "Syllable == S"), "Phonetic")   # down
+#' @export
+move_to <- function(.segments, level, .from = NULL, .quiet = TRUE) {
+  if (S7::S7_inherits(.segments, lazy_segment_list)) .segments <- dplyr::collect(.segments)
+  if (!S7::S7_inherits(.segments, segment_list)) {
+    cli::cli_abort("{.arg .segments} must be a segment_list")
+  }
+  from_levels <- unique(.segments$level)
+  if (length(from_levels) != 1L) {
+    cli::cli_abort("{.fn move_to} needs segments on one level; found {.val {from_levels}}.")
+  }
+  corp <- get_corpus_cached(.segments, .from)
+  hier <- get_hierarchy_info(corp@basePath)
+  path <- find_dominance_path(hier, from_levels, level)
+  if (length(path$path) < 2L) {
+    cli::cli_abort("No hierarchy path between {.val {from_levels}} and {.val {level}}.")
+  }
+  dirs <- unique(path$directions)
+  if (length(dirs) != 1L) {
+    cli::cli_abort("{.val {from_levels}} and {.val {level}} are not on one dominance chain.")
+  }
+  if (dirs == "up") {
+    ascend_to(.segments, level, .from = .from, .quiet = .quiet)
+  } else {
+    descend_to(.segments, level, .from = .from, .quiet = .quiet)
+  }
+}

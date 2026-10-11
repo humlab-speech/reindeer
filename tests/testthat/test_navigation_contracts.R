@@ -134,3 +134,17 @@ test_that("scout over ~18k segments takes well under a few seconds", {
   elapsed <- system.time(suppressWarnings(scout(segs, 1)))[["elapsed"]]
   expect_lt(elapsed, 3)
 })
+
+test_that("move_to() infers the direction from the hierarchy", {
+  skip_if_no_emuR()
+  corp <- create_shared_ae_corpus()
+  ph <- collect(query(corp, "Phonetic == t"))
+  up <- move_to(ph, "Syllable")
+  expect_equal(unique(up$level), "Syllable")
+  expect_equal(nrow(up), nrow(ascend_to(ph, "Syllable")))
+  sy <- collect(query(corp, "Syllable == S"))
+  down <- move_to(sy, "Phonetic")
+  expect_equal(unique(down$level), "Phonetic")
+  expect_equal(nrow(down), nrow(sy))                       # one span per parent
+  expect_error(move_to(ph, "Nonexistent"), "No hierarchy path")
+})
