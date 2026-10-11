@@ -138,3 +138,10 @@
 
   invisible()
 }
+
+.onUnload <- function(libpath) {
+  # Do not leave a reindeer-started Artic server listening after unload.
+  h <- getOption("reindeer.serve_handle")
+  if (!is.null(h)) try(httpuv::stopServer(h), silent = TRUE)
+  options(reindeer.serve_handle = NULL)
+}

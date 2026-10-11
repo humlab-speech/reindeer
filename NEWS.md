@@ -45,6 +45,14 @@ caches miss once. Numbers from 2.3.0's work package list follow.
   with a warning. `annotate()`/`review()` saves update the cache through the
   same sync instead of a hand-rolled bundle upsert.
 
+- Artic server (`annotate()`/`review()`): the Artic dist is served by httpuv
+  `staticPaths` without entering R; whole media files are streamed as file
+  bodies instead of being read into memory (the media URL is now `/media?...`);
+  the server stops 10 s after the last browser client disconnects, and on
+  package unload. Navigation verbs reuse the live corpus' connection instead
+  of opening a new one per call, and `get_corpus_cached()` no longer pins
+  corpora (and connections) for the whole session.
+
 ## EQL / emuR parity
 
 - One compiler: eager `query(lazy = FALSE)` now compiles the same SQL as the

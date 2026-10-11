@@ -39,6 +39,7 @@ Imports:
     dplyr (>= 1.0.0),
     pillar
 Suggests:
+    later,
     Rdpack,
     wrassp,
     imputeTS,

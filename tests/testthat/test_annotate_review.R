@@ -134,7 +134,8 @@ test_that(".serve_file_response streams exactly the requested range", {
 
   full <- .serve_file_response(f, "audio/x-wav", NULL)
   expect_equal(full$status, 200L)
-  expect_length(full$body, 100)
+  # a whole file is handed to httpuv as a file body, never read into R
+  expect_equal(full$body$file, normalizePath(f))
 
   head_range <- .serve_file_response(f, "audio/x-wav", "bytes=10-")
   expect_equal(head_range$status, 206L)
@@ -147,7 +148,7 @@ test_that(".serve_file_response streams exactly the requested range", {
 
   whole <- .serve_file_response(f, "audio/x-wav", "bytes=0-")
   expect_equal(whole$status, 200L)
-  expect_length(whole$body, 100)
+  expect_equal(whole$body$file, normalizePath(f))
 
   expect_equal(.serve_file_response(f, "audio/x-wav", "bytes=500-600")$status, 416L)
   expect_equal(.serve_file_response(f, "audio/x-wav", "garbage")$status, 416L)

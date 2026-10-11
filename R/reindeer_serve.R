@@ -74,106 +74,54 @@
   # filesystem checks, so it should not run per request).
   webAppDir <- find_artic(appDir = appDir, require = require_artic)
 
-  # Define HTTP request handler
+  # HTTP handler. The Artic dist (index.html, JS, CSS, fonts) is served by
+  # httpuv itself from `staticPaths`, without entering R; this handler only
+  # sees what is not a static file: media requests (GET /media?session=...).
   httpRequest <- function(req) {
-    if (req$REQUEST_METHOD == "GET") {
+    if (identical(req$REQUEST_METHOD, "GET") && identical(req$PATH_INFO, "/media")) {
       queryStr <- .parse_query_string(req$QUERY_STRING)
-
-      # Handle media file requests
-      if (!is.null(queryStr$session) && !is.null(queryStr$bundle)) {
-        if (!.safe_part(queryStr$session) || !.safe_part(queryStr$bundle) ||
-            !.safe_part(queryStr$fileExtension)) {
-          return(list(status = 403L, headers = list(`Content-Type` = "text/plain"),
-                      body = "Forbidden: Invalid path\r\n"))
-        }
-        mediaFilePath <- file.path(
-          emuDBhandle$basePath,
-          paste0(queryStr$session, get_session_suffix()),
-          paste0(queryStr$bundle, get_bundle_dir_suffix()),
-          paste0(queryStr$bundle, ".", queryStr$fileExtension)
-        )
-
-        audioFileData <- NULL
-        res <- .serve_file_response(mediaFilePath, "audio/x-wav", req$HTTP_RANGE)
-        res$headers$`Access-Control-Allow-Origin` <- "*"
-        return(res)
-      } else {
-        # Handle static file requests from EMU-webApp
-        path <- utils::URLdecode(req$PATH_INFO)
-        Encoding(path) <- "UTF-8"
-
-        # Prevent path traversal attacks - reject paths with ../ or absolute paths
-        if (grepl("\\.\\.", path, fixed = TRUE) || startsWith(path, "/")) {
-          return(list(
-            status = 403L,
-            headers = list(`Content-Type` = "text/plain"),
-            body = "Forbidden: Invalid path\r\n"
-          ))
-        }
-
-        status <- 200L
-
-        # Use revised EMU-webApp directory (resolved once per serve() call)
-        path <- file.path(webAppDir, path)
-
-        # Additional validation: ensure resolved path is within webAppDir
-        # Use normalizePath with mustWork=FALSE to avoid errors on non-existent paths
-        normalized_path <- normalizePath(path, winslash = "/", mustWork = FALSE)
-        normalized_webAppDir <- normalizePath(webAppDir, winslash = "/", mustWork = TRUE)
-
-        # Check if the normalized path starts with the webapp directory
-        if (!startsWith(normalized_path, normalized_webAppDir)) {
-          return(list(
-            status = 403L,
-            headers = list(`Content-Type` = "text/plain"),
-            body = "Forbidden: Path outside webapp directory\r\n"
-          ))
-        }
-
-        if (utils::file_test("-d", path)) {
-          # Directory listing for the webApp root
-          if (file.exists(idx <- file.path(path, "index.html"))) {
-            body <- readLines(idx, warn = FALSE)
-          } else {
-            d <- file.info(list.files(path, all.files = TRUE, full.names = TRUE))
-            title <- utils::URLencode(path, reserved = TRUE)
-            body <- c("<!DOCTYPE html>", "<html>", "<head>",
-              sprintf("<title>%s</title>", title), "</head>",
-              "<body>",
-              c(sprintf("<h1>Index of %s</h1>", title),
-                # Note: Using simplified directory listing instead of emuR:::fileinfo_table
-                paste0("<ul>", paste0("<li>", names(d), "</li>", collapse = ""), "</ul>")),
-              "</body>", "</html>")
-          }
-          if (is.character(body) && length(body) > 1) {
-            body <- paste(body, collapse = "\n")
-          }
-          return(list(
-            status = 200L,
-            body = body,
-            headers = list(`Content-Type` = "text/html")
-          ))
-        }
-
-        # Files go through the one range-aware implementation. The inlined copy
-        # that used to live here mis-parsed open-ended ranges (`bytes=100-` made
-        # `b3 == 0` evaluate to NA, an error inside `if`), and it duplicated
-        # .serve_file_response().
-        return(.serve_file_response(path, guess_mime_type(path), req$HTTP_RANGE))
+      if (!.safe_part(queryStr$session) || !.safe_part(queryStr$bundle) ||
+          !.safe_part(queryStr$fileExtension)) {
+        return(list(status = 403L, headers = list(`Content-Type` = "text/plain"),
+                    body = "Forbidden: Invalid path\r\n"))
       }
+      mediaFilePath <- file.path(
+        emuDBhandle$basePath,
+        paste0(queryStr$session, get_session_suffix()),
+        paste0(queryStr$bundle, get_bundle_dir_suffix()),
+        paste0(queryStr$bundle, ".", queryStr$fileExtension)
+      )
+      res <- .serve_file_response(mediaFilePath, "audio/x-wav", req$HTTP_RANGE)
+      res$headers$`Access-Control-Allow-Origin` <- "*"
+      return(res)
     }
+    list(status = 404L, headers = list(`Content-Type` = "text/plain"), body = "Not found\r\n")
   }
 
-  # Define WebSocket handlers
   onHeaders <- function(req) {
     # Currently unused
   }
 
+  n_open <- new.env(parent = emptyenv())
+  n_open$n <- 0L
+
   serverEstablished <- function(ws) {
     cli::cli_alert_success("reindeer websocket service established")
 
+    n_open$n <- n_open$n + 1L
     serverClosed <- function(ws) {
       cli::cli_alert_info("reindeer websocket service closed")
+      n_open$n <- n_open$n - 1L
+      # Last client gone: stop the server after a grace period, so closing the
+      # browser tab does not leave it running while a reload can reconnect.
+      later::later(function() {
+        if (n_open$n <= 0L) {
+          h <- getOption("reindeer.serve_handle")
+          if (!is.null(h)) try(httpuv::stopServer(h), silent = TRUE)
+          options(reindeer.serve_handle = NULL)
+          cli::cli_alert_info("reindeer Artic server stopped (no clients left)")
+        }
+      }, delay = 10)
     }
 
     sendError <- function(ws, errMsg, callbackID) {
@@ -312,7 +260,7 @@
           encoding = "GETURL",
           data = paste0(
             translateFunction(paste0("http://", ws$request$HTTP_HOST)),
-            "?session=", utils::URLencode(bundleSess, reserved = TRUE),
+            "/media?session=", utils::URLencode(bundleSess, reserved = TRUE),
             "&bundle=", utils::URLencode(bundleName, reserved = TRUE),
             "&fileExtension=", utils::URLencode(DBconfig$mediafileExtension, reserved = TRUE)
           )
@@ -550,7 +498,7 @@
   cli::cli_alert_info("To stop the server:")
   cli::cli_ul(c(
     "Press the 'clear' button in Artic",
-    "Close/reload the webApp in your browser",
+    "Close the webApp in your browser (the server stops 10 s after the last client leaves)",
     "Call {.code httpuv::stopServer(getOption('reindeer.serve_handle'))} in R"
   ))
 
@@ -558,7 +506,8 @@
   app <- list(
     call = httpRequest,
     onHeaders = onHeaders,
-    onWSOpen = serverEstablished
+    onWSOpen = serverEstablished,
+    staticPaths = list("/" = httpuv::staticPath(webAppDir, indexhtml = TRUE, fallthrough = TRUE))
   )
 
   # Start server and retain the handle so it can be stopped scoped later.
@@ -625,7 +574,8 @@
     return(list(
       status = 200L,
       headers = list(`Content-Type` = content_type),
-      body = readBin(path, "raw", file_size)
+      # httpuv streams the file itself; it is never read into R.
+      body = list(file = normalizePath(path), owned = FALSE)
     ))
   }
 
