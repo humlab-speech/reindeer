@@ -1,0 +1,84 @@
+---
+title: "Annotating and reviewing in Artic"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Annotating and reviewing in Artic}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+Artic is the browser-based annotation tool. `annotate()` starts a
+small local web server for a corpus and open Artic on it; saving in the browser
+writes straight back to the corpus. These chunks are shown, not run, because
+they start a server and open a browser.
+
+```{r load, eval = TRUE}
+library(reindeer)
+corp <- demo_corpus()
+```
+
+## Edit a corpus
+
+```{r annotate}
+annotate(corp)                                       # everything
+annotate(corp, session_pattern = "000.*")            # some sessions
+annotate(corp, bundle_pattern = "msajc01.*")         # some bundles
+```
+
+Patterns are regular expressions. Change the address with `port =`, `host =`,
+`auto_open_url = FALSE`, `browser =` or `use_viewer =`; `debug = TRUE` prints the
+WebSocket traffic. Stop the server by closing the tab or with
+`httpuv::stopAllServers()`.
+
+## Review a query result
+
+Pass a segment list to `annotate()` and Artic opens it as a
+playlist with one time anchor per segment, stepping through them in the order
+of the rows.
+
+```{r review}
+stops <- query(corp, "Phonetic == t")
+annotate(stops)
+```
+
+Sort first to decide the order. Reviewing the least reliable measurements
+first is a good use:
+
+```{r sorted}
+vowels <- query(corp, "Phonetic == V")
+formants <- quantify(vowels, superassp::trk_formant_forest)
+annotate(formants |> dplyr::arrange(dplyr::desc(F1_Hz)))
+```
+
+When the segment list came from `quantify()`, the computed tracks are drawn
+over the spectrogram as overlays, so you can see what the measurement did.
+Choose them with `tracks =`, or turn them off with `tracks = character()`.
+
+## Setup
+
+reindeer ships with a build of Artic. To use another one, give its directory
+for one call, for the session, or for all sessions:
+
+```{r setup-artic}
+annotate(corp, app_dir = "../artic/dist")
+options(reindeer.artic.dir = "/path/to/artic/dist")
+Sys.setenv(ARTIC_DIR = "/path/to/artic/dist")
+```
+
+Lookup order: the `app_dir` argument, the `reindeer.artic.dir` option, the
+`ARTIC_DIR` environment variable, the bundled build, then a sibling
+`../artic/dist`.
+
+## Good to know
+
+* Edits are saved to the `_annot.json` files; the query cache follows
+  automatically the next time the corpus is opened or queried.
+* The corpus's `_DBconfig.json` is never written by a session; view settings
+  (which levels and tracks are shown) live only in memory.
+* `annotate()` is also the name of a ggplot2 function. If the first argument is
+  not a corpus or segment list, the call is passed on to ggplot2, so both work.
+* The old `serve()` and `serve_app()` are stubs that point here.

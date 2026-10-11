@@ -367,10 +367,10 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   add("authors:")
   for (a in cff$authors) {
     if (!is.null(a$`family-names`)) {
-      add(" - family-names: ", esc(a$`family-names`))
+      add("  - family-names: ", esc(a$`family-names`))
       add("    given-names: ", esc(a$`given-names`))
     } else {
-      add(" - name: ", esc(a$name))
+      add("  - name: ", esc(a$name))
     }
     if (!is.null(a$affiliation)) {
       add("    affiliation: ", esc(a$affiliation))
@@ -378,12 +378,12 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   }
   add("identifiers:")
   for (id in cff$identifiers) {
-    add(" - type: ", id$type)
+    add("  - type: ", id$type)
     add("    value: ", esc(id$value))
     add("    description: ", esc(id$description))
   }
   add("keywords:")
-  for (kw in cff$keywords) add(" - ", esc(kw))
+  for (kw in cff$keywords) add("  - ", esc(kw))
 
   writeLines(lines, path, useBytes = TRUE)
   invisible(path)

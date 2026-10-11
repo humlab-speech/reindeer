@@ -1,0 +1,65 @@
+---
+title: "Building a corpus from recordings"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Building a corpus from recordings}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(reindeer)
+library(dplyr, warn.conflicts = FALSE)
+```
+
+A corpus is a directory ending in `_emuDB`. `corpus(path, create = TRUE)` makes
+an empty one; `import_media()` fills it from audio files.
+
+```{r create}
+root <- tempfile("build_"); dir.create(root)
+corp <- corpus(file.path(root, "pilot_emuDB"), create = TRUE)
+corp
+```
+
+## Import recordings
+
+Each file becomes a bundle named after the file, in the session you name. The
+whole batch is checked before anything is written: missing files, duplicate or
+unsafe names, and clashes with existing bundles stop the import with nothing
+changed.
+
+```{r import}
+wavs <- list.files(file.path(demo_corpus()@basePath, "0000_ses"),
+                   pattern = "wav$", recursive = TRUE, full.names = TRUE)[1:3]
+meta <- data.frame(bundle = tools::file_path_sans_ext(basename(wavs)),
+                   Speaker = c("P01", "P02", "P03"),
+                   Gender  = c("Female", "Male", "Female"),
+                   Age     = c(8, 35, 62))
+import_media(corp, wavs, session = "S1", metadata = meta)
+get_metadata(corp) |> select(session, bundle, Speaker, Gender, Age)
+```
+
+Per-bundle metadata can be a data frame (as here), or one named list that
+applies to every file. Whatever you give is validated and written to
+`METADATA.json` files; see `vignette("metadata")`.
+
+```{r clash}
+tryCatch(import_media(corp, wavs[1], session = "S1"),
+         error = function(e) cat(conditionMessage(e)))
+```
+
+## Check what you have
+
+```{r check}
+summary(corp)
+```
+
+`validate_corpus()` checks every JSON file against its schema and returns a
+tidy table, so problems are easy to filter and count.
+
+## Next steps
+
+* Annotate: `annotate(corp)` opens the corpus in Artic (`vignette("annotating")`).
+* Bring in existing annotations: `vignette("interoperability")`.
+* Describe and archive the result: `vignette("archiving")`.

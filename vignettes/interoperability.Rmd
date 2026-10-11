@@ -1,0 +1,53 @@
+---
+title: "Working with other tools: ELAN, Praat and emuR"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Working with other tools: ELAN, Praat and emuR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(reindeer)
+corp <- demo_corpus()
+```
+
+## Praat TextGrid and ELAN
+
+`read_annotations()` and `write_annotations()` choose the format from the file
+extension (`.TextGrid`, `.eaf`) and use one schema: `level`, `labels`, `start`,
+`end`, with times in milliseconds, exactly like a `segment_list`.
+
+```{r write}
+segs <- query(corp, "Phonetic == V") |> collect()
+tg <- tempfile(fileext = ".TextGrid")
+write_annotations(segs, tg)
+ann <- read_annotations(tg)
+ann
+```
+
+```{r eaf}
+eaf <- tempfile(fileext = ".eaf")
+write_annotations(segs, eaf)
+nrow(read_annotations(eaf)) == nrow(segs)
+```
+
+## Coming from emuR
+
+reindeer reads and writes the same on-disk database, so a corpus made with
+emuR opens directly and keeps working in emuR.
+
+| emuR | reindeer |
+|------|----------|
+| `load_emuDB(path)` | `corpus(path)` |
+| `query(db, "Phonetic == t")` | `query(corp, "Phonetic == t")` |
+| `requery_hier()` / `requery_seq()` | `descend_to()` / `ascend_to()` / `move_to()` |
+| `get_trackdata(db, seglist, "fms")` | `quantify(segs, <dsp function>)` |
+| `serve(db)` | `annotate(corp)` |
+| `list_bundles()` / `list_sessions()` | `get_metadata(corp)` |
+
+Queries give the same results as emuR on the 80 golden test queries; the
+difference is speed (the cache is synced incrementally and queries run as
+a single SQL statement) and that results are tibbles with provenance
+(`vignette("querying")`).

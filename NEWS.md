@@ -6,6 +6,11 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
 
 ## Interface
 
+- Vignettes rewritten as eight workflow guides: getting_started, querying,
+  speaker_aware, metadata, building_a_corpus, archiving, interoperability,
+  annotating. Every chunk runs; a test knits them and fails on empty output.
+- `dsp_parameters(age = , gender = )` is vectorised over both arguments.
+
 - `extended_segment_list` is no longer a class. A `segment_list` that carries
   `quantify()` output has `@dsp_function` / `@dsp_columns` set;
   `is_extended_segment_list()` tests for that, and `extended_segment_list()` is
@@ -169,6 +174,11 @@ session with class `reindeer_deprecated` when called from outside the package:
   accepted although emuR rejects them.
 
 ## Fixed (silent wrong results)
+
+- `CITATION.cff` was invalid YAML (list items mis-indented), so GitHub/Zenodo
+  could not read it. Fixed and tested by parsing the file.
+- `set_metadata()` could not update array-valued fields such as `team`: the
+  old value silently stayed in `METADATA.json`. Arrays now replace.
 
 - `quantify()`: when the DSP routine errored on a segment in the batched
   executor, every later segment's result moved up one row (or the call

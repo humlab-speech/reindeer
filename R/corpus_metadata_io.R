@@ -94,6 +94,21 @@ corpus_assign_metadata <- function(corpus_obj, session_pattern, bundle_pattern, 
   invisible(NULL)
 }
 
+#' Merge new metadata into stored metadata: named objects merge key by key,
+#' everything else (scalars, arrays such as `team`) is replaced. `NULL`
+#' removes a field. (`modifyList()` ignores unnamed lists, so an array could
+#' never be updated.)
+#' @noRd
+.merge_metadata <- function(old, new) {
+  for (k in names(new)) {
+    v <- new[[k]]
+    if (is.null(v)) old[[k]] <- NULL
+    else if (is.list(v) && !is.null(names(v)) && is.list(old[[k]]) && !is.null(names(old[[k]]))) old[[k]] <- .merge_metadata(old[[k]], v)
+    else old[[k]] <- v
+  }
+  old
+}
+
 #' Set database-level metadata
 #' @keywords internal
 #' @noRd
@@ -107,7 +122,7 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
     corpus_obj@basePath, sub("_emuDB$", "", basename(corpus_obj@basePath)))
   
   # Merge
-  updated <- utils::modifyList(existing, .jsonable_metadata(metadata_list), keep.null = FALSE)
+  updated <- .merge_metadata(existing, .jsonable_metadata(metadata_list))
 
   # Validate before writing
   .validate_against_schema(updated, "metadata.schema.json",
@@ -156,7 +171,7 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
     existing <- .read_level_metadata(dirname(session_meta_file), session_name)
     
     # Merge
-    updated <- utils::modifyList(existing, .jsonable_metadata(metadata_list), keep.null = FALSE)
+    updated <- .merge_metadata(existing, .jsonable_metadata(metadata_list))
 
     # Ensure directory exists
     session_dir <- dirname(session_meta_file)
@@ -211,7 +226,7 @@ set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, met
     existing <- .read_level_metadata(dirname(bundle_meta_file), bundle_name)
     
     # Merge
-    updated <- utils::modifyList(existing, .jsonable_metadata(metadata_list), keep.null = FALSE)
+    updated <- .merge_metadata(existing, .jsonable_metadata(metadata_list))
 
     # Ensure directory exists
     bundle_dir <- dirname(bundle_meta_file)

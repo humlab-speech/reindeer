@@ -1,0 +1,67 @@
+---
+title: "Describing and archiving a corpus"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Describing and archiving a corpus}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(reindeer)
+src <- demo_corpus()@basePath
+work <- tempfile("arch_"); dir.create(work); file.copy(src, work, recursive = TRUE)
+corp <- corpus(file.path(work, basename(src)))
+```
+
+Archives and repositories want a README, a citation file and a machine-readable
+record. reindeer writes all of them from the metadata you already keep.
+
+## What is generated
+
+```{r describe}
+set_metadata(corp, list(
+  Project = "Demo speech corpus",
+  Description = "Read speech from a small demonstration database.",
+  License = "CC-BY-4.0",
+  team = list(list(name = "Fredrik Nylén", affiliation = "Umeå University"))))
+files <- describe_corpus(corp, verbose = FALSE)
+basename(files)
+```
+
+| File | For |
+|------|-----|
+| `README.md` | people |
+| `CITATION.cff` | GitHub, Zenodo, reference managers |
+| `datacite.json` | DOI registration |
+| `_corpus_jsonld.json` | schema.org / search engines |
+| `<name>_cmdi.xml` | CLARIN infrastructure |
+
+## Kept up to date
+
+After a metadata write, the files reindeer owns are regenerated if (and only
+if) the metadata changed. Files reindeer did not create are never overwritten unless you pass `force = TRUE`. Opening a corpus never writes anything.
+
+```{r auto}
+set_metadata(corp, list(team = list(list(name = "Ada Lovelace"))))
+grep("family-names", readLines(file.path(corp@basePath, "CITATION.cff")), value = TRUE)
+```
+
+Switch the automatic step off with `options(reindeer.auto_cmdi = FALSE)`.
+
+## Export elsewhere, validate
+
+```{r export}
+out <- file.path(work, "export")
+describe_corpus(corp, output_dir = out, formats = c("cff", "datacite"), verbose = FALSE) |>
+  basename()
+```
+
+```{r validate, eval = FALSE}
+validate_cmdi(file.path(corp@basePath, "ae_cmdi.xml"))   # against the CLARIN profile
+```
+
+CMDI profiles: `"speech-corpus"` (default), `"media-corpus"`,
+`"speech-corpus-dlu"`; add `"session-cmdi"` to `formats` for one record per
+session and bundle.

@@ -175,3 +175,22 @@ test_that("summary(corpus) reports schema, FAIR and cache status", {
   expect_match(out, "FAIR artifacts:")
   expect_match(out, "Quantify cache:")
 })
+
+test_that("CITATION.cff is valid YAML with authors and identifiers", {
+  skip_if_not_installed("yaml")
+  corp <- create_isolated_ae_corpus()
+  set_metadata(corp, list(team = list(list(name = "Ada Lovelace", affiliation = "Analytical U"))))
+  describe_corpus(corp, formats = "cff", force = TRUE, verbose = FALSE)
+  cff <- yaml::read_yaml(file.path(corp@basePath, "CITATION.cff"))
+  expect_equal(cff$authors[[1]]$`family-names`, "Lovelace")
+  expect_equal(cff$identifiers[[1]]$type, "other")
+  expect_true("speech corpus" %in% unlist(cff$keywords))
+})
+
+test_that("array-valued metadata (team) can be updated", {
+  corp <- create_isolated_ae_corpus()
+  set_metadata(corp, list(team = list(list(name = "A B"))))
+  set_metadata(corp, list(team = list(list(name = "Ada Lovelace"), list(name = "C D"))))
+  meta <- jsonlite::read_json(file.path(corp@basePath, "METADATA.json"))
+  expect_equal(vapply(meta$team, `[[`, "", "name"), c("Ada Lovelace", "C D"))
+})
