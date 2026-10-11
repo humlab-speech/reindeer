@@ -32,8 +32,25 @@ get_shared_ae_path <- function() {
 #' @param verbose Logical
 #' @return Character path to ae_emuDB directory
 create_isolated_ae_db <- function(verbose = FALSE) {
-  reindeer:::create_ae_db(verbose = verbose)
+  # Copy of a per-session template whose SQLite cache is already built:
+  # opening it costs ~0.06 s instead of ~2 s for a cold build.
+  tpl <- ae_template_path()
+  dest <- tempfile("reindeer_ae_")
+  dir.create(dest)
+  file.copy(tpl, dest, recursive = TRUE)
+  file.path(dest, basename(tpl))
 }
+
+ae_template_path <- function() {
+  if (is.null(.ae_template$path) || !dir.exists(.ae_template$path)) {
+    p <- reindeer:::create_ae_db(verbose = FALSE)
+    suppressMessages(reindeer::corpus(p, verbose = FALSE))
+    gc()  # release the SQLite connection before the dir is copied
+    .ae_template$path <- p
+  }
+  .ae_template$path
+}
+.ae_template <- new.env()
 
 #' Load the shared ae database as an emuR handle
 #'
