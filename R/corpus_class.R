@@ -187,11 +187,8 @@ corpus <- S7::new_class(
       tryCatch(
         describe_corpus(corpus_obj, verbose = FALSE),
         error = function(e) {
-          if (verbose) {
-            cli::cli_alert_warning(
-              "Auto-CMDI regeneration failed: {conditionMessage(e)}"
-            )
-          }
+          cli::cli_warn("Auto-CMDI regeneration failed: {conditionMessage(e)}",
+                        class = c("reindeer_cmdi_warning", "reindeer_warning"))
         }
       )
     }

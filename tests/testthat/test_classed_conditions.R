@@ -42,3 +42,15 @@ test_that("corpus(sync_eaf=) warns with class reindeer_deprecated", {
   p <- create_isolated_ae_db()
   expect_warning(corpus(p, sync_eaf = TRUE), class = "reindeer_deprecated")
 })
+
+test_that("auto-CMDI failure warns with a classed condition and keeps the write", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  withr::local_options(reindeer.auto_cmdi = TRUE)
+  testthat::local_mocked_bindings(
+    describe_corpus = function(...) stop("boom"), .package = "reindeer")
+  expect_warning(
+    add_metadata(corp, list(Project = "p")),
+    class = "reindeer_cmdi_warning")
+  expect_equal(jsonlite::read_json(file.path(corp@basePath, "METADATA.json"))$Project, "p")
+})

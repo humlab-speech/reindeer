@@ -312,7 +312,10 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
   tryCatch(
     file.create(file.path(corpus_obj@basePath, ".cmdi_dirty"),
                 showWarnings = FALSE),
-    error = function(e) NULL
+    error = function(e) {
+      cli::cli_warn("Could not flag metadata as changed: {conditionMessage(e)}",
+                    class = c("reindeer_metadata_warning", "reindeer_warning"))
+    }
   )
   invisible(NULL)
 }
@@ -362,7 +365,10 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
 .auto_describe <- function(corpus_obj) {
   if (!isTRUE(getOption("reindeer.auto_cmdi", FALSE))) return(invisible(FALSE))
   if (isTRUE(getOption("reindeer._auto_cmdi_suppress", FALSE))) return(invisible(FALSE))
-  tryCatch(describe_corpus(corpus_obj, verbose = FALSE), error = function(e) NULL)
+  tryCatch(describe_corpus(corpus_obj, verbose = FALSE), error = function(e) {
+    cli::cli_warn("Auto-CMDI regeneration failed (the metadata write succeeded): {conditionMessage(e)}",
+                  class = c("reindeer_cmdi_warning", "reindeer_warning"))
+  })
   invisible(TRUE)
 }
 

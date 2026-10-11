@@ -36,6 +36,18 @@
   (`reindeer_metadata_warning`). `quantify()` output no longer carries the
   helper Age/Gender columns.
 
+- Metadata safety: the first write to a level that only has a legacy
+  `.meta_json` keeps its fields; `Date`/`POSIXct` values are stored as ISO-8601
+  strings; a field holding integers and doubles is a double (was truncated by
+  the first row's type) and mixed numbers/text become character; `corpus()`
+  reopen picks up `METADATA.json` edits made outside R; a malformed metadata
+  file aborts with `reindeer_metadata_error` naming it and leaves the cache
+  untouched (it used to be read as empty); `add_metadata(reset.before.add =
+  TRUE)` refreshes the cache; `corp["S", ]` selectors match whole names and
+  `corp["S", ] <- list()` works; Excel import validates the whole workbook
+  before writing; failures in auto-CMDI regeneration warn (`reindeer_cmdi_warning`)
+  instead of being swallowed.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

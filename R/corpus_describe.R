@@ -53,7 +53,11 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
   # API writes flat keys (Project, Funder, ...), not the nested project/funding
   # objects read above, so without this user-set metadata never reaches the
   # generated artifacts.
-  md <- tryCatch(get_metadata(corpus_obj), error = function(e) NULL)
+  md <- tryCatch(get_metadata(corpus_obj), error = function(e) {
+    cli::cli_warn("Could not read database metadata for the FAIR artifacts: {conditionMessage(e)}",
+                  class = c("reindeer_metadata_warning", "reindeer_warning"))
+    NULL
+  })
   if (!is.null(md) && nrow(md) > 0) {
     flat <- as.list(md[1, ])  # db-level defaults are inherited into every row
     if (is.null(proj$name)        && .nz(flat$Project))     proj$name        <- as.character(flat$Project)
@@ -592,7 +596,10 @@ describe_corpus <- function(corpus_obj,
 
   # Record the emitted state so the drift guard can skip unchanged reruns.
   if (is_default_dir) {
-    tryCatch(writeLines(state_hash, state_file), error = function(e) NULL)
+    tryCatch(writeLines(state_hash, state_file), error = function(e) {
+      cli::cli_warn("Could not record the FAIR drift state: {conditionMessage(e)}",
+                    class = c("reindeer_cmdi_warning", "reindeer_warning"))
+    })
   }
 
   # Artifacts are back in sync - clear the dirty bit.
