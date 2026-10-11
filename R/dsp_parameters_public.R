@@ -66,7 +66,13 @@ dsp_parameters <- function(age = NULL, gender = NULL, corpus_obj = NULL) {
     cli::cli_abort("Supply both {.arg age} and {.arg gender}, or pass {.arg corpus_obj}.")
   }
   gender <- .normalize_gender(gender)
-  .lookup_dspp_row(dspp, as.numeric(age), gender)
+  age <- as.numeric(age)
+  n <- max(length(age), length(gender))     # vectors are recycled
+  rows <- lapply(seq_len(n), function(i) {
+    .lookup_dspp_row(dspp, age[(i - 1L) %% length(age) + 1L],
+                     gender[(i - 1L) %% length(gender) + 1L])
+  })
+  do.call(rbind, rows)
 }
 
 # --- helpers ------------------------------------------------------------

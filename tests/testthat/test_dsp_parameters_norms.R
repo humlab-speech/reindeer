@@ -95,3 +95,10 @@ test_that("METADATA.json shadows legacy .meta_json at the same level", {
   expect_true("Source" %in% names(meta))
   expect_true(all(meta$Source == "modern"))
 })
+
+test_that("dsp_parameters() is vectorised over age and gender", {
+  p <- dsp_parameters(age = c(6, 40), gender = c("Female", "Male"))
+  expect_equal(nrow(p), 2L)
+  expect_equal(as.numeric(p$Age), c(6, 40))
+  expect_false(p$nominalF1[1] == p$nominalF1[2])
+})

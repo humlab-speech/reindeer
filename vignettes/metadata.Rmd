@@ -1,0 +1,95 @@
+---
+title: "Managing speaker and recording metadata"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Managing speaker and recording metadata}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(reindeer)
+library(dplyr, warn.conflicts = FALSE)
+src <- demo_corpus()@basePath
+work <- tempfile("meta_"); dir.create(work); file.copy(src, work, recursive = TRUE)
+corp <- corpus(file.path(work, basename(src)))
+```
+
+Metadata is stored in plain `METADATA.json` files next to the data they
+describe: one in the corpus directory, one per session, one per bundle. Those
+files are the ground truth; the corpus's SQLite cache is rebuilt from them.
+
+## Three levels, most specific wins
+
+```{r levels}
+set_metadata(corp, list(Project = "Demo study", Country = "SE"))        # whole corpus
+set_metadata(corp, list(Age = 31, Gender = "Female"), session = "0000") # one session
+set_metadata(corp, list(Quality = "poor"),
+             session = "0000", bundle = "msajc010")                     # one bundle
+get_metadata(corp) |> select(bundle, Project, Age, Gender, Quality)
+```
+
+Reading resolves the inheritance for you: every bundle shows the
+corpus-wide `Project`, the session's `Age` and `Gender`, and its own
+`Quality` where one was set. Writing validates against the metadata schema
+before touching a file, and keeps the cache in step.
+
+## From a table
+
+A data frame sets many scopes in one go and is checked as a whole first: if
+one row names a bundle that does not exist, nothing is written.
+
+```{r table}
+speakers <- data.frame(
+  session = "0000",
+  bundle  = c("msajc003", "msajc010", "msajc012"),
+  Speaker = c("P01", "P02", "P03")
+)
+set_metadata(corp, speakers)
+get_metadata(corp) |> select(bundle, Speaker) |> head(4)
+```
+
+```{r bad}
+tryCatch(
+  set_metadata(corp, data.frame(session = "0000", bundle = c("msajc015", "nope"), Rating = 1:2)),
+  error = function(e) conditionMessage(e))
+```
+
+Values keep their type: numbers stay numeric, dates are stored as ISO-8601
+text, and a field that holds both integers and decimals is numeric across the
+corpus.
+
+## Edit in a spreadsheet and come back
+
+`export_metadata()` writes a workbook with one sheet each for bundles,
+sessions and the database. It contains the raw value at each level (not the
+inherited ones), so importing it again changes nothing you did not edit.
+
+```{r excel, eval = requireNamespace("openxlsx", quietly = TRUE)}
+xlsx <- tempfile(fileext = ".xlsx")
+export_metadata(corp, xlsx)
+openxlsx::getSheetNames(xlsx)
+
+# ... edit the file in Excel, then:
+set_metadata(corp, xlsx)       # the whole workbook is validated before any write
+```
+
+## Files edited outside R
+
+Opening a corpus checks the modification time of every metadata file, so
+edits made with a text editor or by a colleague are picked up automatically;
+there is nothing to reload. A malformed file stops the sync with an error that
+names it and leaves the previous cache untouched.
+
+## Older files
+
+A corpus that still has `<name>.meta_json` files is read as before. The first
+time you write to a level, its legacy fields are carried over into
+`METADATA.json`, which then takes precedence at that level.
+
+## Clearing and the paper trail
+
+`set_metadata(..., reset = TRUE)` clears the fields at a scope before
+writing. After a write, reindeer regenerates the corpus's FAIR documentation
+(see `vignette("archiving")`) when the metadata actually changed.

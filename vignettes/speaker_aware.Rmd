@@ -1,0 +1,103 @@
+---
+title: "Speaker-aware measurement"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Speaker-aware measurement}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(reindeer)
+library(dplyr, warn.conflicts = FALSE)
+has_dsp <- requireNamespace("superassp", quietly = TRUE)
+# Work on a copy so the examples can write metadata freely.
+src <- demo_corpus()@basePath
+work <- tempfile("speaker_")
+dir.create(work)
+file.copy(src, work, recursive = TRUE)
+corp <- corpus(file.path(work, basename(src)))
+```
+
+Formant and pitch trackers work best with settings that fit the speaker: a
+child needs a higher formant ceiling than an adult man. reindeer picks those
+settings from the speaker's **Age** and **Gender** metadata, using
+literature-derived norms, and passes them to the signal-processing routine
+under whatever name that routine uses.
+
+## Put the speaker data where it belongs
+
+Metadata lives at three levels, and the most specific one wins: **bundle**
+(one recording) over **session** over **database** (defaults for everyone).
+
+```{r levels}
+set_metadata(corp, list(Project = "demo"))                          # database
+set_metadata(corp, list(Age = 6, Gender = "Female"), session = "0000")  # session
+set_metadata(corp, list(Age = 40, Gender = "Male"),
+             session = "0000", bundle = "msajc003")                 # one bundle
+get_metadata(corp) |> select(session, bundle, Age, Gender, Project)
+```
+
+## Preview what will be applied
+
+`dsp_parameters()` shows the norms for a given age and gender, before any
+measurement.
+
+```{r preview}
+dsp_parameters(age = c(6, 40), gender = c("Female", "Male")) |>
+  select(Age, Gender, minF, maxF, numFormants, nominalF1, windowSize)
+```
+
+## Measure, and see the effect
+
+```{r measure, eval = has_dsp}
+vowels <- collect(query(corp, "Phonetic == V|@|i:|u:|o:|A:|E|I|O"))
+f1 <- function(...) {
+  as.numeric(quantify(vowels, superassp::trk_formant_forest, .at = 0.5, ...)$F1_Hz)
+}
+with_norms    <- suppressWarnings(f1())
+without_norms <- suppressWarnings(f1(.use_metadata = FALSE))
+summary(abs(with_norms - without_norms))   # Hz moved by the speaker settings
+```
+
+The measured F1 values really differ: the metadata changed the settings the
+tracker ran with, not just a column in the output. Pass
+`.use_metadata = FALSE` to measure every speaker with the routine's defaults,
+or override a single setting for everyone, e.g.
+`quantify(vowels, superassp::trk_formant_forest, nominalF1 = 500)`.
+
+A routine that cannot receive any norm (a fixed-parameter tracker, say)
+warns once per call so that you know the speaker data had no effect.
+
+## Results are cached per recording
+
+The expensive step is analysing a whole recording, so reindeer analyses each
+file once and slices every segment out of the result. That table is cached;
+asking again, for other time points or other segments of the same recordings,
+is a cache hit.
+
+```{r cache, eval = has_dsp}
+invisible(suppressMessages(clear_cache(corp)))   # start cold
+midpoint <- suppressWarnings(quantify(vowels, superassp::trk_formant_forest, .at = 0.5))
+table(midpoint$.cache_status)           # first time: computed
+quarter  <- suppressWarnings(quantify(vowels, superassp::trk_formant_forest, .at = 0.25))
+table(quarter$.cache_status)            # different time point, same recordings
+```
+
+The cache is invalidated when the recording, the routine, or the speaker
+settings change. Look at its size with `summary(corp)` and empty it with
+`clear_cache(corp)` (or `clear_cache(corp, older_than = 30)`).
+
+## Several time points and long form
+
+`.at` takes several relative positions. `pivot_tracks_longer()` turns the
+wide result into one row per segment, track and time point, ready for
+plotting.
+
+```{r pivot, eval = has_dsp}
+contour <- suppressWarnings(
+  quantify(vowels, superassp::trk_formant_forest, .at = c(0.2, 0.5, 0.8)))
+long <- pivot_tracks_longer(contour, cols = c("F1_Hz", "F2_Hz"))
+head(as.data.frame(long)[, c("labels", "bundle", "track", "rel_time", "value")], 6)
+```

@@ -1,0 +1,111 @@
+---
+title: "Querying with EQL and moving through the hierarchy"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Querying with EQL and moving through the hierarchy}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(reindeer)
+library(dplyr, warn.conflicts = FALSE)
+corp <- demo_corpus()
+n <- function(q) nrow(collect(query(corp, q)))
+```
+
+`query()` understands the full EMU Query Language (EQL). Results are
+`segment_list`s: tibbles with one row per segment and times in
+milliseconds.
+
+## Simple queries
+
+```{r simple}
+n("Phonetic == t")            # equals
+n("Phonetic != t")            # not equals
+n("Phonetic =~ '[ptk]'")      # regular expression
+n("Phonetic !~ '[ptk]'")      # does not match
+n("Phonetic == t|k|p")        # one of several labels
+```
+
+A query names a level (`Phonetic`) and optionally an attribute
+(`Word:Text`). Labels with special characters are quoted with single quotes.
+
+## Sequences, dominance and conjunction
+
+```{r compound}
+n("[Phonetic == n -> Phonetic == t]")        # n directly followed by t
+n("[Syllable == S ^ Phonetic == @]")         # strong syllables containing @
+n("[Text == the & Word == F]")               # the same word has both labels
+n("[Phonetic == t | Phonetic == k]")         # either
+```
+
+`->` and `^` take exactly two operands; to chain them, nest brackets:
+`[[A -> B] -> C]`. `&` and `|` chain freely.
+
+## Projection
+
+`#` picks which side of a compound query you get back.
+
+```{r projection}
+both  <- collect(query(corp, "[Phonetic == n -> Phonetic == t]"))
+first <- collect(query(corp, "[#Phonetic == n -> Phonetic == t]"))
+both  |> select(labels, start, end) |> head(3)    # the span n..t
+first |> select(labels, start, end) |> head(3)    # just the n
+```
+
+## Position and count functions
+
+```{r functions}
+n("[Phonetic =~ .* & Start(Syllable, Phonetic) == 1]")   # first phone of a syllable
+n("[Syllable =~ .* & Num(Syllable, Phonetic) >= 3]")     # syllables with 3+ phones
+```
+
+These work across any number of hierarchy levels.
+
+## Moving along and through the annotation
+
+`scout()` moves along a level; negative steps go backwards. `move_to()` moves
+up or down the hierarchy, the direction coming from the corpus definition.
+
+```{r navigate}
+stops <- collect(query(corp, "Phonetic == t"))
+next_phone <- scout(stops, 1)
+prev_phone <- scout(stops, -1)
+syllables  <- move_to(stops, "Syllable")        # up
+phones     <- move_to(syllables, "Phonetic")    # down: one span per syllable
+c(stops = nrow(stops), next_phone = nrow(next_phone), syllables = nrow(syllables))
+syllables |> select(labels, start, end) |> head(3)
+```
+
+## Lazy queries and provenance
+
+`query()` does not touch the data until you ask for it, so a long pipeline
+can be built up and optimised as a whole. Adding steps never changes the
+plan you started from.
+
+```{r lazy}
+plan <- query(corp, "Phonetic == t")
+class(plan)[1]
+longer <- scout(plan, 1, collect = FALSE)       # still a plan, with one more step
+c(plan = nrow(plan), longer = nrow(longer))
+class(collect(longer))[1]
+```
+
+Every verb records what it did to the rows, so you can ask where segments
+went:
+
+```{r provenance}
+res <- collect(longer)
+provenance(res)
+dropped(res)
+```
+
+A step that loses more than a quarter of the rows warns, so silent row loss
+does not go unnoticed (change the threshold with
+`options(reindeer.loss_warn = 0.25)`).
+
+```{r loss}
+tryCatch(scout(stops, 500), warning = function(w) conditionMessage(w))
+```
