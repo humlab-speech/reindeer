@@ -352,3 +352,19 @@ test_that("Edge case: segment_list with single segment", {
   # Clean up
   unlink(db_path, recursive = TRUE)
 })
+
+test_that("clear_cache() empties the quantify cache, with dry_run and age filters", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  segs <- collect(query(corp, "Phoneme =~ .+"))[1:5, ]
+  fake <- function(listOfFiles, beginTime, endTime, toFile = FALSE, verbose = FALSE, ...) data.frame(v = 1)
+  quantify(segs, fake)
+  cache <- file.path(corp@basePath, ".quantify_cache")
+  expect_true(dir.exists(cache))
+  n_dry <- suppressMessages(clear_cache(corp, dry_run = TRUE))
+  expect_gt(n_dry, 0)
+  expect_equal(suppressMessages(clear_cache(corp, older_than = 3650, dry_run = TRUE)), 0)
+  n <- suppressMessages(clear_cache(corp))
+  expect_gt(n, 0)
+  expect_error(clear_cache(corp, older_than = "yesterday"), "older_than")
+})

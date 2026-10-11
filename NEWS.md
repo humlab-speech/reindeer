@@ -15,6 +15,18 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
   `autoplot()` collect a lazy plan first. `.cache_status` is no longer listed
   as a measurement column.
 
+## New verbs
+
+- `move_to(segs, level)`: direction inferred from the hierarchy (`ascend_to()` /
+  `descend_to()`, as `emuR::requery_hier()`).
+- `biographize(segs)` takes the corpus from the segments and keeps the input
+  row order (it used to sort by session/bundle).
+- `set_metadata(corpus, x)`: `x` is a list, a data.frame (one row per scope,
+  all-or-nothing) or the path of a workbook.
+- `export_metadata()` writes raw per-level values, so the workbook round-trips
+  through `import_metadata()` without copying inherited values to every bundle.
+- `clear_cache(corpus, older_than = NULL, dry_run = FALSE)`.
+
 ## Performance
 
 - `library(reindeer)` loads 16 namespaces instead of 25 (0.48 s -> 0.28 s): the

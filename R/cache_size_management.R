@@ -759,3 +759,36 @@ manage_cache <- function(corpus,
     }
   )
 }
+
+#' Clear the quantify cache of a corpus
+#'
+#' Removes cached measurements, all of them or only those not used for a
+#' while. The cache is rebuilt on demand by [quantify()]; nothing in the
+#' corpus itself changes.
+#'
+#' @param corpus A [corpus()].
+#' @param older_than `NULL` (default) clears everything. A number is a count
+#'   of days; a `difftime` is used as is. Only entries last used earlier than
+#'   that are removed.
+#' @param dry_run If `TRUE`, report what would be removed and remove nothing.
+#' @return Invisibly, the number of cache files or entries (that would be)
+#'   removed.
+#' @seealso [summary()] on a corpus for cache sizes.
+#' @examplesIf interactive()
+#' corp <- demo_corpus()
+#' clear_cache(corp, dry_run = TRUE)
+#' clear_cache(corp, older_than = 30)
+#' @export
+clear_cache <- function(corpus, older_than = NULL, dry_run = FALSE) {
+  if (!S7::S7_inherits(corpus, reindeer::corpus)) {
+    cli::cli_abort("{.arg corpus} must be a corpus")
+  }
+  days <- if (is.null(older_than)) -1 else  # -1: cutoff in the future = everything if (inherits(older_than, "difftime")) {
+    as.numeric(older_than, units = "days")
+  } else if (is.numeric(older_than) && length(older_than) == 1L && older_than >= 0) {
+    older_than
+  } else {
+    cli::cli_abort("{.arg older_than} must be NULL, a number of days or a difftime")
+  }
+  invisible(clean_quantify_cache(corpus, days_old = days, dry_run = dry_run, verbose = TRUE))
+}
