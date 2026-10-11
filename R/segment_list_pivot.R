@@ -58,7 +58,9 @@
 #'   list-column tracks).
 #' @param .keep_metadata If `TRUE` (default), metadata columns
 #'   (see [metadata_cols()]) are carried through.
-#' @return A `track_long` tibble.
+#' @return A `track_long` tibble with one row per segment, track and time
+#'   point: the segment's own columns plus `track` (e.g. `"F1"`), `rel_time`
+#'   (relative position in the segment, 0 to 1) and `value`.
 #' @examplesIf requireNamespace("superassp", quietly = TRUE)
 #' segs <- query(demo_corpus(), "Phonetic == V", lazy = FALSE)
 #' wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.5))

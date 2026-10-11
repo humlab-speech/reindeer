@@ -32,7 +32,9 @@ list-column tracks).}
 (see \code{\link[=metadata_cols]{metadata_cols()}}) are carried through.}
 }
 \value{
-A \code{track_long} tibble.
+A \code{track_long} tibble with one row per segment, track and time
+point: the segment's own columns plus \code{track} (e.g. \code{"F1"}), \code{rel_time}
+(relative position in the segment, 0 to 1) and \code{value}.
 }
 \description{
 Convert wide-form track columns (e.g. \verb{F1_0.0, F1_0.1, ..., F1_1.0}

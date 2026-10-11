@@ -40,8 +40,6 @@ properties you can read from user code (use \code{@}):
 \item \verb{@dbName} - corpus name (the basename minus \verb{_emuDB}).
 \item \verb{@basePath} - path to the \verb{_emuDB} directory.
 \item \verb{@config} - parsed \verb{_DBconfig.json} (level + link definitions).
-\item Internal: \verb{@.uuid}, \verb{@.connection}, \verb{@.cache_dir} -
-used by the cache machinery; treat as read-only.
 }
 }
 \description{

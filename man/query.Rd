@@ -77,12 +77,8 @@ name (e.g. \code{Text == "always"}) resolves to its host level.
 \itemize{
 \item Use \code{==} (double equals) for equality - \code{=} triggers a parse error.
 \item Regex patterns go with \verb{=~}/\verb{!~}, exact strings with \code{==}/\code{!=}.
-\item Wrap sequences and dominances in \verb{[ ]}: \verb{[A -> B]}, \verb{[A ^ B]}.
+\item Wrap each sequence or dominance in square brackets (see the examples).
 }
-
-[ ]: R:\%20
-[A -> B]: R:A\%20-\%3E\%20B
-[A ^ B]: R:A\%20\%5E\%20B
 }
 
 \examples{

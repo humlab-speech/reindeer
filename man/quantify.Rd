@@ -22,7 +22,7 @@ An \link{extended_segment_list}: every column of the input
 \code{segment_list} (see \code{\link[=query]{query()}} for the column inventory), plus one
 column per DSP output column produced by \code{dsp_function} (consult
 the function's own help - for example \code{superassp::trk_formant_forest} adds
-\code{F1}, \code{F2}, \code{F3}, \code{B1}, \code{B2}, \code{B3}). When \code{.at} is a vector, an
+\code{F1_Hz} to \code{F5_Hz} and \code{B1_Hz} to \code{B5_Hz}; the unit is part of the name). When \code{.at} is a vector, an
 extra \code{.time_point} column records which relative time each row
 came from. When \code{.use_cache = TRUE}, a \code{.cache_status} column
 reports \code{"hit"} or \code{"miss"} per row. The DSP function and its

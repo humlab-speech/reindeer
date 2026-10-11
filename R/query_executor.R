@@ -54,7 +54,7 @@
 #' @section Common pitfalls:
 #'   * Use `==` (double equals) for equality - `=` triggers a parse error.
 #'   * Regex patterns go with `=~`/`!~`, exact strings with `==`/`!=`.
-#'   * Wrap sequences and dominances in `[ ]`: `[A -> B]`, `[A ^ B]`.
+#'   * Wrap each sequence or dominance in square brackets (see the examples).
 #' @family query
 #' @seealso [scout()], [ascend_to()], [descend_to()], [collect()],
 #'   [provenance()]

@@ -37,13 +37,15 @@ A named character vector of paths written, invisibly.
 }
 \description{
 Produces README, CMDI XML, DataCite 4.5 JSON, CITATION.cff, and
-schema.org JSON-LD for a corpus in one call. All formats are derived
-from a single shared summary built by \code{collect_corpus_summary()}.
-CMDI delegates to \code{create_cmdi_metadata()}.
+schema.org JSON-LD for a corpus in one call, all from the corpus's own
+metadata. The files are \code{README.md}, \verb{<name>_cmdi.xml}, \code{datacite.json},
+\code{CITATION.cff} and \verb{_corpus_jsonld.json}.
 }
 \details{
-Existing files at the target paths are never overwritten unless
-\code{force = TRUE}.
+Files that reindeer did not create are never overwritten unless
+\code{force = TRUE}. After metadata changes the files reindeer owns are
+regenerated automatically; \code{options(reindeer.auto_cmdi = FALSE)} turns that
+off.
 }
 \examples{
 src <- demo_corpus()@basePath

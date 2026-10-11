@@ -463,12 +463,14 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
 #' Emit standards-compliant corpus documentation
 #'
 #' Produces README, CMDI XML, DataCite 4.5 JSON, CITATION.cff, and
-#' schema.org JSON-LD for a corpus in one call. All formats are derived
-#' from a single shared summary built by `collect_corpus_summary()`.
-#' CMDI delegates to `create_cmdi_metadata()`.
+#' schema.org JSON-LD for a corpus in one call, all from the corpus's own
+#' metadata. The files are `README.md`, `<name>_cmdi.xml`, `datacite.json`,
+#' `CITATION.cff` and `_corpus_jsonld.json`.
 #'
-#' Existing files at the target paths are never overwritten unless
-#' `force = TRUE`.
+#' Files that reindeer did not create are never overwritten unless
+#' `force = TRUE`. After metadata changes the files reindeer owns are
+#' regenerated automatically; `options(reindeer.auto_cmdi = FALSE)` turns that
+#' off.
 #'
 #' @param corpus_obj A reindeer `corpus` object.
 #' @param output_dir Directory to write outputs into. Defaults to the

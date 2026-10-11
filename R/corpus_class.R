@@ -26,8 +26,6 @@
 #'   * `@dbName` - corpus name (the basename minus `_emuDB`).
 #'   * `@basePath` - path to the `_emuDB` directory.
 #'   * `@config` - parsed `_DBconfig.json` (level + link definitions).
-#'   * Internal: `@.uuid`, `@.connection`, `@.cache_dir` -
-#'     used by the cache machinery; treat as read-only.
 #' @section Bracket access:
 #' Once you have a corpus, you can read and write metadata by name:
 #' \preformatted{

@@ -54,7 +54,7 @@ NULL
 #'   `segment_list` (see [query()] for the column inventory), plus one
 #'   column per DSP output column produced by `dsp_function` (consult
 #'   the function's own help - for example `superassp::trk_formant_forest` adds
-#'   `F1`, `F2`, `F3`, `B1`, `B2`, `B3`). When `.at` is a vector, an
+#'   `F1_Hz` to `F5_Hz` and `B1_Hz` to `B5_Hz`; the unit is part of the name). When `.at` is a vector, an
 #'   extra `.time_point` column records which relative time each row
 #'   came from. When `.use_cache = TRUE`, a `.cache_status` column
 #'   reports `"hit"` or `"miss"` per row. The DSP function and its
