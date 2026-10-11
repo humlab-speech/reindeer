@@ -7,17 +7,15 @@
 library(testthat)
 library(reindeer)
 
-test_that("dirty bit + describe_corpus work when auto-regen is disabled", {
+test_that("describe_corpus emits once, then is a no-op until metadata changes", {
   withr::local_options(reindeer.auto_cmdi = FALSE)
   ae <- create_isolated_ae_corpus()
-
-  expect_false(reindeer:::.is_metadata_dirty(ae))
   add_metadata(ae, list(Project = "v07-autosync-test"))
-  expect_true(reindeer:::.is_metadata_dirty(ae))
-
-  outdir <- withr::local_tempdir()
-  describe_corpus(ae, output_dir = outdir, force = FALSE, verbose = FALSE)
-  expect_false(reindeer:::.is_metadata_dirty(ae))
+  first <- describe_corpus(ae, verbose = FALSE)
+  expect_gt(length(first), 0L)
+  expect_length(describe_corpus(ae, verbose = FALSE), 0L)
+  add_metadata(ae, list(Project = "changed"))
+  expect_gt(length(describe_corpus(ae, verbose = FALSE)), 0L)
 })
 
 test_that("add_metadata auto-regenerates FAIR artifacts (no explicit describe_corpus call)", {
@@ -27,9 +25,7 @@ test_that("add_metadata auto-regenerates FAIR artifacts (no explicit describe_co
 
   add_metadata(ae, list(Project = "auto-regen-1"))
 
-  # Artifact written automatically, and the dirty bit consumed.
   expect_true(file.exists(readme))
-  expect_false(reindeer:::.is_metadata_dirty(ae))
 })
 
 test_that("a distinct metadata change bumps the artifacts automatically", {
@@ -70,5 +66,29 @@ test_that("bulk import suppresses per-row regeneration then emits once", {
   # Simulate the bulk-edit contract directly: suppression is honoured.
   withr::local_options(reindeer._auto_cmdi_suppress = TRUE)
   add_metadata(ae, list(Project = "bulk"))
-  expect_true(reindeer:::.is_metadata_dirty(ae))  # not consumed while suppressed
+  readme <- readLines(file.path(ae@basePath, "README.md"), warn = FALSE)
+  expect_false(any(grepl("bulk", readme)))  # suppressed: not regenerated
+})
+
+test_that("writing identical metadata again rewrites no FAIR file", {
+  withr::local_options(reindeer.auto_cmdi = TRUE)
+  ae <- create_isolated_ae_corpus()
+  add_metadata(ae, list(Project = "same"))
+  files <- list.files(ae@basePath, "\\.(xml|md|cff|json)$", full.names = TRUE)
+  before <- file.info(files)$mtime
+  Sys.sleep(1.1)
+  add_metadata(ae, list(Project = "same"))
+  expect_equal(file.info(files)$mtime, before)
+})
+
+
+test_that("a hand-written README is never overwritten", {
+  withr::local_options(reindeer.auto_cmdi = FALSE)
+  ae <- create_isolated_ae_corpus()
+  readme <- file.path(ae@basePath, "README.md")
+  writeLines("my own notes", readme)
+  add_metadata(ae, list(Project = "p"))
+  describe_corpus(ae, verbose = FALSE)
+  expect_equal(readLines(readme, warn = FALSE), "my own notes")
+  expect_true(file.exists(file.path(ae@basePath, "README-generated.md")))
 })

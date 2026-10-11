@@ -293,10 +293,6 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
     metadata_list = metadataList
   )
 
-  # Flag corpus as dirty so describe_corpus() can auto-regenerate the
-  # FAIR artifacts (CMDI XML, DataCite). Cheap: zero-byte sentinel file.
-  .mark_metadata_dirty(corpus_obj)
-
   # Keep standard-compliant artifacts in sync automatically as the user works
   # (drift-guarded; no-op when suppressed during bulk edits).
   .auto_describe(corpus_obj)
@@ -304,49 +300,26 @@ add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL
   invisible(corpus_obj)
 }
 
-#' Flag corpus metadata as dirty (internal helper for auto-regeneration)
-#' @keywords internal
-#' @noRd
-.mark_metadata_dirty <- function(corpus_obj) {
-  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(invisible(NULL))
-  tryCatch(
-    file.create(file.path(corpus_obj@basePath, ".cmdi_dirty"),
-                showWarnings = FALSE),
-    error = function(e) {
-      cli::cli_warn("Could not flag metadata as changed: {conditionMessage(e)}",
-                    class = c("reindeer_metadata_warning", "reindeer_warning"))
-    }
-  )
-  invisible(NULL)
-}
-
-#' Test whether a corpus has pending metadata changes
-#' @keywords internal
-#' @noRd
-.is_metadata_dirty <- function(corpus_obj) {
-  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(FALSE)
-  file.exists(file.path(corpus_obj@basePath, ".cmdi_dirty"))
-}
-
-#' Clear the metadata-dirty flag (after FAIR artifacts are regenerated)
-#' @keywords internal
-#' @noRd
-.clear_metadata_dirty <- function(corpus_obj) {
-  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) return(invisible(NULL))
-  flag <- file.path(corpus_obj@basePath, ".cmdi_dirty")
-  if (file.exists(flag)) unlink(flag)
-  invisible(NULL)
-}
-
 #' Hash of the metadata state that feeds the FAIR artifacts
 #'
-#' Used by [describe_corpus()]'s drift guard to skip regeneration when the
-#' resolved metadata is unchanged since the last emission.
+#' Used by [describe_corpus()]'s drift guard (the only gate: regeneration is
+#' skipped when this is unchanged since the last emission). Hashes the stored
+#' per-level metadata rows and the bundle list directly, which is far cheaper
+#' than pivoting the resolved metadata table.
 #' @keywords internal
 #' @noRd
 .metadata_state_hash <- function(corpus_obj) {
-  state <- tryCatch(
-    list(name = corpus_obj@dbName, metadata = get_metadata(corpus_obj)),
+  con <- get_corpus_connection(corpus_obj)
+  uuid <- corpus_obj@.uuid
+  q <- function(sql) {
+    DBI::dbGetQuery(con, sql, params = list(uuid))
+  }
+  state <- tryCatch(list(
+    name = corpus_obj@dbName,
+    database = q("SELECT field_name, field_value, field_type FROM metadata_database WHERE db_uuid = ? ORDER BY field_name"),
+    session = q("SELECT session, field_name, field_value, field_type FROM metadata_session WHERE db_uuid = ? ORDER BY session, field_name"),
+    bundle = q("SELECT session, bundle, field_name, field_value, field_type FROM metadata_bundle WHERE db_uuid = ? ORDER BY session, bundle, field_name"),
+    bundles = q("SELECT session, name FROM bundle WHERE db_uuid = ? ORDER BY session, name")),
     error = function(e) list(name = corpus_obj@dbName))
   digest::digest(state)
 }

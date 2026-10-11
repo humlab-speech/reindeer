@@ -10,6 +10,12 @@ caches miss once. Numbers from 2.3.0's work package list follow.
   ggplot2 `autoplot` methods are registered lazily when ggplot2 is loaded, and
   Rdpack (Rd macros only) moved to Suggests.
 
+- FAIR artifact regeneration is gated by a content hash only: writing metadata
+  that did not change rewrites no file (504 bundles: 0.64 s -> 0.05 s; a real
+  change 0.4 s). The `.cmdi_dirty` sentinel is gone. A generated `README.md`
+  carries a marker and is overwritten; a hand-written one never is (the text
+  goes to `README-generated.md`).
+
 ## EQL / emuR parity
 
 - One compiler: eager `query(lazy = FALSE)` now compiles the same SQL as the
