@@ -228,10 +228,9 @@
 #' sig <- peek_signals(corp)
 #' sig$full_path[1]
 #' }
-#' @export
+#' @noRd
 peek_signals <- function(corpus_obj, extension = NULL) {
-  .deprecated_alias("peek_signals", "summary() on the corpus", parent.frame())
-  if (!S7::S7_inherits(corpus_obj, corpus)) {
+    if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a {.cls corpus} object")
   }
 

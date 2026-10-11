@@ -21,7 +21,7 @@ NULL
 #' @param user_params Named list of user overrides (win over derived norms).
 #' @return A named list of DSP parameters to pass to `dsp_fun`.
 #' @keywords internal
-#' @export
+#' @noRd
 derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_params) {
 
   fun_formals <- names(formals(dsp_fun))
@@ -99,7 +99,7 @@ derive_dsp_parameters <- function(dsp_fun, metadata, metadata_fields, user_param
 
 #' Derive DSP params per bundle
 #'
-#' Applies [derive_dsp_parameters()] one bundle at a time. The underlying
+#' Applies `derive_dsp_parameters()` one bundle at a time. The underlying
 #' function has a single-row contract; passing a whole metadata table
 #' recycles vectorised `Age`/`Gender` against the DSPP table and returns
 #' an arbitrary row. This wrapper resolves one params list per

@@ -96,6 +96,8 @@ reference:
     desc: "Edit and review in the Artic web app; exchange annotations with ELAN and Praat."
     contents:
       - annotate
+      - browse_corpus_gadget
+      - edit_metadata_gadget
       - read_annotations
       - write_annotations
 
@@ -112,56 +114,10 @@ reference:
     contents:
       - DSPP
 
-  - title: "Deprecated (removed in 3.0.0)"
-    desc: "Still work; each page names its replacement."
-    contents:
-      - add_metadata
-      - artic_info
-      - ascend_to
-      - descend_to
-      - browse_corpus_gadget
-      - check_cache_size
-      - create_cmdi_metadata
-      - derive_dsp_parameters
-      - dropped_rows
-      - edit_metadata_gadget
-      - erb
-      - semitones
-      - extended_segment_list
-      - is_extended_segment_list
-      - gather_metadata
-      - load_metadata
-      - get_corpus_cached
-      - geom_formant_trajectory
-      - geom_label_tier
-      - geom_pitch_track
-      - import_bundle
-      - import_session
-      - import_metadata
-      - inspect_cache
-      - install_artic
-      - manage_cache
-      - metadata_cols
-      - signal_cols
-      - nest_by_bundle
-      - nest_by_session
-      - nest_by_speaker
-      - peek_signals
-      - quantify_egg
-      - read_eaf
-      - read_textgrid
-      - write_eaf
-      - write_textgrid
-      - review
-      - validate_cmdi
-      - validate_corpus
-      - deprecated-serve
-
   - title: internal
     contents:
       - reindeer
       - reexports
-      - deprecated-moved-functions
       - reindeer-query-parser
       - quantify.lazy_segment_list
       - print.bundle_list

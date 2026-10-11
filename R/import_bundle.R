@@ -27,11 +27,10 @@ NULL
 #'   bundle. Default `TRUE`.
 #' @param verbose Show progress messages.
 #' @return The corpus, invisibly.
-#' @export
+#' @noRd
 import_bundle <- function(corpus_obj, session, bundle, media,
                           metadata = list(), tracks = TRUE, verbose = TRUE) {
-  .deprecated_alias("import_bundle", "import_media", parent.frame())
-  create_session_and_bundle(corpus_obj, session, bundle, verbose = verbose)
+    create_session_and_bundle(corpus_obj, session, bundle, verbose = verbose)
 
   if (length(metadata) > 0) {
     corpus_assign_metadata(corpus_obj, session, bundle, metadata)
@@ -112,7 +111,7 @@ import_bundle <- function(corpus_obj, session, bundle, media,
 
 #' Import every bundle of a recording session into a corpus
 #'
-#' Session-level convenience for [import_bundle()]. `metadata` supplies the
+#' Session-level convenience for `import_bundle()`. `metadata` supplies the
 #' session-level default (e.g. one speaker's Age/Gender for every bundle in
 #' the session); a bundle's own `metadata` entry overrides it for that
 #' bundle only. The session is created transparently by the first bundle
@@ -128,11 +127,10 @@ import_bundle <- function(corpus_obj, session, bundle, media,
 #'   bundle. Default `TRUE`.
 #' @param verbose Show progress messages.
 #' @return The corpus, invisibly.
-#' @export
+#' @noRd
 import_session <- function(corpus_obj, session, bundles,
                            metadata = list(), tracks = TRUE, verbose = TRUE) {
-  .deprecated_alias("import_session", "import_media", parent.frame())
-  for (spec in bundles) {
+    for (spec in bundles) {
     bundle_metadata <- utils::modifyList(metadata, spec$metadata %or_empty% list())
     tryCatch({
       import_bundle(corpus_obj, session, spec$bundle, media = spec$media,

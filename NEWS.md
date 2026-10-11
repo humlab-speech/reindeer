@@ -1,14 +1,34 @@
-# reindeer 2.6.0
+# reindeer 3.0.0
 
-This release folds in the 2.3.0 (silent-wrong-result fixes), 2.4.0 (80 of 80 emuR
-parity; SEGMENT times shift by half a sample and quantify caches miss once),
-2.5.0 (power and latency; see `benchmarking/RESULTS_2.5.0.md`) and 2.6.0
-(documentation: eight vignettes, rewritten reference, website) work packages.
+The 2.2 amendment programme ends here. 2.3.0 fixed silent wrong results, 2.4.0
+reached 80 of 80 emuR query parity (SEGMENT times shift by half a sample and
+quantify caches miss once), 2.5.0 made the package fast (see
+`benchmarking/RESULTS_2.5.0.md`), 2.6.0 rewrote the documentation, and 3.0.0
+removes every name deprecated along the way. The package now exports 31
+functions (from 68).
+
+## Removed in 3.0.0
+
+Gone from the exports (the code is internal where reindeer still uses it):
+`add_metadata`, `import_metadata`, `load_metadata`, `gather_metadata` (use
+`set_metadata`; metadata syncs automatically); `ascend_to`, `descend_to` (use
+`move_to`); `import_bundle`, `import_session` (`import_media`); `read_eaf`,
+`read_textgrid` (`read_annotations`); `write_eaf`, `write_textgrid`
+(`write_annotations`); `review` (`annotate` with a segment list); `quantify_egg`
+(`quantify`); `validate_corpus`, `validate_cmdi`, `create_cmdi_metadata`
+(`describe_corpus`); `manage_cache`, `inspect_cache`, `check_cache_size`,
+`peek_signals` (`clear_cache`, `summary(corpus)`); `dropped_rows`
+(`provenance`); `metadata_cols`, `signal_cols` (`segment_cols`, `track_cols`);
+`nest_by_*` (`tidyr::nest`); `geom_formant_trajectory`, `geom_pitch_track`,
+`geom_label_tier` (`autoplot`); `extended_segment_list` (`segment_list`),
+`is_extended_segment_list`, `get_corpus_cached`, `derive_dsp_parameters`;
+`install_artic`, `artic_info` (the Artic app is bundled). Deleted outright:
+`serve`, `serve_app`, `semitones`, `erb` (use `superassp::ucnv_hz_to_semitone()`
+and `superassp::ucnv_hz_to_erb()`).
 
 ## Interface
 
-- Website: reference index grouped by workflow (deprecated names in their own
-  section), generated article menu, social-card image. Reference pages now have
+- Website: reference index grouped by workflow, generated article menu, social-card image. Reference pages now have
   runnable examples on `demo_corpus()` and name the columns they return.
 
 - Vignettes rewritten as eight workflow guides: getting_started, querying,
@@ -24,24 +44,6 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once),
   `is_segment_list()` is TRUE for lazy plans, and `pivot_tracks_longer()` and
   `autoplot()` collect a lazy plan first. `.cache_status` is no longer listed
   as a measurement column.
-
-## Deprecations (removed in 3.0.0)
-
-These exports are replaced by the consolidated interface. They still work, share
-their implementation with the replacement (same result), and warn once per
-session with class `reindeer_deprecated` when called from outside the package:
-`add_metadata`, `import_metadata`, `load_metadata`, `gather_metadata` ->
-`set_metadata` / automatic sync; `ascend_to`, `descend_to` -> `move_to`;
-`import_bundle`, `import_session` -> `import_media`; `read_eaf`, `read_textgrid`
--> `read_annotations`; `write_eaf`, `write_textgrid` -> `write_annotations`;
-`review` -> `annotate`; `quantify_egg` -> `quantify`; `validate_corpus`,
-`validate_cmdi`, `create_cmdi_metadata` -> `describe_corpus`; `manage_cache`,
-`inspect_cache`, `check_cache_size`, `peek_signals` -> `clear_cache` /
-`summary(corpus)`; `dropped_rows` -> `provenance`; `metadata_cols`,
-`signal_cols` -> `segment_cols` / `track_cols`; `nest_by_*` -> `tidyr::nest`;
-`geom_*` -> `autoplot`; `extended_segment_list` -> `segment_list`;
-`install_artic`, `artic_info` (no replacement); `serve`, `serve_app`,
-`semitones`, `erb` as announced earlier.
 
 ## Argument conventions
 

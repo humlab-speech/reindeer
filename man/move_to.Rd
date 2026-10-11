@@ -20,8 +20,8 @@ A \code{segment_list}.
 }
 \description{
 Direction is inferred from the corpus hierarchy: if \code{level} lies above the
-segments' level the result is the parent (as \code{\link[=ascend_to]{ascend_to()}}), if it lies
-below it is the span of children (as \code{\link[=descend_to]{descend_to()}}), exactly like
+segments' level the result is the parent (like going up one level), if it lies
+below it is the span of children (going down), exactly like
 \code{emuR::requery_hier()}.
 }
 \examples{

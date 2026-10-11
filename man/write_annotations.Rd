@@ -12,7 +12,7 @@ write_annotations(segs, path, ...)
 
 \item{path}{Output path ending in \code{.eaf} or \code{.TextGrid}.}
 
-\item{...}{Passed to the format writer (\code{\link[=write_eaf]{write_eaf()}} / \code{\link[=write_textgrid]{write_textgrid()}}).}
+\item{...}{Passed to the format writer (ELAN or Praat).}
 }
 \value{
 \code{path}, invisibly.

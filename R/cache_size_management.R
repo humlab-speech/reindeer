@@ -119,7 +119,7 @@ get_file_size <- function(path, recursive = FALSE) {
 
 #' Check a cache directory's size and warn if it's getting large
 #'
-#' Low-level companion to [inspect_cache()]; useful when you want to
+#' Low-level companion to `inspect_cache()`; useful when you want to
 #' run a threshold check inside a script. Prefer `inspect_cache()` for
 #' interactive use - it summarises every reindeer-managed cache at once.
 #'
@@ -134,15 +134,14 @@ get_file_size <- function(path, recursive = FALSE) {
 #'   `warn_exceeded`, `max_exceeded`.
 #' @examplesIf interactive()
 #' check_cache_size(corp@.cache_dir, warn_threshold = "1 GB")
-#' @seealso [inspect_cache()], [manage_cache()]
-#' @export
+#' @seealso `inspect_cache()`, `manage_cache()`
+#' @noRd
 check_cache_size <- function(cache_path,
                               cache_type = "general",
                               warn_threshold = "500 MB",
                               max_threshold = "2 GB",
                               verbose = TRUE) {
-  .deprecated_alias("check_cache_size", "summary() on the corpus (checked automatically)", parent.frame())
-
+  
   # Parse thresholds if strings
   if (is.character(warn_threshold)) {
     warn_threshold <- parse_size_string(warn_threshold)
@@ -602,7 +601,7 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 
 #' Inspect the quantify/enrich cache
 #'
-#' Single user-facing entry point that combines [check_cache_size()]
+#' Single user-facing entry point that combines `check_cache_size()`
 #' (size + threshold warnings) and `list_cache_files()` (per-file
 #' inventory) into one tidy report. Prefer this over the older
 #' `check_cache_size()` / `manage_cache()` pair when you just want to
@@ -615,10 +614,9 @@ list_cache_files <- function(corpus_obj, cache_type = "all") {
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/db_emuDB")
 #' inspect_cache(corp)
-#' @export
+#' @noRd
 inspect_cache <- function(corpus_obj, verbose = TRUE) {
-  .deprecated_alias("inspect_cache", "summary() on the corpus", parent.frame())
-  if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
+    if (!S7::S7_inherits(corpus_obj, reindeer::corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
   }
   files <- list_cache_files(corpus_obj, cache_type = "all")
@@ -648,15 +646,14 @@ inspect_cache <- function(corpus_obj, verbose = TRUE) {
 #' @param dry_run For `"clean"`: only report what would be deleted (default).
 #' @return `"list"`: a tibble of files with their sizes. `"status"` and
 #'   `"clean"`: a list of sizes or deleted files, invisibly.
-#' @seealso [clear_cache()], [inspect_cache()]
-#' @export
+#' @seealso [clear_cache()], `inspect_cache()`
+#' @noRd
 manage_cache <- function(corpus,
                         action = c("status", "list", "clean"),
                         days_old = 30,
                         cache_type = c("all", "quantify"),
                         dry_run = TRUE) {
-  .deprecated_alias("manage_cache", "clear_cache", parent.frame())
-
+  
   # Input validation 
   .assert(
     S7::S7_inherits(corpus, reindeer::corpus),

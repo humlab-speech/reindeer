@@ -5,10 +5,10 @@ NULL
 #'
 #' One verb to populate the metadata cache regardless of where the
 #' metadata lives. `source = "files"` rescans every `METADATA.json`
-#' under the corpus (the former [gather_metadata()] path).
+#' under the corpus (the former `gather_metadata()` path).
 #' `source = "excel"` reads a workbook produced by [export_metadata()]
 #' and writes it back through the same channel as
-#' [import_metadata()].
+#' `import_metadata()`.
 #'
 #' @param corpus_obj A corpus object.
 #' @param source One of `"files"` or `"excel"`. Default `"files"`.
@@ -24,14 +24,13 @@ NULL
 #' load_metadata(corp)                                # files (default)
 #' load_metadata(corp, source = "excel",
 #'               path = "corpus_metadata.xlsx")       # excel round-trip
-#' @export
+#' @noRd
 load_metadata <- function(corpus_obj,
                           source = c("files", "excel"),
                           path = NULL,
                           verbose = TRUE,
                           parallel = TRUE) {
-  .deprecated_alias("load_metadata", "nothing: metadata syncs automatically", parent.frame())
-  source <- match.arg(source)
+    source <- match.arg(source)
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("{.arg corpus_obj} must be a corpus object")
   }
@@ -68,6 +67,7 @@ load_metadata <- function(corpus_obj,
 #' @param metadataList Deprecated spelling of `x`.
 #' @param session,bundle Scope to write to (see above). `bundle` needs
 #'   `session`.
+#' @param reset.before.add Deprecated spelling of `reset`.
 #' @param reset If `TRUE`, clear the existing fields at the scope first.
 #'   (`reset.before.add` is the deprecated spelling.)
 #' @return `corpus_obj`, invisibly.

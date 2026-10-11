@@ -18,7 +18,7 @@ metadata-derived ones (\code{nominalF1}, \code{windowSize}, ...). See the
 method accepts ahead of \code{...}.}
 }
 \value{
-An \link{extended_segment_list}: every column of the input
+A \link{segment_list} with the \code{dsp_function} and \code{dsp_columns} properties set: every column of the input
 \code{segment_list} (see \code{\link[=query]{query()}} for the column inventory), plus one
 column per DSP output column produced by \code{dsp_function} (consult
 the function's own help - for example \code{superassp::trk_formant_forest} adds
@@ -61,7 +61,7 @@ DSP function.}
 \item{\code{.use_metadata}}{Look up DSP parameters from speaker metadata.
 Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
 \item{\code{.use_cache}}{Reuse persistent results when the cache key
-matches. Default \code{TRUE}. See \code{\link[=inspect_cache]{inspect_cache()}} for what's stored.
+matches. Default \code{TRUE}. \code{summary()} on the corpus shows what's stored.
 When enabled, the returned tibble gains a \code{.cache_status} column
 (\code{"hit"} / \code{"miss"}).}
 \item{\code{.cache_dir}, \code{.cache_format}}{Where and how to persist cached
@@ -127,6 +127,6 @@ quantify(segs, superassp::trk_formant_forest, nominalF1 = 500, windowSize = 20)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=biographize]{biographize()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=inspect_cache]{inspect_cache()}}
+\code{\link[=biographize]{biographize()}}, \code{\link[=dsp_parameters]{dsp_parameters()}}, \code{\link[=clear_cache]{clear_cache()}}
 }
 \concept{signal}

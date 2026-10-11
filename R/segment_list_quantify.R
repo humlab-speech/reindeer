@@ -31,7 +31,7 @@ NULL
 #'   \item{`.use_metadata`}{Look up DSP parameters from speaker metadata.
 #'     Default `TRUE`. See [dsp_parameters()] to preview.}
 #'   \item{`.use_cache`}{Reuse persistent results when the cache key
-#'     matches. Default `TRUE`. See [inspect_cache()] for what's stored.
+#'     matches. Default `TRUE`. `summary()` on the corpus shows what's stored.
 #'     When enabled, the returned tibble gains a `.cache_status` column
 #'     (`"hit"` / `"miss"`).}
 #'   \item{`.cache_dir`, `.cache_format`}{Where and how to persist cached
@@ -50,7 +50,7 @@ NULL
 #'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,
 #'   and `.cache_format` have no effect - reading or recomputing an
 #'   already-registered track doesn't go through the DSP result cache.
-#' @return An [extended_segment_list]: every column of the input
+#' @return A [segment_list] with the `dsp_function` and `dsp_columns` properties set: every column of the input
 #'   `segment_list` (see [query()] for the column inventory), plus one
 #'   column per DSP output column produced by `dsp_function` (consult
 #'   the function's own help - for example `superassp::trk_formant_forest` adds
@@ -61,7 +61,7 @@ NULL
 #'   added columns are also recorded on the object as the S7 properties
 #'   `@dsp_function` and `@dsp_columns`.
 #' @family signal
-#' @seealso [biographize()], [dsp_parameters()], [inspect_cache()]
+#' @seealso [biographize()], [dsp_parameters()], [clear_cache()]
 #' @examplesIf requireNamespace("superassp", quietly = TRUE)
 #' corp <- demo_corpus()
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)

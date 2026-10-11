@@ -67,10 +67,9 @@ segment_cols <- function() {
 #' @examplesIf interactive()
 #' segs <- biographize(collect(query(demo_corpus(), "Phonetic == t")))
 #' segs |> dplyr::select(metadata_cols())
-#' @export
+#' @noRd
 metadata_cols <- function() {
-  .deprecated_alias("metadata_cols", "segment_cols", parent.frame())
-  data <- tidyselect::peek_data(fn = "metadata_cols")
+    data <- tidyselect::peek_data(fn = "metadata_cols")
   required <- intersect(.required_segment_cols(), names(data))
   tracks <- .detect_track_cols(data)
   setdiff(names(data), c(required, tracks))
@@ -104,10 +103,9 @@ track_cols <- function(pattern = NULL) {
 #' track columns selected by [track_cols()] with the default pattern.
 #'
 #' @return Character vector of column names.
-#' @export
+#' @noRd
 signal_cols <- function() {
-  .deprecated_alias("signal_cols", "track_cols", parent.frame())
-  data <- tidyselect::peek_data(fn = "signal_cols")
+    data <- tidyselect::peek_data(fn = "signal_cols")
   required <- intersect(.required_segment_cols(), names(data))
   candidates <- setdiff(names(data), required)
   candidates[vapply(candidates, function(c) is.list(data[[c]]), logical(1))]

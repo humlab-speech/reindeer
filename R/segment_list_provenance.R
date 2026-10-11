@@ -191,7 +191,7 @@ provenance <- function(seg) {
 #' @return An integer count.
 #' @examples
 #' segs <- query(demo_corpus(), "Phonetic == t") |> collect() |>
-#'   scout(1) |> ascend_to("Word")
+#'   scout(1) |> move_to("Word")
 #' dropped(segs)        # cumulative
 #' dropped(segs, 2L)    # how many scout() dropped
 #' @export
@@ -228,10 +228,9 @@ dropped <- function(seg, step = NULL) {
 #'   dplyr::filter(labels != "never_matches") |>
 #'   scout(1)
 #' dropped_rows(segs)
-#' @export
+#' @noRd
 dropped_rows <- function(seg) {
-  .deprecated_alias("dropped_rows", "provenance", parent.frame())
-  prov <- provenance(seg)
+    prov <- provenance(seg)
   if (nrow(prov) == 0L) {
     return(tibble::tibble(
       step = integer(),

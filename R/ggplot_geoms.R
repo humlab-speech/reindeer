@@ -24,11 +24,10 @@
 #' wide <- quantify(vowels, superassp::trk_formant_forest, .at = seq(0, 1, 0.25))
 #' long <- pivot_tracks_longer(wide, cols = c("F1_Hz", "F2_Hz"))
 #' ggplot2::ggplot(long) + geom_formant_trajectory()
-#' @export
+#' @noRd
 geom_formant_trajectory <- function(mapping = NULL, data = NULL,
                                      formants = 1:3, ...) {
-  .deprecated_alias("geom_formant_trajectory", "autoplot", parent.frame())
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
     .companion_abort("ggplot2", purpose = "geom_formant_trajectory")
   }
   if (is.null(data)) {
@@ -65,10 +64,9 @@ geom_formant_trajectory <- function(mapping = NULL, data = NULL,
 #' @param tier_y Numeric y-position for the tier strip.
 #' @param ... Forwarded to `ggplot2::geom_segment` / `geom_text`.
 #' @return A list of ggplot2 `Layer` objects.
-#' @export
+#' @noRd
 geom_label_tier <- function(mapping = NULL, data = NULL, tier_y = 0, ...) {
-  .deprecated_alias("geom_label_tier", "autoplot", parent.frame())
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
     .companion_abort("ggplot2", purpose = "geom_label_tier")
   }
   list(
@@ -96,10 +94,9 @@ geom_label_tier <- function(mapping = NULL, data = NULL, tier_y = 0, ...) {
 #'
 #' @inheritParams geom_formant_trajectory
 #' @return A `Layer` object.
-#' @export
+#' @noRd
 geom_pitch_track <- function(mapping = NULL, data = NULL, ...) {
-  .deprecated_alias("geom_pitch_track", "autoplot", parent.frame())
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
     .companion_abort("ggplot2", purpose = "geom_pitch_track")
   }
   if (is.null(data)) {

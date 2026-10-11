@@ -15,7 +15,7 @@
 #' @param .from Optional `corpus` to use directly instead of reconstructing.
 #' @return A `corpus` object.
 #' @keywords internal
-#' @export
+#' @noRd
 get_corpus_cached <- function(.segments, .from = NULL) {
   if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
     return(.from)

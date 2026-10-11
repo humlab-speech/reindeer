@@ -134,10 +134,9 @@ export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE,
 #' corp <- corpus("path/to/db_emuDB")
 #' import_metadata(corp, "corpus_metadata.xlsx")
 #'
-#' @export
+#' @noRd
 import_metadata <- function(corpus_obj, Excelfile) {
-  .deprecated_alias("import_metadata", "set_metadata", parent.frame())
-  
+    
   if (!file.exists(Excelfile)) {
     cli::cli_abort("File {.path {Excelfile}} does not exist")
   }
@@ -242,12 +241,11 @@ import_metadata <- function(corpus_obj, Excelfile) {
 }
 
 #' @param reset.before.add Deprecated spelling of `reset`.
-#' @export
-#' @rdname set_metadata
+#' @noRd
+#' @noRd
 add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL,
                         reset.before.add = FALSE) {
-  .deprecated_alias("add_metadata", "set_metadata", parent.frame())
-
+  
   if (!is.null(bundle) && is.null(session)) {
     cli::cli_abort("Bundle requires session")
   }

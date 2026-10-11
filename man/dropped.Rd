@@ -21,7 +21,7 @@ Cumulative or per-step row loss for a segment_list pipeline
 }
 \examples{
 segs <- query(demo_corpus(), "Phonetic == t") |> collect() |>
-  scout(1) |> ascend_to("Word")
+  scout(1) |> move_to("Word")
 dropped(segs)        # cumulative
 dropped(segs, 2L)    # how many scout() dropped
 }

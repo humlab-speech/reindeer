@@ -2,15 +2,15 @@
 
 test_that("create_cmdi_metadata rejects invalid corpus types", {
   expect_error(
-    reindeer::create_cmdi_metadata("not_a_corpus"),
+    reindeer:::create_cmdi_metadata("not_a_corpus"),
     "corpus must be"
   )
   expect_error(
-    reindeer::create_cmdi_metadata(42),
+    reindeer:::create_cmdi_metadata(42),
     "corpus must be"
   )
   expect_error(
-    reindeer::create_cmdi_metadata(list(a = 1)),
+    reindeer:::create_cmdi_metadata(list(a = 1)),
     "corpus must be"
   )
 })
@@ -26,7 +26,7 @@ test_that("create_cmdi_metadata accepts emuDBhandle class", {
 
   # Should pass type check but fail at load_DBconfig
   expect_error(
-    reindeer::create_cmdi_metadata(fake_handle, verbose = FALSE),
+    reindeer:::create_cmdi_metadata(fake_handle, verbose = FALSE),
     "config"
   )
 })

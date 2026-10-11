@@ -29,7 +29,7 @@ for wide-form columns; positional index normalised to \verb{[0, 1]} for
 list-column tracks).}
 
 \item{.keep_metadata}{If \code{TRUE} (default), metadata columns
-(see \code{\link[=metadata_cols]{metadata_cols()}}) are carried through.}
+(see \code{\link[=segment_cols]{segment_cols()}}) are carried through.}
 }
 \value{
 A \code{track_long} tibble with one row per segment, track and time

@@ -6,8 +6,7 @@
 #'
 #' Serves a corpus to the Artic web application in editing mode: all bundles
 #' (or a session/bundle-pattern subset) can be inspected, annotated, and saved
-#' straight back to the database. Artic must be available locally; see
-#' \code{\link{install_artic}} and \code{\link{artic_info}}.
+#' straight back to the database. The Artic web app is bundled with the package.
 #'
 #' \code{annotate()} shares its name with \code{ggplot2::annotate()}. Calls
 #' whose first argument is not a \code{corpus} are forwarded verbatim to
@@ -15,12 +14,18 @@
 #' \pkg{conflicted}, prefer \code{reindeer::annotate} explicitly.
 #'
 #' @param geom A \code{corpus} (editing session), a \code{segment_list} (opens
-#'   as a review playlist, like [review()], with the corpus taken from it) or,
+#'   as a review playlist, with the corpus taken from it) or,
 #'   for ggplot2, the geom to annotate with.
 #' @param ... For a corpus: \code{session_pattern}, \code{bundle_pattern},
 #'   \code{host}, \code{port}, \code{auto_open_url},
 #'   \code{browser}, \code{use_viewer}, \code{app_dir}, \code{debug},
 #'   \code{debug_level}. The camelCase spellings still work with a warning. For ggplot2: forwarded to \code{ggplot2::annotate()}.
+#' @details When given a segment list, Artic opens a playlist with one time
+#'   anchor per row, in the current row order (sort with \code{dplyr::arrange()}
+#'   first to decide it). Extra arguments for that case: \code{tracks}
+#'   (registered tracks to overlay; default the \code{dsp_columns} of a
+#'   \code{quantify()} result), \code{perspective} and \code{canvas}
+#'   (where to draw them; default the first perspective and \code{"SPEC"}).
 #' @return Invisibly \code{TRUE} for a corpus. The server keeps running until
 #'   the *clear* button is used, the tab is closed, or
 #'   \code{httpuv::stopServer(getOption("reindeer.serve_handle"))} is called.
@@ -28,7 +33,7 @@
 #' corp <- corpus("path/to/db_emuDB")
 #' annotate(corp)
 #' annotate(corp, session_pattern = "Session.*")
-#' @seealso [review()], [install_artic()]
+#' @seealso [query()], [quantify()]
 #' @export
 annotate <- function(geom = NULL, ...) {
   if (S7::S7_inherits(geom, corpus)) {
@@ -79,13 +84,11 @@ annotate <- function(geom = NULL, ...) {
 #' review(corp, segs)
 #' review(corp, quantify(segs, dsp_function = superassp::trk_formant_forest))
 #' @seealso [annotate()], [query()], [quantify()]
-#' @export
+#' @noRd
 review <- S7::new_generic("review", "corpus", fun = function(corpus, ...) {
-  .deprecated_alias("review", "annotate", parent.frame())
-  S7::S7_dispatch()
+    S7::S7_dispatch()
 })
 
-#' @export
 S7::method(review, corpus) <- function(corpus, seglist, tracks = NULL,
                                        perspective = NULL, canvas = "SPEC",
                                        app_dir = NULL, ...) {

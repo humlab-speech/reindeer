@@ -5,7 +5,7 @@
 # ggplot2 is in Suggests, not Imports, so these methods gracefully error if
 # ggplot2 isn't installed. The S3 methods are registered in zzz.R against
 # the S7 mangled class names "reindeer::segment_list" and
-# "reindeer::extended_segment_list".
+# the old extended_segment_list class.
 
 # Internal: require ggplot2 or abort with the missing-companion class.
 .require_ggplot2 <- function() {

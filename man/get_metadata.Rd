@@ -35,10 +35,10 @@ get_metadata(corp, session_pattern = "0000")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=set_metadata]{set_metadata()}}, \code{\link[=load_metadata]{load_metadata()}}, \code{\link[=biographize]{biographize()}}
+\code{\link[=set_metadata]{set_metadata()}}, \code{\link[=biographize]{biographize()}}
 
 Other metadata:
-\code{\link[=add_metadata]{add_metadata()}},
-\code{\link[=biographize]{biographize()}}
+\code{\link[=biographize]{biographize()}},
+\code{\link[=set_metadata]{set_metadata()}}
 }
 \concept{metadata}

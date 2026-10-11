@@ -41,7 +41,7 @@ biographize(segs)
 }
 \seealso{
 Other metadata:
-\code{\link[=add_metadata]{add_metadata()}},
-\code{\link[=get_metadata]{get_metadata()}}
+\code{\link[=get_metadata]{get_metadata()}},
+\code{\link[=set_metadata]{set_metadata()}}
 }
 \concept{metadata}

@@ -31,7 +31,7 @@ attribute name, plus the level type (\code{SEGMENT} / \code{EVENT} /
 \code{ITEM}).
 \item \code{start_item_id}, \code{end_item_id}, \code{start_item_seq_idx},
 \code{end_item_seq_idx} - internal item references used by
-\code{\link[=scout]{scout()}} / \code{\link[=ascend_to]{ascend_to()}} / \code{\link[=descend_to]{descend_to()}}.
+\code{\link[=scout]{scout()}} and \code{\link[=move_to]{move_to()}}.
 \item \code{db_uuid} - for joining against the cache.
 Provenance is recorded on the result; see \code{\link[=provenance]{provenance()}}.
 }
@@ -88,7 +88,7 @@ query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]") # sequence
 query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)      # eager
 }
 \seealso{
-\code{\link[=scout]{scout()}}, \code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}, \code{\link[=collect]{collect()}},
+\code{\link[=scout]{scout()}}, \code{\link[=move_to]{move_to()}}, \code{\link[=collect]{collect()}},
 \code{\link[=provenance]{provenance()}}
 }
 \concept{query}

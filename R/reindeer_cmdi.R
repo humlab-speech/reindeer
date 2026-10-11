@@ -21,7 +21,7 @@
 #' @return The path of the written file, invisibly.
 #' @seealso [describe_corpus()]
 #' @keywords internal
-#' @export
+#' @noRd
 create_cmdi_metadata <- function(corpus,
                                   output_file = NULL,
                                   profile = "speech-corpus",
@@ -36,8 +36,7 @@ create_cmdi_metadata <- function(corpus,
                                   child_metadata = NULL,
                                   include_placeholders = TRUE,
                                   verbose = TRUE) {
-  .deprecated_alias("create_cmdi_metadata", "describe_corpus", parent.frame())
-  
+    
   # Check if corpus is emuDB handle or reindeer corpus object
   if (inherits(corpus, "emuDBhandle")) {
     db_handle <- corpus
@@ -207,7 +206,7 @@ collect_database_metadata <- function(db_handle, db_config, verbose = TRUE) {
 #' Collect participant metadata for FAIR artifacts
 #'
 #' Sources from the canonical resolved metadata (flat `METADATA.json` fields via
-#' [get_metadata()]) so metadata set with [add_metadata()] actually reaches the
+#' [get_metadata()]) so metadata set with `add_metadata()` actually reaches the
 #' generated CMDI/DataCite/JSON-LD. Falls back to legacy nested `participant`
 #' objects in `.meta_json` files when no resolved metadata is available.
 #'
@@ -654,11 +653,10 @@ create_media_session_cmdi <- function(corpus, session, bundle = NULL,
 #'   no local XSD is available. Default `FALSE` (offline-safe).
 #' @return Invisibly, a list with `structural` (logical), `problems`
 #'   (character), and `xsd` (logical, or `NA` when not attempted).
-#' @seealso [create_cmdi_metadata()], [describe_corpus()].
-#' @export
+#' @seealso `create_cmdi_metadata()`, [describe_corpus()].
+#' @noRd
 validate_cmdi <- function(path, xsd = NULL, online = FALSE) {
-  .deprecated_alias("validate_cmdi", "describe_corpus", parent.frame())
-  if (!file.exists(path)) {
+    if (!file.exists(path)) {
     cli::cli_abort("CMDI file not found: {.path {path}}")
   }
   cmd_ns <- c(cmd = "http://www.clarin.eu/cmd/1")

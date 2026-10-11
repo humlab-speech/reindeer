@@ -32,7 +32,7 @@
 #'     `ITEM`).
 #'   * `start_item_id`, `end_item_id`, `start_item_seq_idx`,
 #'     `end_item_seq_idx` - internal item references used by
-#'     [scout()] / [ascend_to()] / [descend_to()].
+#'     [scout()] and [move_to()].
 #'   * `db_uuid` - for joining against the cache.
 #'   Provenance is recorded on the result; see [provenance()].
 #' @section Supported EQL features:
@@ -56,7 +56,7 @@
 #'   * Regex patterns go with `=~`/`!~`, exact strings with `==`/`!=`.
 #'   * Wrap each sequence or dominance in square brackets (see the examples).
 #' @family query
-#' @seealso [scout()], [ascend_to()], [descend_to()], [collect()],
+#' @seealso [scout()], [move_to()], [collect()],
 #'   [provenance()]
 #' @examples
 #' corp <- demo_corpus()

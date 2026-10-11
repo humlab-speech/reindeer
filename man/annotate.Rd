@@ -8,7 +8,7 @@ annotate(geom = NULL, ...)
 }
 \arguments{
 \item{geom}{A \code{corpus} (editing session), a \code{segment_list} (opens
-as a review playlist, like \code{\link[=review]{review()}}, with the corpus taken from it) or,
+as a review playlist, with the corpus taken from it) or,
 for ggplot2, the geom to annotate with.}
 
 \item{...}{For a corpus: \code{session_pattern}, \code{bundle_pattern},
@@ -24,14 +24,20 @@ the \emph{clear} button is used, the tab is closed, or
 \description{
 Serves a corpus to the Artic web application in editing mode: all bundles
 (or a session/bundle-pattern subset) can be inspected, annotated, and saved
-straight back to the database. Artic must be available locally; see
-\code{\link{install_artic}} and \code{\link{artic_info}}.
+straight back to the database. The Artic web app is bundled with the package.
 }
 \details{
 \code{annotate()} shares its name with \code{ggplot2::annotate()}. Calls
 whose first argument is not a \code{corpus} are forwarded verbatim to
 ggplot2, so both verbs keep working regardless of attach order. With
 \pkg{conflicted}, prefer \code{reindeer::annotate} explicitly.
+
+When given a segment list, Artic opens a playlist with one time
+anchor per row, in the current row order (sort with \code{dplyr::arrange()}
+first to decide it). Extra arguments for that case: \code{tracks}
+(registered tracks to overlay; default the \code{dsp_columns} of a
+\code{quantify()} result), \code{perspective} and \code{canvas}
+(where to draw them; default the first perspective and \code{"SPEC"}).
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
@@ -41,5 +47,5 @@ annotate(corp, session_pattern = "Session.*")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=review]{review()}}, \code{\link[=install_artic]{install_artic()}}
+\code{\link[=query]{query()}}, \code{\link[=quantify]{quantify()}}
 }

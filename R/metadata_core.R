@@ -217,11 +217,10 @@ initialize_metadata_schema <- function(con) {
 #' corp <- corpus("path/to/ae_emuDB")
 #' load_metadata(corp)              # preferred
 #' gather_metadata(corp)            # equivalent
-#' @seealso [load_metadata()], [set_metadata()], [get_metadata()]
-#' @export
+#' @seealso [set_metadata()], [get_metadata()]
+#' @noRd
 gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
-  .deprecated_alias("gather_metadata", "nothing: metadata syncs automatically", parent.frame())
-
+  
   if (!S7::S7_inherits(corpus_obj, corpus)) {
     cli::cli_abort("Input must be a corpus object")
   }
@@ -579,7 +578,7 @@ register_metadata_field <- function(con, field_name, field_type) {
 #'   Field columns carry the original R type (numeric, integer, logical,
 #'   or character) as recorded when the metadata was written.
 #' @family metadata
-#' @seealso [set_metadata()], [load_metadata()], [biographize()]
+#' @seealso [set_metadata()], [biographize()]
 #' @examplesIf interactive()
 #' corp <- demo_corpus()
 #' get_metadata(corp)

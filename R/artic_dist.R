@@ -168,10 +168,9 @@ find_artic <- function(appDir = NULL, require = character(), quiet = FALSE) {
 #' @return A list with \code{path}, \code{manifest}, and \code{features}.
 #' @examplesIf interactive()
 #' artic_info()
-#' @export
+#' @noRd
 artic_info <- function(appDir = NULL) {
-  .deprecated_alias("artic_info", NA, parent.frame())
-  path <- find_artic(appDir = appDir, quiet = TRUE)
+    path <- find_artic(appDir = appDir, quiet = TRUE)
   man <- .artic_read_manifest(path)
   list(
     path = path,
@@ -201,11 +200,10 @@ artic_info <- function(appDir = NULL) {
 #' @return Invisibly, the path to the installed dist.
 #' @examplesIf interactive()
 #' install_artic(local = "../artic/dist")
-#' @export
+#' @noRd
 install_artic <- function(ref = NULL, url = NULL, local = NULL, sha256 = NULL,
                           dest = NULL, overwrite = FALSE, quiet = FALSE) {
-  .deprecated_alias("install_artic", NA, parent.frame())
-  if (!is.null(local) && !is.null(url)) {
+    if (!is.null(local) && !is.null(url)) {
     .artic_abort("{.arg local} and {.arg url} are mutually exclusive.")
   }
 

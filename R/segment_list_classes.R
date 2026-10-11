@@ -159,18 +159,17 @@ is_segment_list <- function(x) {
 #' @param dsp_function Name of the routine that produced the measurements.
 #' @param dsp_columns Names of the measurement columns.
 #' @return A [segment_list].
-#' @export
+#' @noRd
 extended_segment_list <- function(data, db_uuid = NULL, db_path = NULL,
                                   dsp_function = "", dsp_columns = character(0)) {
-  .deprecated_alias("extended_segment_list", "segment_list", parent.frame())
-  segment_list(data, db_uuid = db_uuid, db_path = db_path,
+    segment_list(data, db_uuid = db_uuid, db_path = db_path,
                dsp_function = dsp_function, dsp_columns = dsp_columns)
 }
 
 #' Does this segment list carry DSP measurements?
 #' @param x Any object.
 #' @return `TRUE` for a [segment_list] with `@dsp_function` or `@dsp_columns`.
-#' @export
+#' @noRd
 is_extended_segment_list <- function(x) {
   S7::S7_inherits(x, segment_list) && (nzchar(x@dsp_function) || length(x@dsp_columns) > 0L)
 }

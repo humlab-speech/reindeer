@@ -147,10 +147,9 @@
 #' @examplesIf interactive()
 #' tg <- read_textgrid("speech.TextGrid")
 #' head(tg)
-#' @export
+#' @noRd
 read_textgrid <- function(path, encoding = "UTF-8") {
-  .deprecated_alias("read_textgrid", "read_annotations", parent.frame())
-  if (!file.exists(path)) {
+    if (!file.exists(path)) {
     cli::cli_abort("File not found: {.path {path}}")
   }
   lines <- .read_textgrid_lines(path)
@@ -219,11 +218,10 @@ read_textgrid <- function(path, encoding = "UTF-8") {
 #' @examplesIf interactive()
 #' segs <- query(corp, "Phonetic == V") |> collect()
 #' write_textgrid(segs, "phonetic.TextGrid")
-#' @export
+#' @noRd
 write_textgrid <- function(seg, path, levels = NULL,
                             short = FALSE, encoding = "UTF-8") {
-  .deprecated_alias("write_textgrid", "write_annotations", parent.frame())
-  if (!is.data.frame(seg)) {
+    if (!is.data.frame(seg)) {
     cli::cli_abort("{.arg seg} must be a data.frame")
   }
   required <- c("start", "end", "labels", "level")

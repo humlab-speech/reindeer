@@ -64,10 +64,9 @@
 #'   `start`, `end`, `label`.
 #' @examplesIf interactive()
 #' eaf <- read_eaf("elan/example.eaf")
-#' @export
+#' @noRd
 read_eaf <- function(path) {
-  .deprecated_alias("read_eaf", "read_annotations", parent.frame())
-  if (!file.exists(path)) {
+    if (!file.exists(path)) {
     cli::cli_abort("File not found: {.path {path}}")
   }
   doc <- xml2::read_xml(path)
@@ -172,11 +171,10 @@ read_eaf <- function(path) {
 #' @examplesIf interactive()
 #' segs <- query(corp, "Phonetic == V") |> collect()
 #' write_eaf(segs, "phonetic.eaf", media_url = "audio/clip.wav")
-#' @export
+#' @noRd
 write_eaf <- function(seg, path, levels = NULL,
                        media_url = NULL, author = "reindeer") {
-  .deprecated_alias("write_eaf", "write_annotations", parent.frame())
-  if (!is.data.frame(seg)) {
+    if (!is.data.frame(seg)) {
     cli::cli_abort("{.arg seg} must be a data.frame")
   }
   required <- c("start", "end", "labels", "level")

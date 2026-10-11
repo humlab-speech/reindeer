@@ -36,7 +36,7 @@
 #' corp["Session1", "Bundle1"] <- "audio.mp3" # import media
 #' }
 #' For programmatic metadata see [set_metadata()] / [get_metadata()].
-#' @seealso [demo_corpus()], [query()], [quantify()], [load_metadata()],
+#' @seealso [demo_corpus()], [query()], [quantify()], [set_metadata()],
 #'   [annotate()]
 #' @examplesIf requireNamespace("superassp", quietly = TRUE)
 #' corp <- demo_corpus()

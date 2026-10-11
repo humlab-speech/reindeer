@@ -1,7 +1,7 @@
 Package: reindeer
 Type: Package
 Title: Reproducible Analysis of Speech Corpora
-Version: 2.6.0
+Version: 3.0.0
 Date: 2026-10-11
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
@@ -91,7 +91,6 @@ Collate:
     'corpus_listing.R'
     'corpus_metadata_io.R'
     'corpus_methods.R'
-    'deprecated_stubs.R'
     'reindeer_signal_extensions_dt.R'
     'dsp_parameter_derivation.R'
     'dsp_parameters_public.R'
@@ -118,7 +117,6 @@ Collate:
     'reindeer_cmdi.R'
     'reindeer_data.R'
     'reindeer_demodata.R'
-    'reindeer_psychoacoustics.R'
     'reindeer_sequence_ops_optimized.R'
     'reindeer_serve.R'
     'schema_validation.R'

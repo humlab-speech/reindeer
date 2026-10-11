@@ -497,4 +497,4 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 6.3 | done (`check_pkgdown()` clean, workflow-grouped index, site builds, og:image from `man/figures/logo.png`) | WP6.3 |
 | 6.4 | done (inst/CITATION from DESCRIPTION, one title, no simulation/webApp text, private-repo links removed) | WP6.4 |
 | Gate 6 | passed: R CMD check --as-cran clean except the Remotes NOTE (D4); site builds. Released 2.6.0 | |
-| 7 | open | |
+| 7 | done: stubs removed, 31 exports, `R CMD check --as-cran` clean except the Remotes NOTE; released 3.0.0 | |

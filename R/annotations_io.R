@@ -36,7 +36,7 @@ read_annotations <- function(path) {
 #' @param segs A `segment_list` or data frame with `level`, `labels`, `start`,
 #'   `end`.
 #' @param path Output path ending in `.eaf` or `.TextGrid`.
-#' @param ... Passed to the format writer ([write_eaf()] / [write_textgrid()]).
+#' @param ... Passed to the format writer (ELAN or Praat).
 #' @return `path`, invisibly.
 #' @seealso [read_annotations()]
 #' @examples

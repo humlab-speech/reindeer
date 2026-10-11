@@ -23,7 +23,7 @@ The (possibly updated) corpus, invisibly.
 }
 \description{
 Spawns a miniUI gadget with an editable \code{DT::datatable} showing the
-selected metadata level. Edits are applied via \code{\link[=add_metadata]{add_metadata()}} when
+selected metadata level. Edits are applied via \code{add_metadata()} when
 the user clicks Done, so \code{METADATA.json} files on disk remain
 authoritative. A diff summary is printed via \code{\link[cli:cli_dl]{cli::cli_dl()}}.
 }

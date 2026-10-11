@@ -48,7 +48,7 @@ NULL
 #' stops <- query(demo_corpus(), "Phonetic =~ [ptk]") |> collect()
 #' scout(stops, steps_forward = 1)                  # the following phone
 #' scout(stops, steps_forward = -1, capture = 2)    # the two before
-#' @seealso [ascend_to()], [descend_to()]
+#' @seealso [move_to()]
 #' @export
 scout <- S7::new_generic("scout", ".segments", fun = function(.segments,
                                                                 steps_forward,
@@ -327,21 +327,18 @@ scout_dt <- function(.segments,
 #' @examplesIf interactive()
 #' vowels <- query(demo_corpus(), "Phonetic =~ [aeiou]")
 #' ascend_to(vowels, "Word")
-#' @seealso [descend_to()], [scout()]
-#' @export
+#' @seealso [move_to()], [scout()]
+#' @noRd
 ascend_to <- S7::new_generic("ascend_to", ".segments", fun = function(.segments,
                                                                         level,
                                                                         .from = NULL,
                                                                         .quiet = TRUE,
                                                                         collect = TRUE) {
-  .deprecated_alias("ascend_to", "move_to", parent.frame())
-  S7::S7_dispatch()
+    S7::S7_dispatch()
 })
 
 #' Ascend method for segment_list
-#' @rdname ascend_to
-#' @usage NULL
-#' @name ascend_to.segment_list
+#' @noRd
 S7::method(ascend_to, segment_list) <- function(.segments, level,
                                                   .from = NULL,
                                                   .quiet = TRUE,
@@ -353,9 +350,7 @@ S7::method(ascend_to, segment_list) <- function(.segments, level,
 }
 
 #' Ascend method for lazy_segment_list
-#' @rdname ascend_to
-#' @usage NULL
-#' @name ascend_to.lazy_segment_list
+#' @noRd
 S7::method(ascend_to, lazy_segment_list) <- function(.segments, level,
                                                        .from = NULL,
                                                        .quiet = TRUE,
@@ -535,7 +530,7 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' Move down the annotation hierarchy
 #'
 #' Returns the child item(s) at `level` for every segment in the input.
-#' Inverse of [ascend_to()]: descending from a word to `"Phonetic"`
+#' Inverse of `ascend_to()`: descending from a word to `"Phonetic"`
 #' gives every phone in that word.
 #'
 #' @param .segments A `segment_list` or `lazy_segment_list`.
@@ -550,21 +545,18 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' @examplesIf interactive()
 #' words  <- query(demo_corpus(), "Word =~ .*")
 #' descend_to(words, "Phonetic")
-#' @seealso [ascend_to()], [scout()]
-#' @export
+#' @seealso [move_to()], [scout()]
+#' @noRd
 descend_to <- S7::new_generic("descend_to", ".segments", fun = function(.segments,
                                                                           level,
                                                                           .from = NULL,
                                                                           .quiet = TRUE,
                                                                           collect = TRUE) {
-  .deprecated_alias("descend_to", "move_to", parent.frame())
-  S7::S7_dispatch()
+    S7::S7_dispatch()
 })
 
 #' Descend method for segment_list
-#' @rdname descend_to
-#' @usage NULL
-#' @name descend_to.segment_list
+#' @noRd
 S7::method(descend_to, segment_list) <- function(.segments, level,
                                                    .from = NULL,
                                                    .quiet = TRUE,
@@ -576,9 +568,7 @@ S7::method(descend_to, segment_list) <- function(.segments, level,
 }
 
 #' Descend method for lazy_segment_list
-#' @rdname descend_to
-#' @usage NULL
-#' @name descend_to.lazy_segment_list
+#' @noRd
 S7::method(descend_to, lazy_segment_list) <- function(.segments, level,
                                                         .from = NULL,
                                                         .quiet = TRUE,
@@ -723,8 +713,8 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' Move to another level of the annotation hierarchy
 #'
 #' Direction is inferred from the corpus hierarchy: if `level` lies above the
-#' segments' level the result is the parent (as [ascend_to()]), if it lies
-#' below it is the span of children (as [descend_to()]), exactly like
+#' segments' level the result is the parent (like going up one level), if it lies
+#' below it is the span of children (going down), exactly like
 #' `emuR::requery_hier()`.
 #'
 #' @param .segments A `segment_list` or lazy plan.

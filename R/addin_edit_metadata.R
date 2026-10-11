@@ -86,7 +86,7 @@
 #' Edit session- or bundle-level metadata interactively (RStudio addin)
 #'
 #' Spawns a miniUI gadget with an editable `DT::datatable` showing the
-#' selected metadata level. Edits are applied via [add_metadata()] when
+#' selected metadata level. Edits are applied via `add_metadata()` when
 #' the user clicks Done, so `METADATA.json` files on disk remain
 #' authoritative. A diff summary is printed via [cli::cli_dl()].
 #'

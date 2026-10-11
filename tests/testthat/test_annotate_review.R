@@ -109,11 +109,6 @@ test_that("review() opens a session with a playlist", {
   )
 })
 
-test_that("serve() and serve_app() redirect to annotate()/review()", {
-  expect_error(serve(42), class = "reindeer_moved_error")
-  expect_error(serve_app(42), class = "reindeer_moved_error")
-})
-
 test_that("annotate() forwards non-corpus calls to ggplot2", {
   skip_if_not_installed("ggplot2")
   layer <- annotate("text", x = 1, y = 1, label = "a")

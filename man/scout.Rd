@@ -61,5 +61,5 @@ scout(stops, steps_forward = -1, capture = 2)    # the two before
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}
+\code{\link[=move_to]{move_to()}}
 }

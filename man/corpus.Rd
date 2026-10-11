@@ -69,6 +69,6 @@ formants <- quantify(vowels, superassp::trk_formant_forest)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=demo_corpus]{demo_corpus()}}, \code{\link[=query]{query()}}, \code{\link[=quantify]{quantify()}}, \code{\link[=load_metadata]{load_metadata()}},
+\code{\link[=demo_corpus]{demo_corpus()}}, \code{\link[=query]{query()}}, \code{\link[=quantify]{quantify()}}, \code{\link[=set_metadata]{set_metadata()}},
 \code{\link[=annotate]{annotate()}}
 }
