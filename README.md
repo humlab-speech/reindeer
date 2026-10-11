@@ -33,7 +33,7 @@ provenance of every measurement matters.
 ```r
 # Reindeer + signal-processing companion
 remotes::install_github("humlab-speech/reindeer")
-remotes::install_github("humlab-speech/superassp")
+remotes::install_github("humlab-speech/superassp")   # for quantify()
 ```
 
 ## Five-minute workflow
@@ -83,7 +83,7 @@ set_metadata(corp,
 dsp_parameters(corpus_obj = corp)   # inspect what each bundle will use
 ```
 
-See `vignette("metadata_management")`.
+See `vignette("speaker_aware")`.
 
 ### Lazy pipelines and provenance
 
@@ -99,18 +99,18 @@ plan <- query(corp, "Phonetic =~ [aeiou]") |>
 
 result <- collect(plan)
 provenance(result)     # per-step row counts
-dropped_rows(result)   # which steps lost rows
+dropped(result)        # rows lost per step
 ```
 
 A navigation step that drops more than 25 % of its input warns by
-default. See `vignette("lazy_and_provenance")`.
+default. See `vignette("querying")`.
 
 ### Persistent measurement cache
 
 ```r
 formants <- quantify(vowels, superassp::trk_formant_forest, .use_cache = TRUE)
 table(formants$.cache_status)   # "hit" / "miss"
-inspect_cache(corp)
+summary(corp)               # cache size and health
 ```
 
 The cache key includes the DSP parameters and the bundle's
@@ -118,13 +118,14 @@ Age / Gender, so external metadata edits invalidate the right rows.
 Enabling the cache turns iterative re-runs of an analysis on a large
 corpus from minutes back to seconds, at the cost of some disk space
 in `.quantify_cache/` next to the database. See
-`vignette("cache_management")`.
+`vignette("speaker_aware")`.
 
 ### FAIR archival metadata
 
 `describe_corpus()` writes a README, CMDI XML, and DataCite JSON next
-to the corpus. With `options(reindeer.auto_cmdi = TRUE)` it runs
-automatically after any metadata change.
+to the corpus. The files are
+regenerated automatically after metadata changes (switch off with
+`options(reindeer.auto_cmdi = FALSE)`).
 
 ```r
 describe_corpus(corp)
@@ -134,59 +135,36 @@ describe_corpus(corp)
 
 ```r
 annotate(corp)                                   # edit the whole corpus
-review(corp, query(corp, "Phonetic == t"))       # review a segment-list playlist
-
-install_artic()                                  # fetch/upgrade the pinned build
+annotate(query(corp, "Phonetic == t"))           # step through a segment list
 ```
 
-`annotate()` opens the corpus in [Artic](https://github.com/humlab-speech/artic)
-in editing mode. `review()` turns a segment list — a `query()` result, a
-`quantify()` result, any augmented segment list — into a playlist of time
-anchors so you can step through, listen, and adjust just those portions.
+`annotate()` opens the corpus in [Artic](https://github.com/humlab-speech/artic).
+Given a segment list (a `query()` or `quantify()` result, sorted as you like)
+it opens a playlist of time anchors, so you review just those portions.
 
 ## Companion packages
 
-### DSP backends (required to run the corresponding verb)
-
-- **[superassp](https://github.com/humlab-speech/superassp)** —
-  formant, pitch, voice-quality, and other DSP functions used inside
-  `quantify()`.
-- **[eggstract](https://github.com/humlab-speech/eggstract)** —
-  electroglottography measurements used inside `quantify_egg()`.
-
-### Optional workflow add-ons (independent, not required for core use)
-
-- **[protoscribe](https://github.com/humlab-speech/protoscribe)** —
-  draft annotation generation (VAD, VOT, MOMEL/INTSINT, …) with its own
-  complete `draft_*() -> assess() -> prepare() -> transcribe()`
-  workflow and vignettes. reindeer has no code dependency on it.
-- **[erodex](https://github.com/humlab-speech/erodex)** — DSP
-  parameter-grid and signal-erosion simulation, with its own vignette
-  set. reindeer has no code dependency on it.
+- **[superassp](https://github.com/humlab-speech/superassp)** — formant, pitch,
+  voice-quality and other DSP functions used inside `quantify()`.
 
 ## Documentation
 
 - [Package website](https://humlab-speech.github.io/reindeer/)
-- `vignette("getting_started")` — five-minute pipeline.
-- `vignette("metadata_management")` — three-level inheritance,
-  Excel round-trip, FAIR export.
-- `vignette("cache_management")` — inspecting and pruning the quantify
-  cache.
-- `vignette("lazy_and_provenance")` — lazy plans, provenance, and
-  pipe-loss debugging.
-- `vignette("end_to_end_pipeline")` — one walk through corpus open →
-  metadata → DSP → simulation → archival metadata.
-- `vignette("interactive_annotation")` — driving the EMU-webApp from
-  R for review and correction.
+- `vignette("getting_started")` — query, measure, plot in ten minutes.
+- `vignette("querying")` — EQL, navigation, lazy plans, provenance.
+- `vignette("speaker_aware")` — metadata-driven parameters, caching.
+- `vignette("metadata")` — the three metadata levels, spreadsheets.
+- `vignette("building_a_corpus")` — import recordings.
+- `vignette("annotating")` — Artic.
+- `vignette("interoperability")` — ELAN, Praat, and a map from emuR.
+- `vignette("archiving")` — README, CITATION.cff, DataCite, CMDI.
 
 ## Citation
 
 If you use reindeer in published work, please cite:
 
-```
-Nylén, F. (2026). reindeer: Reproducible Analysis of Speech Corpora
-in R. R package version 1.0.1.
-https://github.com/humlab-speech/reindeer
+```r
+citation("reindeer")
 ```
 
 ## License

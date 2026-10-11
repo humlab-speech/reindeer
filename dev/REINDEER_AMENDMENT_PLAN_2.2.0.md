@@ -495,5 +495,5 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 6.1 | done (8 vignettes, all chunks evaluated, knit test in `test_vignettes.R`) | WP6.1 |
 | 6.2 | done (five worst pages, runnable examples on `demo_corpus()`, columns in `@return`, leaks and typos fixed) | WP6.2 |
 | 6.3 | done (`check_pkgdown()` clean, workflow-grouped index, site builds, og:image from `man/figures/logo.png`) | WP6.3 |
-| 6.4 | open | |
+| 6.4 | done (inst/CITATION from DESCRIPTION, one title, no simulation/webApp text, private-repo links removed) | WP6.4 |
 | 7 | open | |

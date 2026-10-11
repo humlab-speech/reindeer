@@ -1,6 +1,6 @@
 Package: reindeer
 Type: Package
-Title: Extend emuR for Speech Data in a Nordic Climate
+Title: Reproducible Analysis of Speech Corpora
 Version: 2.5.0
 Date: 2026-10-04
 Authors@R: c(
@@ -11,11 +11,12 @@ Authors@R: c(
     person("Klaus", "Jaensch", , "klausj@phonetik.uni-muenchen.de", c("ctb")),
     person("Steve", "Cassidy", , "steve.cassidy@mq.edu.au", c("ctb")),
     person("Jonathan", "Harrington", , "jmh@phonetik.uni-muenchen.de", c("ctb")))
-Description: A systematic framework for speech corpora management that retains emuR compatibility, but provides
-  expanded ability to store metadata associated with the recording, use the metadata to guide signal processing when appropriate, and support the user in future archiving and FAIR use
-  by automating the creation, and continuous updating, of standard compliant metadata files for corpora. Draft-annotation
-  generation and DSP parameter-grid/signal-erosion simulation are provided by fully independent, optional companion
-  packages (protoscribe and erodex) built on top of this package's core API; neither is required for core operation.
+Description: A framework for speech corpora that stays compatible with emuR.
+  It stores speaker and recording metadata at corpus, session and bundle level,
+  uses that metadata to choose age- and gender-appropriate signal processing
+  parameters, and keeps standards-compliant documentation files (README,
+  CITATION.cff, DataCite, JSON-LD, CMDI) up to date for archiving and FAIR
+  reuse.
 License: GPL (>= 2)
 URL: https://humlab-speech.github.io/reindeer/, https://github.com/humlab-speech/reindeer
 BugReports: https://github.com/humlab-speech/reindeer/issues
@@ -63,7 +64,6 @@ Suggests:
     DT
 Remotes:
   github::humlab-speech/superassp,
-  github::humlab-speech/eggstract,
 RdMacros: Rdpack
 Roxygen: list(markdown = TRUE)
 Depends: 

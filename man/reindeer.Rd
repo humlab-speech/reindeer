@@ -2,8 +2,7 @@
 % Please edit documentation in R/reindeer.R
 \name{reindeer}
 \alias{reindeer}
-\title{reindeer: An extension of the capabilities of emuR to work with speech data in
-a nordic climate}
+\title{reindeer: Reproducible analysis of speech corpora}
 \description{
 The purpose of this package is to provide a systematic framework for speech
 corpora management that retains emuR compatibility, but provides

@@ -1,5 +1,4 @@
-#'reindeer: An extension of the capabilities of emuR to work with speech data in
-#'a nordic climate
+#' reindeer: Reproducible analysis of speech corpora
 #'
 #' The purpose of this package is to provide a systematic framework for speech
 #' corpora management that retains emuR compatibility, but provides
