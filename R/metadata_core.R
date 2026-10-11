@@ -466,6 +466,25 @@ process_metadata_list <- function(con, db_uuid, session, bundle, meta_list, leve
   })
 }
 
+#' Resolve one field's storage types across all bundles to a single type
+#' @noRd
+.resolve_field_type <- function(types) {
+  u <- unique(types)
+  if (length(u) == 1L) return(u)
+  if (all(u %in% c("integer", "numeric"))) return("numeric")
+  "character"
+}
+
+#' Make metadata values JSON-safe: Date/POSIXct become ISO-8601 strings
+#' @noRd
+.jsonable_metadata <- function(x) {
+  lapply(x, function(v) {
+    if (inherits(v, "Date")) format(v, "%Y-%m-%d")
+    else if (inherits(v, "POSIXt")) format(v, "%Y-%m-%dT%H:%M:%S")
+    else v
+  })
+}
+
 #' Serialize a metadata value for storage
 #' @keywords internal
 #' @noRd
@@ -649,13 +668,14 @@ get_metadata <- function(corpus_obj, session_pattern = ".*", bundle_pattern = ".
     return(tibble::as_tibble(bundles_dt[, .(session, bundle)]))
   }
   
-  # Build a type lookup: field_name -> field_type (take first non-NA type per field)
+  # Per-field type over ALL rows, not the first one seen: integer + double ->
+  # double; any other mix -> character (so nothing is truncated or turned NA).
   type_lookup <- metadata_long[
-    !is.na(field_type) & field_type != "",
-    .(field_type = field_type[1]),
+    !is.na(field_type) & field_type != "" & field_type != "NULL",
+    .(field_type = .resolve_field_type(field_type)),
     by = field_name
   ]
-  
+
   # Convert from long to wide format using data.table's dcast (very fast)
   metadata_wide <- data.table::dcast(
     metadata_long,

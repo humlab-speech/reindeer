@@ -90,7 +90,7 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
     corpus_obj@basePath, sub("_emuDB$", "", basename(corpus_obj@basePath)))
   
   # Merge
-  updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
+  updated <- utils::modifyList(existing, .jsonable_metadata(metadata_list), keep.null = FALSE)
 
   # Validate before writing
   .validate_against_schema(updated, "metadata.schema.json",
@@ -102,7 +102,7 @@ set_metadata_database <- function(corpus_obj, metadata_list) {
   # Update cache
   con <- get_corpus_connection(corpus_obj)
 
-  process_metadata_list(con, corpus_obj@.uuid, NULL, NULL, metadata_list, "database")
+  process_metadata_list(con, corpus_obj@.uuid, NULL, NULL, .jsonable_metadata(metadata_list), "database")
 
   cli::cli_alert_success("Database metadata updated")
 }
@@ -139,7 +139,7 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
     existing <- .read_level_metadata(dirname(session_meta_file), session_name)
     
     # Merge
-    updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
+    updated <- utils::modifyList(existing, .jsonable_metadata(metadata_list), keep.null = FALSE)
 
     # Ensure directory exists
     session_dir <- dirname(session_meta_file)
@@ -155,7 +155,7 @@ set_metadata_session <- function(corpus_obj, session_pattern, metadata_list) {
     jsonlite::write_json(updated, session_meta_file, auto_unbox = TRUE, pretty = TRUE)
 
     # Update cache
-    process_metadata_list(con, corpus_obj@.uuid, session_name, NULL, metadata_list, "session")
+    process_metadata_list(con, corpus_obj@.uuid, session_name, NULL, .jsonable_metadata(metadata_list), "session")
   }
 
   cli::cli_alert_success("Metadata updated for {length(matching_sessions)} session{?s}")
@@ -194,7 +194,7 @@ set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, met
     existing <- .read_level_metadata(dirname(bundle_meta_file), bundle_name)
     
     # Merge
-    updated <- utils::modifyList(existing, metadata_list, keep.null = FALSE)
+    updated <- utils::modifyList(existing, .jsonable_metadata(metadata_list), keep.null = FALSE)
 
     # Ensure directory exists
     bundle_dir <- dirname(bundle_meta_file)
@@ -210,7 +210,7 @@ set_metadata_bundle <- function(corpus_obj, session_pattern, bundle_pattern, met
     jsonlite::write_json(updated, bundle_meta_file, auto_unbox = TRUE, pretty = TRUE)
 
     # Update cache
-    process_metadata_list(con, corpus_obj@.uuid, session_name, bundle_name, metadata_list, "bundle")
+    process_metadata_list(con, corpus_obj@.uuid, session_name, bundle_name, .jsonable_metadata(metadata_list), "bundle")
   }
 
   cli::cli_alert_success("Metadata updated for {nrow(matching_bundles)} bundle{?s}")
