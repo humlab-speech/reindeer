@@ -30,9 +30,12 @@ test_that("output keeps input order and exposes no internal columns", {
   }
 })
 
-test_that(".at on a routine that returns a plain table is an error, not ignored", {
+test_that(".at on a routine that returns a plain list is an error, not ignored", {
   skip_if_no_emuR()
   corp <- create_isolated_ae_corpus()
   segs <- collect(query(corp, "Phoneme =~ .+"))[1:5, ]
-  expect_error(quantify(segs, tone, .at = 0.5), class = "reindeer_quantify_error")
+  listy <- function(listOfFiles, beginTime, endTime, toFile = FALSE, verbose = FALSE, ...) {
+    list(a = 1, b = 2)
+  }
+  expect_error(quantify(segs, listy, .at = 0.5), class = "reindeer_quantify_error")
 })

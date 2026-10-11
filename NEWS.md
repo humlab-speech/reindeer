@@ -1,4 +1,4 @@
-# reindeer (development)
+# reindeer 2.3.0
 
 ## Fixed (silent wrong results)
 
@@ -50,7 +50,7 @@
 
 - `quantify()` output: rows come back in input order (cold or cached, any size),
   without internal columns (`seg_params`, `signal_file`, `cache_key`, ...). `.at`
-  on a routine that returns a plain table is now an error instead of being
+  on a routine that returns a plain list or vector is now an error instead of being
   ignored; `.at` picks the nearest frame, there is no interpolation.
   `quantify(corpus, .using=)` regenerates output files deleted since the cached
   run and its cache key now includes the routine's identity and file stamp.

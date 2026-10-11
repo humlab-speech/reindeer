@@ -176,7 +176,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 #'
 #' `.at` (fractions of the segment) selects the NEAREST frame of a track; no
 #' interpolation. It only makes sense for track outputs, so asking for it on a
-#' routine that returns a plain table/list aborts instead of being ignored.
+#' routine that returns a plain list or vector aborts instead of being ignored.
 #' @noRd
 .dsp_result_to_df <- function(result, .at = NULL) {
   if (inherits(result, "AsspDataObj")) {
@@ -189,7 +189,9 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     }
     return(track_data)
   }
-  if (!is.null(.at)) {
+  if (!is.null(.at) && (is.atomic(result) || identical(class(result), "list"))) {
+    # Plain lists (lst_* routines) and bare vectors have no frames to select;
+    # classed objects (data frames, JsonTrackObj, ...) may be tracks and pass through.
     cli::cli_abort(
       c("{.arg .at} selects a frame of a track, but the routine returned a {.cls {class(result)[1]}}.",
         "i" = "Drop {.arg .at} for routines that return one value set per segment."),

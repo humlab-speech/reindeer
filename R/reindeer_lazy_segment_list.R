@@ -100,16 +100,8 @@ lazy_segment_list <- S7::new_class(
                     db_path = x@db_path, db_uuid = x@db_uuid)
 }
 
-#' Collect/Materialize a Lazy Segment List
-#'
-#' `collect()` is [dplyr::collect()], re-exported. On a `lazy_segment_list` it
-#' executes the query plan and returns a regular `segment_list`; on a
-#' `segment_list` or tibble it returns the object unchanged.
-#'
-#' @param x A `lazy_segment_list`, `segment_list` or data frame.
-#' @param ... Unused, for the generic.
-#' @param verbose Logical, whether to print the SQL query.
-#' @return A `segment_list` object.
+# collect() is dplyr::collect(), re-exported; on a lazy_segment_list it executes
+# the plan (see .collect_lazy_segment_list below).
 #' @importFrom dplyr collect
 #' @export
 dplyr::collect

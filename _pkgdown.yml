@@ -72,7 +72,6 @@ reference:
       - describe_corpus
       - validate_corpus
       - peek_signals
-      - glimpse
       - demo_corpus
       - get_corpus_cached
 
@@ -85,7 +84,6 @@ reference:
       - lazy_segment_list
       - is_segment_list
       - as_segment_list
-      - collect
 
   - title: "Measurement"
     desc: "DSP measurement with speaker-aware parameters."

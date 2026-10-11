@@ -294,14 +294,8 @@ NULL
   invisible(object)
 }
 
-#' Glimpse at an object
-#'
-#' `glimpse()` is [pillar::glimpse()], re-exported. reindeer adds methods for
-#' corpus, segment_list, extended_segment_list and lazy_segment_list objects.
-#'
-#' @param x An object to glimpse at
-#' @param ... Additional arguments passed to methods
-#' @return Invisibly returns the object
+# glimpse() is pillar::glimpse(), re-exported; reindeer registers methods for its
+# classes in .onLoad.
 #' @importFrom pillar glimpse
 #' @export
 pillar::glimpse
