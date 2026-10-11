@@ -171,35 +171,9 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   if (.use_metadata) {
     if (.verbose) cli::cli_alert_info("Fetching metadata for {nrow(object)} segments")
 
-    con <- get_corpus_connection(corpus_obj)
-
-    # Get unique bundles from segment list
     unique_bundles <- unique(as.data.frame(object)[, c("session", "bundle")])
-
-    # Fetch only needed metadata from correct table (metadata_bundle).
-    # Filtering in SQL keeps the transfer proportional to the query result
-    # rather than to the whole corpus; the composite key matches the expression
-    # used by biographize().
-    db_uuid <- corpus_obj@.uuid
-    ub_keys <- unique(paste(unique_bundles$session, unique_bundles$bundle, sep = "||"))
-    placeholders <- paste(rep("?", length(ub_keys)), collapse = ", ")
-    all_bundle_meta <- DBI::dbGetQuery(con, paste0(
-      "SELECT session, bundle, field_name AS key, field_value AS value, field_type AS value_type
-       FROM metadata_bundle
-       WHERE db_uuid = ? AND (session || '||' || bundle) IN (", placeholders, ")"),
-      params = c(list(db_uuid), as.list(ub_keys)))
-    # Semi-join: keep only rows matching unique_bundles
-    meta_keys <- paste(all_bundle_meta$session, all_bundle_meta$bundle, sep = "\x01")
-    ub_keys <- paste(unique_bundles$session, unique_bundles$bundle, sep = "\x01")
-    all_bundle_meta <- all_bundle_meta[meta_keys %in% ub_keys, ]
-    # Pivot wider using data.table::dcast
-    if (nrow(all_bundle_meta) > 0) {
-      dt_meta <- data.table::as.data.table(all_bundle_meta)
-      metadata_by_bundle <- data.table::dcast(dt_meta, session + bundle ~ key, value.var = "value")
-      metadata_by_bundle <- tibble::as_tibble(metadata_by_bundle)
-    } else {
-      metadata_by_bundle <- tibble::tibble(session = character(), bundle = character())
-    }
+    metadata_by_bundle <- .speaker_metadata(corpus_obj, unique_bundles,
+                                            c("Age", "Gender"))
   }
 
   # Convert to data frame for processing
@@ -234,21 +208,23 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     seg_df$seg_params <- rep(list(dsp_params_base), nrow(seg_df))
   }
 
-  # On older superassp builds the trk_* wrappers expose no tunable formals, so
-  # nothing can be derived and the DSP runs on its own defaults. Say so, rather
-  # than letting a metadata-driven pipeline report parameters that were never
-  # applied. Once per session.
+  # The speaker columns were only needed to derive parameters; they are not
+  # part of the measurement output (biographize() adds metadata on request).
+  if (!is.null(metadata_by_bundle)) {
+    extra <- setdiff(names(metadata_by_bundle), c("session", "bundle", names(object)))
+    seg_df[extra] <- NULL
+  }
+
+  # Once per call: Age/Gender are known but this routine can receive none of
+  # the derived norms, so it runs on its own defaults. Say so.
   if (.use_metadata &&
       !is.null(metadata_by_bundle) && nrow(metadata_by_bundle) > 0 &&
       all(c("Age", "Gender") %in% names(metadata_by_bundle)) &&
-      all(lengths(seg_df$seg_params) == 0L) &&
-      !isTRUE(getOption("reindeer.norm_warning_shown", FALSE))) {
-    options(reindeer.norm_warning_shown = TRUE)
+      all(vapply(seg_df$seg_params,
+                 function(p) length(attr(p, "derived")) == 0L, logical(1)))) {
     cli::cli_warn(
-      c("Age/Gender metadata is present but no DSP parameters could be derived.",
-        i = "This DSP routine exposes no tunable formals, so its defaults are used.",
-        i = "superassp >= 3.0.0 exposes them; older builds do not.",
-        i = "Reinstall it from GitHub: {.run remotes::install_github(\"humlab-speech/superassp\")}."),
+      c("Age/Gender metadata is present but {.val {dsp_name}} accepts none of the derived DSP parameters.",
+        i = "It runs on its own defaults. See {.fn dsp_parameters} for the norms and {.code formals()} of the routine for what it accepts."),
       class = c("reindeer_metadata_warning", "reindeer_warning"))
   }
 

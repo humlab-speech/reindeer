@@ -24,6 +24,18 @@
   move to Imports (Imports: 17). Print headers no longer show an unrendered
   `{nrow(x)} row{?s}`.
 
+- **Speaker norms now reach the DSP.** `quantify()` read Age/Gender only from
+  bundle-level metadata, so values set at session or database level (the
+  common case) were ignored; it now resolves bundle > session > database like
+  `get_metadata()`. Norms are delivered under each routine's own argument
+  names (`minimum_f0`, `maximum_f0`, `number_of_formants`, `maxHzFormant`, ...),
+  and routines with a `gender` switch (`trk_formant_forest`, `trk_pitch_ksv`,
+  `trk_pitch_mhs`) get `gender = "u"` so the derived norms take effect (they
+  were silently ignored with the default `"m"`). When a routine accepts none
+  of the derived parameters `quantify()` now warns once per call
+  (`reindeer_metadata_warning`). `quantify()` output no longer carries the
+  helper Age/Gender columns.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

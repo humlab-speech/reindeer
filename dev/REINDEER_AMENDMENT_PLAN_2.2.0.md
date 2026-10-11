@@ -472,7 +472,8 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 2.2 | done | WP2.2 |
 | 2.3 | done | WP2.3 |
 | 2.4 | done (tbl_sum print move deferred) | WP2.4 |
-| 2.5–2.8 | open | |
+| 2.5 | done (stable F5/B5 padding deferred to WP2.7) | WP2.5 |
+| 2.6–2.8 | open | |
 | 3.1–3.4 | open | |
 | 4.1–4.7 | open | |
 | 5.1–5.5 | open | |

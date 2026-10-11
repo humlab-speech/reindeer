@@ -207,33 +207,10 @@ NULL
 
   if (.verbose) cli::cli_alert_success("Found {nrow(signal_files)} signal file{?s}")
 
-  con <- get_corpus_connection(corpus_obj)
-  db_uuid <- corpus_obj@.uuid
-  needed_bundles <- unique(paste(signal_files$session, signal_files$bundle, sep = "||"))
-  placeholders <- paste(rep("?", length(needed_bundles)), collapse = ", ")
-  bundle_metadata_query <- sprintf(
-    "SELECT session, bundle, field_name, field_value FROM metadata_bundle WHERE db_uuid = ? AND (session || '||' || bundle) IN (%s)",
-    placeholders
-  )
-  bundle_metadata_long <- tryCatch({
-    DBI::dbGetQuery(con, bundle_metadata_query, params = c(list(db_uuid), as.list(needed_bundles)))
-  }, error = function(e) {
-    all_meta <- DBI::dbReadTable(con, "metadata_bundle")
-    all_meta <- all_meta[all_meta$db_uuid == db_uuid, ]
-    sf_keys <- paste(signal_files$session, signal_files$bundle, sep = "||")
-    meta_keys <- paste(all_meta$session, all_meta$bundle, sep = "||")
-    all_meta[meta_keys %in% sf_keys, c("session", "bundle", "field_name", "field_value")]
-  })
-
-  if (nrow(bundle_metadata_long) > 0) {
-    dt_meta <- data.table::as.data.table(bundle_metadata_long)
-    bundle_metadata <- data.table::dcast(dt_meta, session + bundle ~ field_name,
-                                         value.var = "field_value")
-    bundle_metadata <- as.data.frame(bundle_metadata, stringsAsFactors = FALSE)
-  } else {
-    bundle_metadata <- data.frame(session = character(), bundle = character(),
-                                  stringsAsFactors = FALSE)
-  }
+  bundle_metadata <- as.data.frame(
+    .speaker_metadata(corpus_obj, signal_files[, c("session", "bundle")],
+                      union(.metadata_fields, c("Age", "Gender"))),
+    stringsAsFactors = FALSE)
 
   signal_files_with_meta <- merge(signal_files, bundle_metadata, by = c("session", "bundle"), all.x = TRUE)
 
