@@ -480,7 +480,8 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 3.2 | done (parity 78/80; 2 nested cases left for 3.3-3.4) | WP3.2 |
 | 3.3 | done | WP3.3 |
 | 3.4 | done (80/80 parity, zero skips; 2.4.0) | WP3.4 |
-| 4.1–4.7 | open | |
+| 4.1 | done (0.48 s -> 0.28 s, 25 -> 16 namespaces) | WP4.1 |
+| 4.2–4.7 | open | |
 | 5.1–5.5 | open | |
 | 6.1–6.4 | open | |
 | 7 | open | |

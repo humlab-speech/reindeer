@@ -67,7 +67,6 @@ export(validate_cmdi)
 export(validate_corpus)
 export(write_eaf)
 export(write_textgrid)
-importFrom(Rdpack,reprompt)
 importFrom(S7,
   "method<-",
   method

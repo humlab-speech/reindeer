@@ -4,6 +4,12 @@ EQL and navigation parity with emuR: 80 of 80 golden queries match (unsorted
 rows, 1e-9). SEGMENT times shift by half a sample (see below) and quantify
 caches miss once. Numbers from 2.3.0's work package list follow.
 
+## Performance
+
+- `library(reindeer)` loads 16 namespaces instead of 25 (0.48 s -> 0.28 s): the
+  ggplot2 `autoplot` methods are registered lazily when ggplot2 is loaded, and
+  Rdpack (Rd macros only) moved to Suggests.
+
 ## EQL / emuR parity
 
 - One compiler: eager `query(lazy = FALSE)` now compiles the same SQL as the

@@ -10,7 +10,6 @@
 #'
 #'@name reindeer
 #'
-#' @importFrom Rdpack reprompt
 #' @importFrom stats end median setNames start
 #' @importFrom utils data head modifyList object.size tail
 

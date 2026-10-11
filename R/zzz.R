@@ -102,14 +102,12 @@
     registerS3method("semi_join",  cls, .lazy_dplyr_semi_join,  envir = dn)
   }
 
-  # ggplot2 is in Suggests; register autoplot S3 methods only if installed.
-  if (requireNamespace("ggplot2", quietly = TRUE)) {
-    gn <- asNamespace("ggplot2")
-    registerS3method("autoplot", "reindeer::segment_list",
-                     .autoplot_segment_list, envir = gn)
-    registerS3method("autoplot", "reindeer::extended_segment_list",
-                     .autoplot_extended_segment_list, envir = gn)
-  }
+  # ggplot2 is in Suggests and heavy: register autoplot methods lazily, when
+  # (and only if) ggplot2 gets loaded.
+  vctrs::s3_register("ggplot2::autoplot", "reindeer::segment_list",
+                     .autoplot_segment_list)
+  vctrs::s3_register("ggplot2::autoplot", "reindeer::extended_segment_list",
+                     .autoplot_extended_segment_list)
 
   # dplyr is in Suggests; register reconstruct hooks only if available so
   # filter()/mutate()/select()/arrange() preserve segment_list class + props.

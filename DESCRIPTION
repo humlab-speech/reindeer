@@ -27,7 +27,6 @@ Imports:
     jsonlite,
     data.table,
     stats,
-    Rdpack,
     utils,
     future.apply,
     cli,
@@ -40,6 +39,7 @@ Imports:
     dplyr (>= 1.0.0),
     pillar
 Suggests:
+    Rdpack,
     wrassp,
     imputeTS,
     httpuv,
