@@ -232,11 +232,17 @@ NULL
     cache_key <- NA_character_
     cached <- FALSE
     if (!is.null(cache_conn)) {
+      info <- file.info(bundle_row$full_path)
       cache_key <- digest::digest(list(
-        bundle_row$full_path, file.info(bundle_row$full_path)$mtime,
-        dsp_params, dsp_fun_name
+        bundle_row$full_path, info$mtime, info$size,
+        dsp_params, .fn_identity(.using), dsp_ext, .cache_schema
       ))
-      cached <- !.force && !is.null(.get_persistent_cache(cache_key, cache_conn))
+      # A cache hit only counts while the output file it stands for exists.
+      out_file <- file.path(
+        dirname(bundle_row$full_path),
+        paste0(tools::file_path_sans_ext(basename(bundle_row$full_path)), ".", dsp_ext))
+      cached <- !.force && file.exists(out_file) &&
+        !is.null(.get_persistent_cache(cache_key, cache_conn))
     }
     list(bundle = bundle_row$bundle, session = bundle_row$session,
          full_path = bundle_row$full_path, dsp_params = dsp_params,

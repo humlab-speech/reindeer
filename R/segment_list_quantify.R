@@ -179,10 +179,8 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   # Convert to data frame for processing
   seg_df <- as.data.frame(object)
 
-  # Join with metadata if available
-  if (!is.null(metadata_by_bundle)) {
-    seg_df <- merge(seg_df, metadata_by_bundle, by = c("session", "bundle"), all.x = TRUE)
-  }
+  # Row identity: output is restored to input order at the end.
+  seg_df$.row_id <- seq_len(nrow(seg_df))
 
   # Resolve effective DSP params per segment (list-column). Metadata-derived
   # norms are computed per bundle (single-row contract) and merged under any
@@ -206,13 +204,6 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     })
   } else {
     seg_df$seg_params <- rep(list(dsp_params_base), nrow(seg_df))
-  }
-
-  # The speaker columns were only needed to derive parameters; they are not
-  # part of the measurement output (biographize() adds metadata on request).
-  if (!is.null(metadata_by_bundle)) {
-    extra <- setdiff(names(metadata_by_bundle), c("session", "bundle", names(object)))
-    seg_df[extra] <- NULL
   }
 
   # Once per call: Age/Gender are known but this routine can receive none of
@@ -315,6 +306,15 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     n_rows <- nrow(combined)
     cli::cli_alert_success("Processed {n_segs} segment{?s} ({n_rows} row{?s} total)")
   }
+
+  # Restore input order (stable within a segment's own rows), then drop the
+  # bookkeeping columns: the output is input columns + track columns only.
+  if (".row_id" %in% names(combined)) {
+    combined <- combined[order(combined$.row_id), , drop = FALSE]
+  }
+  internal <- c(".row_id", "signal_file", "file_exists", "cache_key", "cached_result",
+                "file_group_id", "seg_params", "seg_params_digest", "result")
+  combined <- combined[, setdiff(names(combined), internal), drop = FALSE]
 
   # Identify DSP columns (those not in original segment_list)
   segment_cols <- c(

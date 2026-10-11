@@ -48,6 +48,13 @@
   before writing; failures in auto-CMDI regeneration warn (`reindeer_cmdi_warning`)
   instead of being swallowed.
 
+- `quantify()` output: rows come back in input order (cold or cached, any size),
+  without internal columns (`seg_params`, `signal_file`, `cache_key`, ...). `.at`
+  on a routine that returns a plain table is now an error instead of being
+  ignored; `.at` picks the nearest frame, there is no interpolation.
+  `quantify(corpus, .using=)` regenerates output files deleted since the cached
+  run and its cache key now includes the routine's identity and file stamp.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

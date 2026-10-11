@@ -223,3 +223,17 @@ test_that("quantify.corpus connect-existing records an explicit documentation-on
   entry <- cfg$ssffTrackDefinitions[[which(track_names == "rms")]]
   expect_equal(entry$generator$`function`, "external_tool")
 })
+
+test_that("a cache hit regenerates a deleted output file", {
+  skip_if_no_emuR(); skip_if_not_installed("wrassp")
+  corp <- create_isolated_ae_corpus()
+  q <- function(...) quantify(corp, .using = wrassp::rmsana, name = "RMS",
+                              fileExtension = "rms", .verbose = FALSE,
+                              .use_cache = TRUE, ...)
+  q()
+  outs <- list.files(corp@basePath, "\\.rms$", recursive = TRUE, full.names = TRUE)
+  expect_gt(length(outs), 0)
+  unlink(outs[1])
+  q(overwrite = TRUE)
+  expect_true(file.exists(outs[1]))
+})

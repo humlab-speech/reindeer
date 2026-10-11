@@ -172,6 +172,34 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   Filter(Negate(is.null), flat)
 }
 
+#' Turn one DSP return value into a data frame, applying `.at`
+#'
+#' `.at` (fractions of the segment) selects the NEAREST frame of a track; no
+#' interpolation. It only makes sense for track outputs, so asking for it on a
+#' routine that returns a plain table/list aborts instead of being ignored.
+#' @noRd
+.dsp_result_to_df <- function(result, .at = NULL) {
+  if (inherits(result, "AsspDataObj")) {
+    track_data <- as.data.frame(result)
+    if (!is.null(.at)) {
+      n_frames <- nrow(track_data)
+      frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
+      track_data <- track_data[frame_indices, , drop = FALSE]
+      track_data$.time_point <- .at
+    }
+    return(track_data)
+  }
+  if (!is.null(.at)) {
+    cli::cli_abort(
+      c("{.arg .at} selects a frame of a track, but the routine returned a {.cls {class(result)[1]}}.",
+        "i" = "Drop {.arg .at} for routines that return one value set per segment."),
+      class = c("reindeer_quantify_error", "reindeer_error"))
+  }
+  if (is.data.frame(result)) result
+  else if (is.list(result)) as.data.frame(result)
+  else data.frame(value = result)
+}
+
 #' Optimized batch processor for large segment lists
 #' Groups segments by audio file to minimize I/O operations
 #' @noRd
@@ -241,24 +269,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         ))
         
         # Handle different result types
-        result_df <- if (inherits(result, "AsspDataObj")) {
-          track_data <- as.data.frame(result)
-          
-          if (!is.null(.at)) {
-            n_frames <- nrow(track_data)
-            frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
-            track_data <- track_data[frame_indices, , drop = FALSE]
-            track_data$.time_point <- .at
-          }
-          
-          track_data
-        } else if (is.data.frame(result)) {
-          result
-        } else if (is.list(result)) {
-          as.data.frame(result)
-        } else {
-          data.frame(value = result)
-        }
+        result_df <- .dsp_result_to_df(result, .at)
         
         # Add segment info
         n_result_rows <- nrow(result_df)
@@ -267,6 +278,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         
         .bind_seg_and_result(seg_replicated, result_df)
       }, error = function(e) {
+        if (inherits(e, "reindeer_quantify_error")) rlang::cnd_signal(e)
         if (.verbose) {
           cli::cli_alert_warning("Error processing segment: {conditionMessage(e)}")
         }
@@ -684,22 +696,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         return(NULL)
       }
 
-      result_df <- if (inherits(dsp_result, "AsspDataObj")) {
-        track_data <- as.data.frame(dsp_result)
-        if (!is.null(.at)) {
-          n_frames <- nrow(track_data)
-          frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
-          track_data <- track_data[frame_indices, , drop = FALSE]
-          track_data$.time_point <- .at
-        }
-        track_data
-      } else if (is.data.frame(dsp_result)) {
-        dsp_result
-      } else if (is.list(dsp_result)) {
-        as.data.frame(dsp_result)
-      } else {
-        data.frame(value = dsp_result)
-      }
+      result_df <- .dsp_result_to_df(dsp_result, .at)
 
       n_result_rows <- nrow(result_df)
       seg_info <- dt_all[rep(i, n_result_rows)]
@@ -752,24 +749,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         ))
         
         # Handle result formatting
-        result_df <- if (inherits(result, "AsspDataObj")) {
-          track_data <- as.data.frame(result)
-          
-          if (!is.null(.at)) {
-            n_frames <- nrow(track_data)
-            frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
-            track_data <- track_data[frame_indices, , drop = FALSE]
-            track_data$.time_point <- .at
-          }
-          
-          track_data
-        } else if (is.data.frame(result)) {
-          result
-        } else if (is.list(result)) {
-          as.data.frame(result)
-        } else {
-          data.frame(value = result)
-        }
+        result_df <- .dsp_result_to_df(result, .at)
         
         # Add segment info
         n_result_rows <- nrow(result_df)
@@ -778,6 +758,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         
         .bind_seg_and_result(seg_replicated, result_df)
       }, error = function(e) {
+        if (inherits(e, "reindeer_quantify_error")) rlang::cnd_signal(e)
         if (.verbose) {
           cli::cli_alert_warning("Error: {conditionMessage(e)}")
         }
