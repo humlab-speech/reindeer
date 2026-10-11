@@ -247,97 +247,75 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     return(invisible(corpus_obj))
   }
 
-  # Clear existing metadata atomically (we're rebuilding from ground truth).
-  DBI::dbWithTransaction(con, {
-    DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?",
-                   params = list(db_uuid))
-    DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?",
-                   params = list(db_uuid))
-    DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?",
-                   params = list(db_uuid))
-  })
-  
-  # 1. Database-level metadata (METADATA.json, or legacy <db>.meta_json)
-  db_name <- basename(basePath)
-  db_name <- sub("_emuDB$", "", db_name)
+  # Phase 1: read every file BEFORE touching the cache. A malformed file must
+  # abort with the file named and leave the previous cache intact; it is never
+  # read as "empty".
+  db_name <- sub("_emuDB$", "", basename(basePath))
   db_meta_file <- .resolve_metadata_file(basePath, db_name)
-
-  if (!is.na(db_meta_file)) {
-    if (verbose) cli::cli_alert_info("Processing database-level defaults")
-    db_meta <- read_json_fast(db_meta_file, simplifyVector = TRUE)
-    if (length(db_meta) > 0) {
-      process_metadata_list(con, db_uuid, NULL, NULL, db_meta, "database")
-    }
+  malformed <- character()
+  read_or_flag <- function(f) {
+    tryCatch(read_json_fast(f, simplifyVector = TRUE),
+             error = function(e) { structure(list(), reindeer_bad = f) })
   }
-  
-  # 2. Session-level metadata
+
+  if (verbose) cli::cli_alert_info("Reading metadata files")
+  db_meta <- list()
+  if (!is.na(db_meta_file)) db_meta <- read_or_flag(db_meta_file)
+
   sessions <- list_sessions_from_cache(con, db_uuid)
-  if (nrow(sessions) > 0 && verbose) {
-    cli::cli_alert_info("Processing {nrow(sessions)} session(s)")
-  }
-  
-  for (i in seq_len(nrow(sessions))) {
-    session_name <- sessions$name[i]
-    session_meta_file <- .resolve_metadata_file(
-      file.path(basePath, paste0(session_name, "_ses")), session_name)
+  session_meta <- lapply(seq_len(nrow(sessions)), function(i) {
+    f <- .resolve_metadata_file(
+      file.path(basePath, paste0(sessions$name[i], "_ses")), sessions$name[i])
+    if (is.na(f)) list() else read_or_flag(f)
+  })
 
-    if (!is.na(session_meta_file)) {
-      meta_data <- read_json_fast(session_meta_file, simplifyVector = TRUE)
-      if (length(meta_data) > 0) {
-        process_metadata_list(con, db_uuid, session_name, NULL, meta_data, "session")
-      }
-    }
-  }
-  
-  # 3. Bundle-level metadata - OPTIMIZED with optional parallel processing
   bundles <- list_bundles_from_cache(con, db_uuid)
-  
-  if (nrow(bundles) == 0) {
-    .metadata_record_mtime(con, basePath, db_uuid)
-    if (verbose) cli::cli_alert_success("Metadata gathering complete")
-    return(invisible(corpus_obj))
-  }
-  
-  if (verbose) {
-    cli::cli_progress_bar("Processing bundle metadata", total = nrow(bundles))
-  }
-  
-  # Prepare file paths (METADATA.json, or legacy <bundle>.meta_json where absent)
-  bundle_files <- mapply(
+  bundle_files <- if (nrow(bundles) == 0) character() else mapply(
     .resolve_metadata_file,
     file.path(basePath, paste0(bundles$session, "_ses"),
               paste0(bundles$name, "_bndl")),
     bundles$name, USE.NAMES = FALSE
   )
-
-  # Filter to existing files
   exists_idx <- !is.na(bundle_files)
   existing_files <- bundle_files[exists_idx]
   existing_bundles <- bundles[exists_idx, ]
-  
-  if (length(existing_files) == 0) {
-    .metadata_record_mtime(con, basePath, db_uuid)
-    if (verbose) {
-      cli::cli_progress_done()
-      cli::cli_alert_success("Metadata gathering complete (no bundle metadata found)")
-    }
-    return(invisible(corpus_obj))
-  }
-  
+
   # The caller's future::plan() decides whether this runs in parallel.
   all_metadata <- future.apply::future_lapply(existing_files, function(f) {
-    tryCatch({
-      read_json_fast(f, simplifyVector = TRUE)
-    }, error = function(e) {
-      list()
-    })
+    tryCatch(read_json_fast(f, simplifyVector = TRUE),
+             error = function(e) structure(list(), reindeer_bad = f))
   }, future.seed = TRUE)
 
-  # OPTIMIZATION: Bulk process all bundle metadata in a single transaction.
-  # Field registration is deduped here - the previous version called
-  # register_metadata_field once per (bundle, field) which means O(N) SQL
-  # round-trips for a single distinct field name.
+  bad <- c(attr(db_meta, "reindeer_bad"),
+           unlist(lapply(session_meta, attr, "reindeer_bad")),
+           unlist(lapply(all_metadata, attr, "reindeer_bad")))
+  if (length(bad) > 0) {
+    cli::cli_abort(
+      c("Cannot parse {length(bad)} metadata file{?s}; the metadata cache was left unchanged.",
+        stats::setNames(bad, rep("x", length(bad)))),
+      class = c("reindeer_metadata_error", "reindeer_error"))
+  }
+
+  if (verbose && nrow(existing_bundles) > 0) {
+    cli::cli_progress_bar("Processing bundle metadata", total = nrow(existing_bundles))
+  }
+
+  # Phase 2: replace the cache contents in ONE transaction.
+  # Field registration is deduped (once per distinct field name).
   DBI::dbWithTransaction(con, {
+    DBI::dbExecute(con, "DELETE FROM metadata_bundle WHERE db_uuid = ?", params = list(db_uuid))
+    DBI::dbExecute(con, "DELETE FROM metadata_session WHERE db_uuid = ?", params = list(db_uuid))
+    DBI::dbExecute(con, "DELETE FROM metadata_database WHERE db_uuid = ?", params = list(db_uuid))
+
+    if (length(db_meta) > 0) {
+      process_metadata_list(con, db_uuid, NULL, NULL, db_meta, "database")
+    }
+    for (i in seq_len(nrow(sessions))) {
+      if (length(session_meta[[i]]) > 0) {
+        process_metadata_list(con, db_uuid, sessions$name[i], NULL, session_meta[[i]], "session")
+      }
+    }
+
     all_records <- list()
     fields_seen <- list()  # field_name -> field_type (first wins)
 
@@ -372,12 +350,10 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
       }
     }
 
-    # Register each distinct field exactly once
     for (fname in names(fields_seen)) {
       register_metadata_field(con, fname, fields_seen[[fname]])
     }
 
-    # Bulk insert all records at once
     if (length(all_records) > 0) {
       combined_records <- data.table::rbindlist(all_records, use.names = TRUE, fill = TRUE)
       DBI::dbWriteTable(con, "metadata_bundle",

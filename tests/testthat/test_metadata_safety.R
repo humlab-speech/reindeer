@@ -95,3 +95,18 @@ test_that("an external edit made after our write is still detected", {
   con <- get_corpus_connection(fx$corp)
   expect_true(reindeer:::.metadata_needs_refresh(con, fx$corp@basePath, fx$corp@.uuid))
 })
+
+test_that("a malformed metadata file aborts, names the file, keeps the cache", {
+  skip_if_no_emuR()
+  fx <- meta_fixture()
+  add_metadata(fx$corp, list(Speaker = "good"), session = fx$ses, bundle = fx$bndl)
+  f <- file.path(bundle_dir(fx), "METADATA.json")
+  writeLines("{ not json", f)
+  Sys.setFileTime(f, Sys.time() + 10)
+  err <- tryCatch(gather_metadata(fx$corp, verbose = FALSE),
+                  reindeer_metadata_error = function(e) e)
+  expect_s3_class(err, "reindeer_metadata_error")
+  expect_match(conditionMessage(err), "METADATA.json")
+  m <- as.data.frame(get_metadata(fx$corp))
+  expect_equal(m$Speaker[m$bundle == fx$bndl], "good")
+})
