@@ -1,5 +1,14 @@
 # reindeer 3.1.0
 
+- Fixed: `Num(parent, child)` counted link paths instead of distinct children,
+  so `[Syllable =~ .* & Num(Syllable, Phonetic) == 1]` differed from emuR when
+  two intermediate items linked to one child. Found by the new EQL fuzzer
+  (`tools/fuzz-eql.R`, triage in `dev/EQL_FUZZ_TRIAGE.md`); golden cases added.
+- Fixed: `annotate()` viewer check evaluated `rstudioapi::isAvailable()` even
+  when rstudioapi is not installed; `1:nrow()` loops in CMDI generation now use
+  `seq_len()`.
+- Added `.lintr` and a lint workflow; the coverage workflow fails below 69 %
+  (baseline 71.2 %). Property test for metadata precedence.
 - Opening a large corpus is about 35 % cheaper in CPU (700 bundles: 3.3 s to 2.2 s): annotation files are parsed into plain lists instead of one data.table per level (`benchmarking/RESULTS_3.1.0.md`).
 - `annotate()` tears its server down on replace and on unload (tested).
 

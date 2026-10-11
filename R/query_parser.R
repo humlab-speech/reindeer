@@ -1100,7 +1100,7 @@ build_count_function_sql <- function(parent_level, child_level, operator, value,
         p.db_uuid, p.session, p.bundle, p.item_id,
         p.level, p.type, p.seq_idx, p.sample_rate,
         p.sample_point, p.sample_start, p.sample_dur,
-        COUNT(c.item_id) as child_count
+        COUNT(DISTINCT c.item_id) as child_count
       %s
       WHERE p.level = ?
       GROUP BY p.db_uuid, p.session, p.bundle, p.item_id,

@@ -348,7 +348,7 @@
         responseBundleJSON <- jsonlite::toJSON(responseBundle, auto_unbox = TRUE, force = TRUE, pretty = FALSE)
         result <- ws$send(responseBundleJSON)
 
-        if (is.null(err) & debugLevel >= 2) {
+        if (is.null(err) && debugLevel >= 2) {
           if (debugLevel >= 8) cli::cli_alert_info("{responseBundleJSON}")
           cli::cli_alert_success("Sent bundle containing {length(ssffFiles)} SSFF files")
         }
@@ -527,7 +527,7 @@
   if (length(autoOpenURL) != 0 && autoOpenURL != "") {
     viewer <- getOption("viewer")
 
-    if (useViewer & requireNamespace("rstudioapi", quietly = TRUE) & rstudioapi::isAvailable()) {
+    if (useViewer && requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
       # Artic is served from its dist root, so absolute asset URLs resolve
       # against the server root; the RStudio Viewer can load the URL directly.
 

@@ -1,5 +1,17 @@
 # emuR parity harness. Golden outputs come from tools/make-eql-golden.R.
 # Rows are compared UNSORTED: emuR row order is part of the contract.
+#
+# Maintaining the ledger
+#   * Add a case: append the query to `queries` in tools/make-eql-golden.R, run
+#     `Rscript tools/make-eql-golden.R` (needs emuR; it rewrites the fixture
+#     from the installed emuR). No test edit is needed: test_eql_parity.R
+#     iterates the whole fixture.
+#   * A skip names the work package that fixes it; there are none now. Do not
+#     add skips to silence a failure: fix reindeer, or record an emuR quirk in
+#     dev/EQL_FUZZ_TRIAGE.md and drop the query.
+#   * tools/fuzz-eql.R finds new cases; confirmed bugs become golden cases.
+#   * The fixture records the emuR version it was made with; regenerate (and
+#     review the diff) when emuR is upgraded.
 
 eql_golden <- function() {
   readRDS(testthat::test_path("fixtures", "eql_golden.rds"))$queries

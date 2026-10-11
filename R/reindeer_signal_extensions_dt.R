@@ -19,9 +19,9 @@
 dspp_metadataParameters_dt <- function(recompute=FALSE,
                                         id.columns=c("Age","Gender"),
                                         impute=TRUE,
-                                        defaultsEstimatedSampleSize=10){
+                                        defaultsEstimatedSampleSize=10) {
 
-  if(!recompute){
+  if (!recompute) {
     data(DSPP, package = "reindeer", envir = environment())
     return(DSPP)
   }

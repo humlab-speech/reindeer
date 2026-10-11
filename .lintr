@@ -1,0 +1,10 @@
+linters: list(
+    seq_linter(),
+    vector_logic_linter(),
+    T_and_F_symbol_linter(),
+    trailing_blank_lines_linter(),
+    paren_body_linter(),
+    equals_na_linter(),
+    unreachable_code_linter()
+  )
+exclusions: list("tests", "vignettes", "inst", "tools", "benchmarking", "dev")

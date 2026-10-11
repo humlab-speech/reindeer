@@ -42,11 +42,16 @@ jobs:
 
       - name: Test coverage
         run: |
-          covr::codecov(
+          cov <- covr::package_coverage(
             quiet = FALSE,
             clean = FALSE,
             install_path = file.path(normalizePath(Sys.getenv("RUNNER_TEMP"), winslash = "/"), "package")
           )
+          covr::codecov(coverage = cov, quiet = FALSE)
+          # Floor = baseline 71.2 % (2026-10-11) minus 2 points.
+          pct <- covr::percent_coverage(cov)
+          cat(sprintf("coverage: %.1f %%\n", pct))
+          if (pct < 69) stop(sprintf("coverage %.1f %% is below the 69 %% floor", pct))
         shell: Rscript {0}
 
       - name: Show testthat output

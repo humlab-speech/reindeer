@@ -33,23 +33,3 @@
 
   list(items = items, labels = labels, links = links)
 }
-
-
-
-
-
-#' Add session record to SQLite
-#'
-#' Inserts a session record into the session table. Uses INSERT OR IGNORE
-#' so existing sessions are not duplicated.
-#'
-#' @param con DBI connection
-#' @param db_uuid Database UUID
-#' @param name Session name
-#' @keywords internal
-#' @noRd
-.add_session_to_db <- function(con, db_uuid, name) {
-  DBI::dbExecute(con,
-    "INSERT OR IGNORE INTO session (db_uuid, name) VALUES (?, ?)",
-    params = list(db_uuid, name))
-}

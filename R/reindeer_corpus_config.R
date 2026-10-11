@@ -2,7 +2,7 @@
 
 
 
-if(! exists("database.schema.suffix")){
+if (!exists("database.schema.suffix")) {
   emuDB.suffix = '_emuDB'
   session.suffix = '_ses'
   bundle.dir.suffix = '_bndl'

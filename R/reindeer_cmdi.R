@@ -174,7 +174,7 @@ collect_database_metadata <- function(db_handle, db_config, verbose = TRUE) {
   
   # Calculate total duration if possible
   total_duration_sec <- 0
-  for (i in 1:nrow(bundles)) {
+  for (i in seq_len(nrow(bundles))) {
     bundle_dir <- file.path(db_handle$basePath, 
                            paste0(bundles$session[i], "_ses"),
                            paste0(bundles$name[i], "_bndl"))
@@ -284,7 +284,7 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
   participants <- list()
   sessions <- .list_sessions(db_handle)
   
-  for (i in 1:nrow(sessions)) {
+  for (i in seq_len(nrow(sessions))) {
     session_name <- sessions$name[i]
     session_dir <- file.path(db_handle$basePath, paste0(session_name, "_ses"))
     
@@ -300,7 +300,7 @@ collect_participant_metadata <- function(corpus_or_handle, verbose = TRUE) {
     
     # Check for bundle-level .meta_json
     bundles <- .list_bundles(db_handle, session = session_name)
-    for (j in 1:nrow(bundles)) {
+    for (j in seq_len(nrow(bundles))) {
       bundle_name <- bundles$name[j]
       bundle_dir <- file.path(session_dir, paste0(bundle_name, "_bndl"))
       bundle_meta_file <- file.path(bundle_dir, ".meta_json")

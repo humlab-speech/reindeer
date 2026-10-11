@@ -26,4 +26,3 @@ demo_corpus <- function(verbose = FALSE) {
 
   reindeer::corpus(file.path(demodir, "ae_emuDB"), verbose = verbose)
 }
-

@@ -54,6 +54,10 @@ queries <- c(
   "[Syllable =~ .* & Num(Syllable, Phonetic) >= 3]",
   "[Syllable =~ .* & Num(Syllable, Phonetic) < 3]",
   "[Foot =~ .* & Num(Foot, Syllable) == 2]",
+  # fuzzer finds: two Phonemes link to one Phonetic, which Num counts once
+  "[Syllable =~ .* & Num(Syllable, Phonetic) == 1]",
+  "[Syllable =~ .* & Num(Syllable, Phonetic) == 2]",
+  "[Syllable =~ .* & Num(Syllable, Phonetic) > 1]",
   "[Phonetic == n -> Phonetic == t] ",
   # sequence with Start/End functions / num on sequences
   "[#Phonetic == n -> Phonetic == t]",

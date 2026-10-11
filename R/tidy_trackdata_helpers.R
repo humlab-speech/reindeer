@@ -677,4 +677,3 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   if (length(dup) > 0L) data.table::setnames(res, dup, paste0(dup, "_dsp"))
   list(tibble::as_tibble(cbind(seg_info, res)))
 }
-

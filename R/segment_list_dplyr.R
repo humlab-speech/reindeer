@@ -142,4 +142,3 @@
   if (!is.null(prov)) attr(out, "reindeer_provenance") <- prov
   out
 }
-
