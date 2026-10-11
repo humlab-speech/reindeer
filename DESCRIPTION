@@ -1,8 +1,8 @@
 Package: reindeer
 Type: Package
 Title: Reproducible Analysis of Speech Corpora
-Version: 2.5.0
-Date: 2026-10-04
+Version: 2.6.0
+Date: 2026-10-11
 Authors@R: c(
     person("Fredrik", "Nylén", , "fredrik.nylen@umu.se", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-3373-0934")),
@@ -59,6 +59,8 @@ Suggests:
     rstudioapi,
     ggplot2,
     withr,
+    future,
+    yaml,
     shiny,
     miniUI,
     DT

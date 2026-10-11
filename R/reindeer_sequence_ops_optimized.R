@@ -11,6 +11,7 @@
 #'
 #' @author reindeer package
 #' @include segment_list_classes.R reindeer_lazy_segment_list.R
+#' @noRd
 NULL
 
 #' Move forward or backward along an annotation level

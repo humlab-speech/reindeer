@@ -241,24 +241,7 @@ import_metadata <- function(corpus_obj, Excelfile) {
   invisible(TRUE)
 }
 
-#' Add metadata programmatically
-#'
-#' Sets metadata at the database, session, or bundle level. Writes to
-#' METADATA.json (ground truth) and updates the SQLite cache. Level is
-#' determined by which of \code{session}/\code{bundle} are provided.
-#'
-#' @param corpus_obj A corpus object
-#' @param metadataList Named list of metadata key-value pairs
-#' @param session Optional session name (required for session/bundle level)
-#' @param bundle Optional bundle name (requires session)
-#' @param reset.before.add Clear existing metadata at this level first (default: FALSE)
-#' @return The corpus object, invisibly
-#'
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/db_emuDB")
-#' add_metadata(corp, list(Project = "MyStudy"))
-#' add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
-#'
+#' @param reset.before.add Deprecated spelling of `reset`.
 #' @export
 #' @rdname set_metadata
 add_metadata <- function(corpus_obj, metadataList, session = NULL, bundle = NULL,

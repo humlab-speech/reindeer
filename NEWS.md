@@ -1,8 +1,9 @@
-# reindeer 2.5.0
+# reindeer 2.6.0
 
 This release folds in the 2.3.0 (silent-wrong-result fixes), 2.4.0 (80 of 80 emuR
-parity; SEGMENT times shift by half a sample and quantify caches miss once) and
-2.5.0 (power and latency; see `benchmarking/RESULTS_2.5.0.md`) work packages.
+parity; SEGMENT times shift by half a sample and quantify caches miss once),
+2.5.0 (power and latency; see `benchmarking/RESULTS_2.5.0.md`) and 2.6.0
+(documentation: eight vignettes, rewritten reference, website) work packages.
 
 ## Interface
 

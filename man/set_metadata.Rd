@@ -3,7 +3,7 @@
 \name{add_metadata}
 \alias{add_metadata}
 \alias{set_metadata}
-\title{Add metadata programmatically}
+\title{Set metadata on a corpus, session, or bundle}
 \usage{
 add_metadata(
   corpus_obj,
@@ -28,11 +28,10 @@ set_metadata(
 
 \item{metadataList}{Deprecated spelling of \code{x}.}
 
-\item{session}{Optional session name (required for session/bundle level)}
+\item{session, bundle}{Scope to write to (see above). \code{bundle} needs
+\code{session}.}
 
-\item{bundle}{Optional bundle name (requires session)}
-
-\item{reset.before.add}{Clear existing metadata at this level first (default: FALSE)}
+\item{reset.before.add}{Deprecated spelling of \code{reset}.}
 
 \item{x}{What to write: a named list of fields; a data frame (one row per
 scope, with \code{session} and/or \code{bundle} columns, applied all-or-nothing); or
@@ -40,20 +39,11 @@ the path of a workbook written by \code{\link[=export_metadata]{export_metadata(
 
 \item{reset}{If \code{TRUE}, clear the existing fields at the scope first.
 (\code{reset.before.add} is the deprecated spelling.)}
-
-\item{session, bundle}{Scope to write to (see above). \code{bundle} needs
-\code{session}.}
 }
 \value{
-The corpus object, invisibly
-
 \code{corpus_obj}, invisibly.
 }
 \description{
-Sets metadata at the database, session, or bundle level. Writes to
-METADATA.json (ground truth) and updates the SQLite cache. Level is
-determined by which of \code{session}/\code{bundle} are provided.
-
 Writes metadata fields to the \code{METADATA.json} file at the scope you choose
 and keeps the cache in step. Which scope is decided by \code{session} and
 \code{bundle}:
@@ -69,11 +59,6 @@ Values keep their type, arrays such as \code{team} replace the old value, and
 everything is validated before anything is written.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/db_emuDB")
-add_metadata(corp, list(Project = "MyStudy"))
-add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
-\dontshow{\}) # examplesIf}
 \dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 # work on a copy so the demo corpus stays untouched
 src <- demo_corpus()@basePath

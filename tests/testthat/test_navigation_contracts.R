@@ -125,7 +125,9 @@ test_that("scout matches emuR requery_seq (labels, times, ids)", {
 test_that("scout over ~18k segments takes well under a few seconds", {
   skip_if_no_emuR()
   skip_on_cran()
-  source(test_path("../../tools/make-synthetic-corpus.R"), local = TRUE)
+  synth <- test_path("../../tools/make-synthetic-corpus.R")
+  skip_if_not(file.exists(synth), "benchmark tooling not in the built package")
+  source(synth, local = TRUE)
   dir <- withr::local_tempdir()
   p <- make_synthetic_corpus(504, dir)
   corp <- corpus(p, verbose = FALSE)

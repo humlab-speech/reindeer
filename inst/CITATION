@@ -1,4 +1,4 @@
-meta <- packageDescription("reindeer")
+meta <- utils::packageDescription("reindeer")
 year <- sub("-.*", "", meta$Date)
 if (is.null(year) || !nzchar(year)) year <- format(Sys.Date(), "%Y")
 vers <- paste("R package version", meta$Version)
