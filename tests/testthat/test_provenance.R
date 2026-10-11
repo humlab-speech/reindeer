@@ -77,7 +77,7 @@ test_that("loss warning fires for navigation verbs above threshold", {
   segs <- query(ae, "Phonetic == n")
   withr::with_options(list(reindeer.loss_warn = 0.0), {
     expect_warning(
-      ascend_to(segs, "Word", .from = ae),
+      scout(segs, 500),   # steps past the end of every bundle: all rows lost
       regexp = "row.*lost"
     )
   })

@@ -223,112 +223,72 @@ scout_dt <- function(.segments,
     params = c(list(db_uuid), as.list(levels), scope$params)
   ))
 
-  # Compute sample_end from sample_start + sample_dur (emuR stores duration, not end)
-  all_items_dt[, sample_end := data.table::fifelse(
-    type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
-    sample_start + sample_dur,  # emuR: sample_end = start + dur
-    NA_integer_
-  )]
+  all_items_dt <- .nav_fill_item_times(all_items_dt, corp)
 
-  # Query labels
+  # Labels of the default attribute (the level itself): one per item.
   labels_query <- sprintf("SELECT db_uuid, session, bundle, item_id, label
      FROM labels
-     WHERE db_uuid = ? AND %s", scope$sql)
+     WHERE db_uuid = ? AND name IN (%s) AND %s",
+     level_placeholders, scope$sql)
   labels_dt <- data.table::setDT(DBI::dbGetQuery(
-    conn, labels_query, params = c(list(db_uuid), scope$params)))
-  
-  # Set keys for fast joins
-  data.table::setkey(all_items_dt, db_uuid, session, bundle, level, seq_idx)
+    conn, labels_query, params = c(list(db_uuid), as.list(levels), scope$params)))
+  labels_dt <- unique(labels_dt, by = c("db_uuid", "session", "bundle", "item_id"))
   data.table::setkey(labels_dt, db_uuid, session, bundle, item_id)
-  
-  # Initialize result list
-  result_list <- vector("list", nrow(dt))
-  
-  # Process each segment
-  for (i in seq_len(nrow(dt))) {
-    seg <- dt[i, ]
-    
-    # Calculate target sequence indices
-    start_seq <- seg$ref_seq_idx + steps_forward
-    end_seq <- start_seq + capture - 1
-    
-    # Find matching items
-    if (ignore_bundle_boundaries) {
-      # Can cross bundles within same session
-      matches <- all_items_dt[
-        db_uuid == seg$db_uuid &
-          session == seg$session &
-          level == seg$level &
-          seq_idx >= start_seq &
-          seq_idx <= end_seq
-      ]
-    } else {
-      # Must stay within same bundle
-      matches <- all_items_dt[
-        db_uuid == seg$db_uuid &
-          session == seg$session &
-          bundle == seg$bundle &
-          level == seg$level &
-          seq_idx >= start_seq &
-          seq_idx <= end_seq
-      ]
-    }
-    
-    if (nrow(matches) > 0) {
-      # Join with labels
-      matches <- labels_dt[matches, on = .(db_uuid, session, bundle, item_id)]
-      data.table::setnames(matches, "label", "labels", skip_absent = TRUE)
-      
-      # Build result rows
-      if (capture == 1) {
-        # Single item: one row
-        result_row <- data.table::data.table(
-          labels = matches$labels[1],
-          start = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_start[1] - 0.5) / matches$sample_rate[1] * 1000,
-          end = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_end[1] + 0.5) / matches$sample_rate[1] * 1000,
-          db_uuid = seg$db_uuid,
-          session = seg$session,
-          bundle = seg$bundle,
-          start_item_id = matches$item_id[1],
-          end_item_id = matches$item_id[1],
-          level = seg$level,
-          attribute = seg$attribute,
-          start_item_seq_idx = matches$seq_idx[1],
-          end_item_seq_idx = matches$seq_idx[1],
-          type = matches$type[1],
-          sample_start = matches$sample_start[1],
-          sample_end = matches$sample_end[1],
-          sample_rate = matches$sample_rate[1]
-        )
-      } else {
-        # Multiple items: one row spanning range
-        result_row <- data.table::data.table(
-          labels = paste(matches$labels, collapse = " "),
-          start = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_start[1] - 0.5) / matches$sample_rate[1] * 1000,
-          end = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_end[nrow(matches)] + 0.5) / matches$sample_rate[nrow(matches)] * 1000,
-          db_uuid = seg$db_uuid,
-          session = seg$session,
-          bundle = seg$bundle,
-          start_item_id = matches$item_id[1],
-          end_item_id = matches$item_id[nrow(matches)],
-          level = seg$level,
-          attribute = seg$attribute,
-          start_item_seq_idx = matches$seq_idx[1],
-          end_item_seq_idx = matches$seq_idx[nrow(matches)],
-          type = matches$type[1],
-          sample_start = matches$sample_start[1],
-          sample_end = matches$sample_end[nrow(matches)],
-          sample_rate = matches$sample_rate[1]
-        )
-      }
-      
-      result_list[[i]] <- result_row
-    }
+
+  # Position of every item along its level. With ignore_bundle_boundaries the
+  # bundles of a session are laid end to end (alphabetical), so stepping past
+  # the last item of one bundle lands on the first of the next.
+  if (ignore_bundle_boundaries) {
+    data.table::setorder(all_items_dt, db_uuid, session, level, bundle, seq_idx)
+    n_per_bundle <- all_items_dt[, .(n = max(seq_idx)), by = .(db_uuid, session, level, bundle)]
+    n_per_bundle[, offset := cumsum(data.table::shift(n, fill = 0L)), by = .(db_uuid, session, level)]
+    all_items_dt <- n_per_bundle[all_items_dt, on = .(db_uuid, session, level, bundle)]
+    all_items_dt[, pos := seq_idx + offset]
+    seg_off <- n_per_bundle[, .(db_uuid, session, level, bundle, seg_offset = offset)]
+    dt <- seg_off[dt, on = .(db_uuid, session, level, bundle)]
+    dt[, ref_pos := ref_seq_idx + seg_offset]
+    match_keys <- c("db_uuid", "session", "level", "pos")
+  } else {
+    all_items_dt[, pos := seq_idx]
+    dt[, ref_pos := ref_seq_idx]
+    match_keys <- c("db_uuid", "session", "bundle", "level", "pos")
   }
-  
-  # Combine results
-  result_dt <- data.table::rbindlist(result_list, fill = TRUE)
-  
+  data.table::setkeyv(all_items_dt, match_keys)
+
+  # One candidate position per (segment, captured step), matched with a single
+  # equi-join: no per-segment loop.
+  dt[, row_id := .I]
+  cand <- dt[rep(seq_len(.N), each = capture)]
+  cand[, step := rep(seq_len(capture) - 1L, times = nrow(dt))]
+  cand[, pos := ref_pos + steps_forward + step]
+  m <- all_items_dt[cand[, c("row_id", "step", match_keys), with = FALSE],
+                    on = match_keys, nomatch = NULL]
+  m <- labels_dt[m, on = .(db_uuid, session, bundle, item_id)]
+  .nav_times(m)
+  data.table::setorder(m, row_id, step)
+
+  seg_attr <- dt[, .(row_id, seg_attribute = attribute)]
+  result_dt <- m[, .(
+    labels = paste(label, collapse = " "),
+    start = start[1L], end = end[.N],
+    db_uuid = db_uuid[1L], session = session[1L], bundle = bundle[1L],
+    start_item_id = item_id[1L], end_item_id = item_id[.N],
+    level = level[1L],
+    start_item_seq_idx = seq_idx[1L], end_item_seq_idx = seq_idx[.N],
+    type = type[1L],
+    sample_start = sample_start[1L], sample_end = sample_end[.N],
+    sample_rate = sample_rate[1L]
+  ), by = row_id]
+  result_dt <- seg_attr[result_dt, on = "row_id"]
+  data.table::setnames(result_dt, "seg_attribute", "attribute")
+  data.table::setorder(result_dt, row_id)
+  result_dt[, row_id := NULL]
+  data.table::setcolorder(result_dt, c(
+    "labels", "start", "end", "db_uuid", "session", "bundle",
+    "start_item_id", "end_item_id", "level", "attribute",
+    "start_item_seq_idx", "end_item_seq_idx", "type",
+    "sample_start", "sample_end", "sample_rate"))
+
   # Handle time calculation if needed
   if (calculate_times && !is.null(times_from)) {
     # Calculate times from reference level
@@ -413,6 +373,56 @@ S7::method(ascend_to, lazy_segment_list) <- function(.segments, level,
   .fork_lazy(.segments, "sql", transform)
 }
 
+#' Fill sample_end and ms times for navigation results
+#'
+#' SEGMENTs (and ITEMs whose span was deduced from time-bearing descendants)
+#' use emuR's half-sample convention; EVENTs sit at their sample point and have
+#' end 0. Items with no time information keep NA.
+#' @noRd
+.nav_times <- function(dt) {
+  dt[, sample_end := data.table::fifelse(
+    !is.na(sample_start) & !is.na(sample_dur), sample_start + sample_dur, NA_integer_)]
+  dt[, `:=`(
+    start = data.table::fifelse(
+      type == "EVENT", sample_point / sample_rate * 1000,
+      data.table::fifelse(!is.na(sample_start), (sample_start - 0.5) / sample_rate * 1000, NA_real_)),
+    end = data.table::fifelse(
+      type == "EVENT", 0,
+      data.table::fifelse(!is.na(sample_end), (sample_end + 0.5) / sample_rate * 1000, NA_real_))
+  )]
+  invisible(dt)
+}
+
+#' Give ITEM rows the span of their time-bearing descendants
+#' @noRd
+.nav_fill_item_times <- function(items_dt, corp) {
+  if (nrow(items_dt) == 0L || !any(items_dt$type == "ITEM" & is.na(items_dt$sample_start))) {
+    return(items_dt)
+  }
+  sqlite <- file.path(corp@basePath, paste0(corp@dbName, database.cache.suffix))
+  data.table::as.data.table(deduce_item_times(as.data.frame(items_dt), sqlite))
+}
+
+
+#' Transitive parent->child links between two levels
+#'
+#' Same shape as the `links` table (`from_id` = ancestor, `to_id` = descendant),
+#' but spanning every level between `ancestor_level` and `descendant_level`
+#' (e.g. Syllable -> Phoneme -> Phonetic), restricted to the bundles in `dt`.
+#' Built from the DBconfig hierarchy by the same join chain the EQL position
+#' and count functions use.
+#' @noRd
+.hier_links <- function(conn, db_uuid, ancestor_level, descendant_level, hier, dt) {
+  from <- .hier_from_clause(ancestor_level, descendant_level, hier)
+  pairs <- data.table::setDT(DBI::dbGetQuery(conn, paste0(
+    "SELECT DISTINCT p.db_uuid AS db_uuid, p.session AS session, p.bundle AS bundle,
+            p.item_id AS from_id, c.item_id AS to_id ", from,
+    " WHERE p.db_uuid = ? AND p.level = ? AND c.level = ?"),
+    params = list(db_uuid, ancestor_level, descendant_level)))
+  keep <- unique(dt[, .(session, bundle)])
+  pairs[keep, on = .(session, bundle), nomatch = NULL]
+}
+
 #' Ascend Implementation Using data.table
 #'
 #' @keywords internal
@@ -442,23 +452,13 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   # Get database connection - reuse cached connection for corpus objects
   conn <- get_or_create_connection(corp)
 
-  # Query for upward links
-  # We need to find items at the target level that link down to our segments
+  # Links from the target level down to each input level, however many
+  # hierarchy levels lie between them.
   scope <- .scope_to_segments(dt)
-  links_query <- sprintf("
-   SELECT l.*, i.level as from_level
-    FROM links l
-    INNER JOIN items i ON
-      l.db_uuid = i.db_uuid AND
-      l.session = i.session AND
-      l.bundle = i.bundle AND
-      l.to_id = i.item_id
-    WHERE l.db_uuid = ? AND (l.session || '%s' || l.bundle) IN (%s)",
-    scope$sep, scope$in_list)
+  hier <- get_hierarchy_info(corp@basePath)
+  links_dt <- data.table::rbindlist(lapply(
+    unique(dt$level), function(lv) .hier_links(conn, db_uuid, level, lv, hier, dt)))
 
-  links_dt <- data.table::setDT(DBI::dbGetQuery(
-    conn, links_query, params = c(list(db_uuid), scope$params)))
-  
   # Query target level items
   items_query <- sprintf(
     "SELECT * FROM items WHERE db_uuid = ? AND level = ? AND %s", scope$sql)
@@ -467,19 +467,15 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     conn, items_query, params = c(list(db_uuid, level), scope$params)
   ))
 
-  # Compute sample_end from sample_start + sample_dur
-  target_items_dt[, sample_end := data.table::fifelse(
-    type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
-    sample_start + sample_dur,  # emuR: sample_end = start + dur
-    NA_integer_
-  )]
+  target_items_dt <- .nav_fill_item_times(target_items_dt, corp)
 
   # Query labels for target level
+  # The default attribute of a level is the level itself: one label per item.
   labels_query <- "SELECT db_uuid, session, bundle, item_id, label
      FROM labels
-     WHERE db_uuid = ?"
+     WHERE db_uuid = ? AND name = ?"
 
-  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query, params = list(db_uuid)))
+  labels_dt <- data.table::setDT(DBI::dbGetQuery(conn, labels_query, params = list(db_uuid, level)))
 
   # Set keys
   data.table::setkey(links_dt, db_uuid, session, bundle, to_id)
@@ -507,11 +503,8 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   data.table::setnames(result_dt, "label", "labels", skip_absent = TRUE)
 
   # Calculate times if available
+  .nav_times(result_dt)
   result_dt[, `:=`(
-    start = data.table::fifelse(type == "SEGMENT", (sample_start - 0.5) / sample_rate * 1000,
-                                data.table::fifelse(type == "EVENT", sample_start / sample_rate * 1000, NA_real_)),
-    end = data.table::fifelse(type == "SEGMENT", (sample_end + 0.5) / sample_rate * 1000,
-              data.table::fifelse(type == "EVENT", sample_end / sample_rate * 1000, NA_real_)),
     start_item_id = item_id,
     end_item_id = item_id,
     start_item_seq_idx = seq_idx,
@@ -631,13 +624,13 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   # Get database connection - reuse cached connection for corpus objects
   conn <- get_or_create_connection(corp)
 
-  # Query for downward links (from our segments to target level)
+  # Links from each input level down to the target level, across every
+  # intermediate level.
   scope <- .scope_to_segments(dt)
-  links_query <- sprintf("SELECT * FROM links WHERE db_uuid = ? AND %s", scope$sql)
+  hier <- get_hierarchy_info(corp@basePath)
+  links_dt <- data.table::rbindlist(lapply(
+    unique(dt$level), function(lv) .hier_links(conn, db_uuid, lv, level, hier, dt)))
 
-  links_dt <- data.table::setDT(DBI::dbGetQuery(
-    conn, links_query, params = c(list(db_uuid), scope$params)))
-  
   # Query target level items
   items_query <- sprintf(
     "SELECT * FROM items WHERE db_uuid = ? AND level = ? AND %s", scope$sql)
@@ -646,26 +639,23 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     conn, items_query, params = c(list(db_uuid, level), scope$params)
   ))
 
-  # Compute sample_end from sample_start + sample_dur
-  target_items_dt[, sample_end := data.table::fifelse(
-    type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
-    sample_start + sample_dur,  # emuR: sample_end = start + dur
-    NA_integer_
-  )]
+  target_items_dt <- .nav_fill_item_times(target_items_dt, corp)
 
   # Query labels
   labels_query <- sprintf("SELECT db_uuid, session, bundle, item_id, label
      FROM labels
-     WHERE db_uuid = ? AND %s", scope$sql)
+     WHERE db_uuid = ? AND name = ? AND %s", scope$sql)
 
   labels_dt <- data.table::setDT(DBI::dbGetQuery(
-    conn, labels_query, params = c(list(db_uuid), scope$params)))
+    conn, labels_query, params = c(list(db_uuid, level), scope$params)))
 
   # Set keys
   data.table::setkey(links_dt, db_uuid, session, bundle, from_id)
   data.table::setkey(target_items_dt, db_uuid, session, bundle, item_id)
   data.table::setkey(labels_dt, db_uuid, session, bundle, item_id)
   
+  dt[, seg_idx := .I]
+
   # Join segments with links (segments are "from" side, children are "to" side)
   seg_links <- links_dt[dt,
                         on = .(db_uuid, session, bundle, from_id = start_item_id),
@@ -684,11 +674,8 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   data.table::setnames(result_dt, "label", "labels", skip_absent = TRUE)
   
   # Calculate times
+  .nav_times(result_dt)
   result_dt[, `:=`(
-    start = data.table::fifelse(type == "SEGMENT", (sample_start - 0.5) / sample_rate * 1000,
-                                data.table::fifelse(type == "EVENT", sample_start / sample_rate * 1000, NA_real_)),
-    end = data.table::fifelse(type == "SEGMENT", (sample_end + 0.5) / sample_rate * 1000,
-              data.table::fifelse(type == "EVENT", sample_end / sample_rate * 1000, NA_real_)),
     start_item_id = item_id,
     end_item_id = item_id,
     start_item_seq_idx = seq_idx,
@@ -696,6 +683,22 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
     attribute = level
   )]
   
+  # emuR semantics: ONE row per input segment, spanning its first to its last
+  # child (labels joined with "->").
+  result_dt <- unique(result_dt, by = c("seg_idx", "item_id"))
+  data.table::setorder(result_dt, seg_idx, seq_idx)
+  result_dt <- result_dt[, .(
+    labels = paste(labels, collapse = "->"),
+    start = start[1L], end = end[.N],
+    db_uuid = db_uuid[1L], session = session[1L], bundle = bundle[1L],
+    start_item_id = start_item_id[1L], end_item_id = end_item_id[.N],
+    level = level[1L], attribute = attribute[1L],
+    start_item_seq_idx = start_item_seq_idx[1L], end_item_seq_idx = end_item_seq_idx[.N],
+    type = type[1L],
+    sample_start = sample_start[1L], sample_end = sample_end[.N],
+    sample_rate = sample_rate[1L]
+  ), by = seg_idx]
+
   # Select required columns
   result_cols <- c(
     "labels", "start", "end", "db_uuid", "session", "bundle",

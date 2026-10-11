@@ -2,13 +2,8 @@
 # `known_failures` with the work package (dev/REINDEER_AMENDMENT_PLAN_2.2.0.md)
 # that fixes them; they are skipped, not dropped.
 known_failures <- list(
-  "[[#Phonetic == n -> Phonetic == t] ^ Syllable == W]" = "A6/A7: WP3.2-3.4",
-  "[[Syllable == S -> Syllable == W] ^ Phonetic == @]" = "A6/A7: WP3.2-3.4",
-  "[Phonetic =~ .* & Start(Syllable, Phonetic) == 1]" = "A6/A7: WP3.2-3.4",
-  "[Phonetic =~ .* & End(Syllable, Phonetic) == 1]" = "A6/A7: WP3.2-3.4",
-  "[Phonetic == t & Start(Word, Phonetic) == 1]" = "A6/A7: WP3.2-3.4",
-  "[Syllable =~ .* & Num(Syllable, Phonetic) >= 3]" = "A6/A7: WP3.2-3.4",
-  "[Syllable =~ .* & Num(Syllable, Phonetic) < 3]" = "A6/A7: WP3.2-3.4"
+  "[[#Phonetic == n -> Phonetic == t] ^ Syllable == W]" = "A6/A7: WP3.3-3.4",
+  "[[Syllable == S -> Syllable == W] ^ Phonetic == @]" = "A6/A7: WP3.3-3.4"
 )
 
 test_that("EQL results match emuR (unsorted, 1e-9)", {

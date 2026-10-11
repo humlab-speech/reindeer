@@ -934,9 +934,11 @@ execute_function_query_corrected <- function(db_path, parsed_query, con = NULL) 
   level2 <- .resolve_level_attribute(con, level2, level2)$level
 
   if (func_name %in% c("Start", "End", "Medial")) {
-    return(execute_position_function(con, func_name, level1, level2, operator, value, position))
+    return(execute_position_function(con, func_name, level1, level2, operator, value, position,
+                                     hier = get_hierarchy_info(dirname(db_path))))
   } else if (func_name == "Num") {
-    return(execute_count_function(con, level1, level2, operator, value))
+    return(execute_count_function(con, level1, level2, operator, value,
+                                  hier = get_hierarchy_info(dirname(db_path))))
   } else {
     .query_abort("Unknown function: {.val {func_name}}")
   }
@@ -1357,13 +1359,47 @@ build_recursive_dominance_chain <- function(path_info) {
   return(paste(joins, collapse = ",\n"))
 }
 
+# FROM-clause fragment joining every item of `parent_level` to its descendants at
+# `child_level`, however many hierarchy levels lie between them (aliases `p` and
+# `c`). Intermediate levels come from the DBconfig link definitions, so
+# Start(Syllable, Phonetic) works through Phoneme. `hier` is get_hierarchy_info().
+# @keywords internal
+.hier_from_clause <- function(parent_level, child_level, hier, kind = "INNER",
+                              child_cond = "") {
+  path_info <- if (is.null(hier)) NULL else find_dominance_path(hier, parent_level, child_level)
+  path <- if (is.null(path_info) || length(path_info$path) < 2L) c(parent_level, child_level) else path_info$path
+  if (!is.null(path_info) && length(path_info$path) >= 2L && !all(path_info$directions == "down")) {
+    .query_abort("{.val {parent_level}} does not dominate {.val {child_level}}.")
+  }
+  for (lvl in path) {
+    if (grepl("[^A-Za-z0-9_]", lvl)) .query_abort("Invalid level name in hierarchy path: {.val {lvl}}")
+  }
+  from <- "FROM items p"
+  prev <- "p"
+  for (k in seq_len(length(path) - 1L)) {
+    cur <- if (k == length(path) - 1L) "c" else sprintf("i%d", k)
+    cond <- if (cur == "c") child_cond else sprintf(" AND %s.level = '%s'", cur, path[k + 1L])
+    from <- paste0(from, sprintf("
+      %s JOIN links l%d ON %s.db_uuid = l%d.db_uuid
+        AND %s.session = l%d.session AND %s.bundle = l%d.bundle
+        AND %s.item_id = l%d.from_id
+      %s JOIN items %s ON l%d.db_uuid = %s.db_uuid
+        AND l%d.session = %s.session AND l%d.bundle = %s.bundle
+        AND l%d.to_id = %s.item_id%s",
+      kind, k, prev, k, prev, k, prev, k, prev, k,
+      kind, cur, k, cur, k, cur, k, cur, k, cur, cond))
+    prev <- cur
+  }
+  from
+}
+
 # Position function
 # Build SQL for a position function (Start / End / Medial). Returns
 # list(sql, params) so the same builder is shared by the eager and lazy
 # execution paths.
 # @keywords internal
 build_position_function_sql <- function(func_name, parent_level, child_level,
-                                        operator, value, position = NULL) {
+                                        operator, value, position = NULL, hier = NULL) {
   if (func_name == "Medial" && !is.null(position)) {
     position_condition <- sprintf("child_rank = %d", position)
   } else {
@@ -1395,15 +1431,7 @@ build_position_function_sql <- function(func_name, parent_level, child_level,
           ORDER BY c.seq_idx
         ) as child_rank,
         COUNT(*) OVER (PARTITION BY p.db_uuid, p.session, p.bundle, p.item_id) as max_rank
-      FROM items p
-      INNER JOIN links lnk ON p.db_uuid = lnk.db_uuid
-        AND p.session = lnk.session
-        AND p.bundle = lnk.bundle
-        AND p.item_id = lnk.from_id
-      INNER JOIN items c ON lnk.db_uuid = c.db_uuid
-        AND lnk.session = c.session
-        AND lnk.bundle = c.bundle
-        AND lnk.to_id = c.item_id
+      %s
       WHERE p.level = ? AND c.level = ?
     )
     SELECT DISTINCT
@@ -1419,14 +1447,14 @@ build_position_function_sql <- function(func_name, parent_level, child_level,
       AND l.name = ?
     WHERE %s
     ORDER BY cp.session, cp.bundle, cp.seq_idx",
-    position_condition
+    .hier_from_clause(parent_level, child_level, hier), position_condition
   )
   list(sql = sql, params = list(parent_level, child_level, child_level))
 }
 
 # Build SQL for a count function (Num). Returns list(sql, params).
 # @keywords internal
-build_count_function_sql <- function(parent_level, child_level, operator, value) {
+build_count_function_sql <- function(parent_level, child_level, operator, value, hier = NULL) {
   valid_operators <- c("=", "==", "!=", ">", "<", ">=", "<=")
   if (!operator %in% valid_operators) {
     .query_abort("Invalid operator for count function: {.val {operator}}")
@@ -1440,16 +1468,7 @@ build_count_function_sql <- function(parent_level, child_level, operator, value)
         p.level, p.type, p.seq_idx, p.sample_rate,
         p.sample_point, p.sample_start, p.sample_dur,
         COUNT(c.item_id) as child_count
-      FROM items p
-      LEFT JOIN links lnk ON p.db_uuid = lnk.db_uuid
-        AND p.session = lnk.session
-        AND p.bundle = lnk.bundle
-        AND p.item_id = lnk.from_id
-      LEFT JOIN items c ON lnk.db_uuid = c.db_uuid
-        AND lnk.session = c.session
-        AND lnk.bundle = c.bundle
-        AND lnk.to_id = c.item_id
-        AND c.level = ?
+      %s
       WHERE p.level = ?
       GROUP BY p.db_uuid, p.session, p.bundle, p.item_id,
                p.level, p.type, p.seq_idx, p.sample_rate,
@@ -1468,6 +1487,7 @@ build_count_function_sql <- function(parent_level, child_level, operator, value)
       AND l.name = ?
     WHERE cc.child_count %s ?
     ORDER BY cc.session, cc.bundle, cc.seq_idx",
+    .hier_from_clause(parent_level, child_level, hier, kind = "LEFT", child_cond = " AND c.level = ?"),
     sql_op
   )
   list(
@@ -1476,15 +1496,15 @@ build_count_function_sql <- function(parent_level, child_level, operator, value)
   )
 }
 
-execute_position_function <- function(con, func_name, parent_level, child_level, operator, value, position = NULL) {
+execute_position_function <- function(con, func_name, parent_level, child_level, operator, value, position = NULL, hier = NULL) {
   q <- build_position_function_sql(func_name, parent_level, child_level,
-                                   operator, value, position)
+                                   operator, value, position, hier = hier)
   DBI::dbGetQuery(con, q$sql, params = q$params)
 }
 
 # Count function
-execute_count_function <- function(con, parent_level, child_level, operator, value) {
-  q <- build_count_function_sql(parent_level, child_level, operator, value)
+execute_count_function <- function(con, parent_level, child_level, operator, value, hier = NULL) {
+  q <- build_count_function_sql(parent_level, child_level, operator, value, hier = hier)
   DBI::dbGetQuery(con, q$sql, params = q$params)
 }
 

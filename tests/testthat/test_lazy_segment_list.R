@@ -1,6 +1,6 @@
 # Tests for lazy_segment_list (S7 class with environment-based mutable caching)
 #
-# Covers: constructor, validator, build_sql_from_parts, apply_*_transform,
+# Covers: constructor, validator, build_sql_from_parts,
 #   collect(), mutable caching, is_lazy/needs_collect, as.data.frame,
 #   print/summary methods, and query(..., lazy = TRUE) integration.
 
@@ -116,72 +116,6 @@ test_that("build_sql_from_parts errors on missing base", {
     build_sql_from_parts(list(transforms = list())),
     regexp = "base"
   )
-})
-
-# ==============================================================================
-# apply_*_transform (unit tests on SQL composition)
-# ==============================================================================
-
-test_that("apply_scout_transform appends CTE with seq_idx offset", {
-  base <- make_base_query()
-  result <- apply_scout_transform(base, n = 2)
-  expect_true(grepl("WITH base AS", result$sql))
-  expect_true(grepl("seq_idx = b\\.end_item_seq_idx \\+ \\?", result$sql))
-  expect_equal(length(result$params), length(base$params) + 1)
-  expect_equal(result$params[[length(result$params)]], 2L)
-})
-
-test_that("apply_ascend_transform uses links table and level filter", {
-  base <- make_base_query()
-  result <- apply_ascend_transform(base, level = "Syllable")
-  expect_true(grepl("WITH base AS", result$sql))
-  expect_true(grepl("INNER JOIN links lk", result$sql))
-  expect_true(grepl("lk\\.from_id = i\\.item_id", result$sql))
-  expect_true(grepl("WHERE i\\.level = \\?", result$sql))
-  expect_equal(result$params[[length(result$params)]], "Syllable")
-})
-
-test_that("apply_descend_transform uses links table in reverse direction", {
-  base <- make_base_query()
-  result <- apply_descend_transform(base, level = "Phoneme")
-  expect_true(grepl("WITH base AS", result$sql))
-  expect_true(grepl("lk\\.to_id = i\\.item_id", result$sql))
-  expect_true(grepl("lk\\.from_id = b\\.start_item_id", result$sql))
-  expect_equal(result$params[[length(result$params)]], "Phoneme")
-})
-
-test_that("apply_transform dispatches correctly for known types", {
-  base <- make_base_query()
-  r1 <- apply_transform(base, list(type = "scout", n = 1))
-  expect_true(grepl("end_item_seq_idx", r1$sql))
-  r3 <- apply_transform(base, list(type = "ascend", level = "Word"))
-  expect_true(grepl("from_id = i\\.item_id", r3$sql))
-  r4 <- apply_transform(base, list(type = "descend", level = "Phonetic"))
-  expect_true(grepl("to_id = i\\.item_id", r4$sql))
-})
-
-test_that("apply_transform errors on unknown type", {
-  expect_error(
-    apply_transform(make_base_query(), list(type = "teleport")),
-    regexp = "teleport"
-  )
-})
-
-test_that("transforms compose: scout then ascend", {
-  base <- make_base_query()
-  parts <- list(
-    base = base,
-    transforms = list(
-      list(type = "scout", n = 1),
-      list(type = "ascend", level = "Syllable")
-    )
-  )
-  result <- build_sql_from_parts(parts)
-  expect_equal(length(gregexpr("WITH base AS", result$sql)[[1]]), 2)
-  # Total params: 3 (base) + 1 (scout n) + 1 (ascend level) = 5
-  expect_equal(length(result$params), 5)
-  expect_equal(result$params[[4]], 1L)
-  expect_equal(result$params[[5]], "Syllable")
 })
 
 # ==============================================================================

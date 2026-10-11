@@ -14,6 +14,18 @@
 - The parity suite against emuR now passes 73 of 80 golden queries (was 20);
   the rest are multi-hop/navigation cases for the next work packages.
 
+- Hierarchy navigation is multi-hop: `Start()`/`End()`/`Medial()`/`Num()`
+  in EQL and `ascend_to()`/`descend_to()` now work across any number of
+  levels (Syllable -> Phoneme -> Phonetic ...), using the DBconfig link
+  definitions. `descend_to()` returns ONE row per input segment spanning its
+  first to last child (labels joined by `->`), as emuR's `requery_hier()` does;
+  it used to return every child. ITEM-level results get times from their
+  time-bearing descendants. The lazy `scout`/`ascend_to`/`descend_to` steps are
+  no longer SQL fragments: `collect()` replays them through the eager verbs, so
+  lazy and eager results are identical.
+- `scout()` is a vectorised join instead of a per-segment loop: 18k segments in
+  0.55 s (was ~39 s for 25k).
+
 ## Fixed (silent wrong results)
 
 - `quantify()`: when the DSP routine errored on a segment in the batched

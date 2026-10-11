@@ -56,7 +56,6 @@ test_that("ascend_to() lands on the requested level and covers every input", {
   expect_lte(nrow(syl), nrow(segs))
 
   # emuR ground truth for the number of parents (one row per parent item).
-  skip("A7: WP3.2 (multi-hop ascend not emuR-equivalent yet)")
   ae <- load_shared_ae_handle()
   emu_syl <- suppressMessages(emuR::requery_hier(
     ae, emuR::query(ae, "Phoneme =~ .+", verbose = FALSE), "Syllable", verbose = FALSE))
@@ -84,4 +83,54 @@ test_that("navigation verbs agree with their lazy counterparts", {
   lazy <- suppressWarnings(scout(segs, 1, collect = FALSE))
   expect_equal(nrow(collect(lazy)), nrow(eager))
   expect_equal(sort(collect(lazy)$start), sort(eager$start))
+})
+
+test_that("multi-hop ascend/descend row counts match emuR requery_hier", {
+  skip_if_no_emuR()
+  corp <- create_shared_ae_corpus()
+  ae <- load_shared_ae_handle()
+  cases <- list(
+    list("Syllable == S", "Phonetic", "descend"),
+    list("Word == C", "Phoneme", "descend"),
+    list("Phonetic == t", "Syllable", "ascend"),
+    list("Phonetic == t", "Word", "ascend")
+  )
+  for (cs in cases) {
+    segs <- collect(query(corp, cs[[1]]))
+    ours <- if (cs[[3]] == "ascend") ascend_to(segs, cs[[2]]) else descend_to(segs, cs[[2]])
+    theirs <- suppressMessages(emuR::requery_hier(
+      ae, emuR::query(ae, cs[[1]], verbose = FALSE), cs[[2]], verbose = FALSE))
+    expect_equal(nrow(ours), nrow(theirs), info = paste(cs[[1]], "->", cs[[2]]))
+  }
+})
+
+test_that("scout matches emuR requery_seq (labels, times, ids)", {
+  skip_if_no_emuR()
+  corp <- create_shared_ae_corpus()
+  ae <- load_shared_ae_handle()
+  segs <- collect(query(corp, "Phonetic == t"))
+  base <- emuR::query(ae, "Phonetic == t", verbose = FALSE)
+  for (off in c(1L, -1L)) {
+    ours <- as.data.frame(suppressWarnings(scout(segs, off)))
+    theirs <- as.data.frame(suppressMessages(
+      emuR::requery_seq(ae, base, offset = off, ignoreOutOfBounds = TRUE, verbose = FALSE)))
+    expect_equal(nrow(ours), nrow(theirs), info = paste("offset", off))
+    expect_equal(as.character(ours$labels), as.character(theirs$labels), info = as.character(off))
+    expect_equal(ours$start, theirs$start, tolerance = 1e-9, info = as.character(off))
+    expect_equal(ours$end, theirs$end, tolerance = 1e-9, info = as.character(off))
+    expect_equal(as.integer(ours$start_item_id), as.integer(theirs$start_item_id), info = as.character(off))
+  }
+})
+
+test_that("scout over ~18k segments takes well under a few seconds", {
+  skip_if_no_emuR()
+  skip_on_cran()
+  source(test_path("../../tools/make-synthetic-corpus.R"), local = TRUE)
+  dir <- withr::local_tempdir()
+  p <- make_synthetic_corpus(504, dir)
+  corp <- corpus(p, verbose = FALSE)
+  segs <- collect(query(corp, "Phonetic =~ .*"))
+  expect_gt(nrow(segs), 10000)
+  elapsed <- system.time(suppressWarnings(scout(segs, 1)))[["elapsed"]]
+  expect_lt(elapsed, 3)
 })

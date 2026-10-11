@@ -448,9 +448,11 @@ build_function_query_sql <- function(db_path, parsed, con = NULL) {
   position <- parsed$position
 
   q <- if (func_name %in% c("Start", "End", "Medial")) {
-    build_position_function_sql(func_name, level1, level2, operator, value, position)
+    build_position_function_sql(func_name, level1, level2, operator, value, position,
+                                hier = get_hierarchy_info(dirname(db_path)))
   } else if (func_name == "Num") {
-    build_count_function_sql(level1, level2, operator, value)
+    build_count_function_sql(level1, level2, operator, value,
+                             hier = get_hierarchy_info(dirname(db_path)))
   } else {
     .query_abort("Unknown function: {.val {func_name}}")
   }

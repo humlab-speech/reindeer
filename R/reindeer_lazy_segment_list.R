@@ -119,20 +119,14 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
     return(lazy_sl@.state$cache)
   }
   
-  # Steps run in declaration order. The leading run of SQL steps is fused into
-  # the one query; later steps run on the materialized segment_list.
+  # Only the base query is SQL; every step (navigation, quantify, biographize)
+  # is replayed in declaration order on the materialized segment_list.
   parts <- lazy_sl@query_parts
   order <- .step_order(parts)
-  n_lead <- if (length(order) == 0) 0L else {
-    nz <- which(order != "sql")
-    if (length(nz) == 0) length(order) else nz[1] - 1L
-  }
   sql_steps <- parts$transforms
   post_steps <- parts$post_transforms
-  lead_parts <- parts
-  lead_parts$transforms <- sql_steps[seq_len(n_lead)]
-  query <- build_sql_from_parts(lead_parts, verbose = verbose)
-  
+  query <- build_sql_from_parts(parts, verbose = verbose)
+
   if (verbose) {
     cli::cli_alert_info("Executing SQL query:")
     cli::cli_code(query$sql)
@@ -181,31 +175,10 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
   # regardless of whether the segment_list arrived eager or via collect().
   seg_list <- .seed_provenance(seg_list, "query", sys.call(-1L))
 
-  # Navigation steps fused into the SQL still get provenance entries (and the
-  # loss warning): count the base query, then record each step, with in/out
-  # counts known for the first and last only.
-  if (n_lead > 0L) {
-    base <- lead_parts$base
-    n_base <- DBI::dbGetQuery(
-      conn, paste0("SELECT COUNT(*) AS n FROM (", base$sql, ")"),
-      params = if (length(base$params) == 0) NULL else base$params)$n
-    prov <- .append_provenance_row(NULL, "query", sys.call(-1L), NA_integer_, n_base)
-    for (k in seq_len(n_lead)) {
-      verb <- switch(sql_steps[[k]]$type, ascend = "ascend_to",
-                     descend = "descend_to", sql_steps[[k]]$type)
-      prov <- .append_provenance_row(
-        prov, verb, NULL,
-        if (k == 1L) n_base else NA_integer_,
-        if (k == n_lead) nrow(seg_list) else NA_integer_)
-    }
-    attr(seg_list, "reindeer_provenance") <- prov
-    if (n_lead == 1L) .maybe_warn_loss(prov[[2]]$verb, n_base, nrow(seg_list))
-  }
-
   # Replay the remaining steps in declaration order on the materialized list.
-  i_sql <- n_lead
+  i_sql <- 0L
   i_post <- 0L
-  for (kind in order[seq_along(order) > n_lead]) {
+  for (kind in order) {
     if (kind == "sql") {
       i_sql <- i_sql + 1L
       seg_list <- .apply_sql_step_eager(seg_list, sql_steps[[i_sql]])
@@ -247,156 +220,19 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
 #' @keywords internal
 #' @noRd
 build_sql_from_parts <- function(query_parts, verbose = FALSE) {
-  # Start with base query -- list(sql, params)
   if (is.null(query_parts$base)) {
     cli::cli_abort("No base query found in query_parts")
   }
-  
-  current <- query_parts$base  # list(sql, params)
-  
-  # If no transforms, return base
-  if (is.null(query_parts$transforms) || length(query_parts$transforms) == 0) {
-    return(current)
-  }
-  
-  # Apply transforms sequentially -- each returns list(sql, params)
-  for (transform in query_parts$transforms) {
-    current <- apply_transform(current, transform, verbose = verbose)
-  }
-  
-  return(current)
-}
-
-#' Apply a Transform to Parameterized SQL Query
-#'
-#' @param query list(sql, params) -- current query
-#' @param transform List with type and parameters
-#' @param verbose Logical
-#' @return list(sql, params) -- modified query
-#' @keywords internal
-#' @noRd
-apply_transform <- function(query, transform, verbose = FALSE) {
-  type <- transform$type
-  
-  if (verbose) {
-    cli::cli_alert("Applying transform: {type}")
-  }
-  
-  switch(type,
-    scout = apply_scout_transform(query, transform$n),
-    ascend = apply_ascend_transform(query, transform$level),
-    descend = apply_descend_transform(query, transform$level),
-    cli::cli_abort("Unknown transform type: {.val {type}}")
-  )
-}
-
-#' Apply Scout (Forward Sequence) Transform
-#'
-#' @param query list(sql, params) -- current query
-#' @param n integer -- number of steps forward
-#' @return list(sql, params) -- modified query
-#' @keywords internal
-#' @noRd
-apply_scout_transform <- function(query, n = 1) {
-  n <- as.integer(n)
-  # Project the segment_list-shaped columns the eager path emits so
-  # collect()'s deduce_item_times + format_as_emuRsegs see what they
-  # expect: items.* plus labels/attribute and start/end_item_id +
-  # start/end_item_seq_idx aliases.
-  sql <- paste0(
-    "WITH base AS (", query$sql, ") ",
-    "SELECT i.*, ",
-    "  l.label AS labels, l.name AS attribute, ",
-    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
-    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
-    "FROM items i ",
-    "INNER JOIN base b ON ",
-    "  i.db_uuid = b.db_uuid AND ",
-    "  i.session = b.session AND ",
-    "  i.bundle = b.bundle AND ",
-    "  i.level = b.level AND ",
-    "  i.seq_idx = b.end_item_seq_idx + ? ",
-    "LEFT JOIN labels l ON ",
-    "  l.db_uuid = i.db_uuid AND ",
-    "  l.session = i.session AND ",
-    "  l.bundle = i.bundle AND ",
-    "  l.item_id = i.item_id AND ",
-    "  l.name = b.attribute")
-  list(sql = sql, params = c(query$params, list(n)))
+  # Navigation steps (scout/ascend/descend) are not part of the SQL: collect()
+  # replays them through the eager verbs, so lazy and eager share one
+  # implementation.
+  query_parts$base
 }
 
 
-#' Apply Ascend (Dominance Upward) Transform
-#'
-#' @param query list(sql, params) -- current query
-#' @param level character -- target level to ascend to
-#' @return list(sql, params) -- modified query
-#' @keywords internal
-#' @noRd
-apply_ascend_transform <- function(query, level) {
-  # Project segment_list-shape columns; default attribute on the target
-  # level is the level name itself, so label lookup keys on l.name = i.level.
-  sql <- paste0(
-    "WITH base AS (", query$sql, ") ",
-    "SELECT DISTINCT i.*, ",
-    "  lb.label AS labels, lb.name AS attribute, ",
-    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
-    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
-    "FROM items i ",
-    "INNER JOIN links lk ON ",
-    "  lk.db_uuid = i.db_uuid AND ",
-    "  lk.session = i.session AND ",
-    "  lk.bundle = i.bundle AND ",
-    "  lk.from_id = i.item_id ",
-    "INNER JOIN base b ON ",
-    "  lk.db_uuid = b.db_uuid AND ",
-    "  lk.session = b.session AND ",
-    "  lk.bundle = b.bundle AND ",
-    "  lk.to_id = b.start_item_id ",
-    "LEFT JOIN labels lb ON ",
-    "  lb.db_uuid = i.db_uuid AND ",
-    "  lb.session = i.session AND ",
-    "  lb.bundle = i.bundle AND ",
-    "  lb.item_id = i.item_id AND ",
-    "  lb.name = i.level ",
-    "WHERE i.level = ?")
-  list(sql = sql, params = c(query$params, list(level)))
-}
 
-#' Apply Descend (Dominance Downward) Transform
-#'
-#' @param query list(sql, params) -- current query
-#' @param level character -- target level to descend to
-#' @return list(sql, params) -- modified query
-#' @keywords internal
-#' @noRd
-apply_descend_transform <- function(query, level) {
-  sql <- paste0(
-    "WITH base AS (", query$sql, ") ",
-    "SELECT DISTINCT i.*, ",
-    "  lb.label AS labels, lb.name AS attribute, ",
-    "  i.item_id AS start_item_id, i.item_id AS end_item_id, ",
-    "  i.seq_idx AS start_item_seq_idx, i.seq_idx AS end_item_seq_idx ",
-    "FROM items i ",
-    "INNER JOIN links lk ON ",
-    "  lk.db_uuid = i.db_uuid AND ",
-    "  lk.session = i.session AND ",
-    "  lk.bundle = i.bundle AND ",
-    "  lk.to_id = i.item_id ",
-    "INNER JOIN base b ON ",
-    "  lk.db_uuid = b.db_uuid AND ",
-    "  lk.session = b.session AND ",
-    "  lk.bundle = b.bundle AND ",
-    "  lk.from_id = b.start_item_id ",
-    "LEFT JOIN labels lb ON ",
-    "  lb.db_uuid = i.db_uuid AND ",
-    "  lb.session = i.session AND ",
-    "  lb.bundle = i.bundle AND ",
-    "  lb.item_id = i.item_id AND ",
-    "  lb.name = i.level ",
-    "WHERE i.level = ?")
-  list(sql = sql, params = c(query$params, list(level)))
-}
+
+
 
 # ==============================================================================
 # PRINT, SUMMARY, AND GLIMPSE METHODS FOR LAZY_SEGMENT_LIST
