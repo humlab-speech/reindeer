@@ -493,5 +493,6 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 5.4 | done (snake_case + deprecation aliases; dots checks on query/annotate/review) | WP5.4 |
 | 5.5 | done (Gate 5: 71 exports, 38 deprecated for removal in 3.0) | WP5.5 |
 | 6.1 | done (8 vignettes, all chunks evaluated, knit test in `test_vignettes.R`) | WP6.1 |
-| 6.2–6.4 | open | |
+| 6.2 | in progress: five worst pages rewritten (set_metadata, scout, biographize, create_cmdi_metadata, manage_cache); remaining pages + runnable examples open | WP6.2 |
+| 6.3–6.4 | open | |
 | 7 | open | |

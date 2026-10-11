@@ -635,48 +635,21 @@ inspect_cache <- function(corpus_obj, verbose = TRUE) {
 # USER-FRIENDLY CACHE MANAGEMENT WRAPPER
 # ==============================================================================
 
-#' Manage reindeer caches
+#' Inspect and clean the quantify cache (deprecated)
 #'
-#' User-friendly wrapper for cache management operations. Provides a unified
-#' interface for checking cache status, listing cache files, and cleaning old
-#' cache data for quantify/enrich and simulation caches.
+#' Deprecated: use [clear_cache()] to empty the cache (optionally only entries
+#' older than some days) and `summary(corp)` to see its size.
 #'
-#' For draft annotation cache management, use protoscribe package functions.
-#'
-#' @param corpus A corpus object
-#' @param action Character; one of:
-#' - "status": Show cache sizes and warnings (default)
-#' - "list": List all cache files sorted by size
-#' - "clean": Remove old cache files (interactive prompt)
-#' @param days_old Integer; for "clean" action, remove files older than this
-#'   (default: 30 days)
-#' @param cache_type Character; type of cache to manage for "list" action:
-#'   "all" (default) or "quantify"
-#' @param dry_run Logical; for "clean" action, preview what would be deleted
-#'   without actually deleting (default: TRUE)
-#'
-#' @return Depends on action:
-#' - "status": List with cache sizes (invisibly)
-#' - "list": Data frame of cache files
-#' - "clean": Summary of cleanup (invisibly)
-#'
+#' @param corpus A [corpus()].
+#' @param action `"status"` (sizes and warnings, default), `"list"` (cache
+#'   files, largest first) or `"clean"` (remove old files).
+#' @param days_old For `"clean"`: remove files older than this many days.
+#' @param cache_type For `"list"`: `"all"` (default) or `"quantify"`.
+#' @param dry_run For `"clean"`: only report what would be deleted (default).
+#' @return `"list"`: a tibble of files with their sizes. `"status"` and
+#'   `"clean"`: a list of sizes or deleted files, invisibly.
+#' @seealso [clear_cache()], [inspect_cache()]
 #' @export
-#'
-#' @examplesIf interactive()
-#' # Check cache status
-#' manage_cache(corpus)
-#'
-#' # List all cache files
-#' manage_cache(corpus, action = "list")
-#'
-#' # Preview cleanup (dry run)
-#' manage_cache(corpus, action = "clean", days_old = 30)
-#'
-#' # Actually clean old files
-#' manage_cache(corpus, action = "clean", days_old = 30, dry_run = FALSE)
-#'
-#' # List only quantify caches
-#' manage_cache(corpus, action = "list", cache_type = "quantify")
 manage_cache <- function(corpus,
                         action = c("status", "list", "clean"),
                         days_old = 30,

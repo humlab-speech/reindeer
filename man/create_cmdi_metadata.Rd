@@ -2,7 +2,7 @@
 % Please edit documentation in R/reindeer_cmdi.R
 \name{create_cmdi_metadata}
 \alias{create_cmdi_metadata}
-\title{Generate CMDI metadata file for an EMU speech corpus}
+\title{Generate a CMDI metadata file (deprecated)}
 \usage{
 create_cmdi_metadata(
   corpus,
@@ -22,77 +22,36 @@ create_cmdi_metadata(
 )
 }
 \arguments{
-\item{corpus}{A reindeer corpus object or emuDB handle}
+\item{corpus}{A \code{\link[=corpus]{corpus()}}.}
 
-\item{output_file}{Path for the output CMDI XML file. If NULL, writes to
-corpus_name_cmdi.xml in the database base directory.}
+\item{output_file}{Where to write the XML. Default: \verb{<name>_cmdi.xml} in the
+corpus directory.}
 
-\item{profile}{Character. CMDI profile to use:
-\itemize{
-\item "media-corpus" (default): General media corpus profile
-\item "speech-corpus": Speech corpus with participants
-\item "speech-corpus-dlu": Speech corpus DLU variant
-}}
+\item{profile}{\code{"speech-corpus"} (default), \code{"media-corpus"} or
+\code{"speech-corpus-dlu"}.}
 
-\item{corpus_title}{Character. Title of the corpus (defaults to database name)}
+\item{corpus_title, corpus_description, author, institution, contact_email, license}{Descriptive fields; each defaults to the corpus's own metadata when \code{NULL}.}
 
-\item{corpus_description}{Character. Description of the corpus}
+\item{availability}{Availability statement, e.g. \code{"available"} or
+\code{"restricted"}.}
 
-\item{author}{Character. Author/creator of the corpus}
+\item{self_link, child_metadata}{For building collection hierarchies:
+this record's own URL, and paths of the child records it links to.}
 
-\item{institution}{Character. Institution responsible for the corpus}
+\item{include_placeholders}{Add empty elements for fields CMDI allows but
+the corpus does not record.}
 
-\item{contact_email}{Character. Contact email for corpus inquiries}
-
-\item{license}{Character. License under which corpus is distributed}
-
-\item{availability}{Character. Availability status ("available", "restricted", etc.)}
-
-\item{include_placeholders}{Logical. If TRUE, includes placeholder fields for
-planned metadata additions}
-
-\item{verbose}{Logical. Print progress messages}
+\item{verbose}{Print progress.}
 }
 \value{
-Path to created CMDI file (invisibly)
+The path of the written file, invisibly.
 }
 \description{
-Internal CMDI generator. End users should call
-\code{describe_corpus(corp, formats = "cmdi")} instead, which handles
-output paths, dirty-bit logic, and writes README + DataCite in the
-same call. This function remains exported for the auto-regen
-machinery and companion tooling.
+Deprecated: use \code{describe_corpus(corp, formats = "cmdi")}, which also keeps
+the file up to date and writes the README and citation files. This function
+still works and takes the same CMDI profile choices.
 }
-\details{
-The function collects metadata from multiple sources:
-
-\strong{From Database:}
-\itemize{
-\item Database name, UUID
-\item Level definitions (annotation tiers)
-\item Link definitions (tier hierarchy)
-\item SSFF track definitions
-\item Media file extension
-}
-
-\strong{From .meta_json files:}
-\itemize{
-\item Participant information (age, gender, language, dialect)
-\item Recording information (date, location, equipment)
-\item Session information (tasks, conditions)
-}
-
-\strong{Planned additions (placeholders):}
-\itemize{
-\item Funding information
-\item Project details
-\item Publications related to corpus
-\item Annotation procedures
-\item Quality control measures
-\item Ethical approval information
-}
-
-The generated CMDI file follows the CLARIN metadata standards and can be
-ingested into CLARIN repositories.
+\seealso{
+\code{\link[=describe_corpus]{describe_corpus()}}
 }
 \keyword{internal}

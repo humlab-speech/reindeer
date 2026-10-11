@@ -1,59 +1,25 @@
-#' Generate CMDI metadata file for an EMU speech corpus
+#' Generate a CMDI metadata file (deprecated)
 #'
-#' Internal CMDI generator. End users should call
-#' `describe_corpus(corp, formats = "cmdi")` instead, which handles
-#' output paths, dirty-bit logic, and writes README + DataCite in the
-#' same call. This function remains exported for the auto-regen
-#' machinery and companion tooling.
+#' Deprecated: use `describe_corpus(corp, formats = "cmdi")`, which also keeps
+#' the file up to date and writes the README and citation files. This function
+#' still works and takes the same CMDI profile choices.
 #'
-#' @keywords internal
-#'
-#' @param corpus A reindeer corpus object or emuDB handle
-#' @param output_file Path for the output CMDI XML file. If NULL, writes to
-#'   corpus_name_cmdi.xml in the database base directory.
-#' @param profile Character. CMDI profile to use:
-#' - "media-corpus" (default): General media corpus profile
-#' - "speech-corpus": Speech corpus with participants
-#' - "speech-corpus-dlu": Speech corpus DLU variant
-#' @param corpus_title Character. Title of the corpus (defaults to database name)
-#' @param corpus_description Character. Description of the corpus
-#' @param author Character. Author/creator of the corpus
-#' @param institution Character. Institution responsible for the corpus
-#' @param contact_email Character. Contact email for corpus inquiries
-#' @param license Character. License under which corpus is distributed
-#' @param availability Character. Availability status ("available", "restricted", etc.)
-#' @param include_placeholders Logical. If TRUE, includes placeholder fields for
-#'   planned metadata additions
-#' @param verbose Logical. Print progress messages
-#'
-#' @return Path to created CMDI file (invisibly)
-#'
-#' @details
-#' The function collects metadata from multiple sources:
-#' 
-#' **From Database:**
-#' - Database name, UUID
-#' - Level definitions (annotation tiers)
-#' - Link definitions (tier hierarchy)
-#' - SSFF track definitions
-#' - Media file extension
-#' 
-#' **From .meta_json files:**
-#' - Participant information (age, gender, language, dialect)
-#' - Recording information (date, location, equipment)
-#' - Session information (tasks, conditions)
-#' 
-#' **Planned additions (placeholders):**
-#' - Funding information
-#' - Project details
-#' - Publications related to corpus
-#' - Annotation procedures
-#' - Quality control measures
-#' - Ethical approval information
-#' 
-#' The generated CMDI file follows the CLARIN metadata standards and can be
-#' ingested into CLARIN repositories.
-#'
+#' @param corpus A [corpus()].
+#' @param output_file Where to write the XML. Default: `<name>_cmdi.xml` in the
+#'   corpus directory.
+#' @param profile `"speech-corpus"` (default), `"media-corpus"` or
+#'   `"speech-corpus-dlu"`.
+#' @param corpus_title,corpus_description,author,institution,contact_email,license
+#'   Descriptive fields; each defaults to the corpus's own metadata when `NULL`.
+#' @param availability Availability statement, e.g. `"available"` or
+#'   `"restricted"`.
+#' @param self_link,child_metadata For building collection hierarchies:
+#'   this record's own URL, and paths of the child records it links to.
+#' @param include_placeholders Add empty elements for fields CMDI allows but
+#'   the corpus does not record.
+#' @param verbose Print progress.
+#' @return The path of the written file, invisibly.
+#' @seealso [describe_corpus()]
 #' @keywords internal
 #' @export
 create_cmdi_metadata <- function(corpus,

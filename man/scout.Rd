@@ -13,41 +13,39 @@ scout(.segments, steps_forward, count_from = "START", capture = 1,
 \arguments{
 \item{.segments}{A \code{segment_list} or \code{lazy_segment_list}.}
 
-\item{steps_forward}{Integer offset. \code{1} = next item, \code{-1} = previous,
-\code{2} = item after next.}
+\item{steps_forward}{\code{1} = next item, \code{-1} = previous, \code{2} = the one after
+next.}
 
-\item{count_from}{\code{"START"} (default) or \code{"END"} - which edge of the
-current segment to count from.}
+\item{count_from}{\code{"START"} (default) or \code{"END"}: which edge of the segment
+to count from.}
 
-\item{capture}{Number of consecutive items to return per input
-segment. Default \code{1}.}
+\item{capture}{Items to return per input segment (default \code{1}).}
 
-\item{ignore_bundle_boundaries}{If \code{TRUE}, walk past the end of a
-bundle into the next one. Default \code{FALSE} (recommended).}
+\item{ignore_bundle_boundaries}{Continue into the next bundle at the end of
+one (default \code{FALSE}).}
 
-\item{calculate_times, times_from}{Recompute start/end times after the
-move; advanced, defaults are usually right.}
+\item{calculate_times, times_from}{Recompute start and end times after the
+move. The defaults are usually right.}
 
-\item{.from}{Optional \code{corpus} (only needed if the segment list lost
-its \code{db_path}).}
+\item{.from}{A \code{\link[=corpus]{corpus()}}; only needed if the segment list no longer knows
+where it came from.}
 
-\item{.quiet}{Suppress informational messages.}
+\item{.quiet}{Suppress messages.}
 
-\item{collect}{Materialise the result (default \code{TRUE}). With
-\code{FALSE} the operation is deferred into the lazy plan - note that
-the lazy SQL path for \code{scout} / \code{ascend_to} / \code{descend_to} does
-not yet preserve every derived column (labels, attribute,
-start_item_id, ...), so eager evaluation is the safe default
-until full SQL parity lands.}
+\item{collect}{Return a materialised \code{segment_list} (default). With \code{FALSE}
+the step is added to a lazy plan instead; some derived columns (labels,
+attribute, start_item_id) are not carried through the lazy path yet.}
 }
 \value{
-A \code{segment_list}, or \code{lazy_segment_list} when \code{collect = FALSE}.
+A \code{segment_list} with one row per moved-to item (\code{session}, \code{bundle},
+\code{level}, \code{start}, \code{end}, \code{labels}, ...); a \code{lazy_segment_list} when
+\code{collect = FALSE}. Segments with nothing at the target position are
+dropped, which \code{\link[=dropped]{dropped()}} reports.
 }
 \description{
-Given a \code{segment_list}, returns the item(s) \code{steps_forward} positions
-away on the same level - typically the previous or next phone, word,
-or syllable. Use negative steps to go backward, or \code{capture > 1} to
-grab a run of consecutive items.
+For each segment, returns the item \code{steps_forward} positions away on the
+same level: the next or previous phone, word or syllable. Negative steps go
+backward; \code{capture > 1} returns a run of consecutive items.
 
 When \code{collect = TRUE} (default) the lazy plan is materialised first and
 the segment_list method runs; when \code{FALSE} a \code{scout} transform is
@@ -56,11 +54,10 @@ appended to the lazy plan for SQL-side evaluation at the next
 so eager remains the safe default.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/ae_emuDB")
-stops <- query(corp, "Phonetic =~ [ptk]")
-next_phone <- scout(stops, steps_forward = 1)     # following phoneme
-prev_two   <- scout(stops, steps_forward = -1, capture = 2)
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+stops <- query(demo_corpus(), "Phonetic =~ [ptk]") |> collect()
+scout(stops, steps_forward = 1)                  # the following phone
+scout(stops, steps_forward = -1, capture = 2)    # the two before
 \dontshow{\}) # examplesIf}
 }
 \seealso{

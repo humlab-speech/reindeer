@@ -24,54 +24,49 @@ set_metadata(
 )
 }
 \arguments{
-\item{corpus_obj}{A corpus object.}
+\item{corpus_obj}{A \code{\link[=corpus]{corpus()}}.}
 
 \item{metadataList}{Deprecated spelling of \code{x}.}
 
-\item{session}{Optional session name. Required to write at session
-level, and required (together with \code{bundle}) to write at bundle
-level.}
+\item{session}{Optional session name (required for session/bundle level)}
 
-\item{bundle}{Optional bundle name. When given, \code{session} must also
-be provided; together they identify a bundle-level scope.}
+\item{bundle}{Optional bundle name (requires session)}
 
 \item{reset.before.add}{Clear existing metadata at this level first (default: FALSE)}
 
-\item{x}{What to write: a named list of field/value pairs; a data.frame
-(with \code{session}/\code{bundle} columns, one row per scope, applied all-or-nothing);
-or the path of a workbook written by \code{\link[=export_metadata]{export_metadata()}}.}
+\item{x}{What to write: a named list of fields; a data frame (one row per
+scope, with \code{session} and/or \code{bundle} columns, applied all-or-nothing); or
+the path of a workbook written by \code{\link[=export_metadata]{export_metadata()}}.}
 
-\item{reset}{Logical; if \code{TRUE}, clear existing fields at the given scope
-before writing. (\code{reset.before.add} is the deprecated spelling.)}
+\item{reset}{If \code{TRUE}, clear the existing fields at the scope first.
+(\code{reset.before.add} is the deprecated spelling.)}
+
+\item{session, bundle}{Scope to write to (see above). \code{bundle} needs
+\code{session}.}
 }
 \value{
 The corpus object, invisibly
 
-The corpus object, invisibly.
+\code{corpus_obj}, invisibly.
 }
 \description{
 Sets metadata at the database, session, or bundle level. Writes to
 METADATA.json (ground truth) and updates the SQLite cache. Level is
 determined by which of \code{session}/\code{bundle} are provided.
 
-Writes one or more metadata fields at the chosen scope. The scope is
-chosen by which of \code{session} and \code{bundle} you pass:
+Writes metadata fields to the \code{METADATA.json} file at the scope you choose
+and keeps the cache in step. Which scope is decided by \code{session} and
+\code{bundle}:
 \itemize{
-\item neither - \emph{database} level (defaults that apply to every bundle).
-\item \code{session} only - \emph{session} level (overrides the database default
-for that session's bundles).
-\item \code{session} + \code{bundle} - \emph{bundle} level (overrides both).
+\item neither: the whole corpus (defaults for every bundle);
+\item \code{session}: that session (overrides the corpus default);
+\item \code{session} and \code{bundle}: that bundle (overrides both).
 }
 }
 \details{
-On read, \code{\link[=get_metadata]{get_metadata()}} resolves inheritance with
-\strong{bundle > session > database} precedence: a value set at a more
-specific scope wins over a less specific one. Writes are stored in
-the bundle / session / database \code{METADATA.json} files (the ground
-truth) and mirrored to the SQLite cache.
-
-\code{add_metadata()} is the older spelling; it remains as an alias of
-\code{set_metadata()} for backwards compatibility.
+\code{\link[=get_metadata]{get_metadata()}} reads the result with the most specific value winning.
+Values keep their type, arrays such as \code{team} replace the old value, and
+everything is validated before anything is written.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
@@ -79,18 +74,21 @@ corp <- corpus("path/to/db_emuDB")
 add_metadata(corp, list(Project = "MyStudy"))
 add_metadata(corp, list(Age = 25, Gender = "Female"), session = "S1")
 \dontshow{\}) # examplesIf}
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- demo_corpus()
-set_metadata(corp, list(Project = "MyStudy"))                 # database
-set_metadata(corp, list(Age = 25, Gender = "Female"),
-             session = "0000")                                 # session
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+# work on a copy so the demo corpus stays untouched
+src <- demo_corpus()@basePath
+tmp <- tempfile(); dir.create(tmp); file.copy(src, tmp, recursive = TRUE)
+corp <- corpus(file.path(tmp, basename(src)))
+
+set_metadata(corp, list(Project = "MyStudy"))                      # corpus
+set_metadata(corp, list(Age = 25, Gender = "Female"), session = "0000")
 set_metadata(corp, list(Quality = "Good"),
-             session = "0000", bundle = "msajc003")            # bundle
+             session = "0000", bundle = "msajc003")                # bundle
+dplyr::select(get_metadata(corp), bundle, Project, Age, Gender, Quality)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=get_metadata]{get_metadata()}} for the matching reader, \code{\link[=load_metadata]{load_metadata()}}
-for bulk import.
+\code{\link[=get_metadata]{get_metadata()}}, \code{\link[=export_metadata]{export_metadata()}}
 
 Other metadata:
 \code{\link[=biographize]{biographize()}},

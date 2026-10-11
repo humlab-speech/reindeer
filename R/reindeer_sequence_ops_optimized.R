@@ -15,41 +15,38 @@ NULL
 
 #' Move forward or backward along an annotation level
 #'
-#' Given a `segment_list`, returns the item(s) `steps_forward` positions
-#' away on the same level - typically the previous or next phone, word,
-#' or syllable. Use negative steps to go backward, or `capture > 1` to
-#' grab a run of consecutive items.
+#' For each segment, returns the item `steps_forward` positions away on the
+#' same level: the next or previous phone, word or syllable. Negative steps go
+#' backward; `capture > 1` returns a run of consecutive items.
 #'
 #' @param .segments A `segment_list` or `lazy_segment_list`.
-#' @param steps_forward Integer offset. `1` = next item, `-1` = previous,
-#'   `2` = item after next.
-#' @param count_from `"START"` (default) or `"END"` - which edge of the
-#'   current segment to count from.
-#' @param capture Number of consecutive items to return per input
-#'   segment. Default `1`.
-#' @param ignore_bundle_boundaries If `TRUE`, walk past the end of a
-#'   bundle into the next one. Default `FALSE` (recommended).
-#' @param calculate_times,times_from Recompute start/end times after the
-#'   move; advanced, defaults are usually right.
-#' @param .from Optional `corpus` (only needed if the segment list lost
-#'   its `db_path`).
-#' @param .quiet Suppress informational messages.
-#' @param collect Materialise the result (default `TRUE`). With
-#'   `FALSE` the operation is deferred into the lazy plan - note that
-#'   the lazy SQL path for `scout` / `ascend_to` / `descend_to` does
-#'   not yet preserve every derived column (labels, attribute,
-#'   start_item_id, ...), so eager evaluation is the safe default
-#'   until full SQL parity lands.
+#' @param steps_forward `1` = next item, `-1` = previous, `2` = the one after
+#'   next.
+#' @param count_from `"START"` (default) or `"END"`: which edge of the segment
+#'   to count from.
+#' @param capture Items to return per input segment (default `1`).
+#' @param ignore_bundle_boundaries Continue into the next bundle at the end of
+#'   one (default `FALSE`).
+#' @param calculate_times,times_from Recompute start and end times after the
+#'   move. The defaults are usually right.
+#' @param .from A [corpus()]; only needed if the segment list no longer knows
+#'   where it came from.
+#' @param .quiet Suppress messages.
+#' @param collect Return a materialised `segment_list` (default). With `FALSE`
+#'   the step is added to a lazy plan instead; some derived columns (labels,
+#'   attribute, start_item_id) are not carried through the lazy path yet.
 #' @usage
 #' scout(.segments, steps_forward, count_from = "START", capture = 1,
 #'   ignore_bundle_boundaries = FALSE, calculate_times = TRUE,
 #'   times_from = NULL, .from = NULL, .quiet = TRUE, collect = TRUE)
-#' @return A `segment_list`, or `lazy_segment_list` when `collect = FALSE`.
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' stops <- query(corp, "Phonetic =~ [ptk]")
-#' next_phone <- scout(stops, steps_forward = 1)     # following phoneme
-#' prev_two   <- scout(stops, steps_forward = -1, capture = 2)
+#' @return A `segment_list` with one row per moved-to item (`session`, `bundle`,
+#'   `level`, `start`, `end`, `labels`, ...); a `lazy_segment_list` when
+#'   `collect = FALSE`. Segments with nothing at the target position are
+#'   dropped, which [dropped()] reports.
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
+#' stops <- query(demo_corpus(), "Phonetic =~ [ptk]") |> collect()
+#' scout(stops, steps_forward = 1)                  # the following phone
+#' scout(stops, steps_forward = -1, capture = 2)    # the two before
 #' @seealso [ascend_to()], [descend_to()]
 #' @export
 scout <- S7::new_generic("scout", ".segments", fun = function(.segments,

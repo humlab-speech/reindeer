@@ -2,7 +2,7 @@
 % Please edit documentation in R/cache_size_management.R
 \name{manage_cache}
 \alias{manage_cache}
-\title{Manage reindeer caches}
+\title{Inspect and clean the quantify cache (deprecated)}
 \usage{
 manage_cache(
   corpus,
@@ -13,55 +13,25 @@ manage_cache(
 )
 }
 \arguments{
-\item{corpus}{A corpus object}
+\item{corpus}{A \code{\link[=corpus]{corpus()}}.}
 
-\item{action}{Character; one of:
-\itemize{
-\item "status": Show cache sizes and warnings (default)
-\item "list": List all cache files sorted by size
-\item "clean": Remove old cache files (interactive prompt)
-}}
+\item{action}{\code{"status"} (sizes and warnings, default), \code{"list"} (cache
+files, largest first) or \code{"clean"} (remove old files).}
 
-\item{days_old}{Integer; for "clean" action, remove files older than this
-(default: 30 days)}
+\item{days_old}{For \code{"clean"}: remove files older than this many days.}
 
-\item{cache_type}{Character; type of cache to manage for "list" action:
-"all" (default) or "quantify"}
+\item{cache_type}{For \code{"list"}: \code{"all"} (default) or \code{"quantify"}.}
 
-\item{dry_run}{Logical; for "clean" action, preview what would be deleted
-without actually deleting (default: TRUE)}
+\item{dry_run}{For \code{"clean"}: only report what would be deleted (default).}
 }
 \value{
-Depends on action:
-\itemize{
-\item "status": List with cache sizes (invisibly)
-\item "list": Data frame of cache files
-\item "clean": Summary of cleanup (invisibly)
-}
+\code{"list"}: a tibble of files with their sizes. \code{"status"} and
+\code{"clean"}: a list of sizes or deleted files, invisibly.
 }
 \description{
-User-friendly wrapper for cache management operations. Provides a unified
-interface for checking cache status, listing cache files, and cleaning old
-cache data for quantify/enrich and simulation caches.
+Deprecated: use \code{\link[=clear_cache]{clear_cache()}} to empty the cache (optionally only entries
+older than some days) and \code{summary(corp)} to see its size.
 }
-\details{
-For draft annotation cache management, use protoscribe package functions.
-}
-\examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-# Check cache status
-manage_cache(corpus)
-
-# List all cache files
-manage_cache(corpus, action = "list")
-
-# Preview cleanup (dry run)
-manage_cache(corpus, action = "clean", days_old = 30)
-
-# Actually clean old files
-manage_cache(corpus, action = "clean", days_old = 30, dry_run = FALSE)
-
-# List only quantify caches
-manage_cache(corpus, action = "list", cache_type = "quantify")
-\dontshow{\}) # examplesIf}
+\seealso{
+\code{\link[=clear_cache]{clear_cache()}}, \code{\link[=inspect_cache]{inspect_cache()}}
 }

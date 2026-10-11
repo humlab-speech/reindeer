@@ -395,26 +395,27 @@ clear_metadata <- function(corpus_obj, session, bundle, level) {
   }
 }
 
-#' Enrich query results with metadata
+#' Add speaker and recording metadata to segments
 #'
-#' Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
-#' containing session and bundle columns. Call it directly when you want
-#' only the metadata join, or pass a `lazy_segment_list` to defer the join
-#' until [collect()].
+#' Looks up the metadata of each segment's bundle (with session and corpus
+#' defaults resolved, see [set_metadata()]) and appends it as columns.
 #'
-#' @param segs_tbl A `segment_list`, `lazy_segment_list`, or data.frame with
-#'   session and bundle columns. A lazy input defers the join until `collect()`.
-#' @param corpus_obj Optional corpus object; by default the corpus the segments came from.
-#' @param compute_digests Compute file checksums before joining (default: FALSE)
-#' @param algorithm Hash algorithm for digests (default: "sha1")
-#' @return An \code{extended_segment_list} with metadata columns appended (or
-#'   the same `lazy_segment_list` with a deferred step appended).
+#' @param segs_tbl A `segment_list`, `lazy_segment_list` or data frame with
+#'   `session` and `bundle` columns. A lazy list stays lazy: the join happens
+#'   at [collect()].
+#' @param corpus_obj A [corpus()]. Default: the corpus the segments came from.
+#' @param compute_digests Also store a checksum of each media file as metadata
+#'   (default `FALSE`).
+#' @param algorithm Checksum algorithm, e.g. `"sha1"` (default).
+#' @return The input with one extra column per metadata field (for example
+#'   `Age` and `Gender`), in the same row order. A `segment_list` stays a
+#'   `segment_list`; a field already present in the input gets the suffix
+#'   `.y` (and the input's own column `.x`).
 #' @family metadata
 #'
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/db_emuDB")
-#' segs <- query(corp, "Phonetic == t")
-#' enriched <- biographize(segs, corp)
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
+#' segs <- query(demo_corpus(), "Phonetic == t") |> collect()
+#' biographize(segs)
 #'
 #' @export
 biographize <- function(segs_tbl, corpus_obj = NULL, compute_digests = FALSE, algorithm = "sha1") {

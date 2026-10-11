@@ -2,7 +2,7 @@
 % Please edit documentation in R/metadata_import_export.R
 \name{biographize}
 \alias{biographize}
-\title{Enrich query results with metadata}
+\title{Add speaker and recording metadata to segments}
 \usage{
 biographize(
   segs_tbl,
@@ -12,30 +12,31 @@ biographize(
 )
 }
 \arguments{
-\item{segs_tbl}{A \code{segment_list}, \code{lazy_segment_list}, or data.frame with
-session and bundle columns. A lazy input defers the join until \code{collect()}.}
+\item{segs_tbl}{A \code{segment_list}, \code{lazy_segment_list} or data frame with
+\code{session} and \code{bundle} columns. A lazy list stays lazy: the join happens
+at \code{\link[=collect]{collect()}}.}
 
-\item{corpus_obj}{Optional corpus object; by default the corpus the segments came from.}
+\item{corpus_obj}{A \code{\link[=corpus]{corpus()}}. Default: the corpus the segments came from.}
 
-\item{compute_digests}{Compute file checksums before joining (default: FALSE)}
+\item{compute_digests}{Also store a checksum of each media file as metadata
+(default \code{FALSE}).}
 
-\item{algorithm}{Hash algorithm for digests (default: "sha1")}
+\item{algorithm}{Checksum algorithm, e.g. \code{"sha1"} (default).}
 }
 \value{
-An \code{extended_segment_list} with metadata columns appended (or
-the same \code{lazy_segment_list} with a deferred step appended).
+The input with one extra column per metadata field (for example
+\code{Age} and \code{Gender}), in the same row order. A \code{segment_list} stays a
+\code{segment_list}; a field already present in the input gets the suffix
+\code{.y} (and the input's own column \code{.x}).
 }
 \description{
-Joins metadata (Age, Gender, etc.) onto a segment list or data.frame
-containing session and bundle columns. Call it directly when you want
-only the metadata join, or pass a \code{lazy_segment_list} to defer the join
-until \code{\link[=collect]{collect()}}.
+Looks up the metadata of each segment's bundle (with session and corpus
+defaults resolved, see \code{\link[=set_metadata]{set_metadata()}}) and appends it as columns.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/db_emuDB")
-segs <- query(corp, "Phonetic == t")
-enriched <- biographize(segs, corp)
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+segs <- query(demo_corpus(), "Phonetic == t") |> collect()
+biographize(segs)
 \dontshow{\}) # examplesIf}
 }
 \seealso{

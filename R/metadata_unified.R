@@ -50,45 +50,40 @@ load_metadata <- function(corpus_obj,
 
 #' Set metadata on a corpus, session, or bundle
 #'
-#' Writes one or more metadata fields at the chosen scope. The scope is
-#' chosen by which of `session` and `bundle` you pass:
-#' * neither - *database* level (defaults that apply to every bundle).
-#' * `session` only - *session* level (overrides the database default
-#'   for that session's bundles).
-#' * `session` + `bundle` - *bundle* level (overrides both).
+#' Writes metadata fields to the `METADATA.json` file at the scope you choose
+#' and keeps the cache in step. Which scope is decided by `session` and
+#' `bundle`:
+#' * neither: the whole corpus (defaults for every bundle);
+#' * `session`: that session (overrides the corpus default);
+#' * `session` and `bundle`: that bundle (overrides both).
 #'
-#' On read, [get_metadata()] resolves inheritance with
-#' **bundle > session > database** precedence: a value set at a more
-#' specific scope wins over a less specific one. Writes are stored in
-#' the bundle / session / database `METADATA.json` files (the ground
-#' truth) and mirrored to the SQLite cache.
+#' [get_metadata()] reads the result with the most specific value winning.
+#' Values keep their type, arrays such as `team` replace the old value, and
+#' everything is validated before anything is written.
 #'
-#' `add_metadata()` is the older spelling; it remains as an alias of
-#' `set_metadata()` for backwards compatibility.
-#'
-#' @param corpus_obj A corpus object.
-#' @param x What to write: a named list of field/value pairs; a data.frame
-#'   (with `session`/`bundle` columns, one row per scope, applied all-or-nothing);
-#'   or the path of a workbook written by [export_metadata()].
+#' @param corpus_obj A [corpus()].
+#' @param x What to write: a named list of fields; a data frame (one row per
+#'   scope, with `session` and/or `bundle` columns, applied all-or-nothing); or
+#'   the path of a workbook written by [export_metadata()].
 #' @param metadataList Deprecated spelling of `x`.
-#' @param session Optional session name. Required to write at session
-#'   level, and required (together with `bundle`) to write at bundle
-#'   level.
-#' @param bundle Optional bundle name. When given, `session` must also
-#'   be provided; together they identify a bundle-level scope.
-#' @param reset Logical; if `TRUE`, clear existing fields at the given scope
-#'   before writing. (`reset.before.add` is the deprecated spelling.)
-#' @return The corpus object, invisibly.
+#' @param session,bundle Scope to write to (see above). `bundle` needs
+#'   `session`.
+#' @param reset If `TRUE`, clear the existing fields at the scope first.
+#'   (`reset.before.add` is the deprecated spelling.)
+#' @return `corpus_obj`, invisibly.
 #' @family metadata
-#' @seealso [get_metadata()] for the matching reader, [load_metadata()]
-#'   for bulk import.
-#' @examplesIf interactive()
-#' corp <- demo_corpus()
-#' set_metadata(corp, list(Project = "MyStudy"))                 # database
-#' set_metadata(corp, list(Age = 25, Gender = "Female"),
-#'              session = "0000")                                 # session
+#' @seealso [get_metadata()], [export_metadata()]
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
+#' # work on a copy so the demo corpus stays untouched
+#' src <- demo_corpus()@basePath
+#' tmp <- tempfile(); dir.create(tmp); file.copy(src, tmp, recursive = TRUE)
+#' corp <- corpus(file.path(tmp, basename(src)))
+#'
+#' set_metadata(corp, list(Project = "MyStudy"))                      # corpus
+#' set_metadata(corp, list(Age = 25, Gender = "Female"), session = "0000")
 #' set_metadata(corp, list(Quality = "Good"),
-#'              session = "0000", bundle = "msajc003")            # bundle
+#'              session = "0000", bundle = "msajc003")                # bundle
+#' dplyr::select(get_metadata(corp), bundle, Project, Age, Gender, Quality)
 #' @export
 set_metadata <- function(corpus_obj, x, session = NULL, bundle = NULL,
                          reset = FALSE, reset.before.add = NULL, metadataList = NULL) {
