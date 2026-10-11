@@ -11,6 +11,11 @@
   internal `retreat()` and its lazy transform, `emu_ae()`/`ae()` aliases, the
   lookup of a non-existent bundled CMDI XSD. Stubs past their window removed:
   `enrich()`, `enrich_egg()`, `st()` (use `semitones()`).
+- reindeer no longer creates or changes `future::plan()` and no longer uses
+  furrr. Parallel sections use `future.apply`, so your plan decides (default:
+  sequential). `quantify(.parallel=, .workers=, .optimize=)` warn and are
+  ignored. Worker payloads no longer carry SQLite connections (fixes the
+  `bad_weak_ptr` crash in `quantify(corpus, .using=)` under multisession).
 - Policy: a removed name is a classed stub for one minor release, then deleted.
 
 # reindeer 2.2.0

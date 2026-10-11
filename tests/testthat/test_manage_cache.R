@@ -259,25 +259,9 @@ test_that("quantify validates inputs with assertthat", {
     ".at must be numeric"
   )
 
-  # Test invalid .workers
-  expect_error(
-    quantify(test_seg, function(x) x, .workers = -1),
-    ".workers must be a positive integer"
-  )
-
-  expect_error(
-    quantify(test_seg, function(x) x, .workers = 2.5),
-    ".workers must be a positive integer"
-  )
-
   # Test invalid flags
   expect_error(
     quantify(test_seg, function(x) x, .verbose = "yes"),
-    "Logical flags must be TRUE or FALSE"
-  )
-
-  expect_error(
-    quantify(test_seg, function(x) x, .parallel = 1),
     "Logical flags must be TRUE or FALSE"
   )
 

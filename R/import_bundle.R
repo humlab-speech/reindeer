@@ -82,7 +82,7 @@ import_bundle <- function(corpus_obj, session, bundle, media,
            sessionPattern = paste0("^", session, "$"),
            bundlePattern = paste0("^", bundle, "$"),
            .metadata_fields = c("Gender", "Age"),
-           .verbose = verbose, .parallel = FALSE),
+           .verbose = verbose),
       gen$args %||% list()
     ))
 

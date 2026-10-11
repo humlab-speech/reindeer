@@ -32,7 +32,6 @@ Imports:
     utils,
     assertthat,
     future,
-    furrr,
     future.apply,
     cli,
     xml2,

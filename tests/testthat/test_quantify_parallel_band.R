@@ -38,8 +38,7 @@ test_that("quantify() works in the 21-100 segment band", {
   segs <- collect(query(corp, "Phoneme =~ .+"))[1:50, ]
   expect_equal(nrow(segs), 50)
 
-  out <- quantify(segs, superassp::trk_rms, .at = 0.5,
-                  .parallel = TRUE, .verbose = FALSE)
+  out <- quantify(segs, superassp::trk_rms, .at = 0.5, .verbose = FALSE)
   expect_equal(nrow(out), 50)
   expect_true("RMS_dB" %in% names(out))
 })

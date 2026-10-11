@@ -36,11 +36,10 @@ NULL
 #'     (`"hit"` / `"miss"`).}
 #'   \item{`.cache_dir`, `.cache_format`}{Where and how to persist cached
 #'     results.}
-#'   \item{`.parallel`, `.workers`}{Run segments concurrently via a
-#'     multi-session future plan. Default: on, with `detectCores() - 1`.}
+#'   \item{`.parallel`, `.workers`}{Deprecated and ignored. Parallelism
+#'     follows the caller's [future::plan()]; the default is sequential.}
 #'   \item{`.verbose`}{Print a per-step progress summary.}
-#'   \item{`.optimize`}{Use optimized computation (default `TRUE`; turn off
-#'     only for debugging).}
+#'   \item{`.optimize`}{Deprecated and ignored.}
 #' }
 #' @details When `dsp_function` is a character vector of registered
 #'   track names, `.use_cache`, `.parallel`, `.workers`, `.cache_dir`,
@@ -82,12 +81,18 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .at = NULL,
                                                 .use_metadata = TRUE,
                                                 .verbose = FALSE,
-                                                .parallel = TRUE,
+                                                .parallel = NULL,
                                                 .workers = NULL,
                                                 .use_cache = FALSE,
                                                 .cache_dir = NULL,
                                                 .cache_format = c("auto", "qs", "rds"),
-                                                .optimize = TRUE) {
+                                                .optimize = NULL) {
+
+  .warn_ignored_parallel_args(.parallel = .parallel, .workers = .workers,
+                              .optimize = .optimize)
+  .parallel <- TRUE
+  .workers <- NULL
+  .optimize <- TRUE
 
   # Input validation with assertthat
   assertthat::assert_that(
@@ -108,17 +113,14 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
   assertthat::assert_that(
     assertthat::is.flag(.use_metadata),
     assertthat::is.flag(.verbose),
-    assertthat::is.flag(.parallel),
     assertthat::is.flag(.use_cache),
-    assertthat::is.flag(.optimize),
     msg = "Logical flags must be TRUE or FALSE"
   )
 
   if (is.character(dsp_function)) {
     return(.quantify_segment_list_by_name(
       object, dsp_function, ...,
-      .at = .at, .verbose = .verbose, .parallel = .parallel,
-      .workers = .workers, .use_cache = .use_cache,
+      .at = .at, .verbose = .verbose, .use_cache = .use_cache,
       .cache_dir = .cache_dir, .cache_format = match.arg(.cache_format)
     ))
   }
@@ -145,14 +147,6 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
     assertthat::assert_that(
       all(.at >= 0 & .at <= 1),
       msg = ".at values must be between 0 and 1"
-    )
-  }
-
-  # Validate .workers if provided
-  if (!is.null(.workers)) {
-    assertthat::assert_that(
-      assertthat::is.count(.workers),
-      msg = ".workers must be a positive integer"
     )
   }
 
@@ -290,14 +284,10 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
       cli::cli_alert_info("Using parallel I/O processing")
     }
 
-    if (is.null(.workers)) {
-      .workers <- max(1, parallel::detectCores() - 1)
-    }
-
     # PHASE 2: Parallel I/O processing
     results_list <- .process_parallel_io(
       seg_df, corpus_obj, dsp_function, dsp_params_base,
-      media_ext, .at, .workers, .verbose
+      media_ext, .at, .verbose
     )
 
   } else {
@@ -427,7 +417,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
 #'
 #' @noRd
 .quantify_segment_list_by_name <- function(object, track_names, ...,
-                                           .at, .verbose, .parallel, .workers,
+                                           .at, .verbose,
                                            .use_cache, .cache_dir, .cache_format) {
   corpus_obj <- get_corpus_cached(object, NULL)
   if (is.null(corpus_obj)) {

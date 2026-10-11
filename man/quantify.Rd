@@ -66,11 +66,10 @@ When enabled, the returned tibble gains a \code{.cache_status} column
 (\code{"hit"} / \code{"miss"}).}
 \item{\code{.cache_dir}, \code{.cache_format}}{Where and how to persist cached
 results.}
-\item{\code{.parallel}, \code{.workers}}{Run segments concurrently via a
-multi-session future plan. Default: on, with \code{detectCores() - 1}.}
+\item{\code{.parallel}, \code{.workers}}{Deprecated and ignored. Parallelism
+follows the caller's \code{\link[future:plan]{future::plan()}}; the default is sequential.}
 \item{\code{.verbose}}{Print a per-step progress summary.}
-\item{\code{.optimize}}{Use optimized computation (default \code{TRUE}; turn off
-only for debugging).}
+\item{\code{.optimize}}{Deprecated and ignored.}
 }
 }
 

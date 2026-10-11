@@ -211,7 +211,7 @@ initialize_metadata_schema <- function(con) {
 #'
 #' @param corpus_obj A `corpus`.
 #' @param verbose Print progress. Default `TRUE`.
-#' @param parallel Scan bundles in parallel. Default `TRUE`.
+#' @param parallel Deprecated and ignored; parallelism follows [future::plan()].
 #' @return The corpus, invisibly.
 #' @examplesIf interactive()
 #' corp <- corpus("path/to/ae_emuDB")
@@ -322,38 +322,15 @@ gather_metadata <- function(corpus_obj, verbose = TRUE, parallel = TRUE) {
     return(invisible(corpus_obj))
   }
   
-  # OPTIMIZATION: Use parallel processing for large databases
-  use_parallel <- parallel && length(existing_files) > 50 &&
-    requireNamespace("future.apply", quietly = TRUE) &&
-    .use_parallel_workers(length(existing_files), 4)
-  
-  if (use_parallel) {
-    # Set up parallel processing
-    orig_plan <- future::plan()
-    future::plan(future::multisession,
-                 workers = .reindeer_workers(length(existing_files), 4))
-    on.exit(future::plan(orig_plan), add = TRUE)
-    
-    # Read all files in parallel
-    all_metadata <- future.apply::future_lapply(existing_files, function(f) {
-      tryCatch({
-        read_json_fast(f, simplifyVector = TRUE)
-      }, error = function(e) {
-        list()
-      })
-    }, future.seed = TRUE)
-    
-  } else {
-    # Sequential reading (for small databases or if future not available)
-    all_metadata <- lapply(existing_files, function(f) {
-      tryCatch({
-        read_json_fast(f, simplifyVector = TRUE)
-      }, error = function(e) {
-        list()
-      })
+  # The caller's future::plan() decides whether this runs in parallel.
+  all_metadata <- future.apply::future_lapply(existing_files, function(f) {
+    tryCatch({
+      read_json_fast(f, simplifyVector = TRUE)
+    }, error = function(e) {
+      list()
     })
-  }
-  
+  }, future.seed = TRUE)
+
   # OPTIMIZATION: Bulk process all bundle metadata in a single transaction.
   # Field registration is deduped here - the previous version called
   # register_metadata_field once per (bundle, field) which means O(N) SQL

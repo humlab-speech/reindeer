@@ -5,16 +5,12 @@
 #' processing by default for large databases.
 #'
 #' @param database_dir Path to the `_emuDB` directory
-#' @param parallel Whether to use parallel processing (default TRUE)
-#' @param workers Number of parallel workers
 #' @param batch_size Number of bundles per batch
 #' @param verbose Whether to show progress messages
 #' @return Invisible NULL, called for side effects
 #' @keywords internal
 #' @noRd
 build_emuDB_cache <- function(database_dir,
-                              parallel = TRUE,
-                              workers = future::availableCores() - 1,
                               batch_size = 50,
                               verbose = TRUE) {
 
@@ -83,15 +79,6 @@ build_emuDB_cache <- function(database_dir,
     cli::cli_alert_success("Found {.val {length(unique(sessions_bundles$session))}} sessions with {.val {nrow(sessions_bundles)}} bundles")
   }
 
-  # Setup parallel processing if requested
-  if (parallel && .use_parallel_workers(nrow(sessions_bundles), workers)) {
-    workers <- .reindeer_workers(nrow(sessions_bundles), workers)
-    oplan <- future::plan(future::multisession, workers = workers)
-    on.exit(future::plan(oplan), add = TRUE)
-  } else {
-    parallel <- FALSE
-  }
-
   # Process bundles
   results <- process_bundles_batch(
     con = con,
@@ -99,7 +86,6 @@ build_emuDB_cache <- function(database_dir,
     database_dir = database_dir,
     db_config = db_config,
     batch_size = batch_size,
-    parallel = parallel,
     verbose = verbose
   )
 
@@ -273,7 +259,7 @@ discover_sessions_bundles <- function(database_dir) {
 # ==============================================================================
 
 process_bundles_batch <- function(con, sessions_bundles, database_dir,
-                                  db_config, batch_size, parallel, verbose) {
+                                  db_config, batch_size, verbose) {
 
   # Add sessions to database
   unique_sessions <- unique(sessions_bundles$session)
@@ -331,9 +317,6 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
   
   if (verbose) {
     cli::cli_alert_info("Processing {total_bundles} bundles{?s} in {length(batches)} batch{?es}...")
-    if (parallel) {
-      cli::cli_alert_info("Using parallel processing with {workers} worker{?s}")
-    }
     cli::cli_progress_bar(
       "Processing",
       total = total_bundles,
@@ -345,21 +328,13 @@ process_bundles_batch <- function(con, sessions_bundles, database_dir,
   for (i in seq_along(batches)) {
     batch <- batches[[i]]
 
-    if (parallel) {
-      batch_results <- furrr::future_pmap(
-        list(batch$session, batch$bundle),
-        process_bundle,
-        database_dir = database_dir,
-        db_config = db_config,
-        .options = furrr::furrr_options(seed = TRUE)
-      )
-    } else {
-      batch_results <- Map(
-        process_bundle,
-        batch$session, batch$bundle,
-        MoreArgs = list(database_dir = database_dir, db_config = db_config)
-      )
-    }
+    # The caller's future::plan() decides whether this runs in parallel.
+    batch_results <- future.apply::future_mapply(
+      process_bundle,
+      batch$session, batch$bundle,
+      MoreArgs = list(database_dir = database_dir, db_config = db_config),
+      SIMPLIFY = FALSE, USE.NAMES = FALSE, future.seed = TRUE
+    )
 
     # Insert successful results into database
     successful_results <- Filter(function(x) x$success, batch_results)

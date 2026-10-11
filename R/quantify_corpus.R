@@ -154,7 +154,7 @@ NULL
                                      name, columnName, fileExtension, overwrite,
                                      sessionPattern, bundlePattern,
                                      .metadata_fields, .signal_extension,
-                                     .force, .verbose, .parallel, .workers,
+                                     .force, .verbose,
                                      .use_cache, .cache_dir, .cache_format) {
   .cache_format <- match.arg(.cache_format, choices = c("auto", "qs", "rds"))
 
@@ -237,78 +237,56 @@ NULL
 
   signal_files_with_meta <- merge(signal_files, bundle_metadata, by = c("session", "bundle"), all.x = TRUE)
 
-  if (.parallel && .use_parallel_workers(nrow(signal_files_with_meta), .workers)) {
-    .workers <- .reindeer_workers(nrow(signal_files_with_meta), .workers)
-    if (.verbose) cli::cli_alert_info("Using parallel processing with {(.workers)} worker{?s}")
-    old_plan <- future::plan()
-    on.exit(future::plan(old_plan), add = TRUE)
-    future::plan(future::multisession, workers = .workers)
-  }
-
-  if (.verbose) cli::cli_progress_bar("Processing bundles", total = nrow(signal_files_with_meta))
-
   cache_conn <- NULL
   if (.use_cache) {
     resolved_cache_dir <- .cache_dir %||% corpus_obj@.cache_dir
     cache_conn <- .get_persistent_cache_connection(resolved_cache_dir, verbose = .verbose)
   }
 
-  process_bundle <- function(i, signal_files_with_meta, dsp_fun,
-                             metadata_fields, user_params, verbose = FALSE,
-                             cache_conn = NULL, cache_format = "auto") {
+  # Main process: derive parameters, build cache keys and look up the cache.
+  # Workers only compute, so no connection ever crosses a process boundary.
+  n_bundles <- nrow(signal_files_with_meta)
+  jobs <- lapply(seq_len(n_bundles), function(i) {
     bundle_row <- signal_files_with_meta[i, ]
     dsp_params <- derive_dsp_parameters(
-      dsp_fun = dsp_fun, metadata = bundle_row,
-      metadata_fields = metadata_fields, user_params = user_params
+      dsp_fun = .using, metadata = bundle_row,
+      metadata_fields = .metadata_fields, user_params = user_params
     )
     cache_key <- NA_character_
+    cached <- FALSE
     if (!is.null(cache_conn)) {
       cache_key <- digest::digest(list(
         bundle_row$full_path, file.info(bundle_row$full_path)$mtime,
         dsp_params, dsp_fun_name
       ))
-      if (!.force) {
-        cached <- .get_persistent_cache(cache_key, cache_conn)
-        if (!is.null(cached)) {
-          return(list(success = TRUE, bundle = bundle_row$bundle,
-                      session = bundle_row$session, cached = TRUE,
-                      full_path = bundle_row$full_path))
-        }
-      }
+      cached <- !.force && !is.null(.get_persistent_cache(cache_key, cache_conn))
+    }
+    list(bundle = bundle_row$bundle, session = bundle_row$session,
+         full_path = bundle_row$full_path, dsp_params = dsp_params,
+         cache_key = cache_key, cached = cached)
+  })
+
+  run_job <- function(job, dsp_fun) {
+    if (job$cached) {
+      return(list(success = TRUE, bundle = job$bundle, session = job$session,
+                  cached = TRUE, full_path = job$full_path))
     }
     tryCatch({
       do.call(dsp_fun, c(
-        list(listOfFiles = bundle_row$full_path), dsp_params,
+        list(listOfFiles = job$full_path), job$dsp_params,
         list(toFile = TRUE, verbose = FALSE)
       ))
-      list(success = TRUE, bundle = bundle_row$bundle, session = bundle_row$session,
-           cache_key = cache_key, full_path = bundle_row$full_path)
+      list(success = TRUE, bundle = job$bundle, session = job$session,
+           cache_key = job$cache_key, full_path = job$full_path)
     }, error = function(e) {
-      list(success = FALSE, bundle = bundle_row$bundle, session = bundle_row$session,
+      list(success = FALSE, bundle = job$bundle, session = job$session,
            error = e$message)
     })
   }
 
-  if (.parallel) {
-    results <- furrr::future_map(
-      seq_len(nrow(signal_files_with_meta)), process_bundle,
-      signal_files_with_meta = signal_files_with_meta, dsp_fun = .using,
-      metadata_fields = .metadata_fields, user_params = user_params,
-      verbose = FALSE, cache_conn = cache_conn, cache_format = .cache_format,
-      .progress = .verbose, .options = furrr::furrr_options(seed = TRUE)
-    )
-  } else {
-    results <- list()
-    for (i in seq_len(nrow(signal_files_with_meta))) {
-      results[[i]] <- process_bundle(
-        i, signal_files_with_meta, .using, .metadata_fields, user_params, FALSE,
-        cache_conn = cache_conn, cache_format = .cache_format
-      )
-      if (.verbose) cli::cli_progress_update()
-    }
-  }
-
-  if (.verbose) cli::cli_progress_done()
+  # The caller's future::plan() decides whether this runs in parallel.
+  results <- future.apply::future_lapply(jobs, run_job, dsp_fun = .using,
+                                         future.seed = TRUE)
 
   if (!is.null(cache_conn)) {
     miss_keys <- unique(vapply(
@@ -411,11 +389,12 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
                                          .signal_extension = NULL,
                                          .force = FALSE,
                                          .verbose = TRUE,
-                                         .parallel = TRUE,
+                                         .parallel = NULL,
                                          .workers = NULL,
                                          .use_cache = TRUE,
                                          .cache_dir = NULL,
                                          .cache_format = c("auto", "qs", "rds")) {
+  .warn_ignored_parallel_args(.parallel = .parallel, .workers = .workers)
   if (!is.null(.using) && (!is.null(from) || !is.null(index))) {
     cli::cli_abort(c(
       "Cannot supply both {.arg .using} and {.arg from}/{.arg index}.",
@@ -432,8 +411,8 @@ S7::method(quantify, corpus) <- function(object, .using = NULL, ...,
       fileExtension = fileExtension, overwrite = overwrite,
       sessionPattern = sessionPattern, bundlePattern = bundlePattern,
       .metadata_fields = .metadata_fields, .signal_extension = .signal_extension,
-      .force = .force, .verbose = .verbose, .parallel = .parallel,
-      .workers = .workers, .use_cache = .use_cache, .cache_dir = .cache_dir,
+      .force = .force, .verbose = .verbose,
+      .use_cache = .use_cache, .cache_dir = .cache_dir,
       .cache_format = .cache_format
     )
   } else {

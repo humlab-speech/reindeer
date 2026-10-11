@@ -11,7 +11,7 @@ gather_metadata(corpus_obj, verbose = TRUE, parallel = TRUE)
 
 \item{verbose}{Print progress. Default \code{TRUE}.}
 
-\item{parallel}{Scan bundles in parallel. Default \code{TRUE}.}
+\item{parallel}{Deprecated and ignored; parallelism follows \code{\link[future:plan]{future::plan()}}.}
 }
 \value{
 The corpus, invisibly.

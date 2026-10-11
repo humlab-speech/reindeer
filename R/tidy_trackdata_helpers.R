@@ -669,7 +669,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 #' Parallel audio file processing with true parallel I/O
 #' @noRd
 .process_parallel_io <- function(seg_df, corpus_obj, dsp_function, dsp_params,
-                                 media_ext, .at = NULL, .cores = NULL, .verbose = FALSE,
+                                 media_ext, .at = NULL, .verbose = FALSE,
                                  dsp_name = NULL) {
   
   if (!requireNamespace("future", quietly = TRUE)) {
@@ -678,8 +678,6 @@ get_corpus_cached <- function(.segments, .from = NULL) {
                                        media_ext, .at, .verbose, use_cache = FALSE,
                                        dsp_name = dsp_name))
   }
-  
-  # Worker count is decided per workload: see R/parallel_utils.R
   
   # Split segments by file for optimal I/O
   seg_df$signal_file <- file.path(
@@ -691,12 +689,9 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   
   file_groups <- split(seg_df, seg_df$signal_file)
   
-  # Process files in parallel when there is more than one file and workers can
-  # actually load this package. .with_worker_plan() leaves the plan untouched
-  # otherwise, and future_lapply then runs in-process with no spawn cost.
-  results <- .with_worker_plan(
-    length(file_groups), .cores,
-    future.apply::future_lapply(file_groups, function(file_segs) {
+  # One task per file; the caller's future::plan() decides whether they run
+  # in parallel (default: sequential, in-process).
+  results <- future.apply::future_lapply(file_groups, function(file_segs) {
     signal_file <- unique(file_segs$signal_file)[1]
     
     if (!file.exists(signal_file)) {
@@ -753,7 +748,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         NULL
       })
     })
-  }, future.seed = TRUE))
+  }, future.seed = TRUE)
   
   # Flatten one level only: see .flatten_segment_results()
   .flatten_segment_results(results)
