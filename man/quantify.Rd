@@ -112,7 +112,7 @@ bundles to process. Default \code{".*"} (all).}
 }
 
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+\dontshow{if (requireNamespace("superassp", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 corp <- demo_corpus()
 segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 

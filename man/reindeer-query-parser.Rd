@@ -29,22 +29,6 @@ This implementation provides significant performance benefits for large database
 by using optimized SQL queries and avoiding R object overhead.
 }
 
-\examples{
-\dontrun{
-# Simple query
-query(corpus, "Phonetic == t")
-query(corpus, "Phonetic == t")  # alias
-
-# Sequence with projection
-query(corpus, "[#Phoneme == n -> Phoneme == t]")
-
-# Dominance query
-query(corpus, "[Word == the ^ Phoneme == D]")
-
-# Count function
-query(corpus, "Num(Syllable, Phoneme) >= 3")
-}
-}
 \references{
 EQL Specification: https://ips-lmu.github.io/The-EMU-SDMS-Manual/app-chap-EQL-EBNF.html
 }

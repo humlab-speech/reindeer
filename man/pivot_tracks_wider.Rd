@@ -35,8 +35,10 @@ way in. When the input has all required segment columns plus a \code{db_uuid}
 attribute, the result is upgraded to a \code{segment_list}.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-long <- pivot_tracks_longer(wide)
+\dontshow{if (requireNamespace("superassp", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+segs <- query(demo_corpus(), "Phonetic == V", lazy = FALSE)
+wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.5))
+long <- pivot_tracks_longer(wide, cols = c("F1_Hz", "F2_Hz"))
 restored <- pivot_tracks_wider(long)
 \dontshow{\}) # examplesIf}
 }

@@ -20,9 +20,7 @@ and the timestamp. Use this to surface silent row drops introduced by
 navigation verbs (\code{scout}, \code{ascend_to}, \code{descend_to}) or dplyr filters.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-segs <- query(corp, "Phonetic == t")
+segs <- query(demo_corpus(), "Phonetic == t") |> collect()
 segs <- scout(segs, 1)
 provenance(segs)
-\dontshow{\}) # examplesIf}
 }

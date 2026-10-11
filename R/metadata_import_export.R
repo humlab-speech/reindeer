@@ -28,10 +28,10 @@
 #'   even if empty (default: \code{c("Age", "Gender")})
 #' @return A data.frame of bundle metadata, invisibly
 #'
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/db_emuDB")
-#' export_metadata(corp, "corpus_metadata.xlsx")
-#'
+#' @examplesIf requireNamespace("openxlsx", quietly = TRUE)
+#' xlsx <- tempfile(fileext = ".xlsx")
+#' export_metadata(demo_corpus(), xlsx)
+#' openxlsx::getSheetNames(xlsx)
 #' @export
 export_metadata <- function(corpus_obj, Excelfile, overwrite = FALSE, 
                            mandatory = c("Age", "Gender")) {

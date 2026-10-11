@@ -20,7 +20,9 @@
 #' @param ... Additional arguments to `ggplot2::geom_line`.
 #' @return A `Layer` object.
 #' @examplesIf interactive()
-#' long <- pivot_tracks_longer(quantify_result)
+#' vowels <- collect(query(demo_corpus(), "Phonetic == V"))
+#' wide <- quantify(vowels, superassp::trk_formant_forest, .at = seq(0, 1, 0.25))
+#' long <- pivot_tracks_longer(wide, cols = c("F1_Hz", "F2_Hz"))
 #' ggplot2::ggplot(long) + geom_formant_trajectory()
 #' @export
 geom_formant_trajectory <- function(mapping = NULL, data = NULL,

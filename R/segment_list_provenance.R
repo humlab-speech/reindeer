@@ -164,8 +164,8 @@
 #' @param seg A `segment_list` or `extended_segment_list`.
 #' @return A tibble with columns `step`, `verb`, `call`, `rows_in`,
 #'   `rows_out`, `rows_lost`, `ts`. Empty if no provenance has been recorded.
-#' @examplesIf interactive()
-#' segs <- query(corp, "Phonetic == t")
+#' @examples
+#' segs <- query(demo_corpus(), "Phonetic == t") |> collect()
 #' segs <- scout(segs, 1)
 #' provenance(segs)
 #' @export
@@ -189,10 +189,11 @@ provenance <- function(seg) {
 #'   cumulative number of rows lost across the entire pipeline. Otherwise
 #'   returns the rows lost at the given step.
 #' @return An integer count.
-#' @examplesIf interactive()
-#' segs <- query(corp, "Phonetic == t") |> scout(1) |> ascend_to("Word")
+#' @examples
+#' segs <- query(demo_corpus(), "Phonetic == t") |> collect() |>
+#'   scout(1) |> ascend_to("Word")
 #' dropped(segs)        # cumulative
-#' dropped(segs, 2L)    # how many segs scout() dropped
+#' dropped(segs, 2L)    # how many scout() dropped
 #' @export
 dropped <- function(seg, step = NULL) {
   prov <- provenance(seg)
@@ -223,9 +224,9 @@ dropped <- function(seg, step = NULL) {
 #' @return A tibble with one row per step: `step`, `verb`, `call`,
 #'   `rows_in`, `rows_out`, `rows_lost`, `pct_lost`.
 #' @examplesIf interactive()
-#' segs <- query(corp, "Phonetic == t") |>
-#'         dplyr::filter(label != "never_matches") |>
-#'         scout(1)
+#' segs <- query(demo_corpus(), "Phonetic == t") |> collect() |>
+#'   dplyr::filter(labels != "never_matches") |>
+#'   scout(1)
 #' dropped_rows(segs)
 #' @export
 dropped_rows <- function(seg) {

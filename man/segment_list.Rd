@@ -58,15 +58,10 @@ A segment_list must contain the following columns:
 }
 
 \examples{
-\dontrun{
-# Query returns a segment_list
-segs <- query(corpus("path/to/db_emuDB"), "Phonetic == t")
+segs <- collect(query(demo_corpus(), "Phonetic == t"))
 
-# Tidyverse pipe preserves segment_list and its properties
-long_segs <- segs |> dplyr::filter(end - start > 50)
-
-# Apply DSP to segments
-result <- quantify(segs, corpus, tracks = "fm")
-}
+# dplyr verbs keep the class and its properties
+long_segs <- dplyr::filter(segs, end - start > 50)
+class(long_segs)
 
 }

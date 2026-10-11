@@ -43,9 +43,9 @@ written: they must exist, have distinct, filesystem-safe names, and must
 not already be bundles of the session.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("my_emuDB", create = TRUE)
-import_media(corp, c("a.wav", "b.wav"), session = "S1",
-             metadata = list(Gender = "f"))
-\dontshow{\}) # examplesIf}
+root <- tempfile(); dir.create(root)
+corp <- corpus(file.path(root, "pilot_emuDB"), create = TRUE)
+wavs <- list.files(demo_corpus()@basePath, pattern = "wav$",
+                   recursive = TRUE, full.names = TRUE)[1:2]
+import_media(corp, wavs, session = "S1", metadata = list(Gender = "Female"))
 }

@@ -40,7 +40,7 @@
 #' For programmatic metadata see [set_metadata()] / [get_metadata()].
 #' @seealso [demo_corpus()], [query()], [quantify()], [load_metadata()],
 #'   [annotate()]
-#' @examplesIf interactive()
+#' @examplesIf requireNamespace("superassp", quietly = TRUE)
 #' corp <- demo_corpus()
 #' vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #' formants <- quantify(vowels, superassp::trk_formant_forest)

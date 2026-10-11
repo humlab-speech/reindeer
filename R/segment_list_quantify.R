@@ -62,7 +62,7 @@ NULL
 #'   `@dsp_function` and `@dsp_columns`.
 #' @family signal
 #' @seealso [biographize()], [dsp_parameters()], [inspect_cache()]
-#' @examplesIf interactive()
+#' @examplesIf requireNamespace("superassp", quietly = TRUE)
 #' corp <- demo_corpus()
 #' segs <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 #'

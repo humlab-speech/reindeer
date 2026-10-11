@@ -18,9 +18,9 @@ formats come back in one schema: a tibble with \code{level}, \code{labels}, \cod
 and \code{end} in milliseconds, the same names and units a \link{segment_list} uses.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-ann <- read_annotations("speech.TextGrid")
-\dontshow{\}) # examplesIf}
+tg <- tempfile(fileext = ".TextGrid")
+write_annotations(collect(query(demo_corpus(), "Phonetic == V")), tg)
+read_annotations(tg)
 }
 \seealso{
 \code{\link[=write_annotations]{write_annotations()}}

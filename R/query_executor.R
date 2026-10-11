@@ -58,7 +58,7 @@
 #' @family query
 #' @seealso [scout()], [ascend_to()], [descend_to()], [collect()],
 #'   [provenance()]
-#' @examplesIf interactive()
+#' @examples
 #' corp <- demo_corpus()
 #' query(corp, "Phonetic == n")                          # lazy by default
 #' query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]") # sequence

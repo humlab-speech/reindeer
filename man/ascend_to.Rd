@@ -33,9 +33,8 @@ phone to \code{"Syllable"} gives the containing syllable.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/ae_emuDB")
-vowels <- query(corp, "Phonetic =~ [aeiou]")
-words  <- ascend_to(vowels, "Word")
+vowels <- query(demo_corpus(), "Phonetic =~ [aeiou]")
+ascend_to(vowels, "Word")
 \dontshow{\}) # examplesIf}
 }
 \seealso{

@@ -46,10 +46,10 @@ many rows). It is a \code{track_long} tibble that carries \code{db_uuid},
 \code{db_path}, and provenance as plain attributes for traceability.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-segs <- query(corp, "Phonetic == V")
-wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.1))
-long <- pivot_tracks_longer(wide)
+\dontshow{if (requireNamespace("superassp", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+segs <- query(demo_corpus(), "Phonetic == V", lazy = FALSE)
+wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.5))
+long <- pivot_tracks_longer(wide, cols = c("F1_Hz", "F2_Hz"))
 head(long)
 \dontshow{\}) # examplesIf}
 }

@@ -31,8 +31,8 @@ gives every phone in that word.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-words  <- query(corp, "Word =~ .*")
-phones <- descend_to(words, "Phonetic")
+words  <- query(demo_corpus(), "Word =~ .*")
+descend_to(words, "Phonetic")
 \dontshow{\}) # examplesIf}
 }
 \seealso{

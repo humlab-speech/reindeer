@@ -29,8 +29,9 @@ Creates a multi-sheet Excel workbook with bundle, session, and database
 metadata. Requires the \pkg{openxlsx} package.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/db_emuDB")
-export_metadata(corp, "corpus_metadata.xlsx")
+\dontshow{if (requireNamespace("openxlsx", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+xlsx <- tempfile(fileext = ".xlsx")
+export_metadata(demo_corpus(), xlsx)
+openxlsx::getSheetNames(xlsx)
 \dontshow{\}) # examplesIf}
 }

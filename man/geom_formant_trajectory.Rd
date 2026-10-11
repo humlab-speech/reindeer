@@ -26,7 +26,9 @@ line per (segment, formant) pair. Requires columns \code{rel_time},
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-long <- pivot_tracks_longer(quantify_result)
+vowels <- collect(query(demo_corpus(), "Phonetic == V"))
+wide <- quantify(vowels, superassp::trk_formant_forest, .at = seq(0, 1, 0.25))
+long <- pivot_tracks_longer(wide, cols = c("F1_Hz", "F2_Hz"))
 ggplot2::ggplot(long) + geom_formant_trajectory()
 \dontshow{\}) # examplesIf}
 }

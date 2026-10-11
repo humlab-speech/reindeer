@@ -20,8 +20,10 @@ and list-column tracks (per-segment time series). When given a custom
 \code{pattern} argument, the regex overrides the default.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+\dontshow{if (requireNamespace("superassp", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+segs <- quantify(query(demo_corpus(), "Phonetic == V", lazy = FALSE),
+                superassp::trk_formant_forest)
 segs |> dplyr::select(track_cols())                # all tracks
-segs |> dplyr::select(track_cols("^F\\\\d_"))         # only formants
+segs |> dplyr::select(track_cols("^F\\\\d_"))        # only formants
 \dontshow{\}) # examplesIf}
 }

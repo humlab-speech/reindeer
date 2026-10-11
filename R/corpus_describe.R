@@ -484,11 +484,12 @@ collect_corpus_summary <- function(corpus_obj, verbose = FALSE) {
 #' @param verbose Logical; print progress.
 #' @return A named character vector of paths written, invisibly.
 #'
-#' @examplesIf interactive()
-#' corp <- corpus("path/to/db_emuDB")
-#' describe_corpus(corp)
-#' describe_corpus(corp, formats = c("cff", "jsonld"), force = TRUE)
-#'
+#' @examples
+#' src <- demo_corpus()@basePath
+#' tmp <- tempfile(); dir.create(tmp); file.copy(src, tmp, recursive = TRUE)
+#' corp <- corpus(file.path(tmp, basename(src)))
+#' describe_corpus(corp, verbose = FALSE)
+#' describe_corpus(corp, formats = c("cff", "jsonld"), force = TRUE, verbose = FALSE)
 #' @export
 describe_corpus <- function(corpus_obj,
                      output_dir = NULL,

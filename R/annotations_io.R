@@ -7,8 +7,10 @@
 #' @param path Path to a `.eaf` or `.TextGrid` file.
 #' @return A tibble with columns `level`, `labels`, `start`, `end` (ms).
 #' @seealso [write_annotations()]
-#' @examplesIf interactive()
-#' ann <- read_annotations("speech.TextGrid")
+#' @examples
+#' tg <- tempfile(fileext = ".TextGrid")
+#' write_annotations(collect(query(demo_corpus(), "Phonetic == V")), tg)
+#' read_annotations(tg)
 #' @export
 read_annotations <- function(path) {
   ext <- tolower(tools::file_ext(path))
@@ -37,8 +39,9 @@ read_annotations <- function(path) {
 #' @param ... Passed to the format writer ([write_eaf()] / [write_textgrid()]).
 #' @return `path`, invisibly.
 #' @seealso [read_annotations()]
-#' @examplesIf interactive()
-#' write_annotations(query(demo_corpus(), "Phonetic == t") |> collect(), "t.TextGrid")
+#' @examples
+#' segs <- collect(query(demo_corpus(), "Phonetic == t"))
+#' write_annotations(segs, tempfile(fileext = ".TextGrid"))
 #' @export
 write_annotations <- function(segs, path, ...) {
   if (S7::S7_inherits(segs, lazy_segment_list)) segs <- dplyr::collect(segs)

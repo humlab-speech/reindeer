@@ -24,11 +24,9 @@ Modified corpus object (invisibly)
 Assign metadata or import media files to corpus bundles using bracket notation.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-# Set metadata
-corpus["Session1", "Bundle1"] <- list(Age = 25, Gender = "F")
-
-# Import media file
-corpus["Session1", "Bundle1"] <- "path/to/audio.wav"
-\dontshow{\}) # examplesIf}
+src <- demo_corpus()@basePath
+tmp <- tempfile(); dir.create(tmp); file.copy(src, tmp, recursive = TRUE)
+corp <- corpus(file.path(tmp, basename(src)))
+corp["0000", "msajc003"] <- list(Age = 25, Gender = "F")
+get_metadata(corp)[1, c("bundle", "Age", "Gender")]
 }

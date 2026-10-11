@@ -46,7 +46,8 @@
 #'
 #' @return A character vector of column names present in the current
 #'   tidyselect context.
-#' @examplesIf interactive()
+#' @examples
+#' segs <- biographize(collect(query(demo_corpus(), "Phonetic == t")))
 #' segs |> dplyr::select(segment_cols())          # keep only required cols
 #' segs |> dplyr::select(-segment_cols())         # drop them
 #' @export
@@ -64,6 +65,7 @@ segment_cols <- function() {
 #'
 #' @return Character vector of column names.
 #' @examplesIf interactive()
+#' segs <- biographize(collect(query(demo_corpus(), "Phonetic == t")))
 #' segs |> dplyr::select(metadata_cols())
 #' @export
 metadata_cols <- function() {
@@ -84,9 +86,11 @@ metadata_cols <- function() {
 #' @param pattern Optional regex used to detect wide-form track names. The
 #'   default matches the `_<numeric>` suffix produced by `quantify(.at=)`.
 #' @return Character vector of column names.
-#' @examplesIf interactive()
+#' @examplesIf requireNamespace("superassp", quietly = TRUE)
+#' segs <- quantify(query(demo_corpus(), "Phonetic == V", lazy = FALSE),
+#'                 superassp::trk_formant_forest)
 #' segs |> dplyr::select(track_cols())                # all tracks
-#' segs |> dplyr::select(track_cols("^F\\d_"))         # only formants
+#' segs |> dplyr::select(track_cols("^F\\d_"))        # only formants
 #' @export
 track_cols <- function(pattern = NULL) {
   data <- tidyselect::peek_data(fn = "track_cols")

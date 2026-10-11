@@ -64,7 +64,7 @@ For programmatic metadata see \code{\link[=set_metadata]{set_metadata()}} / \cod
 }
 
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+\dontshow{if (requireNamespace("superassp", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 corp <- demo_corpus()
 vowels <- query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)
 formants <- quantify(vowels, superassp::trk_formant_forest)

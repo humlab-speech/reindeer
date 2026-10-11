@@ -25,11 +25,9 @@ below it is the span of children (as \code{\link[=descend_to]{descend_to()}}), e
 \code{emuR::requery_hier()}.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- demo_corpus()
 move_to(query(corp, "Phonetic == t"), "Syllable")   # up
 move_to(query(corp, "Syllable == S"), "Phonetic")   # down
-\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=scout]{scout()}} for moving along a level.

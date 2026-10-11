@@ -20,9 +20,8 @@ An integer count.
 Cumulative or per-step row loss for a segment_list pipeline
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-segs <- query(corp, "Phonetic == t") |> scout(1) |> ascend_to("Word")
+segs <- query(demo_corpus(), "Phonetic == t") |> collect() |>
+  scout(1) |> ascend_to("Word")
 dropped(segs)        # cumulative
-dropped(segs, 2L)    # how many segs scout() dropped
-\dontshow{\}) # examplesIf}
+dropped(segs, 2L)    # how many scout() dropped
 }

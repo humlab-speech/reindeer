@@ -324,9 +324,8 @@ scout_dt <- function(.segments,
 #' @usage ascend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
-#' corp <- corpus("path/to/ae_emuDB")
-#' vowels <- query(corp, "Phonetic =~ [aeiou]")
-#' words  <- ascend_to(vowels, "Word")
+#' vowels <- query(demo_corpus(), "Phonetic =~ [aeiou]")
+#' ascend_to(vowels, "Word")
 #' @seealso [descend_to()], [scout()]
 #' @export
 ascend_to <- S7::new_generic("ascend_to", ".segments", fun = function(.segments,
@@ -548,8 +547,8 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' @usage descend_to(.segments, level, .from = NULL, .quiet = TRUE, collect = TRUE)
 #' @return A `segment_list` (or `lazy_segment_list` when `collect = FALSE`).
 #' @examplesIf interactive()
-#' words  <- query(corp, "Word =~ .*")
-#' phones <- descend_to(words, "Phonetic")
+#' words  <- query(demo_corpus(), "Word =~ .*")
+#' descend_to(words, "Phonetic")
 #' @seealso [ascend_to()], [scout()]
 #' @export
 descend_to <- S7::new_generic("descend_to", ".segments", fun = function(.segments,
@@ -733,7 +732,7 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 #' @param .quiet Suppress messages.
 #' @return A `segment_list`.
 #' @seealso [scout()] for moving along a level.
-#' @examplesIf interactive()
+#' @examples
 #' corp <- demo_corpus()
 #' move_to(query(corp, "Phonetic == t"), "Syllable")   # up
 #' move_to(query(corp, "Syllable == S"), "Phonetic")   # down

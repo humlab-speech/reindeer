@@ -25,11 +25,8 @@ while. The cache is rebuilt on demand by \code{\link[=quantify]{quantify()}}; no
 corpus itself changes.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- demo_corpus()
 clear_cache(corp, dry_run = TRUE)
-clear_cache(corp, older_than = 30)
-\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=summary]{summary()}} on a corpus for cache sizes.

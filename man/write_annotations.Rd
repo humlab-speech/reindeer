@@ -23,9 +23,8 @@ The format is taken from the file extension (\code{.eaf}, \code{.TextGrid}).
 \code{\link[=read_annotations]{read_annotations()}} and every \link{segment_list}.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-write_annotations(query(demo_corpus(), "Phonetic == t") |> collect(), "t.TextGrid")
-\dontshow{\}) # examplesIf}
+segs <- collect(query(demo_corpus(), "Phonetic == t"))
+write_annotations(segs, tempfile(fileext = ".TextGrid"))
 }
 \seealso{
 \code{\link[=read_annotations]{read_annotations()}}

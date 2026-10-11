@@ -35,7 +35,6 @@ Pass \code{age} and \code{gender} directly to look up a single row, or pass a
 session/bundle inheritance chain).
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Single speaker
 dsp_parameters(age = 35, gender = "Female")
 # Compare two
@@ -44,6 +43,5 @@ rbind(
   dsp_parameters(age = 45, gender = "Male")
 )
 # Whole corpus
-dsp_parameters(corpus_obj = corp)
-\dontshow{\}) # examplesIf}
+dsp_parameters(corpus_obj = demo_corpus())
 }

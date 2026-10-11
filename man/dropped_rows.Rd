@@ -23,9 +23,9 @@ you want to know \emph{where} in the pipeline.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-segs <- query(corp, "Phonetic == t") |>
-        dplyr::filter(label != "never_matches") |>
-        scout(1)
+segs <- query(demo_corpus(), "Phonetic == t") |> collect() |>
+  dplyr::filter(labels != "never_matches") |>
+  scout(1)
 dropped_rows(segs)
 \dontshow{\}) # examplesIf}
 }

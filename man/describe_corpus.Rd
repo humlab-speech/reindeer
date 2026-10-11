@@ -46,9 +46,9 @@ Existing files at the target paths are never overwritten unless
 \code{force = TRUE}.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
-corp <- corpus("path/to/db_emuDB")
-describe_corpus(corp)
-describe_corpus(corp, formats = c("cff", "jsonld"), force = TRUE)
-\dontshow{\}) # examplesIf}
+src <- demo_corpus()@basePath
+tmp <- tempfile(); dir.create(tmp); file.copy(src, tmp, recursive = TRUE)
+corp <- corpus(file.path(tmp, basename(src)))
+describe_corpus(corp, verbose = FALSE)
+describe_corpus(corp, formats = c("cff", "jsonld"), force = TRUE, verbose = FALSE)
 }

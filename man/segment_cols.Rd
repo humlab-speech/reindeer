@@ -18,8 +18,7 @@ inside \code{dplyr::select()} or any other tidyselect-aware verb to keep or
 drop the segment columns as a group.
 }
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+segs <- biographize(collect(query(demo_corpus(), "Phonetic == t")))
 segs |> dplyr::select(segment_cols())          # keep only required cols
 segs |> dplyr::select(-segment_cols())         # drop them
-\dontshow{\}) # examplesIf}
 }

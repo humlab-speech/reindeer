@@ -750,10 +750,9 @@ manage_cache <- function(corpus,
 #' @return Invisibly, the number of cache files or entries (that would be)
 #'   removed.
 #' @seealso [summary()] on a corpus for cache sizes.
-#' @examplesIf interactive()
+#' @examples
 #' corp <- demo_corpus()
 #' clear_cache(corp, dry_run = TRUE)
-#' clear_cache(corp, older_than = 30)
 #' @export
 clear_cache <- function(corpus, older_than = NULL, dry_run = FALSE) {
   if (!S7::S7_inherits(corpus, reindeer::corpus)) {

@@ -164,10 +164,12 @@ import_session <- function(corpus_obj, session, bundles,
 #'   (default `TRUE`).
 #' @param verbose Print progress.
 #' @return A tibble of `session`, `bundle`, `file`, invisibly.
-#' @examplesIf interactive()
-#' corp <- corpus("my_emuDB", create = TRUE)
-#' import_media(corp, c("a.wav", "b.wav"), session = "S1",
-#'              metadata = list(Gender = "f"))
+#' @examples
+#' root <- tempfile(); dir.create(root)
+#' corp <- corpus(file.path(root, "pilot_emuDB"), create = TRUE)
+#' wavs <- list.files(demo_corpus()@basePath, pattern = "wav$",
+#'                    recursive = TRUE, full.names = TRUE)[1:2]
+#' import_media(corp, wavs, session = "S1", metadata = list(Gender = "Female"))
 #' @export
 import_media <- function(corpus, files, session, metadata = NULL,
                          annotations = NULL, tracks = TRUE, verbose = FALSE) {

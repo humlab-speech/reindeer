@@ -62,13 +62,12 @@ NULL
 #' @param value Either a named list (metadata) or character vector (media files)
 #' @return Modified corpus object (invisibly)
 #' 
-#' @examplesIf interactive()
-#' # Set metadata
-#' corpus["Session1", "Bundle1"] <- list(Age = 25, Gender = "F")
-#'
-#' # Import media file
-#' corpus["Session1", "Bundle1"] <- "path/to/audio.wav"
-#'
+#' @examples
+#' src <- demo_corpus()@basePath
+#' tmp <- tempfile(); dir.create(tmp); file.copy(src, tmp, recursive = TRUE)
+#' corp <- corpus(file.path(tmp, basename(src)))
+#' corp["0000", "msajc003"] <- list(Age = 25, Gender = "F")
+#' get_metadata(corp)[1, c("bundle", "Age", "Gender")]
 #' @export
 `[<-.corpus` <- function(x, i, j, ..., value) {
   i <- if (missing(i) || is.null(i)) NULL else .full_match(i)

@@ -86,12 +86,10 @@ name (e.g. \code{Text == "always"}) resolves to its host level.
 }
 
 \examples{
-\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 corp <- demo_corpus()
 query(corp, "Phonetic == n")                          # lazy by default
 query(corp, "[Phonetic == t -> Phonetic =~ [aeiou]]") # sequence
 query(corp, "Phonetic =~ [aeiou]", lazy = FALSE)      # eager
-\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=scout]{scout()}}, \code{\link[=ascend_to]{ascend_to()}}, \code{\link[=descend_to]{descend_to()}}, \code{\link[=collect]{collect()}},

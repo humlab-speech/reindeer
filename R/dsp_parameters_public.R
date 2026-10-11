@@ -23,7 +23,7 @@ NULL
 #'   row per bundle when `corpus_obj` is supplied. Columns mirror the
 #'   internal DSPP table (windowSize, minF, maxF, nominalF1, nominalF2,
 #'   nominalF3, plus any others present).
-#' @examplesIf interactive()
+#' @examples
 #' # Single speaker
 #' dsp_parameters(age = 35, gender = "Female")
 #' # Compare two
@@ -32,7 +32,7 @@ NULL
 #'   dsp_parameters(age = 45, gender = "Male")
 #' )
 #' # Whole corpus
-#' dsp_parameters(corpus_obj = corp)
+#' dsp_parameters(corpus_obj = demo_corpus())
 #' @export
 dsp_parameters <- function(age = NULL, gender = NULL, corpus_obj = NULL) {
   dspp <- dspp_metadataParameters_dt()

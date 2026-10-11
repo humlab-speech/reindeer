@@ -17,6 +17,7 @@ joined onto the segment_list.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+segs <- biographize(collect(query(demo_corpus(), "Phonetic == t")))
 segs |> dplyr::select(metadata_cols())
 \dontshow{\}) # examplesIf}
 }

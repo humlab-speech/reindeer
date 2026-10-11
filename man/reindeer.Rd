@@ -6,9 +6,9 @@
 a nordic climate}
 \description{
 The purpose of this package is to provide a systematic framework for speech
-corpora managemnet that retains emuR compatability, but provides provides
+corpora management that retains emuR compatibility, but provides
 expanded ability to store metadata associated with the recording, use the
 metadata to guide signal processing when appropriate, and support the user in
-future archiving and FAIR use by automating the creation, and continnous
+future archiving and FAIR use by automating the creation, and continuous
 updating, of standard compliant metadata files for corpora.
 }

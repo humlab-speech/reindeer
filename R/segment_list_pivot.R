@@ -59,10 +59,10 @@
 #' @param .keep_metadata If `TRUE` (default), metadata columns
 #'   (see [metadata_cols()]) are carried through.
 #' @return A `track_long` tibble.
-#' @examplesIf interactive()
-#' segs <- query(corp, "Phonetic == V")
-#' wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.1))
-#' long <- pivot_tracks_longer(wide)
+#' @examplesIf requireNamespace("superassp", quietly = TRUE)
+#' segs <- query(demo_corpus(), "Phonetic == V", lazy = FALSE)
+#' wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.5))
+#' long <- pivot_tracks_longer(wide, cols = c("F1_Hz", "F2_Hz"))
 #' head(long)
 #' @export
 pivot_tracks_longer <- function(seg,
@@ -227,8 +227,10 @@ pivot_tracks_longer <- function(seg,
 #' @param values_from Name of the column holding the measurement value.
 #' @param time_from Name of the column holding the relative time.
 #' @return A tibble or `segment_list`.
-#' @examplesIf interactive()
-#' long <- pivot_tracks_longer(wide)
+#' @examplesIf requireNamespace("superassp", quietly = TRUE)
+#' segs <- query(demo_corpus(), "Phonetic == V", lazy = FALSE)
+#' wide <- quantify(segs, superassp::trk_formant_forest, .at = seq(0, 1, 0.5))
+#' long <- pivot_tracks_longer(wide, cols = c("F1_Hz", "F2_Hz"))
 #' restored <- pivot_tracks_wider(long)
 #' @export
 pivot_tracks_wider <- function(long,
