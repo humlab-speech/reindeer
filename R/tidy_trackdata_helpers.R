@@ -593,7 +593,9 @@ get_corpus_cached <- function(.segments, .from = NULL) {
           list(toFile = FALSE, verbose = FALSE)
         )
         for (i in idx) {
-          raw_results[[i]] <- tryCatch(
+          # list(NULL) keeps the slot: `[[<-` with NULL would delete it and shift
+          # every later result onto the wrong row.
+          raw_results[i] <- list(tryCatch(
             do.call(dsp_function, c(
               dsp_call_base,
               list(beginTime = dt_uncached$start[i] / 1000,
@@ -604,7 +606,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
                 cli::cli_alert_warning("Error: {conditionMessage(e)}")
               }
               NULL
-            })
+            }))
         }
       }
       dt_uncached[, result := raw_results]

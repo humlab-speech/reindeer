@@ -1,5 +1,11 @@
 # reindeer (development)
 
+## Fixed (silent wrong results)
+
+- `quantify()`: when the DSP routine errored on a segment in the batched
+  executor, every later segment's result moved up one row (or the call
+  crashed). Failed segments are now dropped alone.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

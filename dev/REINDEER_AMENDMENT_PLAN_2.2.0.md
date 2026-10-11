@@ -468,7 +468,8 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 1.4 | done | WP1.4 |
 | 1.5 | done | WP1.5 |
 | 1.6 | done | WP1.6 |
-| 2.1–2.8 | open | |
+| 2.1 | done | WP2.1 |
+| 2.2–2.8 | open | |
 | 3.1–3.4 | open | |
 | 4.1–4.7 | open | |
 | 5.1–5.5 | open | |
