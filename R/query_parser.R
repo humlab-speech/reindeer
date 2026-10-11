@@ -244,8 +244,13 @@ parse_simple_query <- function(query_string) {
   alternatives <- NULL
   if (operator %in% c("==", "=", "!=") && matches[7] != "" && grepl("\\|", value)) {
     alternatives <- trimws(strsplit(value, "\\|")[[1]])
+    # Each alternative may be quoted: 'm'|'n'
+    alternatives <- sub("^(['\"])(.*)\\1$", "\\2", alternatives)
     value <- alternatives[1]  # Keep first as primary
   }
+
+  # emuR accepts a single `=` as `==`.
+  if (operator == "=") operator <- "=="
 
   return(list(
     type = "simple",
@@ -1698,13 +1703,15 @@ format_as_emuRsegs <- function(result_df) {
   start_times <- ifelse(
     is_event,
     (result_df$sample_point / result_df$sample_rate) * 1000,
-    (result_df$sample_start / result_df$sample_rate) * 1000
+    # emuR: a SEGMENT starts half a sample before its first sample ...
+    ((result_df$sample_start - 0.5) / result_df$sample_rate) * 1000
   )
   # emuR returns 0 for EVENT end times
   end_times <- ifelse(
     is_event,
     0,
-    ((result_df$sample_start + result_df$sample_dur) / result_df$sample_rate) * 1000
+    # ... and ends half a sample after its last one.
+    ((result_df$sample_start + result_df$sample_dur + 0.5) / result_df$sample_rate) * 1000
   )
   
   # Check if we have separate end_item_id and end_seq_idx (from sequence queries)

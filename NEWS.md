@@ -1,5 +1,19 @@
 # reindeer 2.3.0
 
+## EQL / emuR parity
+
+- SEGMENT times now follow emuR: start is half a sample before the first sample
+  and end half a sample after the last (`(sample_start - 0.5)/sr`,
+  `(sample_start + sample_dur + 0.5)/sr`). All times of segment queries shift by
+  up to half a sample (25 us at 20 kHz); quantify caches miss once.
+- A single `=` means `==` (it used to return every item on the level);
+  quoted alternatives `'m'|'n'` work.
+- `query(sessionPattern=, bundlePattern=)` now filter; `calcTimes = FALSE`,
+  `timeRefSegmentLevel` and `resultType` abort with `reindeer_query_error`, as
+  do unknown arguments, instead of being ignored.
+- The parity suite against emuR now passes 73 of 80 golden queries (was 20);
+  the rest are multi-hop/navigation cases for the next work packages.
+
 ## Fixed (silent wrong results)
 
 - `quantify()`: when the DSP routine errored on a segment in the batched

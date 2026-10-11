@@ -476,7 +476,8 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 2.6 | done (a-g, 8 partly: swallows in metadata/describe paths) | WP2.6a-h |
 | 2.7 | done (bind_rows(s,s) deferred to WP5.1) | WP2.7a-d |
 | 2.8 | done (Gate 2 green; 2.3.0) | WP2.8 |
-| 3.1–3.4 | open | |
+| 3.1 | done (73/80 parity; 7 left for 3.2-3.4) | WP3.1 |
+| 3.2–3.4 | open | |
 | 4.1–4.7 | open | |
 | 5.1–5.5 | open | |
 | 6.1–6.4 | open | |

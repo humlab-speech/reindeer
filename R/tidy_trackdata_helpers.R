@@ -95,7 +95,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 
 #' Bump to invalidate every existing quantify cache entry.
 #' @noRd
-.cache_schema <- 2L
+.cache_schema <- 3L
 
 #' Identity of a DSP routine for cache keys
 #'

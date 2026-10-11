@@ -133,7 +133,10 @@ query <- function(emuDB, eql, ...) {
   # Lazy is the default as of v0.7.0; auto-collect S3 methods preserve
   # data-access behaviour for callers that expect a materialised segment_list.
   dots <- list(...)
+  .check_query_options(dots)
   lazy <- if ("lazy" %in% names(dots)) dots$lazy else TRUE
+  session_pat <- dots$sessionPattern
+  bundle_pat <- dots$bundlePattern
   
   if (lazy) {
     # Return lazy segment list without executing query
@@ -147,6 +150,7 @@ query <- function(emuDB, eql, ...) {
     on.exit(DBI::dbDisconnect(conn))
 
     base_query <- build_base_sql(db_path, parsed, dots, con = conn)
+    base_query <- .restrict_scope_sql(base_query, session_pat, bundle_pat)
 
     # Get db_uuid from database (reuses the same connection)
     db_uuid_result <- DBI::dbGetQuery(conn, "SELECT uuid FROM emu_db LIMIT 1")
@@ -169,8 +173,14 @@ query <- function(emuDB, eql, ...) {
   } else {
     # Execute immediately (old behavior). Strip `lazy` from dots since
     # execute_query() doesn't accept it.
-    eager_dots <- dots[setdiff(names(dots), "lazy")]
+    eager_dots <- dots[intersect(names(dots), "result_level")]
     result <- do.call(execute_query, c(list(db_path, eql), eager_dots))
+    if (is.data.frame(result) && nrow(result) > 0) {
+      keep <- rep(TRUE, nrow(result))
+      if (!is.null(session_pat)) keep <- keep & grepl(session_pat, result$session)
+      if (!is.null(bundle_pat)) keep <- keep & grepl(bundle_pat, result$bundle)
+      result <- result[keep, , drop = FALSE]
+    }
 
     # Convert to segment_list if result is a data.frame
     if (is.data.frame(result) && !S7::S7_inherits(result, segment_list)) {
@@ -184,6 +194,48 @@ query <- function(emuDB, eql, ...) {
     }
     return(result)
   }
+}
+
+#' Validate the options accepted through `...` of query()
+#'
+#' emuR's `calcTimes`, `timeRefSegmentLevel` and `resultType` are not
+#' implemented: a non-default value aborts instead of being silently ignored.
+#' @noRd
+.check_query_options <- function(dots) {
+  known <- c("lazy", "result_level", "sessionPattern", "bundlePattern",
+             "calcTimes", "timeRefSegmentLevel", "resultType")
+  unknown <- setdiff(names(dots), known)
+  if (length(unknown) > 0 || (length(dots) > 0 && is.null(names(dots)))) {
+    .query_abort(c("Unknown argument{?s} to {.fn query}: {.arg {unknown}}.",
+                   "i" = "Supported: {.arg {known}}."))
+  }
+  if (!is.null(dots$calcTimes) && !isTRUE(dots$calcTimes)) {
+    .query_abort("{.arg calcTimes = FALSE} is not supported; times are always calculated.")
+  }
+  if (!is.null(dots$timeRefSegmentLevel)) {
+    .query_abort("{.arg timeRefSegmentLevel} is not supported.")
+  }
+  if (!is.null(dots$resultType)) {
+    .query_abort("{.arg resultType} is not supported; {.fn query} returns a segment_list.")
+  }
+  for (a in c("sessionPattern", "bundlePattern")) {
+    if (!is.null(dots[[a]]) && !(is.character(dots[[a]]) && length(dots[[a]]) == 1L)) {
+      .query_abort("{.arg {a}} must be a single regular expression.")
+    }
+  }
+  invisible(TRUE)
+}
+
+#' Restrict a lazy base query to sessions/bundles matching regular expressions
+#' @noRd
+.restrict_scope_sql <- function(q, session_pat = NULL, bundle_pat = NULL) {
+  conds <- character()
+  params <- list()
+  if (!is.null(session_pat)) { conds <- c(conds, "session REGEXP ?"); params <- c(params, list(session_pat)) }
+  if (!is.null(bundle_pat))  { conds <- c(conds, "bundle REGEXP ?");  params <- c(params, list(bundle_pat)) }
+  if (length(conds) == 0L) return(q)
+  list(sql = paste0("SELECT * FROM (", q$sql, ") WHERE ", paste(conds, collapse = " AND ")),
+       params = c(q$params, params))
 }
 
 #' Build Base SQL Query Without Execution

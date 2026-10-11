@@ -226,7 +226,7 @@ scout_dt <- function(.segments,
   # Compute sample_end from sample_start + sample_dur (emuR stores duration, not end)
   all_items_dt[, sample_end := data.table::fifelse(
     type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
-    sample_start + sample_dur - 1L,
+    sample_start + sample_dur,  # emuR: sample_end = start + dur
     NA_integer_
   )]
 
@@ -284,8 +284,8 @@ scout_dt <- function(.segments,
         # Single item: one row
         result_row <- data.table::data.table(
           labels = matches$labels[1],
-          start = if (matches$type[1] == "ITEM") NA_real_ else matches$sample_start[1] / matches$sample_rate[1] * 1000,
-          end = if (matches$type[1] == "ITEM") NA_real_ else matches$sample_end[1] / matches$sample_rate[1] * 1000,
+          start = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_start[1] - 0.5) / matches$sample_rate[1] * 1000,
+          end = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_end[1] + 0.5) / matches$sample_rate[1] * 1000,
           db_uuid = seg$db_uuid,
           session = seg$session,
           bundle = seg$bundle,
@@ -304,8 +304,8 @@ scout_dt <- function(.segments,
         # Multiple items: one row spanning range
         result_row <- data.table::data.table(
           labels = paste(matches$labels, collapse = " "),
-          start = if (matches$type[1] == "ITEM") NA_real_ else matches$sample_start[1] / matches$sample_rate[1] * 1000,
-          end = if (matches$type[1] == "ITEM") NA_real_ else matches$sample_end[nrow(matches)] / matches$sample_rate[nrow(matches)] * 1000,
+          start = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_start[1] - 0.5) / matches$sample_rate[1] * 1000,
+          end = if (matches$type[1] == "ITEM") NA_real_ else (matches$sample_end[nrow(matches)] + 0.5) / matches$sample_rate[nrow(matches)] * 1000,
           db_uuid = seg$db_uuid,
           session = seg$session,
           bundle = seg$bundle,
@@ -470,7 +470,7 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   # Compute sample_end from sample_start + sample_dur
   target_items_dt[, sample_end := data.table::fifelse(
     type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
-    sample_start + sample_dur - 1L,
+    sample_start + sample_dur,  # emuR: sample_end = start + dur
     NA_integer_
   )]
 
@@ -508,8 +508,10 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
 
   # Calculate times if available
   result_dt[, `:=`(
-    start = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_start / sample_rate * 1000, NA_real_),
-    end = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_end / sample_rate * 1000, NA_real_),
+    start = data.table::fifelse(type == "SEGMENT", (sample_start - 0.5) / sample_rate * 1000,
+                                data.table::fifelse(type == "EVENT", sample_start / sample_rate * 1000, NA_real_)),
+    end = data.table::fifelse(type == "SEGMENT", (sample_end + 0.5) / sample_rate * 1000,
+              data.table::fifelse(type == "EVENT", sample_end / sample_rate * 1000, NA_real_)),
     start_item_id = item_id,
     end_item_id = item_id,
     start_item_seq_idx = seq_idx,
@@ -647,7 +649,7 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   # Compute sample_end from sample_start + sample_dur
   target_items_dt[, sample_end := data.table::fifelse(
     type == "SEGMENT" & !is.na(sample_start) & !is.na(sample_dur),
-    sample_start + sample_dur - 1L,
+    sample_start + sample_dur,  # emuR: sample_end = start + dur
     NA_integer_
   )]
 
@@ -683,8 +685,10 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   
   # Calculate times
   result_dt[, `:=`(
-    start = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_start / sample_rate * 1000, NA_real_),
-    end = data.table::fifelse(type %in% c("SEGMENT", "EVENT"), sample_end / sample_rate * 1000, NA_real_),
+    start = data.table::fifelse(type == "SEGMENT", (sample_start - 0.5) / sample_rate * 1000,
+                                data.table::fifelse(type == "EVENT", sample_start / sample_rate * 1000, NA_real_)),
+    end = data.table::fifelse(type == "SEGMENT", (sample_end + 0.5) / sample_rate * 1000,
+              data.table::fifelse(type == "EVENT", sample_end / sample_rate * 1000, NA_real_)),
     start_item_id = item_id,
     end_item_id = item_id,
     start_item_seq_idx = seq_idx,
