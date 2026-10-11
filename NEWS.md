@@ -12,6 +12,13 @@
   or re-binding a name to a different function returned stale cached results.
   Existing cache entries miss once.
 
+- Lazy `query()` plans: deriving a plan (`quantify()`, `biographize()`,
+  `scout(collect = FALSE)`, ...) no longer shares the materialization cache
+  with its parent, so `nrow(x)` before `quantify(x)` could return the parent's
+  result without the new columns. Steps now run in declaration order
+  (previously all SQL steps ran before all deferred ones), and lazy
+  `ascend_to()`/`descend_to()` SQL no longer has the link direction swapped.
+
 ## Removed
 
 - Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is

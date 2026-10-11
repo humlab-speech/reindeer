@@ -136,7 +136,7 @@ test_that("apply_ascend_transform uses links table and level filter", {
   result <- apply_ascend_transform(base, level = "Syllable")
   expect_true(grepl("WITH base AS", result$sql))
   expect_true(grepl("INNER JOIN links lk", result$sql))
-  expect_true(grepl("lk\\.to_id = i\\.item_id", result$sql))
+  expect_true(grepl("lk\\.from_id = i\\.item_id", result$sql))
   expect_true(grepl("WHERE i\\.level = \\?", result$sql))
   expect_equal(result$params[[length(result$params)]], "Syllable")
 })
@@ -145,8 +145,8 @@ test_that("apply_descend_transform uses links table in reverse direction", {
   base <- make_base_query()
   result <- apply_descend_transform(base, level = "Phoneme")
   expect_true(grepl("WITH base AS", result$sql))
-  expect_true(grepl("lk\\.from_id = i\\.item_id", result$sql))
-  expect_true(grepl("lk\\.to_id = b\\.start_item_id", result$sql))
+  expect_true(grepl("lk\\.to_id = i\\.item_id", result$sql))
+  expect_true(grepl("lk\\.from_id = b\\.start_item_id", result$sql))
   expect_equal(result$params[[length(result$params)]], "Phoneme")
 })
 
@@ -155,9 +155,9 @@ test_that("apply_transform dispatches correctly for known types", {
   r1 <- apply_transform(base, list(type = "scout", n = 1))
   expect_true(grepl("end_item_seq_idx", r1$sql))
   r3 <- apply_transform(base, list(type = "ascend", level = "Word"))
-  expect_true(grepl("to_id = i\\.item_id", r3$sql))
+  expect_true(grepl("from_id = i\\.item_id", r3$sql))
   r4 <- apply_transform(base, list(type = "descend", level = "Phonetic"))
-  expect_true(grepl("from_id = i\\.item_id", r4$sql))
+  expect_true(grepl("to_id = i\\.item_id", r4$sql))
 })
 
 test_that("apply_transform errors on unknown type", {

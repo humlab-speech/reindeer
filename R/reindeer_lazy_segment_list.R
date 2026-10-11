@@ -71,6 +71,35 @@ lazy_segment_list <- S7::new_class(
   }
 )
 
+#' Declaration order of a plan's steps
+#'
+#' `query_parts` keeps SQL steps (`transforms`) and R-side steps
+#' (`post_transforms`) in separate lists; `order` records how they interleave.
+#' Plans built without it (older objects, tests) run SQL steps first.
+#' @noRd
+.step_order <- function(query_parts) {
+  if (!is.null(query_parts$order)) return(query_parts$order)
+  c(rep("sql", length(query_parts$transforms)),
+    rep("post", length(query_parts$post_transforms)))
+}
+
+#' Append a step to a lazy plan, returning a new plan with its own state
+#'
+#' Plans are values: deriving one must never share the materialization cache
+#' of the plan it came from.
+#' @param x A `lazy_segment_list`.
+#' @param kind `"sql"` (a `transforms` entry) or `"post"` (`post_transforms`).
+#' @param spec The step specification (a list with `type`).
+#' @noRd
+.fork_lazy <- function(x, kind, spec) {
+  qp <- x@query_parts
+  qp$order <- c(.step_order(qp), kind)
+  field <- if (kind == "sql") "transforms" else "post_transforms"
+  qp[[field]] <- c(qp[[field]], list(spec))
+  lazy_segment_list(corpus = x@corpus, query_parts = qp,
+                    db_path = x@db_path, db_uuid = x@db_uuid)
+}
+
 #' Collect/Materialize a Lazy Segment List
 #'
 #' Forces execution of the query chain and returns a regular segment_list.
@@ -106,8 +135,19 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
     return(lazy_sl@.state$cache)
   }
   
-  # Build parameterized query from query_parts -- returns list(sql, params)
-  query <- build_sql_from_parts(lazy_sl@query_parts, verbose = verbose)
+  # Steps run in declaration order. The leading run of SQL steps is fused into
+  # the one query; later steps run on the materialized segment_list.
+  parts <- lazy_sl@query_parts
+  order <- .step_order(parts)
+  n_lead <- if (length(order) == 0) 0L else {
+    nz <- which(order != "sql")
+    if (length(nz) == 0) length(order) else nz[1] - 1L
+  }
+  sql_steps <- parts$transforms
+  post_steps <- parts$post_transforms
+  lead_parts <- parts
+  lead_parts$transforms <- sql_steps[seq_len(n_lead)]
+  query <- build_sql_from_parts(lead_parts, verbose = verbose)
   
   if (verbose) {
     cli::cli_alert_info("Executing SQL query:")
@@ -157,11 +197,16 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
   # regardless of whether the segment_list arrived eager or via collect().
   seg_list <- .seed_provenance(seg_list, "query", sys.call(-1L))
 
-  # Apply any deferred post-materialization transforms (quantify, biographize).
-  # These run on the materialized segment_list, in declaration order.
-  post <- lazy_sl@query_parts$post_transforms
-  if (length(post) > 0) {
-    for (tr in post) {
+  # Replay the remaining steps in declaration order on the materialized list.
+  i_sql <- n_lead
+  i_post <- 0L
+  for (kind in order[seq_along(order) > n_lead]) {
+    if (kind == "sql") {
+      i_sql <- i_sql + 1L
+      seg_list <- .apply_sql_step_eager(seg_list, sql_steps[[i_sql]])
+    } else {
+      i_post <- i_post + 1L
+      tr <- post_steps[[i_post]]
       seg_list <- switch(tr$type,
         "quantify"    = do.call(quantify, c(list(seg_list, tr$dsp_function), tr$args)),
         "biographize" = do.call(biographize, c(list(seg_list, tr$corpus_obj), tr$args)),
@@ -175,6 +220,18 @@ collect_lazy_impl <- function(lazy_sl, verbose = FALSE) {
   lazy_sl@.state$materialized <- TRUE
 
   return(seg_list)
+}
+
+#' Run one SQL-step spec through the eager verbs
+#' @noRd
+.apply_sql_step_eager <- function(seg, tr) {
+  switch(tr$type,
+    scout = scout(seg, tr$n, count_from = tr$count_from, capture = tr$capture,
+                  ignore_bundle_boundaries = tr$ignore_bundle_boundaries),
+    ascend = ascend_to(seg, tr$level),
+    descend = descend_to(seg, tr$level),
+    cli::cli_abort("Unknown transform type: {.val {tr$type}}")
+  )
 }
 
 #' Build Parameterized SQL Query from Query Parts
@@ -285,12 +342,12 @@ apply_ascend_transform <- function(query, level) {
     "  lk.db_uuid = i.db_uuid AND ",
     "  lk.session = i.session AND ",
     "  lk.bundle = i.bundle AND ",
-    "  lk.to_id = i.item_id ",
+    "  lk.from_id = i.item_id ",
     "INNER JOIN base b ON ",
     "  lk.db_uuid = b.db_uuid AND ",
     "  lk.session = b.session AND ",
     "  lk.bundle = b.bundle AND ",
-    "  lk.from_id = b.start_item_id ",
+    "  lk.to_id = b.start_item_id ",
     "LEFT JOIN labels lb ON ",
     "  lb.db_uuid = i.db_uuid AND ",
     "  lb.session = i.session AND ",
@@ -320,12 +377,12 @@ apply_descend_transform <- function(query, level) {
     "  lk.db_uuid = i.db_uuid AND ",
     "  lk.session = i.session AND ",
     "  lk.bundle = i.bundle AND ",
-    "  lk.from_id = i.item_id ",
+    "  lk.to_id = i.item_id ",
     "INNER JOIN base b ON ",
     "  lk.db_uuid = b.db_uuid AND ",
     "  lk.session = b.session AND ",
     "  lk.bundle = b.bundle AND ",
-    "  lk.to_id = b.start_item_id ",
+    "  lk.from_id = b.start_item_id ",
     "LEFT JOIN labels lb ON ",
     "  lb.db_uuid = i.db_uuid AND ",
     "  lb.session = i.session AND ",

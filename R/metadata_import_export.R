@@ -401,9 +401,7 @@ biographize <- function(segs_tbl, corpus_obj, compute_digests = FALSE, algorithm
   if (S7::S7_inherits(segs_tbl, lazy_segment_list)) {
     spec <- list(type = "biographize", corpus_obj = corpus_obj,
                  args = list(compute_digests = compute_digests, algorithm = algorithm))
-    segs_tbl@query_parts$post_transforms <- c(
-      segs_tbl@query_parts$post_transforms, list(spec))
-    return(invisible(segs_tbl))
+    return(invisible(.fork_lazy(segs_tbl, "post", spec)))
   }
 
   if (!is.data.frame(segs_tbl) || !all(c("session", "bundle") %in% names(segs_tbl))) {

@@ -136,11 +136,7 @@ S7::method(scout, lazy_segment_list) <- function(.segments,
     capture = capture,
     ignore_bundle_boundaries = ignore_bundle_boundaries
   )
-  .segments@query_parts$transforms <- c(
-    .segments@query_parts$transforms,
-    list(transform)
-  )
-  .segments
+  .fork_lazy(.segments, "sql", transform)
 }
 
 #' Scout Implementation Using data.table
@@ -414,11 +410,7 @@ S7::method(ascend_to, lazy_segment_list) <- function(.segments, level,
                      .from = .from, .quiet = .quiet, collect = TRUE))
   }
   transform <- list(type = "ascend", level = level)
-  .segments@query_parts$transforms <- c(
-    .segments@query_parts$transforms,
-    list(transform)
-  )
-  .segments
+  .fork_lazy(.segments, "sql", transform)
 }
 
 #' Ascend Implementation Using data.table
@@ -605,11 +597,7 @@ S7::method(descend_to, lazy_segment_list) <- function(.segments, level,
                       .from = .from, .quiet = .quiet, collect = TRUE))
   }
   transform <- list(type = "descend", level = level)
-  .segments@query_parts$transforms <- c(
-    .segments@query_parts$transforms,
-    list(transform)
-  )
-  .segments
+  .fork_lazy(.segments, "sql", transform)
 }
 
 #' Descend Implementation Using data.table

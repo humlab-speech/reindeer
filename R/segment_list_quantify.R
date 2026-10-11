@@ -398,11 +398,7 @@ S7::method(quantify, lazy_segment_list) <- function(object, dsp_function, ...) {
     dsp_function = dsp_function,
     args = list(...)
   )
-  object@query_parts$post_transforms <- c(
-    object@query_parts$post_transforms,
-    list(spec)
-  )
-  invisible(object)
+  invisible(.fork_lazy(object, "post", spec))
 }
 
 #' Character-track-name branch of quantify.segment_list
