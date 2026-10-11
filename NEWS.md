@@ -26,6 +26,15 @@ caches miss once. Numbers from 2.3.0's work package list follow.
   (file-batch, parallel-IO, vectorised-with-loop) are gone; the cache is still
   read and written per segment.
 
+- The quantify cache (now ON by default, D6: `.use_cache = TRUE`, stored under
+  `<corpus>/.quantify_cache`) keeps ONE entry per bundle file - its flattened
+  frame table - keyed by routine identity, speaker parameters and file stamp.
+  Re-running with a different `.at` or a different set of segments is a hit.
+  Warm re-run of 253 segments: 0.05 s (was a full recompute). Results gain a
+  `.cache_status` column (`"hit"`/`"miss"`). A warning fires when the cache
+  passes 500 MB. Results of routines that are not sliceable tracks are cached
+  per segment as before. Pass `.use_cache = FALSE` to opt out.
+
 ## EQL / emuR parity
 
 - One compiler: eager `query(lazy = FALSE)` now compiles the same SQL as the

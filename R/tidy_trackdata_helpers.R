@@ -172,21 +172,46 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   Filter(Negate(is.null), flat)
 }
 
-#' Run the DSP routine for every segment of ONE signal file
+#' Analyse ONE whole signal file; return its frames as a table, or NULL
 #'
-#' `mode = "bundle"` analyses the whole file once with the bundle's speaker
-#' parameters and slices each segment's frames out of the result (frames keep
-#' their absolute `frame_time`). That avoids re-analysing the file per segment
-#' and the begin-of-file failures of windowed analysis. Routines that do not
-#' return a time-indexed track (tables, lists) fall back to `mode = "window"`,
-#' one call per segment, as does any failure of the whole-file call.
-#'
+#' Only time-indexed tracks (real `AsspDataObj`s carrying their own time base)
+#' can be sliced per segment later. Anything else - tables, lists, fakes, or a
+#' failed call - returns NULL and is analysed per window instead.
+#' @noRd
+.dsp_whole_table <- function(dsp_function, file, params) {
+  whole <- tryCatch(
+    do.call(dsp_function, c(list(listOfFiles = file), params,
+                            list(toFile = FALSE, verbose = FALSE))),
+    error = function(e) NULL)
+  if (!inherits(whole, "AsspDataObj") || is.null(attr(whole, "sampleRate")) ||
+      is.null(attr(whole, "startTime"))) {
+    return(NULL)
+  }
+  tab <- as.data.frame(whole)
+  tm <- suppressWarnings(as.numeric(tab[["frame_time"]]))
+  if (length(tm) != nrow(tab) || anyNA(tm)) return(NULL)
+  tab
+}
+
+#' Cut each segment's frames out of a whole-file table
+#' @return One element per segment: a `reindeer_track_slice`, or NULL if no
+#'   frame falls inside the segment.
+#' @noRd
+.slice_table <- function(tab, starts_ms, ends_ms) {
+  tm <- as.numeric(tab[["frame_time"]])
+  lapply(seq_along(starts_ms), function(i) {
+    keep <- which(tm >= starts_ms[i] / 1000 & tm <= ends_ms[i] / 1000)
+    if (length(keep) == 0L) return(NULL)
+    structure(tab[keep, , drop = FALSE], class = c("reindeer_track_slice", "data.frame"))
+  })
+}
+
+#' Run the DSP routine once per segment window of ONE signal file
 #' @return A list with one element per segment (NULL where nothing came out).
 #' @noRd
-.run_dsp_group <- function(dsp_function, file, params, starts_ms, ends_ms,
-                           mode = "bundle", verbose = FALSE) {
+.run_dsp_windows <- function(dsp_function, file, params, starts_ms, ends_ms, verbose = FALSE) {
   base <- c(list(listOfFiles = file), params, list(toFile = FALSE, verbose = FALSE))
-  window <- function(i) {
+  lapply(seq_along(starts_ms), function(i) {
     tryCatch(
       do.call(dsp_function, c(base, list(beginTime = starts_ms[i] / 1000,
                                          endTime = ends_ms[i] / 1000))),
@@ -194,24 +219,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         if (verbose) cli::cli_alert_warning("Error: {conditionMessage(e)}")
         NULL
       })
-  }
-  if (identical(mode, "bundle")) {
-    whole <- tryCatch(do.call(dsp_function, base), error = function(e) NULL)
-    # A real track carries its own time base; anything else is analysed per window.
-    if (inherits(whole, "AsspDataObj") && !is.null(attr(whole, "sampleRate")) &&
-        !is.null(attr(whole, "startTime"))) {
-      tab <- as.data.frame(whole)
-      tm <- suppressWarnings(as.numeric(tab[["frame_time"]]))
-      if (length(tm) == nrow(tab) && !anyNA(tm)) {
-        return(lapply(seq_along(starts_ms), function(i) {
-          keep <- tm >= starts_ms[i] / 1000 & tm <= ends_ms[i] / 1000
-          if (!any(keep)) return(NULL)
-          structure(tab[keep, , drop = FALSE], class = c("reindeer_track_slice", "data.frame"))
-        }))
-      }
-    }
-  }
-  lapply(seq_along(starts_ms), window)
+  })
 }
 
 #' Turn one DSP return value into a data frame, applying `.at`
@@ -528,142 +536,137 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   invisible(NULL)
 }
 
-#' Vectorized segment processing using data.table
+#' Warn when the quantify cache has grown past 500 MB
+#' @noRd
+.warn_if_cache_large <- function(cache_conn) {
+  path <- tryCatch(DBI::dbGetInfo(cache_conn)$dbname, error = function(e) NULL)
+  if (is.null(path) || !file.exists(path) || file.size(path) < 500 * 1024^2) return(invisible())
+  check_cache_size(dirname(path), cache_type = "Quantify", verbose = TRUE)
+  invisible()
+}
+
+#' The quantify executor
+#'
+#' Per bundle file: in `"bundle"` mode the whole file is analysed once and the
+#' flattened frame table is what the persistent cache stores (one entry per
+#' bundle, keyed by routine identity, speaker parameters and file stamp, so
+#' `.at` and the segment set can change without a miss); each segment is then
+#' a slice of that table. Files whose routine does not return a sliceable
+#' track, and `"window"` mode, are analysed per segment, with one cache entry
+#' per segment.
 #' @noRd
 .process_segments_vectorized <- function(seg_df, corpus_obj, dsp_function, dsp_params,
                                          media_ext, .at = NULL, .verbose = FALSE,
                                          use_cache = TRUE, cache_conn = NULL,
                                          cache_format = "auto", dsp_name = NULL,
                                          .mode = "bundle") {
-  
-  # Convert to data.table for faster operations
   dt <- data.table::as.data.table(seg_df)
-    
-    # Add file paths vectorized
-    dt[, signal_file := file.path(
-      corpus_obj@basePath,
-      paste0(session, "_ses"),
-      paste0(bundle, "_bndl"),
-      paste0(bundle, ".", media_ext)
-    )]
-    
-    # Filter existing files
-    dt[, file_exists := file.exists(signal_file)]
-    dt_valid <- dt[file_exists == TRUE]
-    
-    if (nrow(dt_valid) == 0) {
-      return(list())
-    }
-    
-    # Generate cache keys if caching enabled. The params digest is computed
-    # per row: effective DSP params now vary by bundle (Age/Gender), so it is
-    # no longer loop-invariant. Everything else (dsp name, .at) is hoisted.
-    if (use_cache && !is.null(cache_conn)) {
-      key_pre <- .precompute_cache_key_parts(dsp_name, list(), .at,
-                                             fn_id = .fn_identity(dsp_function))
-      dt_valid[, seg_params_digest := vapply(seg_params, function(p) {
-        digest::digest(p, algo = "xxhash64")
-      }, character(1))]
-      stamps <- stats::setNames(.file_stamp(unique(dt_valid$signal_file)),
-                                unique(dt_valid$signal_file))
-      dt_valid[, cache_key := paste(
-        session, bundle, as.character(start), as.character(end),
-        key_pre$dsp_name, seg_params_digest, key_pre$at_digest,
-        stamps[signal_file],
-        sep = "_"
-      )]
-      
-      # Batch cache lookup - a handful of chunked IN queries instead of one
-      # SELECT + UPDATE per row.
-      cached_map <- .get_persistent_cache_batch(dt_valid$cache_key, cache_conn)
-      dt_valid[, cached_result := lapply(cache_key, function(k) cached_map[[k]])]
-      
-      # Separate cached and uncached
-      dt_cached <- dt_valid[!vapply(cached_result, is.null, logical(1))]
-      dt_uncached <- dt_valid[vapply(cached_result, is.null, logical(1))]
-      if (nrow(dt_cached) > 0) {
-        dt_cached[, .cache_status := "hit"]
-      }
-      if (nrow(dt_uncached) > 0) {
-        dt_uncached[, .cache_status := "miss"]
-      }
+  dt[, signal_file := file.path(
+    corpus_obj@basePath, paste0(session, "_ses"), paste0(bundle, "_bndl"),
+    paste0(bundle, ".", media_ext))]
+  dt[, file_exists := file.exists(signal_file)]
+  dt_valid <- dt[file_exists == TRUE]
+  n <- nrow(dt_valid)
+  if (n == 0) return(list())
 
-      if (.verbose && nrow(dt_cached) > 0) {
-        cli::cli_alert_success("Found {nrow(dt_cached)} cached result{?s}")
-      }
-    } else {
-      dt_uncached <- dt_valid
-      dt_uncached[, .cache_status := NA_character_]
-      dt_cached <- data.table::data.table()
-    }
-    
-    # Process uncached segments
-    if (nrow(dt_uncached) > 0) {
-      # Group by file so each group shares one bundle (hence one params list)
-      # and one file handle.
-      dt_uncached[, file_group_id := .GRP, by = signal_file]
+  caching <- use_cache && !is.null(cache_conn)
+  fn_id <- .fn_identity(dsp_function)
+  results <- vector("list", n)
+  status <- rep(NA_character_, n)
+  resolved <- rep(FALSE, n)
+  by_file <- split(seq_len(n), dt_valid$signal_file)
+  stamps <- .file_stamp(names(by_file))
 
-      # One DSP call per segment, results kept in row order. The raw return
-      # value is stored untouched: real DSP routines return AsspDataObj track
-      # objects, and flattening them here would destroy the tracks.
-      raw_results <- vector("list", nrow(dt_uncached))
-      groups <- lapply(unique(dt_uncached$file_group_id), function(g) {
-        idx <- which(dt_uncached$file_group_id == g)
-        list(idx = idx, file = dt_uncached$signal_file[idx[1]],
-             params = dt_uncached$seg_params[[idx[1]]],
-             starts = dt_uncached$start[idx], ends = dt_uncached$end[idx])
-      })
-      # One task per bundle file; the caller's future::plan() decides whether
-      # they run in parallel (default: sequential, in-process).
-      group_results <- future.apply::future_lapply(groups, function(gr) {
-        .run_dsp_group(dsp_function, gr$file, gr$params, gr$starts, gr$ends,
-                       mode = .mode, verbose = .verbose)
+  # ---- bundle level: one table per file -------------------------------------
+  if (identical(.mode, "bundle")) {
+    first <- vapply(by_file, `[`, integer(1), 1L)
+    params <- dt_valid$seg_params[first]
+    gkeys <- vapply(seq_along(by_file), function(k) {
+      digest::digest(list("bundle-table", dt_valid$session[first[k]], dt_valid$bundle[first[k]],
+                          fn_id, params[[k]], stamps[k], .cache_schema), algo = "xxhash64")
+    }, character(1))
+    tabs <- vector("list", length(by_file))
+    cached <- if (caching) .get_persistent_cache_batch(gkeys, cache_conn) else list()
+    for (k in seq_along(by_file)) tabs[k] <- list(cached[[gkeys[k]]])
+    miss <- which(vapply(tabs, is.null, logical(1)))
+    if (length(miss) > 0L) {
+      computed <- future.apply::future_lapply(miss, function(k) {
+        .dsp_whole_table(dsp_function, names(by_file)[k], params[[k]])
       }, future.seed = TRUE)
-      for (k in seq_along(groups)) {
-        # `[<-` with list(NULL) keeps the slot of a failed segment
-        raw_results[groups[[k]]$idx] <- group_results[[k]]
+      for (j in seq_along(miss)) tabs[miss[j]] <- list(computed[[j]])
+      ok <- miss[!vapply(computed, is.null, logical(1))]
+      if (caching && length(ok) > 0L) {
+        .set_persistent_cache_batch(
+          Map(function(k) list(cache_key = gkeys[k], result = tabs[[k]]), ok),
+          cache_conn, format = cache_format)
+        .warn_if_cache_large(cache_conn)
       }
-      dt_uncached[, result := raw_results]
+    }
+    for (k in seq_along(by_file)) {
+      if (is.null(tabs[[k]])) next
+      idx <- by_file[[k]]
+      results[idx] <- .slice_table(tabs[[k]], dt_valid$start[idx], dt_valid$end[idx])
+      status[idx] <- if (caching) (if (k %in% miss) "miss" else "hit") else NA_character_
+      resolved[idx] <- TRUE
+    }
+  }
 
-      # Batch-write all misses in one transaction instead of per row.
-      if (use_cache && !is.null(cache_conn)) {
-        non_null <- !vapply(dt_uncached$result, is.null, logical(1))
-        if (any(non_null)) {
-          entries <- Map(
-            function(k, r) list(cache_key = k, result = r),
-            dt_uncached$cache_key[non_null],
-            dt_uncached$result[non_null]
-          )
-          .set_persistent_cache_batch(entries, cache_conn, format = cache_format)
+  # ---- segment level: windowed analysis, per-segment cache -------------------
+  pending <- which(!resolved)
+  if (length(pending) > 0L) {
+    sub <- dt_valid[pending]
+    if (caching) {
+      key_pre <- .precompute_cache_key_parts(dsp_name, list(), .at, fn_id = fn_id)
+      sp_digest <- vapply(sub$seg_params, function(p) digest::digest(p, algo = "xxhash64"),
+                          character(1))
+      st <- stats::setNames(stamps, names(by_file))[sub$signal_file]
+      keys <- paste(sub$session, sub$bundle, as.character(sub$start), as.character(sub$end),
+                    key_pre$dsp_name, sp_digest, key_pre$at_digest, st, sep = "_")
+      seg_cached <- .get_persistent_cache_batch(keys, cache_conn)
+      hit <- !vapply(keys, function(k) is.null(seg_cached[[k]]), logical(1))
+      for (j in which(hit)) results[pending[j]] <- list(seg_cached[[keys[j]]])
+      status[pending] <- ifelse(hit, "hit", "miss")
+      todo <- which(!hit)
+    } else {
+      keys <- NULL
+      todo <- seq_along(pending)
+    }
+    if (length(todo) > 0L) {
+      files <- unique(sub$signal_file[todo])
+      groups <- lapply(files, function(f) {
+        idx <- todo[sub$signal_file[todo] == f]
+        list(idx = idx, file = f, params = sub$seg_params[[idx[1]]],
+             starts = sub$start[idx], ends = sub$end[idx])
+      })
+      group_results <- future.apply::future_lapply(groups, function(gr) {
+        .run_dsp_windows(dsp_function, gr$file, gr$params, gr$starts, gr$ends, .verbose)
+      }, future.seed = TRUE)
+      for (g in seq_along(groups)) {
+        # `[<-` with list(NULL) keeps the slot of a failed segment
+        results[pending[groups[[g]]$idx]] <- group_results[[g]]
+      }
+      if (caching) {
+        done <- todo[!vapply(results[pending[todo]], is.null, logical(1))]
+        if (length(done) > 0L) {
+          .set_persistent_cache_batch(
+            Map(function(k, r) list(cache_key = k, result = r), keys[done], results[pending[done]]),
+            cache_conn, format = cache_format)
         }
       }
-    } else {
-      dt_uncached[, result := list()]
     }
+  }
 
-    # Combine cached and uncached
-    if (nrow(dt_cached) > 0) {
-      dt_cached[, result := cached_result]
-      dt_all <- data.table::rbindlist(list(dt_cached, dt_uncached), fill = TRUE)
-    } else {
-      dt_all <- dt_uncached
-    }
+  dt_valid[, .cache_status := status]
 
-    # Assemble one tibble per segment: segment bookkeeping plus the DSP output,
-    # sampled at `.at` when the routine returned a track object.
-    pieces <- lapply(seq_len(nrow(dt_all)), function(i) {
-      dsp_result <- dt_all$result[[i]]
-      if (is.null(dsp_result)) {
-        return(NULL)
-      }
-
-      result_df <- .dsp_result_to_df(dsp_result, .at)
-
-      n_result_rows <- nrow(result_df)
-      seg_info <- dt_all[rep(i, n_result_rows)]
-      .bind_seg_and_result(seg_info, result_df)
-    })
-
-    Filter(Negate(is.null), pieces)
+  # ---- assemble: one rbindlist for all results -------------------------------
+  frames <- lapply(results, function(r) if (is.null(r)) NULL else .dsp_result_to_df(r, .at))
+  have <- which(!vapply(frames, is.null, logical(1)))
+  if (length(have) == 0L) return(list())
+  nrows <- vapply(frames[have], nrow, integer(1))
+  seg_info <- dt_valid[rep(have, times = nrows)]
+  res <- data.table::rbindlist(frames[have], fill = TRUE)
+  dup <- intersect(names(seg_info), names(res))
+  if (length(dup) > 0L) data.table::setnames(res, dup, paste0(dup, "_dsp"))
+  list(tibble::as_tibble(cbind(seg_info, res)))
 }
 

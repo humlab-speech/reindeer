@@ -31,7 +31,7 @@ NULL
 #'   \item{`.use_metadata`}{Look up DSP parameters from speaker metadata.
 #'     Default `TRUE`. See [dsp_parameters()] to preview.}
 #'   \item{`.use_cache`}{Reuse persistent results when the cache key
-#'     matches. Default `FALSE`. See [inspect_cache()] for what's stored.
+#'     matches. Default `TRUE`. See [inspect_cache()] for what's stored.
 #'     When enabled, the returned tibble gains a `.cache_status` column
 #'     (`"hit"` / `"miss"`).}
 #'   \item{`.cache_dir`, `.cache_format`}{Where and how to persist cached
@@ -88,7 +88,7 @@ S7::method(quantify, segment_list) <- function(object, dsp_function, ...,
                                                 .verbose = FALSE,
                                                 .parallel = NULL,
                                                 .workers = NULL,
-                                                .use_cache = FALSE,
+                                                .use_cache = TRUE,
                                                 .cache_dir = NULL,
                                                 .cache_format = c("auto", "qs", "rds"),
                                                 .optimize = NULL,

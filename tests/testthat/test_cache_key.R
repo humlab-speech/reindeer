@@ -45,3 +45,15 @@ test_that("the same function under another name hits", {
   r <- quantify(fx$segs, g, .use_cache = TRUE, .cache_dir = fx$dir)
   expect_equal(status(r), "hit")
 })
+
+test_that("bundle-table cache: warm re-run hits, and changing .at or the segment set still hits", {
+  skip_if_no_emuR(); skip_if_no_superassp()
+  fx <- cache_setup()
+  segs <- collect(query(fx$corp, "Phonetic =~ .*"))
+  q <- function(s, ...) quantify(s, superassp::trk_formant_forest, .cache_dir = fx$dir,
+                                 .use_metadata = FALSE, ...)
+  expect_equal(status(suppressWarnings(q(segs, .at = 0.5))), "miss")
+  expect_equal(status(suppressWarnings(q(segs, .at = 0.5))), "hit")
+  expect_equal(status(suppressWarnings(q(segs, .at = 0.25))), "hit")
+  expect_equal(status(suppressWarnings(q(segs[1:10, ], .at = 0.5))), "hit")
+})
