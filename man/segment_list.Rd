@@ -19,6 +19,9 @@ columns (see Structure below)}
 \item{db_uuid}{Character; the database UUID}
 
 \item{db_path}{Character; path to the database directory}
+
+\item{dsp_function, dsp_columns}{Set by \code{\link[=quantify]{quantify()}}: the routine and the
+columns it added. Empty for a plain query result.}
 }
 \value{
 A \code{segment_list} object that inherits from

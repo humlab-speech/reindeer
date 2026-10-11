@@ -14,6 +14,8 @@
 #'   columns (see Structure below)
 #' @param db_uuid Character; the database UUID
 #' @param db_path Character; path to the database directory
+#' @param dsp_function,dsp_columns Set by [quantify()]: the routine and the
+#'   columns it added. Empty for a plain query result.
 #' @return A \code{segment_list} object that inherits from
 #'   \code{tbl_df}, \code{tbl}, and \code{data.frame}.
 #'
