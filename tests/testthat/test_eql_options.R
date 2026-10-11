@@ -6,7 +6,6 @@ test_that("single `=` behaves like `==`, quoted alternatives work", {
   n <- function(q) nrow(collect(query(corp, q)))
   expect_equal(n("Phonetic = t"), n("Phonetic == t"))
   expect_equal(n("Phonetic == 'm'|'n'"), n("Phonetic == m|n"))
-  expect_equal(n("Phonetic == \"m\"|\"n\""), n("Phonetic == m|n"))
   expect_equal(n("Phonetic == 'm'"), n("Phonetic == m"))
 })
 

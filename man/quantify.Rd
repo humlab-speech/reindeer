@@ -36,7 +36,7 @@ in a \code{segment_list} and get one row of measurements back per segment
 \item or per time point when \code{.at} is given. Parameters are picked from
 speaker metadata (\code{Age}, \code{Gender}) unless overridden through \code{...}.
 For lazy pipelines \code{quantify()} records the request and runs it at
-the next \code{\link[dplyr:collect]{collect()}}.
+the next \code{\link[=collect]{collect()}}.
 }
 }
 \details{

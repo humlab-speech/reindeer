@@ -97,10 +97,10 @@ describe("Simple Queries", {
 
     result_no_quotes <- query(ae_path, "Phonetic == t")
     result_single <- query(ae_path, "Phonetic == 't'")
-    result_double <- query(ae_path, 'Phonetic == "t"')
 
     expect_equal(nrow(result_no_quotes), nrow(result_single))
-    expect_equal(nrow(result_no_quotes), nrow(result_double))
+    # EQL quotes with single quotes only; a double-quoted label is an error.
+    expect_error(query(ae_path, 'Phonetic == "t"'), class = "reindeer_query_error")
   })
 
   test_that("inequality queries work", {

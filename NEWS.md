@@ -26,6 +26,14 @@
 - `scout()` is a vectorised join instead of a per-segment loop: 18k segments in
   0.55 s (was ~39 s for 25k).
 
+- New EQL parser (tokenizer + recursive descent, `R/eql_parser.R`) replaces the
+  string-splitting one. `&` and `|` chain (`[A & B & C]`, unbracketed `A & B`),
+  sequences nest, `#` projection works on any operand, compact `A==a->B==b`
+  parses. Non-EQL input fails with a caret: double-quoted labels (EQL quotes
+  with `'`), and unbracketed chains `[A -> B -> C]` / `[A ^ B ^ C]` (bracket
+  them, as emuR requires). Unquoted regex classes (`=~ [aeiou]`) remain
+  accepted although emuR rejects them.
+
 ## Fixed (silent wrong results)
 
 - `quantify()`: when the DSP routine errored on a segment in the batched

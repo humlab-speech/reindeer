@@ -43,58 +43,6 @@
 #' @keywords internal
 NULL
 
-#' Query EMU database using optimized SQLite backend
-#' 
-#' @param query_string EQL query string to parse
-#' @return A list describing the parsed query structure
-#' @keywords internal
-#' @noRd
-parse_eql_query <- function(query_string) {
-  query_string <- trimws(query_string)
-
-  # For bracket-wrapped queries, strip outer brackets and detect top-level operator
-  if (grepl("^\\[.*\\]$", query_string)) {
-    inner <- substr(query_string, 2, nchar(query_string) - 1)
-
-    # A dangling operator (`[A == x ^]`) would otherwise be read as part of
-    # an unquoted label, since split_on_operator() requires an operand on
-    # each side.
-    dangling <- regexpr("^\\s*(\\^|->|&|\\|)|\\s(\\^|->|&|\\|)\\s*$", inner, perl = TRUE)
-    if (dangling > 0) {
-      # Point at the operator itself: offset of whichever group matched,
-      # +1 for the stripped `[`.
-      op_pos <- max(attr(dangling, "capture.start"))
-      .query_abort(c(
-        "Operator is missing an operand.",
-        .eql_caret(query_string, pos = op_pos + 1L, label = "Query:")
-      ))
-    }
-
-    # Try operators in precedence order using bracket-aware splitting
-    # Conjunction/disjunction first, then sequence, then dominance
-    if (!is.null(split_on_operator(inner, "&"))) {
-      return(parse_conjunction_query(query_string))
-    }
-    if (!is.null(split_on_operator(inner, "|"))) {
-      return(parse_disjunction_query(query_string))
-    }
-    if (!is.null(split_on_operator(inner, "->"))) {
-      return(parse_sequence_query(query_string))
-    }
-    if (!is.null(split_on_operator(inner, "^"))) {
-      return(parse_dominance_query(query_string))
-    }
-    # No top-level operator found - strip redundant brackets and re-parse
-    return(parse_eql_query(inner))
-  }
-
-  if (grepl("^(Start|End|Medial|Num)\\(", query_string)) {
-    return(parse_function_query(query_string))
-  } else {
-    return(parse_simple_query(query_string))
-  }
-}
-
 # Expand label-group names in `==` / `!=` predicates, as emuR does.
 # Attribute-level groups win over database-level ones; a group name shadows a
 # literal label of the same name. Regex operators are left untouched.
@@ -207,6 +155,15 @@ parse_simple_query <- function(query_string) {
     ))
   }
 
+  # EQL has single-quoted strings only; a double-quoted value would be a
+  # literal label with quote characters, never what the author meant.
+  if (length(matches) >= 6 && matches[6] != "") {
+    .query_abort(c(
+      "Labels are quoted with single quotes in EQL.",
+      "i" = "Use {.code {matches[4]} '{matches[6]}'} instead of double quotes.",
+      .eql_caret(query_string, pos = regexpr("\"", query_string), label = "Query:")))
+  }
+
   level <- matches[2]
   attribute <- if (length(matches) >= 3 && matches[3] != "") matches[3] else level
   operator <- matches[4]
@@ -261,149 +218,6 @@ parse_simple_query <- function(query_string) {
     alternatives = alternatives,
     projection = has_projection
   ))
-}
-
-parse_dominance_query <- function(query_string) {
-  inner <- sub("^\\[(.*)\\]$", "\\1", query_string)
-  parts <- split_on_operator(inner, "^")
-
-  if (is.null(parts) || length(parts) != 2) {
-    .query_abort(c(
-      "Invalid dominance query.",
-      .eql_caret(query_string,
-                 pos = regexpr("\\^", query_string),
-                 label = "Query:")
-    ))
-  }
-
-  left_query <- parse_eql_query(trimws(parts[1]))
-  right_query <- parse_eql_query(trimws(parts[2]))
-  
-  return(list(
-    type = "dominance",
-    left = left_query,
-    right = right_query
-  ))
-}
-
-parse_sequence_query <- function(query_string) {
-  inner <- sub("^\\[(.*)\\]$", "\\1", query_string)
-  parts <- split_on_operator(inner, "->")
-
-  if (is.null(parts) || length(parts) != 2) {
-    .query_abort(c(
-      "Invalid sequence query.",
-      .eql_caret(query_string,
-                 pos = regexpr("->", query_string, fixed = TRUE),
-                 label = "Query:")
-    ))
-  }
-
-  left_query <- parse_eql_query(trimws(parts[1]))
-  right_query <- parse_eql_query(trimws(parts[2]))
-  
-  return(list(
-    type = "sequence",
-    left = left_query,
-    right = right_query
-  ))
-}
-
-parse_conjunction_query <- function(query_string) {
-  inner <- sub("^\\[(.*)\\]$", "\\1", query_string)
-  
-  # Find the & operator that's not inside nested brackets
-  parts <- split_on_operator(inner, "&")
-  
-  if (length(parts) != 2) {
-    .query_abort(c(
-      "Invalid conjunction query.",
-      .eql_caret(query_string,
-                 pos = regexpr("&", query_string, fixed = TRUE),
-                 label = "Query:")
-    ))
-  }
-  
-  left_query <- parse_eql_query(trimws(parts[1]))
-  right_query <- parse_eql_query(trimws(parts[2]))
-  
-  return(list(
-    type = "conjunction",
-    left = left_query,
-    right = right_query
-  ))
-}
-
-parse_disjunction_query <- function(query_string) {
-  inner <- sub("^\\[(.*)\\]$", "\\1", query_string)
-  
-  # Find the | operator that's not inside nested brackets
-  parts <- split_on_operator(inner, "|")
-  
-  if (length(parts) != 2) {
-    .query_abort(c(
-      "Invalid disjunction query.",
-      .eql_caret(query_string,
-                 pos = regexpr("\\|", query_string),
-                 label = "Query:")
-    ))
-  }
-  
-  left_query <- parse_eql_query(trimws(parts[1]))
-  right_query <- parse_eql_query(trimws(parts[2]))
-  
-  return(list(
-    type = "disjunction",
-    left = left_query,
-    right = right_query
-  ))
-}
-
-# Helper to split on a top-level query operator (&, |, ->, ^).
-#
-# The operator characters also occur inside values: label alternatives
-# (`p|t|k`), regexes (`=~ ^a|b`), and plain labels (`R&B`). A candidate is
-# therefore only accepted when it sits outside brackets and quotes, the left
-# side does not end in a comparison operator or `|` (so `=~ ^a` is a regex
-# anchor), and the right side starts a new operand. Bare level names count as
-# operands only for `->` and `^`; for `|` and `&` they would be
-# indistinguishable from a label (`p|t`, `R&B`).
-.eql_operand_start <- "^\\s*(#?[A-Za-z_]+(:[A-Za-z_]+)?\\s*(==|!=|=~|!~|=)|\\[|(Start|End|Medial|Num)\\()"
-.eql_bare_operand <- "^\\s*#?[A-Za-z_]+(:[A-Za-z_]+)?\\s*$"
-
-split_on_operator <- function(string, operator) {
-  bracket_depth <- 0
-  quote_char <- ""
-  chars <- strsplit(string, "")[[1]]
-  n <- length(chars)
-  op_len <- nchar(operator)
-
-  for (i in seq_along(chars)) {
-    ch <- chars[i]
-    if (nzchar(quote_char)) {
-      if (ch == quote_char) quote_char <- ""
-    } else if (ch %in% c("'", "\"") &&
-               grepl("[=~]\\s*$", substr(string, 1, i - 1))) {
-      # Quotes open a value only right after a comparison operator, so an
-      # apostrophe inside an unquoted label (`don't`) is left alone.
-      quote_char <- ch
-    } else if (ch == "[") {
-      bracket_depth <- bracket_depth + 1
-    } else if (ch == "]") {
-      bracket_depth <- bracket_depth - 1
-    } else if (bracket_depth == 0 && i + op_len - 1 <= n &&
-               substr(string, i, i + op_len - 1) == operator) {
-      left <- substr(string, 1, i - 1)
-      right <- substr(string, i + op_len, nchar(string))
-      if (!nzchar(trimws(left)) || grepl("[=~|]\\s*$", left)) next
-      if (grepl(.eql_operand_start, right) ||
-          (operator %in% c("->", "^") && grepl(.eql_bare_operand, right))) {
-        return(c(left, right))
-      }
-    }
-  }
-
-  NULL
 }
 
 parse_function_query <- function(query_string) {

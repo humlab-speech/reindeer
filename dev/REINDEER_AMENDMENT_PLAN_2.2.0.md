@@ -478,7 +478,8 @@ Delete the deprecation stubs (including `semitones`/`erb`) and
 | 2.8 | done (Gate 2 green; 2.3.0) | WP2.8 |
 | 3.1 | done (73/80 parity; 7 left for 3.2-3.4) | WP3.1 |
 | 3.2 | done (parity 78/80; 2 nested cases left for 3.3-3.4) | WP3.2 |
-| 3.3–3.4 | open | |
+| 3.3 | done | WP3.3 |
+| 3.4 | open | |
 | 4.1–4.7 | open | |
 | 5.1–5.5 | open | |
 | 6.1–6.4 | open | |
