@@ -28,6 +28,8 @@ jobs:
           # the companion-gated tests skip, while superassp comes from
           # GitHub and the DSP tests do run.
           dependencies: '"hard"'
+          # Skip the pandoc probe: it resolves Suggests (private eggstract) and fails.
+          install-pandoc: false
           extra-packages: |
             any::covr
             any::testthat
