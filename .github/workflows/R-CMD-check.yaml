@@ -14,6 +14,10 @@ jobs:
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
+    # superassp 3.2.1 does not compile on Windows (munmap in dataobj.c);
+    # remove once fixed upstream.
+    continue-on-error: ${{ matrix.config.os == 'windows-latest' }}
+
     strategy:
       fail-fast: false
       matrix:
