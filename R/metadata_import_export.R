@@ -486,10 +486,7 @@ add_digests <- function(corpus_obj, sessionPattern = ".*", bundlePattern = ".*",
 #' Get database UUID from corpus object
 #' @keywords internal
 #' @noRd
-get_db_uuid <- function(corpus_obj) {
-  config <- load_DBconfig(corpus_obj)
-  config$UUID
-}
+get_db_uuid <- function(corpus_obj) corpus_obj@.uuid
 
 #' Get connection from corpus object (alias for get_corpus_connection)
 #' @keywords internal

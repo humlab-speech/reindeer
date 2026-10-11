@@ -190,6 +190,7 @@ corpus <- S7::new_class(
       )
     }
 
+    .register_corpus(corpus_obj)
     corpus_obj
   },
   validator = function(self) {

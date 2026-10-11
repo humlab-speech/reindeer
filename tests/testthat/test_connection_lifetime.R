@@ -44,3 +44,22 @@ test_that("session/bundle creation and schema validation keep the shared connect
   s <- list_sessions_from_cache(con, corp@.uuid)$name
   expect_true("tricky'session" %in% s)
 })
+
+test_that("navigation reuses the live corpus' connection and pins nothing", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  segs <- collect(query(corp, "Phonetic == t"))
+  again <- get_corpus_cached(segs)
+  expect_identical(again@.connection, corp@.connection)
+  expect_true(DBI::dbIsValid(get_corpus_connection(corp)))
+  expect_no_error(ascend_to(segs, "Syllable"))
+  expect_no_error(scout(segs, 1))
+
+  # No global pin: once the user drops the corpus it can be collected, and a
+  # later call simply opens a fresh one.
+  path <- corp@basePath
+  segs@db_path <- path
+  rm(corp, again); gc()
+  expect_null(reindeer:::.live_corpus(path))
+  expect_no_error(ascend_to(segs, "Syllable"))
+})

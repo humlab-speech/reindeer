@@ -200,7 +200,7 @@ scout_dt <- function(.segments,
   if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
     corp <- .from
   } else if (nzchar(db_path) && dir.exists(db_path)) {
-    corp <- corpus(db_path)
+    corp <- get_corpus_cached(.segments, .from)
   } else {
     cli::cli_abort("Cannot determine corpus. Provide via {.arg .from}")
   }
@@ -444,7 +444,7 @@ ascend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
     corp <- .from
   } else if (nzchar(db_path) && dir.exists(db_path)) {
-    corp <- corpus(db_path)
+    corp <- get_corpus_cached(.segments, .from)
   } else {
     cli::cli_abort("Cannot determine corpus")
   }
@@ -616,7 +616,7 @@ descend_dt <- function(.segments, level, .from = NULL, .quiet = TRUE) {
   if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
     corp <- .from
   } else if (nzchar(db_path) && dir.exists(db_path)) {
-    corp <- corpus(db_path)
+    corp <- get_corpus_cached(.segments, .from)
   } else {
     cli::cli_abort("Cannot determine corpus")
   }

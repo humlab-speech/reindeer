@@ -17,48 +17,46 @@
 #' @keywords internal
 #' @export
 get_corpus_cached <- function(.segments, .from = NULL) {
-  # If .from is provided and is a corpus, use it directly
   if (!is.null(.from) && S7::S7_inherits(.from, reindeer::corpus)) {
     return(.from)
   }
-  
-  # Try to get from segment list
-  if (S7::S7_inherits(.segments, reindeer::segment_list)) {
-    db_path <- S7::prop(.segments, "db_path")
-    if (nzchar(db_path) && dir.exists(db_path)) {
-      # Check cache
-      cache_key <- paste0("corpus_", db_path)
-      if (exists(cache_key, envir = .tidy_cache)) {
-        return(get(cache_key, envir = .tidy_cache))
-      }
-      
-      # Create and cache
-      corp <- corpus(db_path)
-      assign(cache_key, corp, envir = .tidy_cache)
-      return(corp)
-    }
+  db_path <- if (S7::S7_inherits(.segments, reindeer::segment_list)) {
+    S7::prop(.segments, "db_path")
+  } else ""
+  if (nzchar(db_path) && dir.exists(db_path)) {
+    # Reuse the corpus (and its open SQLite connection) while someone still
+    # holds it; otherwise open a fresh one. Nothing is pinned for the session.
+    live <- .live_corpus(db_path)
+    if (!is.null(live)) return(live)
+    return(corpus(db_path))
   }
-  
   cli::cli_abort(c(
     "Cannot determine corpus",
     "x" = "Please provide a corpus via {.arg .from} argument or ensure segment list has valid db_path"
   ))
 }
 
+# basePath -> weak reference to the corpus. The key is the corpus' connection
+# environment, so the registry never keeps a corpus (or its connection) alive.
+.corpus_registry <- new.env(parent = emptyenv())
+
+.register_corpus <- function(corp) {
+  assign(normalizePath(corp@basePath, mustWork = FALSE),
+         rlang::new_weakref(key = corp@.connection, value = corp),
+         envir = .corpus_registry)
+  invisible(corp)
+}
+
+.live_corpus <- function(base_path) {
+  key <- normalizePath(base_path, mustWork = FALSE)
+  if (!exists(key, envir = .corpus_registry, inherits = FALSE)) return(NULL)
+  rlang::wref_value(get(key, envir = .corpus_registry, inherits = FALSE))
+}
+
 #' Get or create emuR handle (with caching)
 #' @noRd
 .get_handle_cached <- function(corp) {
-  cache_key <- paste0("handle_", corp@basePath)
-  
-  if (exists(cache_key, envir = .tidy_cache)) {
-    handle <- get(cache_key, envir = .tidy_cache)
-    # Validate connection is still active
-    if (DBI::dbIsValid(handle$connection)) {
-      return(handle)
-    }
-  }
-  
-  # Create native handle (no emuR dependency)
+  # Built on demand around the corpus' own connection: nothing is pinned.
   handle <- list(
     dbName = corp@dbName,
     basePath = corp@basePath,
@@ -66,8 +64,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     UUID = corp@.uuid
   )
   class(handle) <- "emuDBhandle"
-  assign(cache_key, handle, envir = .tidy_cache)
-  return(handle)
+  handle
 }
 #' Stable name for a DSP function, for cache keys and result metadata
 #'
