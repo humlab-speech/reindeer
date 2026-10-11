@@ -66,8 +66,7 @@ test_that("bulk import suppresses per-row regeneration then emits once", {
   # Simulate the bulk-edit contract directly: suppression is honoured.
   withr::local_options(reindeer._auto_cmdi_suppress = TRUE)
   add_metadata(ae, list(Project = "bulk"))
-  readme <- readLines(file.path(ae@basePath, "README.md"), warn = FALSE)
-  expect_false(any(grepl("bulk", readme)))  # suppressed: not regenerated
+  expect_false(file.exists(file.path(ae@basePath, "README.md")))  # suppressed: nothing emitted
 })
 
 test_that("writing identical metadata again rewrites no FAIR file", {
@@ -91,4 +90,35 @@ test_that("a hand-written README is never overwritten", {
   describe_corpus(ae, verbose = FALSE)
   expect_equal(readLines(readme, warn = FALSE), "my own notes")
   expect_true(file.exists(file.path(ae@basePath, "README-generated.md")))
+})
+
+test_that("auto-CMDI is on by default and regenerates every owned artifact in place", {
+  withr::local_options(reindeer.auto_cmdi = NULL)       # package default
+  ae <- create_isolated_ae_corpus()
+  add_metadata(ae, list(Project = "first"))
+  base <- ae@basePath
+  expect_true(file.exists(file.path(base, "README.md")))
+  expect_true(file.exists(file.path(base, "CITATION.cff")))
+  before <- file.info(file.path(base, c("README.md", "CITATION.cff", "datacite.json")))$mtime
+  Sys.sleep(1.1)
+  add_metadata(ae, list(Project = "second"))
+  after <- file.info(file.path(base, c("README.md", "CITATION.cff", "datacite.json")))$mtime
+  expect_true(all(after > before))
+  expect_length(list.files(base, "-generated"), 0L)     # updated in place, no stale twins
+})
+
+test_that("a hand-written CITATION.cff is never overwritten", {
+  withr::local_options(reindeer.auto_cmdi = NULL)
+  ae <- create_isolated_ae_corpus()
+  writeLines("# mine", file.path(ae@basePath, "CITATION.cff"))
+  add_metadata(ae, list(Project = "p"))
+  expect_equal(readLines(file.path(ae@basePath, "CITATION.cff"), warn = FALSE), "# mine")
+  expect_true(file.exists(file.path(ae@basePath, "CITATION-generated.cff")))
+})
+
+test_that("opening a corpus writes nothing", {
+  withr::local_options(reindeer.auto_cmdi = NULL)
+  p <- create_isolated_ae_db()
+  corpus(p, verbose = FALSE)
+  expect_false(file.exists(file.path(p, "README.md")))
 })

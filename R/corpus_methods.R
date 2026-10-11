@@ -168,6 +168,26 @@ NULL
   invisible(x)
 }
 
+# One-line health statuses shown by summary(corpus).
+.corpus_health <- function(corp) {
+  schema <- tryCatch({
+    res <- suppressWarnings(suppressMessages(validate_corpus(corp)))
+    bad <- sum(!res$ok)
+    if (bad == 0L) sprintf("%d file(s) valid", nrow(res)) else sprintf("%d of %d file(s) INVALID", bad, nrow(res))
+  }, error = function(e) "not available")
+  fair <- tryCatch({
+    state <- file.path(corp@basePath, ".cmdi_state")
+    if (!file.exists(state)) "not generated yet (written after the first metadata write)"
+    else if (identical(readLines(state, warn = FALSE)[1], .metadata_state_hash(corp))) "up to date"
+    else "out of date (regenerated on the next metadata write, or run describe_corpus())"
+  }, error = function(e) "not available")
+  cache <- tryCatch({
+    dir <- get_quantify_cache_dir(corp)
+    if (!dir.exists(dir)) "empty" else format_bytes(get_file_size(dir, recursive = TRUE))
+  }, error = function(e) "not available")
+  list(schema = schema, fair = fair, cache = cache)
+}
+
 # Summary method for corpus - to be registered with S7
 #' @keywords internal
 .summary_corpus <- function(object, ...) {
@@ -205,6 +225,13 @@ NULL
   cli::cli_text("Annotation item count:  {.val {item_count}}")
   cli::cli_text("Label count:     {.val {label_count}}")
   cli::cli_text("Link count:      {.val {link_count}}")
+  cli::cli_text("")
+
+  # Health: schema validation, FAIR artifacts, cache size
+  h <- .corpus_health(object)
+  cli::cli_text("Schema check:    {h$schema}")
+  cli::cli_text("FAIR artifacts:  {h$fair}")
+  cli::cli_text("Quantify cache:  {h$cache}")
   cli::cli_text("")
   
   # Database configuration

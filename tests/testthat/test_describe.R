@@ -164,3 +164,14 @@ test_that("describe('cff','jsonld') honors force=FALSE on pre-existing files", {
   expect_equal(readLines(file.path(out_dir, "CITATION.cff"))[1],
                "# pre-existing CFF")
 })
+
+test_that("summary(corpus) reports schema, FAIR and cache status", {
+  skip_if_no_emuR()
+  corp <- create_isolated_ae_corpus()
+  add_metadata(corp, list(Project = "p"))
+  out <- paste(cli::ansi_strip(capture.output(summary(corp), type = "message")),
+               capture.output(summary(corp)), collapse = "\n")
+  expect_match(out, "Schema check:\\s+\\d+ file\\(s\\) valid")
+  expect_match(out, "FAIR artifacts:")
+  expect_match(out, "Quantify cache:")
+})

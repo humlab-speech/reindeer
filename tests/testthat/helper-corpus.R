@@ -1,3 +1,6 @@
+# Tests opt in to automatic FAIR regeneration explicitly (it is on by default).
+options(reindeer.auto_cmdi = FALSE)
+
 # Shared test fixtures for reindeer test suite
 # Auto-sourced by testthat before any test file runs.
 

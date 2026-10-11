@@ -177,18 +177,8 @@ corpus <- S7::new_class(
     # and picks up edits made outside R since the corpus was last opened.
     gather_metadata(corpus_obj, verbose = verbose)
 
-    # Auto-regenerate FAIR artifacts when the dirty bit was flipped by an
-    # earlier metadata write. Gated by an option so power users can disable
-    # it; default off in 0.8.x to preserve the previous opt-in behaviour.
-    if (isTRUE(getOption("reindeer.auto_cmdi", FALSE))) {
-      tryCatch(
-        describe_corpus(corpus_obj, verbose = FALSE),
-        error = function(e) {
-          cli::cli_warn("Auto-CMDI regeneration failed: {conditionMessage(e)}",
-                        class = c("reindeer_cmdi_warning", "reindeer_warning"))
-        }
-      )
-    }
+    # FAIR artifacts are regenerated after write verbs only (add_metadata() and
+    # friends), never on open: opening a corpus does not touch the disk.
 
     .register_corpus(corpus_obj)
     corpus_obj

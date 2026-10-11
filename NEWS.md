@@ -15,6 +15,17 @@ parity; SEGMENT times shift by half a sample and quantify caches miss once) and
   `autoplot()` collect a lazy plan first. `.cache_status` is no longer listed
   as a measurement column.
 
+## Automatic bookkeeping
+
+- FAIR artifacts (README, CITATION.cff, datacite, JSON-LD, CMDI) are now
+  regenerated automatically after metadata writes (`options(reindeer.auto_cmdi =
+  FALSE)` opts out), hash-gated and never on open. reindeer keeps a manifest
+  (`.cmdi_owned`) of the files it wrote: those are updated in place, while a
+  hand-written file of the same name is never touched (the generated text goes
+  to `*-generated.*`). The "no author" notice only appears when verbose.
+- `summary(corpus)` shows schema validation, FAIR artifact and quantify cache
+  status. Metadata writes already validate against the JSON schema.
+
 ## New verbs
 
 - `move_to(segs, level)`: direction inferred from the hierarchy (`ascend_to()` /
