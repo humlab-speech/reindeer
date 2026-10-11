@@ -36,3 +36,9 @@ test_that("a single reindeer_error handler catches every reindeer abort", {
   )
   expect_s3_class(cnd, "reindeer_error")
 })
+
+test_that("corpus(sync_eaf=) warns with class reindeer_deprecated", {
+  skip_if_no_emuR()
+  p <- create_isolated_ae_db()
+  expect_warning(corpus(p, sync_eaf = TRUE), class = "reindeer_deprecated")
+})

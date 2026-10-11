@@ -8,8 +8,8 @@ corpus(
   path,
   verbose = FALSE,
   create = FALSE,
-  sync_eaf = FALSE,
-  sync_cmdi = FALSE,
+  sync_eaf = NULL,
+  sync_cmdi = NULL,
   cache_dir = NULL,
   quick = TRUE
 )
@@ -23,9 +23,8 @@ appended automatically if missing), or an existing \code{emuDBhandle}.}
 \item{create}{If \code{TRUE} and the path does not exist, create an empty
 corpus there. Default \code{FALSE}.}
 
-\item{sync_eaf, sync_cmdi}{Keep ELAN \code{.eaf} files / CMDI metadata in
-sync with the corpus on each annotation or metadata change.
-Off by default.}
+\item{sync_eaf, sync_cmdi}{Deprecated and ignored; auto-sync has been
+removed.}
 
 \item{cache_dir}{Override the quantify/enrich cache directory.
 Default \verb{<basePath>/.quantify_cache}.}
@@ -43,7 +42,7 @@ properties you can read from user code (use \code{@}):
 \item \verb{@dbName} - corpus name (the basename minus \verb{_emuDB}).
 \item \verb{@basePath} - path to the \verb{_emuDB} directory.
 \item \verb{@config} - parsed \verb{_DBconfig.json} (level + link definitions).
-\item Internal: \verb{@.uuid}, \verb{@.connection}, \verb{@.cache_dir}, \verb{@.sync} -
+\item Internal: \verb{@.uuid}, \verb{@.connection}, \verb{@.cache_dir} -
 used by the cache machinery; treat as read-only.
 }
 }

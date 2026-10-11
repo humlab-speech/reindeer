@@ -1,3 +1,12 @@
+# reindeer (development)
+
+## Removed
+
+- Auto-sync (`R/reindeer_autosync*.R`, ELAN autosync) was unreachable and is
+  deleted. `corpus(sync_eaf=, sync_cmdi=)` now warn (class
+  `reindeer_deprecated`) and are ignored; the arguments go in a later release.
+- Policy: a removed name is a classed stub for one minor release, then deleted.
+
 # reindeer 2.2.0
 
 ## Breaking changes

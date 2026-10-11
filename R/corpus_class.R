@@ -13,9 +13,8 @@
 #'   appended automatically if missing), or an existing `emuDBhandle`.
 #' @param create If `TRUE` and the path does not exist, create an empty
 #'   corpus there. Default `FALSE`.
-#' @param sync_eaf,sync_cmdi Keep ELAN `.eaf` files / CMDI metadata in
-#'   sync with the corpus on each annotation or metadata change.
-#'   Off by default.
+#' @param sync_eaf,sync_cmdi Deprecated and ignored; auto-sync has been
+#'   removed.
 #' @param verbose Print progress while loading. Default `FALSE`.
 #' @param quick Reuse the existing cache when present (default `TRUE`).
 #'   Set `FALSE` to force a full cache + metadata rebuild on open, for
@@ -29,7 +28,7 @@
 #'   * `@dbName` - corpus name (the basename minus `_emuDB`).
 #'   * `@basePath` - path to the `_emuDB` directory.
 #'   * `@config` - parsed `_DBconfig.json` (level + link definitions).
-#'   * Internal: `@.uuid`, `@.connection`, `@.cache_dir`, `@.sync` - 
+#'   * Internal: `@.uuid`, `@.connection`, `@.cache_dir` -
 #'     used by the cache machinery; treat as read-only.
 #' @section Bracket access:
 #' Once you have a corpus, you can read and write metadata by name:
@@ -56,11 +55,10 @@ corpus <- S7::new_class(
     config = S7::class_any,
     .uuid = S7::class_character,
     .connection = S7::class_any,
-    .cache_dir = S7::class_character,
-    .sync = S7::class_any
+    .cache_dir = S7::class_character
   ),
   constructor = function(path, verbose = FALSE, create = FALSE,
-                         sync_eaf = FALSE, sync_cmdi = FALSE,
+                         sync_eaf = NULL, sync_cmdi = NULL,
                          cache_dir = NULL, quick = TRUE) {
     # Input validation with assertthat
     assertthat::assert_that(
@@ -150,17 +148,11 @@ corpus <- S7::new_class(
     # Resolve cache directory
     resolved_cache_dir <- cache_dir %||% file.path(basePath, ".quantify_cache")
 
-    # Handle sync configuration
-    if (sync_eaf || sync_cmdi) {
-      existing_sync <- load_sync_config_from_path(basePath)
-      sync_config <- .init_sync_config(basePath, sync_eaf, sync_cmdi,
-                                        existing = existing_sync)
-    } else {
-      sync_config <- load_sync_config_from_path(basePath)
-    }
-
-    if (!is.null(sync_config) && sync_config$enabled && verbose) {
-      cli::cli_alert_info("Auto-sync is enabled for this database")
+    if (!is.null(sync_eaf) || !is.null(sync_cmdi)) {
+      cli::cli_warn(
+        "{.arg sync_eaf}/{.arg sync_cmdi} are ignored: auto-sync has been removed and had no effect.",
+        class = "reindeer_deprecated"
+      )
     }
 
     # Create corpus object
@@ -171,8 +163,7 @@ corpus <- S7::new_class(
       config = config,
       .uuid = config$UUID,
       .connection = new.env(parent = emptyenv()),
-      .cache_dir = resolved_cache_dir,
-      .sync = sync_config
+      .cache_dir = resolved_cache_dir
     )
 
     # Add "corpus" as FIRST class for S3 method dispatch priority
