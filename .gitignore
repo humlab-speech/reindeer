@@ -53,3 +53,14 @@ benchmarking/*.txt
 
 # pkgdown site — built by CI, never commit
 docs/
+
+# Local artefacts
+*.tar.gz
+/*.Rcheck/
+/docs/
+/doc/
+/Meta/
+Rplots.pdf
+bench.log
+.RData
+.Rhistory

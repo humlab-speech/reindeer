@@ -4,14 +4,11 @@
 \alias{demo_corpus}
 \title{Load a small bundled demo corpus}
 \usage{
-demo_corpus(verbose = FALSE, format = c("wav", "flac"))
+demo_corpus(verbose = FALSE)
 }
 \arguments{
 \item{verbose}{Logical; if \code{TRUE}, pass progress messages from
 \code{\link[=corpus]{corpus()}} through. Default \code{FALSE}.}
-
-\item{format}{One of \code{"wav"} (default) or \code{"flac"}. Selects which
-bundled archive to unpack.}
 }
 \value{
 A \code{\link[=corpus]{corpus()}} object pointing at a freshly unpacked copy of
@@ -22,8 +19,7 @@ temp directory rather than re-unpacking.
 Returns a ready-to-use \code{\link[=corpus]{corpus()}} object loaded from the \code{ae} demo
 speech database that ships inside the package. Intended for examples
 and quick experiments - no separate download, no \code{emuR} install
-required. Two flavours of the same data are available:
-WAV-backed (default) and FLAC-backed.
+required.#'
 }
 \examples{
 corp <- demo_corpus()

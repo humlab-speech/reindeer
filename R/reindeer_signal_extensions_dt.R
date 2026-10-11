@@ -33,11 +33,12 @@ dspp_metadataParameters_dt <- function(recompute=FALSE,
       "i" = "Install it with: {.code install.packages('openxlsx')}"
     ))
   }
-  defaults <- openxlsx::read.xlsx(
-    file.path(system.file(package = "reindeer", mustWork = TRUE),
-              "default_parameters.xlsx"),
-    sep.names = " "
-  )
+  # Source-tree only: run from the package root (the file is not installed).
+  defaults_file <- file.path("data-raw", "default_parameters.xlsx")
+  if (!file.exists(defaults_file)) {
+    cli::cli_abort("{.path {defaults_file}} not found; run from the package source root.")
+  }
+  defaults <- openxlsx::read.xlsx(defaults_file, sep.names = " ")
 
   # Convert to data.table for efficient operations
   defaults <- data.table::as.data.table(defaults)

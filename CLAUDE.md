@@ -45,7 +45,6 @@ Rscript -e "devtools::document()"
 ```bash
 # Run benchmarks from benchmarking/ directory
 Rscript benchmarking/benchmark_dspp.R
-Rscript benchmarking/benchmark_serialization.R
 ```
 
 ### Building Vignettes
@@ -70,7 +69,7 @@ The package uses S7 object system for type safety and performance:
   - Automatically builds/updates SQLite cache on creation
   - Supports bracket notation for metadata access: `corpus["Session","Bundle"]`
 
-- **`segment_list`** (`R/reindeer_segment_list.R`): Query results containing time-aligned segments
+- **`segment_list`** (`R/segment_list_classes.R`): Query results containing time-aligned segments
   - Subclass of tibble with required columns: session, bundle, start, end, label
   - Created by `query()` and `query()` functions
 
@@ -100,7 +99,7 @@ extended_segment_list with tracks/metadata
 
 ### Metadata System
 
-Three-level hierarchy with proper inheritance (R/reindeeR_metadata_optimized.R):
+Three-level hierarchy with proper inheritance (R/metadata_core.R):
 
 1. **Database level**: Defaults for all bundles (stored in `<dbname>_DBconfig.json`)
 2. **Session level**: Overrides for session (stored in `<session>_ses/METADATA.json`)
@@ -156,14 +155,6 @@ query(corp, "Phonetic == t") -> segments
 - Cache invalidation based on signal file modification time + processing parameters
 - Uses digest/hash to identify unique parameter combinations
 
-### C++ Components
-
-Two C++ files in `src/`:
-- `corpus_config_helpers.cpp`: Fast database configuration operations
-- `RcppExports.cpp`: Auto-generated Rcpp bindings
-
-Functions are called from `R/RcppExports.R` and used in corpus configuration utilities.
-
 ### Interactive Annotation System
 
 `R/reindeer_serve.R` implements the Artic session engine (`.artic_session()`);
@@ -216,7 +207,7 @@ See NEWS.md (deprecation ledger) for complete list of files marked for deletion.
 
 ### 3. Lazy Evaluation (Future)
 
-`R/reindeer_lazy_segment_list.R` implements lazy evaluation for query chains but is not yet integrated into main workflow. This is a planned optimization.
+`query()` is lazy by default: it returns a `lazy_segment_list` (`R/reindeer_lazy_segment_list.R`) that `collect()` executes. `query(..., lazy = FALSE)` returns a `segment_list` directly.
 
 ### 4. Simulation System (MOVED TO erodex)
 
@@ -266,44 +257,7 @@ See protoscribe documentation for details on:
 
 ### 6. Cache Size Management
 
-`R/cache_size_management.R` provides unified monitoring and cleanup across all cache systems:
-
-**Size Monitoring**:
-- `check_quantify_cache_size(corpus)`: Check quantify/enrich cache
-- `check_simulation_cache_size(simulation_store)`: Check simulation cache
-- `check_all_cache_sizes(corpus)`: Check all caches with total
-
-**Automatic Warnings**: Integrated into cache connection code
-- Warning threshold: 500 MB for quantify, 1 GB for simulation
-- Maximum threshold: 2 GB for quantify, 5 GB for simulation
-- Warnings appear when opening/accessing caches
-
-**Cache Cleanup**:
-- `clean_quantify_cache(corpus, days_old = 30)`: Remove old quantify files
-- `clean_simulation_cache(simulation_store, days_old = 30)`: Remove old simulation files
-- `clean_all_caches(corpus, days_old = 30, dry_run = TRUE)`: Clean all caches
-
-**Cache Inspection**:
-- `list_cache_files(corpus, cache_type = "all")`: List files with sizes
-- Sorted by size (largest first)
-
-**Example**:
-```r
-# Check all cache sizes
-check_all_cache_sizes(corp)
-## ✓ Quantify/enrich cache: 234.56 MB
-## ℹ Total cache size: 234.56 MB
-
-# Preview cleanup (dry run)
-clean_all_caches(corp, days_old = 30, dry_run = TRUE)
-## ℹ Would delete 17 files (1.12 GB)
-
-# Actually clean
-clean_all_caches(corp, days_old = 30)
-## ✓ Deleted 17 files total
-```
-
-See `R/cache_size_management.R` for the full implementation.
+`R/cache_size_management.R` holds the internal size checks and cleanup (not exported). User-facing cache verbs: `manage_cache()`, `inspect_cache()`. Warning thresholds: 500 MB quantify / 1 GB simulation.
 
 ## Testing
 
@@ -353,11 +307,10 @@ Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_cache
 1. **SQLite caching**: Metadata, query results, signal processing cache
 2. **data.table**: Used for large data operations (3-5x speedup vs dplyr)
 3. **Persistent cache**: Avoid recomputing identical signal processing operations
-4. **Lazy evaluation**: Prepared but not yet fully integrated
+4. **Lazy evaluation**: `query()` is lazy by default
 
 ### Known Optimization Opportunities
 1. **Cache serialization**: Switch from `serialize()` to `qs` package (3-4x faster)
-2. **Lazy segment_list**: Integrate `lazy_segment_list` into `query()` workflow
 3. **Parallel processing**: `transcribe_parallel()` exists but not widely used
 
 ## Common Development Tasks
@@ -369,36 +322,9 @@ Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_cache
 3. Add track to corpus: Store SSFF files in bundle directories
 4. Access in queries: `quantify(segments, corp, tracks = "newtrack")`
 
-### Adding metadata fields
+### Metadata and cache debugging
 
-```r
-# Set database-wide default
-add_metadata(corp, list(Project = "MyStudy"))
-
-# Set session-level
-add_metadata(corp, list(Speaker = "P01"), session = "Session1")
-
-# Set bundle-level
-add_metadata(corp, list(Quality = "Good"), session = "Session1", bundle = "Bundle1")
-
-# Always call gather_metadata() after manual METADATA.json edits
-gather_metadata(corp)
-```
-
-### Debugging cache issues
-
-```r
-# Rebuild metadata cache
-gather_metadata(corp, verbose = TRUE)
-
-# Check cache contents
-con <- get_connection(corp)
-DBI::dbGetQuery(con, "SELECT * FROM metadata_fields")
-DBI::dbDisconnect(con)
-
-# Clear all caches
-clear_all_caches(corp)  # if defined in corpus_config.R
-```
+Metadata lives in `METADATA.json` files (ground truth); the SQLite cache is rebuilt from them. See `R/metadata_core.R` and `R/metadata_import_export.R`; do not rely on internal helpers such as `get_connection()` from user-facing guidance.
 
 ### Running specific benchmarks
 
@@ -406,16 +332,13 @@ clear_all_caches(corp)  # if defined in corpus_config.R
 # Compare implementations
 Rscript benchmarking/benchmark_dspp.R
 
-# Test serialization methods
-Rscript benchmarking/benchmark_serialization.R
 ```
 
 ## Documentation Files
 
 Root-level markdown docs, current as of this file:
 - **NEWS.md**: Changelog and deprecation ledger (files/functions marked for deletion or moved to companion packages)
-- **CMDI_VALIDATION.md**: CMDI profile validation notes
-- **VIGNETTES_SUMMARY.md**: Overview of the vignette set
+- **dev/**: assessments, plans, specs, `CMDI_VALIDATION.md`, `NEWS-archive.md`
 - **README.md**: Package overview
 
 Implementation notes referenced by earlier versions of this file
