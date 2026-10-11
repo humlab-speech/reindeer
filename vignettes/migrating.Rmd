@@ -1,0 +1,52 @@
+---
+title: "Migrating to reindeer"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Migrating to reindeer}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## From emuR
+
+reindeer reads and writes the same `_emuDB` directories, so existing corpora
+open unchanged. Only the verbs differ.
+
+| emuR | reindeer |
+|---|---|
+| `load_emuDB()` | `corpus()` |
+| `query()` | `query()` then `collect()` (lazy by default) |
+| `requery_seq()` | `scout()` |
+| `requery_hier()` | `move_to()` |
+| `get_trackdata()` | `quantify()` |
+| `list_bundles()`, `list_sessions()` | `get_metadata(corp)` (one row per bundle) |
+| `import_mediaFiles()` | `import_media()` |
+| `serve()` | `annotate()` (opens Artic) |
+| `export_TextGridCollection()`, `convert_TextGridCollection()` | `write_annotations()`, `read_annotations()` |
+
+Query results are tibbles with a `segment_list` class, so dplyr verbs work and
+record which rows each step dropped (`provenance()`). Measurements adapt to the
+speaker's `Age` and `Gender` metadata (`vignette("speaker_aware")`).
+
+## From reindeer 2.x
+
+This section is generated from `NEWS.md`, so it cannot drift from the release
+notes.
+
+```{r removed, echo = FALSE, results = "asis"}
+news <- c(system.file("NEWS.md", package = "reindeer"), "../NEWS.md", "NEWS.md")
+news <- news[nzchar(news) & file.exists(news)][1]
+x <- readLines(news, warn = FALSE)
+start <- grep("^## Removed in 3\\.0\\.0", x)
+if (length(start)) {
+  end <- grep("^#{1,2} ", x)
+  end <- min(end[end > start], length(x) + 1L)
+  cat(x[(start + 1L):(end - 1L)], sep = "\n")
+} else {
+  cat("See `NEWS.md` for the list of removed names.\n")
+}
+```

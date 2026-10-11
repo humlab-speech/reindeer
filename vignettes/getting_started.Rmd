@@ -72,11 +72,29 @@ formants |>
   ggplot2::labs(x = "F2 (Hz)", y = "F1 (Hz)", title = "Vowel midpoints in the demo corpus")
 ```
 
+## Speed, caching and parallelism
+
+- Everything runs sequentially unless you ask otherwise: set
+  `future::plan(future::multisession)` before `quantify()` and it uses the
+  workers; reindeer never changes your plan.
+- A corpus is indexed once (`corpus()` on 700 bundles takes a few seconds) and
+  re-synced incrementally afterwards, so reopening is about a tenth of a second.
+- `quantify()` analyses each bundle's whole file once, slices every segment from
+  that, and caches the result per bundle. Repeating a call on the same signals
+  takes a fraction of a second; changing the routine, its parameters, a helper
+  function it uses, or the audio file invalidates the entry. `clear_cache()`
+  empties it.
+- Order of magnitude on a laptop: a query takes milliseconds, a cold
+  `quantify()` of 250 segments about half a second, `scout()` over 25,000
+  segments under a second. The repository's `benchmarking/` directory has the
+  measured tables and `tools/bench.R` regenerates them.
+
 ## Where next
 
 - `vignette("querying")` for the query language and moving around the
   annotation hierarchy.
 - `vignette("speaker_aware")` for measurements that adapt to each speaker.
+- `vignette("migrating")` if you come from emuR or reindeer 2.x.
 - `vignette("metadata")`, `vignette("building_a_corpus")`,
   `vignette("archiving")`, `vignette("interoperability")` and
   `vignette("annotating")` for the rest of the workflow.

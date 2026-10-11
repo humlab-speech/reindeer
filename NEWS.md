@@ -7,6 +7,7 @@
 - Fixed: `annotate()` viewer check evaluated `rstudioapi::isAvailable()` even
   when rstudioapi is not installed; `1:nrow()` loops in CMDI generation now use
   `seq_len()`.
+- New article `vignette("migrating")` (emuR and 2.x name maps; the 3.0 half is generated from this file), a speed/caching section in `vignette("getting_started")`, `check_pkgdown()` in the site workflow and an Ecosystem navbar menu.
 - Added `.lintr` and a lint workflow; the coverage workflow fails below 69 %
   (baseline 71.2 %). Property test for metadata precedence.
 - Opening a large corpus is about 35 % cheaper in CPU (700 bundles: 3.3 s to 2.2 s): annotation files are parsed into plain lists instead of one data.table per level (`benchmarking/RESULTS_3.1.0.md`).

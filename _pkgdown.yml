@@ -35,12 +35,23 @@ authors:
 navbar:
   structure:
     left: [home, reference, articles, news]
-    right: [search, github]
+    right: [ecosystem, search, github]
   components:
     home:
       icon: fas fa-home
       href: index.html
       aria-label: Home
+    ecosystem:
+      text: Ecosystem
+      menu:
+        - text: protoscribe (draft annotations)
+          href: https://github.com/humlab-speech/protoscribe
+        - text: erodex (parameter simulation)
+          href: https://github.com/humlab-speech/erodex
+        - text: superassp (signal processing)
+          href: https://github.com/humlab-speech/superassp
+        - text: emuR
+          href: https://ips-lmu.github.io/emuR/
     news:
       text: News
       href: news/index.html
@@ -144,3 +155,6 @@ articles:
       - annotating
       - interoperability
       - archiving
+  - title: "Coming from elsewhere"
+    contents:
+      - migrating

@@ -209,8 +209,8 @@ Remotes NOTE.
 
 | WP | State |
 |---|---|
-| F0.1–F0.2 | open |
-| F1.1–F1.3 | open |
-| F2.1–F2.5 | open (each conditional on its F0.1 number) |
-| F3.1–F3.6 | open |
-| F4.1–F4.3 | open |
+| F0.1-F0.2 | done (`tools/bench.R`, `BASELINE_3.0.0.md`, stale scripts removed) |
+| F1.1-F1.3 | done (3.0.1: flat Age/Gender schema, draft-04, jsonvalidate Import; cache key; `WHOLE_FILE_FIDELITY.md`) |
+| F2.1-F2.5 | done (`benchmarking/RESULTS_3.1.0.md`; F2.1 parse -35 % CPU, F2.2-F2.4 measured and closed, F2.5 test) |
+| F3.1-F3.6 | done (coverage floor 69 %, `.lintr` + workflow, `tools/fuzz-eql.R` found and fixed a `Num()` bug, precedence property test, dead-code sweep small, `CRAN_DECISION.md`) |
+| F4.1-F4.3 | done (`migrating` vignette, getting_started speed section, `check_pkgdown()` in CI, ecosystem menu) |
