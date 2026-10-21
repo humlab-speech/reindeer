@@ -51,7 +51,9 @@ already-registered track doesn't go through the DSP result cache.
 \item{\code{dsp_function}}{A DSP function. Common choices:
 \code{superassp::trk_formant_forest} (formants), \code{superassp::trk_pitch_ksv}
 (pitch), \code{superassp::trk_rms} (intensity), \code{superassp::trk_dft_spectrum}.}
-\item{\code{.at}}{Relative time points to sample, each in \verb{[0, 1]}. A scalar
+\item{\code{.at}}{Relative time points to sample, each in \verb{[0, 1]}. Each
+selects the frame nearest to \code{start + .at * (end - start)} (emuR's
+\code{get_trackdata(cut =)}; no interpolation). A scalar
 gives one row per segment (e.g. \code{0.5} for midpoint); a vector
 multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}). Required (no default) when
 \code{dsp_function} is a character vector of registered track names -

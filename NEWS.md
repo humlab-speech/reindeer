@@ -1,3 +1,12 @@
+# reindeer 3.1.1
+
+- Fixed: `quantify(.at =)` took frame `round(.at * n_frames)` of the segment
+  instead of the frame nearest to `start + .at * (end - start)`. About half of
+  all midpoint values change (on `ae`, 122 of 253 midpoints moved by one
+  5 ms frame; F1 up to 1.1 kHz). Values now equal `emuR::get_trackdata(cut =)`
+  exactly; a parity test against emuR's output guards this
+  (`tests/testthat/test_dsp_parity.R`).
+
 # reindeer 3.1.0
 
 - Fixed: `Num(parent, child)` counted link paths instead of distinct children,

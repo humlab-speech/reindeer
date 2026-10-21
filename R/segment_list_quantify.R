@@ -21,7 +21,9 @@ NULL
 #'   \item{`dsp_function`}{A DSP function. Common choices:
 #'     `superassp::trk_formant_forest` (formants), `superassp::trk_pitch_ksv`
 #'     (pitch), `superassp::trk_rms` (intensity), `superassp::trk_dft_spectrum`.}
-#'   \item{`.at`}{Relative time points to sample, each in `[0, 1]`. A scalar
+#'   \item{`.at`}{Relative time points to sample, each in `[0, 1]`. Each
+#'     selects the frame nearest to `start + .at * (end - start)` (emuR's
+#'     `get_trackdata(cut =)`; no interpolation). A scalar
 #'     gives one row per segment (e.g. `0.5` for midpoint); a vector
 #'     multiplies rows (e.g. `c(0.2, 0.5, 0.8)`). Required (no default) when
 #'     `dsp_function` is a character vector of registered track names -

@@ -38,7 +38,6 @@ fm_track_mode <- function(corp, .at) {
 }
 
 test_that("function mode .at matches get_trackdata(cut =)", {
-  skip("G0.2: .at picks round(.at * n_frames), not the frame nearest the cut")
   skip_if_no_emuR(); skip_if_no_superassp()
   corp <- create_shared_ae_corpus()
   g <- trackdata_golden()

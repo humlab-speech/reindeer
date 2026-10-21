@@ -232,20 +232,29 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 
 #' Turn one DSP return value into a data frame, applying `.at`
 #'
-#' `.at` (fractions of the segment) selects the NEAREST frame of a track; no
-#' interpolation. It only makes sense for track outputs, so asking for it on a
-#' routine that returns a plain list or vector aborts instead of being ignored.
+#' `.at` (fractions of the segment) selects, per cut time
+#' `start + .at * (end - start)`, the frame nearest in time, ties to the
+#' earlier frame: emuR's `get_trackdata(cut =)` rule. No interpolation. It only
+#' makes sense for track outputs, so asking for it on a routine that returns a
+#' plain list or vector aborts instead of being ignored.
 #' @noRd
-.dsp_result_to_df <- function(result, .at = NULL) {
+.dsp_result_to_df <- function(result, .at = NULL, start_ms = NULL, end_ms = NULL) {
   if (inherits(result, "AsspDataObj") || inherits(result, "reindeer_track_slice")) {
     track_data <- if (inherits(result, "AsspDataObj")) as.data.frame(result) else {
       class(result) <- "data.frame"
       result
     }
     if (!is.null(.at)) {
-      n_frames <- nrow(track_data)
-      frame_indices <- pmax(1, pmin(n_frames, round(.at * n_frames)))
-      track_data <- track_data[frame_indices, , drop = FALSE]
+      # Rounding puts s -> ms float noise back on emuR's ms grid, so exact
+      # ties (cut midway between two frames) resolve as in emuR.
+      tm <- round(suppressWarnings(as.numeric(track_data[["frame_time"]])) * 1000, 9)
+      if (length(tm) == 0L || anyNA(tm)) {
+        cli::cli_abort("{.arg .at} needs frame times, but the track has no {.field frame_time} column.",
+                       class = c("reindeer_quantify_error", "reindeer_error"))
+      }
+      cut_ms <- start_ms + .at * (end_ms - start_ms)
+      idx <- vapply(cut_ms, function(t) which.min(abs(tm - t)), integer(1))
+      track_data <- track_data[idx, , drop = FALSE]
       track_data$.time_point <- .at
     }
     return(track_data)
@@ -667,7 +676,10 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   dt_valid[, .cache_status := status]
 
   # ---- assemble: one rbindlist for all results -------------------------------
-  frames <- lapply(results, function(r) if (is.null(r)) NULL else .dsp_result_to_df(r, .at))
+  frames <- lapply(seq_along(results), function(i) {
+    if (is.null(results[[i]])) NULL
+    else .dsp_result_to_df(results[[i]], .at, dt_valid$start[i], dt_valid$end[i])
+  })
   have <- which(!vapply(frames, is.null, logical(1)))
   if (length(have) == 0L) return(list())
   nrows <- vapply(frames[have], nrow, integer(1))
