@@ -1,419 +1,80 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+reindeer is an R package for emuR databases (`*_emuDB`): query them with EQL,
+measure them with superassp, and keep speaker metadata alongside. emuR is
+**test-only** (parity goldens); at runtime reindeer reads `_DBconfig.json`,
+`_annot.json` and `_emuDBcache.sqlite` itself.
 
-## Package Overview
+Active plan: `dev/REINDEER_WAY_FORWARD_3.2.md`; its status table (§7) says
+what is open. Older `dev/` plans are history, not instructions.
 
-**reindeer** is an R package that extends [emuR](https://github.com/IPS-LMU/emuR) for working with speech data in a nordic climate. It provides optimized workflows for:
-
-- Metadata management with SQLite caching
-- Speech signal processing with age/gender-appropriate parameters
-- Query optimization using direct SQLite access
-- Track data quantification and enrichment
-- Interactive annotation via Artic (`annotate()`/`review()`)
-
-The package uses modern S7 classes and data.table for performance, with extensive caching to handle computationally intensive operations on large speech corpora.
-
-**For draft annotation generation** (MOMEL/INTSINT, periods, VOT, VAD, etc.), use the companion package **[protoscribe](https://github.com/humlab-speech/protoscribe)**. As of v0.3.0, all annotation draft functionality has been moved to protoscribe.
-
-## Development Commands
-
-### Building and Testing
+## Commands
 
 ```bash
-# Install package with dependencies
-Rscript -e "devtools::install(dependencies = TRUE)"
-
-# Load for development
-Rscript -e "devtools::load_all()"
-
-# Run all tests
-Rscript -e "devtools::test()"
-
-# Run specific test file
-Rscript -e "testthat::test_file('tests/testthat/test_query_optimized.R')"
-
-# Check package (R CMD check)
-Rscript -e "devtools::check()"
-
-# Build documentation
-Rscript -e "devtools::document()"
+Rscript -e 'devtools::test()'                                  # full suite (~2 min)
+Rscript -e 'devtools::load_all(); testthat::test_file("tests/testthat/test_eql_parity.R")'
+Rscript -e 'devtools::document()'
+Rscript -e 'devtools::check(args = "--as-cran")'               # must stay 0/0/0
+Rscript -e 'lintr::lint_package()'                             # config in .lintr
+Rscript tools/make-eql-golden.R                                # regenerate EQL goldens (needs emuR)
 ```
 
-### Benchmarking
-
-```bash
-# Run benchmarks from benchmarking/ directory
-Rscript benchmarking/benchmark_dspp.R
-```
-
-### Building Vignettes
-
-```bash
-# Render a specific vignette
-Rscript -e 'rmarkdown::render("vignettes/getting_started.Rmd")'
-
-# Build all vignettes
-Rscript -e "devtools::build_vignettes()"
-```
-
-## Architecture Overview
-
-### Core S7 Classes
-
-The package uses S7 object system for type safety and performance:
-
-- **`corpus`** (`R/reindeer-corpus.R`): Main class representing an Emu database with persistent SQLite connection
-  - Properties: `dbName`, `basePath`, `config`, `.uuid`, `.connection`
-  - Constructor handles both paths and emuDBhandle objects
-  - Automatically builds/updates SQLite cache on creation
-  - Supports bracket notation for metadata access: `corpus["Session","Bundle"]`
-
-- **`segment_list`** (`R/segment_list_classes.R`): Query results containing time-aligned segments
-  - Subclass of tibble with required columns: session, bundle, start, end, label
-  - Created by `query()` and `query()` functions
-
-- **`extended_segment_list`**: segment_list enriched with metadata and/or signal tracks
-
-- **`lazy_segment_list`** (`R/reindeer_lazy_segment_list.R`): Delayed evaluation wrapper
-  - Not yet fully integrated into main workflow
-  - Future optimization for query chains
-
-### Data Flow Architecture
-
-```
-User Query (EQL)
-    ↓
-query() [R/R/query_executor.R]
-    ↓
-SQLite Cache (_emuDBcache.sqlite) ← built by build_emuDB_cache()
-    ↓
-segment_list (S7 object)
-    ↓
-quantify() / enrich() [R/reindeer_signal_extensions_dt.R]
-    ↓
-Signal Processing + Persistent Cache
-    ↓
-extended_segment_list with tracks/metadata
-```
-
-### Metadata System
-
-Three-level hierarchy with proper inheritance (R/metadata_core.R):
-
-1. **Database level**: Defaults for all bundles (stored in `<dbname>_DBconfig.json`)
-2. **Session level**: Overrides for session (stored in `<session>_ses/METADATA.json`)
-3. **Bundle level**: Bundle-specific values (stored in `<bundle>_bndl/METADATA.json`)
-
-**Filename note (as of v0.5.0):** all three levels use the same filename
-`METADATA.json`. The `metadata.filename` constant in `R/metadata_core.R:12`
-is the single source of truth. Older docs / comments referring to
-`.meta_json` are stale.
-
-Key functions:
-- `gather_metadata(corpus)`: Scan METADATA.json files and populate SQLite cache
-- `get_metadata(corpus)`: Retrieve with inheritance resolved
-- `add_metadata(corpus, list(...), session, bundle)`: Set metadata programmatically
-- `export_metadata(corpus, "file.xlsx")` / `import_metadata(corpus, "file.xlsx")`: Batch editing
-- `biographize(segments, corpus)`: Enrich query results with metadata
-
-**Ground truth**: Always the `METADATA.json` files. SQLite cache is for performance only.
-
-### Query System
-
-Two implementations:
-1. **Standard emuR**: Via `emuR::query()` (slower, more compatible)
-2. **Optimized**: Via `query()` - direct SQLite queries (`R/R/query_executor.R`)
-
-The optimized system:
-- Parses EQL (EMU Query Language) directly
-- Queries `_emuDBcache.sqlite` without emuR overhead
-- Supports: ==, !=, =~, !~, sequences [A -> B], dominance [A ^ B], projection #Level
-- Returns segment_list objects
-
-Example:
-```r
-corpus("path/to/db_emuDB") -> corp
-query(corp, "Phonetic == t") -> segments
-```
-
-### Signal Processing & Caching
-
-**Age/Gender-Specific Parameters** (`R/reindeer_signal_extensions_dt.R`):
-- `dspp_metadataParameters_dt()`: Returns processing params based on Age/Gender
-- Uses LOESS smoothing over empirical defaults from literature
-- Optimized with data.table (3-4x faster than original dplyr version)
-
-**Track Quantification**:
-- `quantify(segments, corpus, tracks, ...)`: Extract signal measurements
-- Uses persistent cache in SQLite to avoid recomputation
-- Cache serialization currently uses base R `serialize()`
-- **Optimization available**: qs package provides 3-4x speedup
-
-**Cache Management** (`R/tidy_trackdata_helpers.R`):
-- `.set_persistent_cache()` / `.get_persistent_cache()`: Internal cache functions
-- Cache invalidation based on signal file modification time + processing parameters
-- Uses digest/hash to identify unique parameter combinations
-
-### Interactive Annotation System
-
-`R/reindeer_serve.R` implements the Artic session engine (`.artic_session()`);
-`R/reindeer_annotate.R` exposes the verbs:
-
-- **`annotate(corpus, ...)`**: open the corpus in Artic in editing mode.
-- **`review(corpus, seglist, ...)`**: open a segment list as a playlist of
-  time anchors (query result, `extended_segment_list`, or data.frame).
-- HTTP server on port 17890 (configurable); WebSocket protocol v0.0.2.
-- Artic dist resolution and provisioning live in `R/artic_dist.R`
-  (`find_artic()`, `install_artic()`, `artic_info()`); the pinned build is
-  vendored under `inst/artic/dist` by `tools/sync-artic-dist.R`.
-- Overlays (`R/artic_playlist.R`) enable editing and saveBundle in memory;
-  `_DBconfig.json` is never written on serve.
-
-**Usage**:
-```r
-corp <- corpus("path/to/db_emuDB")
-annotate(corp)                                  # edit the corpus
-review(corp, query(corp, "Phonetic == t"))      # playlist review
-# Make annotations, then close or call httpuv::stopAllServers()
-```
-
-**Key features**:
-- Filter bundles: `annotate(corp, sessionPattern = "Session.*", bundlePattern = "msajc.*")`
-- Playlist review: `review(corp, seglist = query(corp, "Phonetic == t"))`
-- Track overlays: `review(corp, quantify(segs, dsp_function = superassp::forest))`
-- Custom port: `annotate(corp, port = 8080)`
-- Debug mode: `annotate(corp, debug = TRUE, debugLevel = 2)`
-- Old names `serve()`/`serve_app()` are hard stubs pointing here.
-
-## Key Design Patterns
-
-### 1. Ground Truth vs Cache
-
-- **Ground truth**: JSON files (`METADATA.json`, `_DBconfig.json`, `_annot.json`)
-- **Cache**: SQLite database (`_emuDBcache.sqlite`)
-- Always trust JSON files; rebuild cache when in doubt: `gather_metadata(corpus)`
-
-### 2. Optimized vs Legacy
-
-Many functions have optimized versions:
-- `reindeeR_metadata_optimized.R` vs `reindeeR_metadata.R` (deprecated)
-- `R/query_executor.R` (`query`) vs `emuR::query()`
-- `reindeer_signal_extensions_dt.R` (data.table; the old dplyr
-  `reindeeR_signalextensions.R` was removed)
-- `reindeer_transcription_system_optimized.R` vs `reindeer_transcription_system.R` (deprecated)
-
-See NEWS.md (deprecation ledger) for complete list of files marked for deletion.
-
-### 3. Lazy Evaluation (Future)
-
-`query()` is lazy by default: it returns a `lazy_segment_list` (`R/reindeer_lazy_segment_list.R`) that `collect()` executes. `query(..., lazy = FALSE)` returns a `segment_list` directly.
-
-### 4. Simulation System (MOVED TO erodex)
-
-**As of v0.7.0**, all parameter-grid simulation functionality moved to
-the companion **[erodex](../erodex/)** package.
-The reindeer core no longer ships `quantify_simulate`, `enrich_simulate`,
-`reminisce`, `reminisce_tracks`, or `list_simulations`.
-
-```r
-library(erodex)
-library(reindeer)
-
-corp <- corpus("path/to/db")
-segments <- query(corp, "Phonetic == t")
-erodex::quantify_simulate(
-  segments, .using = superassp::forest,
-  .simulate = list(nominalF1 = seq(500, 900, 100)),
-  .simulation_store = "simulations/formants"
-)
-```
-
-See the erodex README for usage details.
-
-### 5. Draft Annotation System (MOVED TO PROTOSCRIBE)
-
-**As of v0.3.0**, all draft annotation functionality has been moved to the **[protoscribe](https://github.com/humlab-speech/protoscribe)** package.
-
-For draft annotation generation (periods, VOT, VAD, creak, etc.), use:
-
-```r
-library(protoscribe)
-library(reindeer)
-
-# Get audio file paths from corpus
-corp <- corpus("path/to/db")
-# ... use protoscribe draft functions
-suggestions <- protoscribe::draft_vad(corpus = corp)
-protoscribe::assess(suggestions)
-protoscribe::transcribe(suggestions)
-```
-
-See protoscribe documentation for details on:
-- Draft cache system
-- Suggestion classes (EventSuggestion, SegmentSuggestion, ItemSuggestion)
-- Workflow functions (assess, prepare, transcribe, reverse)
-- All draft_*() annotation functions
-
-### 6. Cache Size Management
-
-`R/cache_size_management.R` holds the internal size checks and cleanup (not exported). User-facing cache verbs: `manage_cache()`, `inspect_cache()`. Warning thresholds: 500 MB quantify / 1 GB simulation.
-
-## Testing
-
-Test files in `tests/testthat/`:
-- `test_query_optimized.R`: Query system tests (EQL parity vs emuR)
-- `test_lazy_segment_list.R`: Lazy evaluation + auto-collect
-- `test_lazy_quantify.R`: Lazy quantify pipeline
-- `test_metadata_optimized.R`: Metadata system tests
-- `test_quantify_segment_list.R`: Signal quantification tests
-- `test_cache_size_management.R`: Cache size monitoring tests
-- `test_provenance.R`: Pipe-loss provenance accounting
-- `test_provenance_joins.R`: Named provenance for dplyr joins (v0.7)
-- `test_provenance_serialization.R`: saveRDS / qs round-trip (v0.7)
-- `test_classed_conditions.R`: reindeer_*_error class hierarchy (v0.7)
-- `test_auto_cmdi.R`: Auto-regeneration of FAIR artifacts (v0.7)
-- `test_reindeeR-metadata.R`: Legacy metadata tests
-
-Tests use the `ae` demo database from emuR package.
-Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test_cache_size_management.R')"
-```
-
-## Important Conventions
-
-### Function Naming
-- `query()`: Query the database (returns segment_list)
-- `quantify()`: Extract measurements from signal tracks
-- `enrich()`: Add signal data to segments
-- `biographize()`: Add metadata to segments
-- `gather_*()`: Collect data from JSON files into cache
-- `get_*()`: Retrieve data (usually from cache)
-- `add_*()`: Set/update data (writes to JSON + updates cache)
-
-### File Naming
-- `reindeeR_*.R`: Core reindeer functionality
-- `reindeer_*.R`: Extended/specialized functionality
-- `*_optimized.R`: Performance-optimized implementations
-- `*_dt.R`: data.table-based implementations
-- `emuR_*.R`: Extensions/wrappers for emuR functions
-
-### Object Properties
-- Use `@` for S7 property access: `corpus@basePath`
-- Use `$` for emuDBhandle attributes: `handle$basePath`
-
-## Performance Considerations
-
-### Current Optimizations
-1. **SQLite caching**: Metadata, query results, signal processing cache
-2. **data.table**: Used for large data operations (3-5x speedup vs dplyr)
-3. **Persistent cache**: Avoid recomputing identical signal processing operations
-4. **Lazy evaluation**: `query()` is lazy by default
-
-### Known Optimization Opportunities
-1. **Cache serialization**: Switch from `serialize()` to `qs` package (3-4x faster)
-3. **Parallel processing**: `transcribe_parallel()` exists but not widely used
-
-## Common Development Tasks
-
-### Adding a new signal track
-
-1. Define track in database config: `add_ssffTrackDefinition()`
-2. Compute track: Use `superassp` or custom DSP function
-3. Add track to corpus: Store SSFF files in bundle directories
-4. Access in queries: `quantify(segments, corp, tracks = "newtrack")`
-
-### Metadata and cache debugging
-
-Metadata lives in `METADATA.json` files (ground truth); the SQLite cache is rebuilt from them. See `R/metadata_core.R` and `R/metadata_import_export.R`; do not rely on internal helpers such as `get_connection()` from user-facing guidance.
-
-### Running specific benchmarks
-
-```bash
-# Compare implementations
-Rscript benchmarking/benchmark_dspp.R
-
-```
-
-## Documentation Files
-
-Root-level markdown docs, current as of this file:
-- **NEWS.md**: Changelog and deprecation ledger (files/functions marked for deletion or moved to companion packages)
-- **dev/**: assessments, plans, specs, `CMDI_VALIDATION.md`, `NEWS-archive.md`
-- **README.md**: Package overview
-
-Implementation notes referenced by earlier versions of this file
-(`METADATA_SYSTEM.md`, `CACHE_OPTIMIZATION_SUMMARY.md`,
-`DRAFT_CACHE_SYSTEM_SUMMARY.md`, `CACHE_SIZE_MANAGEMENT_SUMMARY.md`,
-`SIMULATION_PREPROCESSING_SUMMARY.md`, `SERIALIZATION_QUICK_REF.md`,
-`CI_CD_SETUP_SUMMARY.md`, `SERVE_FUNCTION_SUMMARY.md`) no longer exist in
-the repo — their content is now covered inline above or superseded by the
-protoscribe/eggstract/erodex splits. Don't link to them.
-
-User docs are in:
-- `vignettes/*.Rmd`: User-facing tutorials
-- `man/*.Rd`: Function reference (auto-generated by roxygen2)
-
-## Dependencies
-
-Key dependencies:
-- **emuR** (>= 2.0.2): Base EMU-SDMS functionality
-- **S7**: Modern OOP system
-- **data.table** (>= 1.14.0): High-performance data manipulation
-- **reticulate**: Python integration (if needed for custom DSP)
-- **superassp**: Advanced signal processing (from GitHub: humlab-speech/superassp)
-- **qs** (>= 0.25.0): Fast serialization (in Imports as of recent optimization)
-- **DBI, RSQLite**: SQLite database access
-- **digest**: Hash computation for cache keys
-
-## Working with Git
-
-Current branch: `main`
-
-Recent focus areas (based on commit history):
-- Cache serialization optimization (qs package)
-- Deprecating legacy code
-- Workflow documentation
-- Performance benchmarking
-
-When committing, follow existing commit message style:
-- `feat:` for new features
-- `refactor:` for code restructuring
-- `fix:` for bug fixes
-- Be specific about the change and its impact
-
-## Cache Locations
-
-Understanding where caches are stored is critical for debugging:
-
-```
-corpus_emuDB/
-├── _emuDBcache.sqlite          # Main metadata/query cache
-├── _signal_cache.sqlite         # Signal processing cache (deprecated)
-├── .quantify_cache/             # Persistent quantify/enrich cache
-│   ├── cache_item1.rds
-│   └── cache_item2.qs
-└── sessions/bundles...
-
-simulations/                     # Simulation caches (user-specified location)
-├── 20251020_forest.sqlite
-└── 20251019_ksvF0.sqlite
-```
-
-**Note:** Draft annotation caches (`.draft_cache/`) are managed by the protoscribe package.
-
-**Cache priority**:
-1. Ground truth: JSON files (`METADATA.json`, `_annot.json`)
-2. Cache: SQLite databases (for performance)
-3. Always rebuild cache if JSON files change
-
-## Notes for Claude Code
-
-1. **Always prefer optimized versions**: Use `*_optimized.R` and `*_dt.R` implementations
-2. **Don't edit deprecated files**: See NEWS.md (deprecation ledger) for files to avoid
-3. **Maintain ground truth**: Always update JSON files, not just SQLite cache
-4. **Test with ae database**: Use `reindeer:::create_ae_db()` for testing
-5. **Check benchmarks**: Run relevant benchmarks after performance-related changes
-6. **Update docs**: Roxygen comments for functions, vignettes for workflows
-7. **S7 class properties**: Use `@` not `$` for S7 objects
-8. **Cache invalidation**: Consider digest/hash when modifying cache-related code
-9. **Cache management**: Use `check_*_cache_size()` and `clean_*_cache()` functions (draft cache functions in protoscribe)
+## Public surface (31 exports, see NAMESPACE)
+
+| Verb | File |
+|---|---|
+| `corpus()`, `demo_corpus()` | `R/corpus_class.R`, `R/reindeer_demodata.R` |
+| `query(corp, eql)` → `lazy_segment_list`; `collect()` runs it (`lazy = FALSE` for eager) | `R/query_executor.R`, `R/query_parser.R`, `R/eql_parser.R`, `R/reindeer_lazy_segment_list.R` |
+| `scout()`, `move_to()` | `R/reindeer_sequence_ops_optimized.R` |
+| `quantify()` | `R/segment_list_quantify.R`, `R/quantify_corpus.R`, executor + cache in `R/tidy_trackdata_helpers.R` |
+| `dsp_parameters()` (Age/Gender → DSP args) | `R/dsp_parameters_public.R`, `R/dsp_parameter_derivation.R` |
+| `get_metadata()`, `set_metadata()`, `corp[ses, bndl]`, `export_metadata()`, `biographize()` | `R/metadata_core.R`, `R/metadata_unified.R`, `R/metadata_import_export.R` |
+| `annotate(corp)` / `annotate(segs)` (Artic; `review()` is internal) | `R/reindeer_annotate.R`, `R/reindeer_serve.R`, `R/artic_*.R` |
+| `import_media()`, `read_annotations()`, `write_annotations()` | `R/import_bundle.R`, `R/annotations_io.R` |
+| `describe_corpus()`, `clear_cache()`, `provenance()`, `dropped()`, `pivot_tracks_*()` | `R/corpus_describe.R`, `R/cache_size_management.R`, `R/segment_list_*.R` |
+
+Classes are S7 (`@` for properties): `corpus`, `segment_list` (inherits
+`tbl_df`; dplyr/vctrs hooks in `R/segment_list_dplyr.R`), `lazy_segment_list`.
+
+## quantify() modes
+
+- `quantify(segs, fn)`: run a superassp-style function. `.mode = "bundle"`
+  (default) analyses each file once and slices; `"window"` analyses each
+  segment. `.at` picks one frame per segment; `.use_metadata = TRUE` feeds
+  Age/Gender from metadata into the DSP arguments.
+- `quantify(segs, "fm")`: read a track registered in `_DBconfig.json`.
+- `quantify(corp, .using = fn)`: write SSFF files into the bundles and
+  register the track.
+
+## Storage
+
+- Ground truth: `_DBconfig.json`, `<bundle>_annot.json`, `METADATA.json` (same
+  name at db, session and bundle level). Caches are rebuildable from them.
+- `<db>/<name>_emuDBcache.sqlite`: annotation/metadata cache (emuR schema).
+- `<db>/.quantify_cache/quantify_cache.sqlite` (`corpus@.cache_dir`):
+  quantify results, keyed by function identity, parameter digest, file stamp
+  and `.cache_schema` (`R/tidy_trackdata_helpers.R`). Bump `.cache_schema`
+  when cached content changes meaning.
+
+## Tests
+
+- Fixtures: the emuR `ae` demo corpus via `demo_corpus()` or the helpers in
+  `tests/testthat/helper-corpus.R` (`create_isolated_ae_corpus()` when a test
+  writes to the corpus).
+- EQL parity: `test_eql_parity.R` against `fixtures/eql_golden.rds`; how to
+  add a case is in `helper-parity.R`.
+- DSP tests use real superassp output or the `.fms` files `ae` ships, never
+  fake SSFF bytes; `emuR::get_trackdata()` is the reference.
+- A skip names the WP that removes it. A WP is not done while a skip names it.
+
+## Rules
+
+- Errors are not fallbacks: no `tryCatch(..., error = function(e) NULL)` on
+  measurement paths. Signal with the classed helpers in `R/conditions.R`.
+- superassp is a moving dependency: behaviour reindeer relies on belongs in a
+  contract test, not in a comment.
+- Write JSON ground truth, then refresh the cache; never the cache alone.
+- Commits: `feat:`, `fix:`, `refactor:`, `test:`, `perf:`, `docs:`, `ci:`;
+  one WP per commit.
+- Companion packages: protoscribe (draft annotation), erodex (parameter
+  simulation).
