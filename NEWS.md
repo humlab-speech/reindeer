@@ -16,6 +16,18 @@
   instead of 4.4 s. `.at = NULL` returns full trajectories. A bundle without
   the track file aborts (`reindeer_missing_track_file_error`) instead of
   recomputing. Output gains `frame_time`.
+- Fixed: when a DSP routine failed on a whole file, `quantify()` silently
+  re-measured that bundle per segment window (values differ: up to 17 Hz F0,
+  118 Hz COG, 6 dB intensity). Failed segments now come back as `NA` rows with
+  one `reindeer_dsp_warning` naming the bundles; window-mode failures likewise
+  (they were `NA` or dropped without a warning). Routines whose `beginTime` has
+  no default always run per segment.
+- Fixed: `quantify(corpus, .using = fn)` registered a track even when `fn`
+  wrote no file (superassp < 3.2.3 ignored `toFile = TRUE`), leaving a
+  DBconfig that emuR cannot read. A bundle now counts as done only if its
+  output file was written; if none was, the call aborts
+  (`reindeer_dsp_error`) and DBconfig is untouched. An existing track file is
+  restored if the routine fails on it.
 
 # reindeer 3.1.0
 

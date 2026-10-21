@@ -180,17 +180,20 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   Filter(Negate(is.null), flat)
 }
 
-#' Analyse ONE whole signal file; return its frames as a table, or NULL
+#' Analyse ONE whole signal file; return its frames as a table
 #'
 #' Only time-indexed tracks (real `AsspDataObj`s carrying their own time base)
-#' can be sliced per segment later. Anything else - tables, lists, fakes, or a
-#' failed call - returns NULL and is analysed per window instead.
+#' can be sliced per segment later. Anything else - tables, lists, fakes -
+#' returns NULL and is analysed per window instead. A routine that fails
+#' returns its error condition: the caller reports it and leaves the bundle's
+#' rows NA, rather than silently measuring it another way.
 #' @noRd
 .dsp_whole_table <- function(dsp_function, file, params) {
   whole <- tryCatch(
     do.call(dsp_function, c(list(listOfFiles = file), params,
                             list(toFile = FALSE, verbose = FALSE))),
-    error = function(e) NULL)
+    error = function(e) e)
+  if (inherits(whole, "error")) return(whole)
   if (!inherits(whole, "AsspDataObj") || is.null(attr(whole, "sampleRate")) ||
       is.null(attr(whole, "startTime"))) {
     return(NULL)
@@ -215,18 +218,16 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 }
 
 #' Run the DSP routine once per segment window of ONE signal file
-#' @return A list with one element per segment (NULL where nothing came out).
+#' @return A list with one element per segment: the routine's result, or its
+#'   error condition.
 #' @noRd
-.run_dsp_windows <- function(dsp_function, file, params, starts_ms, ends_ms, verbose = FALSE) {
+.run_dsp_windows <- function(dsp_function, file, params, starts_ms, ends_ms) {
   base <- c(list(listOfFiles = file), params, list(toFile = FALSE, verbose = FALSE))
   lapply(seq_along(starts_ms), function(i) {
     tryCatch(
       do.call(dsp_function, c(base, list(beginTime = starts_ms[i] / 1000,
                                          endTime = ends_ms[i] / 1000))),
-      error = function(e) {
-        if (verbose) cli::cli_alert_warning("Error: {conditionMessage(e)}")
-        NULL
-      })
+      error = function(e) e)
   })
 }
 
@@ -591,11 +592,16 @@ get_corpus_cached <- function(.segments, .from = NULL) {
   results <- vector("list", n)
   status <- rep(NA_character_, n)
   resolved <- rep(FALSE, n)
+  failed <- rep(FALSE, n)
+  first_error <- NULL
   by_file <- split(seq_len(n), dt_valid$signal_file)
   stamps <- .file_stamp(names(by_file))
 
   # ---- bundle level: one table per file -------------------------------------
-  if (identical(.mode, "bundle")) {
+  # A routine whose beginTime has no default cannot analyse a whole file.
+  fml <- formals(dsp_function)
+  needs_window <- "beginTime" %in% names(fml) && identical(fml$beginTime, quote(expr = ))
+  if (identical(.mode, "bundle") && !needs_window) {
     first <- vapply(by_file, `[`, integer(1), 1L)
     params <- dt_valid$seg_params[first]
     gkeys <- vapply(seq_along(by_file), function(k) {
@@ -611,7 +617,7 @@ get_corpus_cached <- function(.segments, .from = NULL) {
         .dsp_whole_table(dsp_function, names(by_file)[k], params[[k]])
       }, future.seed = TRUE)
       for (j in seq_along(miss)) tabs[miss[j]] <- list(computed[[j]])
-      ok <- miss[!vapply(computed, is.null, logical(1))]
+      ok <- miss[vapply(computed, is.data.frame, logical(1))]
       if (caching && length(ok) > 0L) {
         .set_persistent_cache_batch(
           Map(function(k) list(cache_key = gkeys[k], result = tabs[[k]]), ok),
@@ -622,9 +628,14 @@ get_corpus_cached <- function(.segments, .from = NULL) {
     for (k in seq_along(by_file)) {
       if (is.null(tabs[[k]])) next
       idx <- by_file[[k]]
+      resolved[idx] <- TRUE
+      if (inherits(tabs[[k]], "error")) {
+        failed[idx] <- TRUE
+        first_error <- first_error %or_empty% conditionMessage(tabs[[k]])
+        next
+      }
       results[idx] <- .slice_table(tabs[[k]], dt_valid$start[idx], dt_valid$end[idx])
       status[idx] <- if (caching) (if (k %in% miss) "miss" else "hit") else NA_character_
-      resolved[idx] <- TRUE
     }
   }
 
@@ -656,11 +667,17 @@ get_corpus_cached <- function(.segments, .from = NULL) {
              starts = sub$start[idx], ends = sub$end[idx])
       })
       group_results <- future.apply::future_lapply(groups, function(gr) {
-        .run_dsp_windows(dsp_function, gr$file, gr$params, gr$starts, gr$ends, .verbose)
+        .run_dsp_windows(dsp_function, gr$file, gr$params, gr$starts, gr$ends)
       }, future.seed = TRUE)
       for (g in seq_along(groups)) {
-        # `[<-` with list(NULL) keeps the slot of a failed segment
         results[pending[groups[[g]]$idx]] <- group_results[[g]]
+      }
+      err <- pending[vapply(results[pending], inherits, logical(1), what = "error")]
+      if (length(err) > 0L) {
+        failed[err] <- TRUE
+        first_error <- first_error %or_empty% conditionMessage(results[[err[1]]])
+        # `[<-` with list(NULL) keeps the slots
+        results[err] <- list(NULL)
       }
       if (caching) {
         done <- todo[!vapply(results[pending[todo]], is.null, logical(1))]
@@ -675,8 +692,22 @@ get_corpus_cached <- function(.segments, .from = NULL) {
 
   dt_valid[, .cache_status := status]
 
+  if (any(failed)) {
+    bad <- unique(dt_valid$bundle[failed])
+    cli::cli_warn(c(
+      "{.val {dsp_name}} failed on {sum(failed)} segment{?s}; their track values are NA.",
+      "x" = "{length(bad)} bundle{?s}: {.val {bad}}",
+      "i" = "First error: {first_error}"),
+      class = c("reindeer_dsp_warning", "reindeer_warning"))
+  }
+
   # ---- assemble: one rbindlist for all results -------------------------------
   frames <- lapply(seq_along(results), function(i) {
+    if (failed[i]) {
+      na <- data.frame(frame_time = rep(NA_real_, max(1L, length(.at))))
+      if (!is.null(.at)) na$.time_point <- .at
+      return(na)
+    }
     if (is.null(results[[i]])) NULL
     else .dsp_result_to_df(results[[i]], .at, dt_valid$start[i], dt_valid$end[i])
   })

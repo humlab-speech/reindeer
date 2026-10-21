@@ -135,8 +135,8 @@ NULL
   if (is.null(written_file) || !file.exists(written_file)) {
     return(sanitized)
   }
-  read_back <- tryCatch(superassp::read_track(written_file), error = function(e) NULL)
-  if (is.null(read_back) || !is.list(read_back) || length(read_back) != length(display_tracks)) {
+  read_back <- superassp::read_track(written_file)
+  if (!is.list(read_back) || length(read_back) != length(display_tracks)) {
     return(sanitized)
   }
   on_disk_names <- names(read_back)
@@ -229,6 +229,9 @@ NULL
       dsp_fun = .using, metadata = bundle_row,
       metadata_fields = .metadata_fields, user_params = user_params
     )
+    out_file <- file.path(
+      dirname(bundle_row$full_path),
+      paste0(tools::file_path_sans_ext(basename(bundle_row$full_path)), ".", dsp_ext))
     cache_key <- NA_character_
     cached <- FALSE
     if (!is.null(cache_conn)) {
@@ -238,33 +241,39 @@ NULL
         dsp_params, .fn_identity(.using), dsp_ext, .cache_schema
       ))
       # A cache hit only counts while the output file it stands for exists.
-      out_file <- file.path(
-        dirname(bundle_row$full_path),
-        paste0(tools::file_path_sans_ext(basename(bundle_row$full_path)), ".", dsp_ext))
       cached <- !.force && file.exists(out_file) &&
         !is.null(.get_persistent_cache(cache_key, cache_conn))
     }
     list(bundle = bundle_row$bundle, session = bundle_row$session,
-         full_path = bundle_row$full_path, dsp_params = dsp_params,
-         cache_key = cache_key, cached = cached)
+         full_path = bundle_row$full_path, out_file = out_file,
+         dsp_params = dsp_params, cache_key = cache_key, cached = cached)
   })
 
+  # A bundle counts as done only when the routine wrote its output file. An
+  # existing file is moved aside first (so a stale one cannot pass for new
+  # output) and restored if the routine fails.
   run_job <- function(job, dsp_fun) {
     if (job$cached) {
       return(list(success = TRUE, bundle = job$bundle, session = job$session,
-                  cached = TRUE, full_path = job$full_path))
+                  cached = TRUE, out_file = job$out_file))
     }
-    tryCatch({
+    backup <- paste0(job$out_file, ".reindeer-bak")
+    had_file <- file.exists(job$out_file) && file.rename(job$out_file, backup)
+    err <- tryCatch({
       do.call(dsp_fun, c(
         list(listOfFiles = job$full_path), job$dsp_params,
         list(toFile = TRUE, verbose = FALSE)
       ))
-      list(success = TRUE, bundle = job$bundle, session = job$session,
-           cache_key = job$cache_key, full_path = job$full_path)
-    }, error = function(e) {
-      list(success = FALSE, bundle = job$bundle, session = job$session,
-           error = e$message)
-    })
+      NULL
+    }, error = conditionMessage)
+    if (is.null(err) && !file.exists(job$out_file)) {
+      err <- paste0("no ", basename(job$out_file), " was written")
+    }
+    if (had_file) {
+      if (is.null(err)) unlink(backup) else file.rename(backup, job$out_file)
+    }
+    list(success = is.null(err), bundle = job$bundle, session = job$session,
+         cache_key = job$cache_key, out_file = job$out_file, error = err)
   }
 
   # The caller's future::plan() decides whether this runs in parallel.
@@ -285,32 +294,21 @@ NULL
 
   successes <- Filter(function(x) isTRUE(x$success), results)
   errors <- Filter(function(x) !isTRUE(x$success), results)
-  if (length(errors) > 0) {
-    cli::cli_alert_warning("{length(errors)} bundle{?s} failed processing")
-    for (err in errors) cli::cli_alert_info("{err$session}/{err$bundle}: {err$error}")
-  }
-
   if (length(successes) == 0) {
-    cli::cli_abort("No bundle was processed successfully; nothing to register.")
+    cli::cli_abort(c(
+      "{.fn {dsp_fun_name}} wrote no {.file .{dsp_ext}} file; no track was registered.",
+      "x" = "{errors[[1]]$session}/{errors[[1]]$bundle}: {errors[[1]]$error}"
+    ), class = c("reindeer_dsp_error", "reindeer_error"))
+  }
+  if (length(errors) > 0) {
+    cli::cli_warn(c(
+      "{.fn {dsp_fun_name}} failed on {length(errors)} bundle{?s}; they have no {.file .{dsp_ext}} file.",
+      stats::setNames(vapply(errors, function(e) paste0(e$session, "/", e$bundle, ": ", e$error),
+                             character(1)), rep("x", length(errors)))
+    ), class = c("reindeer_dsp_warning", "reindeer_warning"))
   }
 
-  written_file <- sub(paste0("\\.", .signal_extension, "$"), paste0(".", dsp_ext),
-                      successes[[1]]$full_path)
-  if (!file.exists(written_file)) {
-    # cli_alert_warning() (unlike cli_warn()/cli_abort()) doesn't render a
-    # c(...) vector's "i" elements as separate bulleted lines -- it glues
-    # them onto the main line with no separator. Match this file's own
-    # established multi-line alert style instead (see the "bundle{?s}
-    # failed processing" alert above): one cli_alert_warning() for the
-    # headline, one cli_alert_info() for the detail.
-    cli::cli_alert_warning(
-      "{.fn {dsp_fun_name}} completed without error, but no {.val {dsp_ext}} file was found on disk afterward."
-    )
-    cli::cli_alert_info(
-      "Registering the track definition from {.fn {dsp_fun_name}}'s declared metadata only; nothing was actually materialized."
-    )
-  }
-  column_names <- .discover_written_column_names(written_file, display_tracks)
+  column_names <- .discover_written_column_names(successes[[1]]$out_file, display_tracks)
 
   for (i in seq_along(display_tracks)) {
     track_name <- if (!is.null(name)) name[i] else gsub("\\[.*\\]$", "", display_tracks[i])

@@ -75,8 +75,10 @@ follows the caller's \code{\link[future:plan]{future::plan()}}; the default is s
 \item{\code{.mode}}{\code{"bundle"} (default) analyses each bundle's whole file once
 with that speaker's parameters and slices every segment out of the
 result; \code{"window"} calls the routine once per segment on just its
-window. Routines that do not return a time-indexed track always run
-per segment. The default matches emuR (whole-file tracks, sliced per
+window. Routines that do not return a time-indexed track, or whose
+\code{beginTime} argument has no default, always run per segment. If the
+routine fails on a file, that bundle's rows are \code{NA} and a
+\code{reindeer_dsp_warning} names it; it is not re-measured per segment. The default matches emuR (whole-file tracks, sliced per
 segment). Windowed analysis loses left context, so pitch, spectral and
 intensity values differ from \code{"bundle"} (see \code{dev/WHOLE_FILE_FIDELITY.md}
 in the source repository); formant routines such as

@@ -55,12 +55,10 @@ test_that("generator with empty args round-trips through toJSON as an object, no
   expect_true(is.list(parsed$generator$args))
 })
 
+# Declared-metadata wrappers around real wrassp routines: the files they write
+# are real SSFF, which registration reads back (no fake SSFF bytes).
 .fake_rms_dsp <- function(listOfFiles, toFile = FALSE, verbose = FALSE, ...) {
-  if (isTRUE(toFile)) {
-    writeLines("fake-ssff-data", sub("\\.wav$", ".rms", listOfFiles))
-    return(invisible(1L))
-  }
-  data.frame(`RMS[dB]` = 36.9, check.names = FALSE)
+  wrassp::rmsana(listOfFiles, toFile = toFile, verbose = FALSE)
 }
 attr(.fake_rms_dsp, "ext") <- "rms"
 attr(.fake_rms_dsp, "tracks") <- "RMS[dB]"
@@ -68,11 +66,7 @@ attr(.fake_rms_dsp, "outputType") <- "SSFF"
 attr(.fake_rms_dsp, "suggestCaching") <- FALSE
 
 .fake_formant_dsp <- function(listOfFiles, toFile = FALSE, verbose = FALSE, ...) {
-  if (isTRUE(toFile)) {
-    writeLines("fake-ssff-data", sub("\\.wav$", ".fms", listOfFiles))
-    return(invisible(1L))
-  }
-  list(`F[Hz]` = matrix(500, 1, 4), `B[Hz]` = matrix(80, 1, 4))
+  wrassp::forest(listOfFiles, toFile = toFile, verbose = FALSE)
 }
 attr(.fake_formant_dsp, "ext") <- "fms"
 attr(.fake_formant_dsp, "tracks") <- c("F[Hz]", "B[Hz]")
@@ -146,14 +140,10 @@ test_that("quantify.corpus runs end-to-end with a real superassp function (smoke
   skip_if_not_installed("superassp")
   ae <- create_isolated_ae_corpus()
 
-  # No file-existence assertion here: real superassp::trk_rms's toFile=TRUE
-  # write is unreliable in this environment (see note above this test block).
-  # This only proves the real integration path (derive_dsp_parameters() on a
-  # real superassp function's formals, real attr() reads, real do.call
-  # dispatch) runs to completion and registers something.
   expect_no_error(
     quantify(ae, .using = superassp::trk_rms, .verbose = FALSE)
   )
+  expect_gt(length(list.files(ae@basePath, "\\.rms$", recursive = TRUE)), 0)
   cfg <- reindeer:::load_DBconfig(ae)
   # The ae demo corpus ships two pre-existing ssffTrackDefinitions ("dft",
   # "fm") from emuR's own demo data, so the newly-registered entry is not

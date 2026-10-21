@@ -15,24 +15,30 @@ test_that("bundle mode agrees with window mode (forest F1 at midpoints)", {
 })
 
 test_that("bundle mode analyses each file once, window mode once per segment", {
-  skip_if_no_emuR()
+  skip_if_no_emuR(); skip_if_no_superassp()
+  loadNamespace("superassp")  # registers as.data.frame.AsspDataObj
   corp <- create_isolated_ae_corpus()
   segs <- collect(query(corp, "Phonetic == t"))
-  calls <- new.env(); calls$whole <- 0L; calls$window <- 0L
-  fake <- function(listOfFiles, beginTime, endTime, toFile = FALSE, verbose = FALSE, ...) {
-    if (missing(beginTime)) calls$whole <- calls$whole + 1L else calls$window <- calls$window + 1L
-    n <- 400
-    obj <- data.frame(frame_time = seq(0.0025, by = 0.005, length.out = n), v = seq_len(n))
+  calls <- new.env()
+  fake <- function(listOfFiles, beginTime = NULL, endTime = NULL, toFile = FALSE,
+                   verbose = FALSE, ...) {
+    if (is.null(beginTime)) calls$whole <- calls$whole + 1L else calls$window <- calls$window + 1L
+    obj <- list(v = matrix(seq_len(400), ncol = 1))
     attr(obj, "sampleRate") <- 200; attr(obj, "startTime") <- 0.0025
-    class(obj) <- c("AsspDataObj", "data.frame")
+    class(obj) <- "AsspDataObj"
     obj
   }
-  # A real AsspDataObj is needed for as.data.frame(); skip if superassp's method
-  # would reject the fake.
-  skip_if_not_installed("superassp")
-  out <- tryCatch(quantify(segs, fake), error = function(e) NULL)
-  skip_if(is.null(out), "fake track not accepted by as.data.frame.AsspDataObj")
-  expect_lte(calls$whole, length(unique(segs$bundle)))
+  for (mode in c("bundle", "window")) {
+    calls$whole <- 0L; calls$window <- 0L
+    quantify(segs, fake, .mode = mode, .use_cache = FALSE)
+    if (mode == "bundle") {
+      expect_equal(calls$whole, length(unique(segs$bundle)))
+      expect_equal(calls$window, 0L)
+    } else {
+      expect_equal(calls$whole, 0L)
+      expect_equal(calls$window, nrow(segs))
+    }
+  }
 })
 
 test_that("ksv no longer fails for a segment at the start of the file", {
