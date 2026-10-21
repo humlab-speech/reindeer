@@ -211,7 +211,7 @@ case. This comes first because every later WP is executed from it.
 
 **G0.2 `.at` by time (S).**
 - Select the frame nearest to `start + .at * (end - start)` in both modes.
-  Window-mode frame times are window-relative, so add the window start.
+  (Window-mode frame times turned out to be absolute already.)
 - Caches hold tables and raw results from before selection, so `.cache_schema`
   should not need a bump. Verify that before committing.
 - NEWS: about half of all midpoint values change, toward emuR.
@@ -311,9 +311,17 @@ test passes on superassp HEAD. **Release 3.1.1.**
 
 | WP | State |
 |---|---|
-| G0.0–G0.5 | open |
+| G0.0 | done `130a992` |
+| G0.1 | done `3cf7ee6`: function-mode trajectories already matched (3468 frames) |
+| G0.2 | done `aaf2714`: exact ties needed ms-grid rounding to match emuR |
+| G0.3 | done `ff647ad`: 253 segments 4.4 s → 0.09 s |
+| G0.4 | done `054ecbd`: whole-file errors → NA + `reindeer_dsp_warning`; routines with a mandatory `beginTime` windowed by rule; existing track files restored on failure |
+| G0.5 | done `d6a16f0`: CI on superassp HEAD to be confirmed on push |
+
 | G1.1–G1.6 | open |
 | G2.1–G2.2 | open |
+
+G0 gate met locally (parity 0 skips, R4/R5 repros, contract on 3.2.3, check 0/0/0, lint clean). Released 3.1.1.
 
 ## Appendix: one-call repros (on `ec1aa02`)
 
