@@ -52,7 +52,7 @@ Suggests:
     qs2,
     knitr,
     rmarkdown,
-    superassp (>= 3.0.0),
+    superassp (>= 3.2.3),
     eggstract,
     openxlsx,
     av,

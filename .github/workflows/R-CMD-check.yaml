@@ -5,6 +5,9 @@ on:
     branches: [main, master, v0.7-breaking]
   pull_request:
     branches: [main, master, v0.7-breaking]
+  # Weekly, so superassp HEAD drift fails here without a reindeer push.
+  schedule:
+    - cron: '17 4 * * 1'
 
 name: R-CMD-check
 
@@ -13,10 +16,6 @@ jobs:
     runs-on: ${{ matrix.config.os }}
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
-
-    # superassp 3.2.1 does not compile on Windows (munmap in dataobj.c);
-    # remove once fixed upstream.
-    continue-on-error: ${{ matrix.config.os == 'windows-latest' }}
 
     strategy:
       fail-fast: false

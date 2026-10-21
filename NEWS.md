@@ -28,6 +28,10 @@
   output file was written; if none was, the call aborts
   (`reindeer_dsp_error`) and DBconfig is untouched. An existing track file is
   restored if the routine fails on it.
+- Requires superassp >= 3.2.3 (writes files for `toFile = TRUE`; builds on
+  Windows). A contract test (`test_superassp_contract.R`) checks the
+  superassp behaviour reindeer relies on; R-CMD-check also runs weekly
+  against superassp HEAD, and Windows failures are no longer tolerated.
 
 # reindeer 3.1.0
 
