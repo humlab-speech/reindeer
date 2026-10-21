@@ -6,6 +6,16 @@
   5 ms frame; F1 up to 1.1 kHz). Values now equal `emuR::get_trackdata(cut =)`
   exactly; a parity test against emuR's output guards this
   (`tests/testthat/test_dsp_parity.R`).
+- Fixed: `quantify(segs, "fm", .at = 0.5)` (reading a registered track)
+  dropped rows or returned no track columns without warning, because
+  `superassp::read_track()` rejects single off-frame time points and the error
+  was swallowed. Tracks with a stored `generator` were silently recomputed
+  per segment instead, with the generator's parameters. Track mode now reads
+  each bundle's file once (zeros kept, as in emuR), selects frames as function
+  mode does, and equals `emuR::get_trackdata()`; 253 segments take 0.09 s
+  instead of 4.4 s. `.at = NULL` returns full trajectories. A bundle without
+  the track file aborts (`reindeer_missing_track_file_error`) instead of
+  recomputing. Output gains `frame_time`.
 
 # reindeer 3.1.0
 

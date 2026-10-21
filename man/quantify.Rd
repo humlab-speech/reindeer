@@ -41,9 +41,12 @@ the next \code{\link[=collect]{collect()}}.
 }
 \details{
 When \code{dsp_function} is a character vector of registered
-track names, \code{.use_cache}, \code{.parallel}, \code{.workers}, \code{.cache_dir},
-and \code{.cache_format} have no effect - reading or recomputing an
-already-registered track doesn't go through the DSP result cache.
+track names, each bundle's track file is read once (as
+\code{emuR::get_trackdata()} does: \code{quantify(segs, "fm", .at = 0.5)} equals
+\code{get_trackdata(db, segs, "fm", cut = 0.5)}); value columns are named
+after the track (\code{fm1} to \code{fm4}). A bundle without the file is an error.
+\code{.use_cache}, \code{.parallel}, \code{.workers}, \code{.cache_dir}, and \code{.cache_format}
+have no effect there.
 }
 \section{Method arguments - segment_list}{
 
@@ -55,11 +58,8 @@ already-registered track doesn't go through the DSP result cache.
 selects the frame nearest to \code{start + .at * (end - start)} (emuR's
 \code{get_trackdata(cut =)}; no interpolation). A scalar
 gives one row per segment (e.g. \code{0.5} for midpoint); a vector
-multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}). Required (no default) when
-\code{dsp_function} is a character vector of registered track names -
-character-mode reads one specific time point per segment, so there
-is no unambiguous "whole contour" fallback the way there is for a
-DSP function.}
+multiplies rows (e.g. \code{c(0.2, 0.5, 0.8)}). \code{NULL} (default) returns
+every frame inside each segment.}
 \item{\code{.use_metadata}}{Look up DSP parameters from speaker metadata.
 Default \code{TRUE}. See \code{\link[=dsp_parameters]{dsp_parameters()}} to preview.}
 \item{\code{.use_cache}}{Reuse persistent results when the cache key

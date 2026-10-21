@@ -57,7 +57,6 @@ test_that("function mode trajectories match get_trackdata()", {
 })
 
 test_that("track mode quantify(segs, \"fm\") matches get_trackdata(cut =)", {
-  skip("G0.3: track mode loses read_track() errors and needs .at")
   skip_if_no_emuR(); skip_if_no_superassp()
   corp <- create_shared_ae_corpus()
   g <- trackdata_golden()
@@ -69,7 +68,6 @@ test_that("track mode quantify(segs, \"fm\") matches get_trackdata(cut =)", {
 })
 
 test_that("track mode trajectories match get_trackdata()", {
-  skip("G0.3: track mode loses read_track() errors and needs .at")
   skip_if_no_emuR(); skip_if_no_superassp()
   corp <- create_shared_ae_corpus()
   got <- fm_track_mode(corp, NULL)

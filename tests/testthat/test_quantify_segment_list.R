@@ -98,20 +98,22 @@ test_that("quantify works with .at parameter for time points", {
   seg_list <- query(corp, "Phonetic == n", lazy = FALSE)
   seg_list@db_path <- ae_path
 
+  skip_if_no_superassp()
+  loadNamespace("superassp")  # registers as.data.frame.AsspDataObj
+  # Ten frames spanning the analysed window, shaped like a superassp track.
   fake_dsp_track <- function(listOfFiles, beginTime, endTime, toFile = FALSE, verbose = FALSE, ...) {
     n_frames <- 10
-    obj <- data.frame(
-      f1 = seq(500, 600, length.out = n_frames),
-      f2 = seq(1500, 1600, length.out = n_frames),
-      f3 = seq(2500, 2600, length.out = n_frames)
-    )
-    class(obj) <- c("AsspDataObj", "data.frame")
+    obj <- list(fm = cbind(seq(500, 600, length.out = n_frames),
+                           seq(1500, 1600, length.out = n_frames)))
+    attr(obj, "sampleRate") <- n_frames / (endTime - beginTime)
+    attr(obj, "startTime") <- beginTime
+    class(obj) <- "AsspDataObj"
     obj
   }
 
   result <- quantify(seg_list, fake_dsp_track,
-                     .at = c(0.25, 0.5, 0.75),
-                     .verbose = FALSE)
+                     .at = c(0.25, 0.5, 0.75), .mode = "window",
+                     .use_cache = FALSE, .verbose = FALSE)
 
   n_segs <- nrow(seg_list)
   expect_equal(nrow(result), n_segs * 3)
@@ -337,38 +339,19 @@ test_that("quantify(segs, dsp_function) rejects mixed character/non-character in
   )
 })
 
-test_that("quantify(segs, character_name) falls back to compute when the on-the-fly recipe is registered but file is missing", {
+test_that("quantify(segs, character_name) aborts when the track file is missing (no recompute)", {
   ae <- create_isolated_ae_corpus()
   quantify(ae, name = "rms_recipe", file_extension = "rms",
-           generator = list(`function` = "rmsana", package = "wrassp",
-                            version = as.character(utils::packageVersion("wrassp"))))
-  # No files were actually written (connect-existing, documentation-only) —
-  # the character path must recompute via the stored recipe rather than error.
+           generator = list(`function` = "rmsana", package = "wrassp"))
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
-  result <- quantify(segs, "rms_recipe", .at = 0.5, .verbose = FALSE)
-  expect_true(is.data.frame(result))
-  expect_gt(nrow(result), 0)
-
-  # Guard against the fallback branch silently returning the same
-  # arbitrary-in-file row for every segment (e.g. treating a relative
-  # time point as a fraction of the whole recording instead of indexing
-  # by the segment's own absolute start time). Comparing across the full
-  # `segs` set isn't a sharp enough test here: cross-bundle content
-  # variation alone would produce multiple unique values even under the
-  # bug (each bundle is a different recording), masking a same-bundle
-  # regression. Narrow it to two segments known to share one bundle —
-  # that's where the bug's effect (identical value regardless of
-  # in-bundle position) would actually show up.
-  same_bundle <- segs[segs$bundle == segs$bundle[1], ][1:2, ]
-  same_bundle@db_path <- ae@basePath
-  result2 <- quantify(same_bundle, "rms_recipe", .at = 0.5, .verbose = FALSE)
-  expect_true(nrow(result2) < 2 || length(unique(result2$rms_recipe)) > 1)
+  expect_error(quantify(segs, "rms_recipe", .at = 0.5),
+               class = "reindeer_missing_track_file_error")
 })
 
 # --- Final-review fix round (2026-09-24 quantify-unification brief) --------
 
-test_that("quantify(segs, character_name) requires .at (Fix 1 / C1)", {
+test_that("quantify(segs, character_name) without .at returns every frame", {
   ae <- create_isolated_ae_corpus()
   quantify(ae, .using = wrassp::rmsana, name = "RMS", file_extension = "rms",
            .verbose = FALSE)
@@ -376,15 +359,11 @@ test_that("quantify(segs, character_name) requires .at (Fix 1 / C1)", {
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
 
-  expect_error(
-    quantify(segs, "RMS", .verbose = FALSE),
-    class = "reindeer_quantify_missing_at_error"
-  )
-
-  # And that it still works once .at is supplied.
-  expect_no_error(
-    quantify(segs, "RMS", .at = 0.5, .verbose = FALSE)
-  )
+  all <- quantify(segs, "RMS")
+  mid <- quantify(segs, "RMS", .at = 0.5)
+  expect_gt(nrow(all), nrow(mid))
+  expect_false(".time_point" %in% names(all))
+  expect_error(quantify(segs, c("RMS", "fm")), class = "reindeer_quantify_error")
 })
 
 test_that("quantify(segs, character_name) rejects DSP-style extra arguments (Fix 6A / I4)", {
@@ -401,98 +380,22 @@ test_that("quantify(segs, character_name) rejects DSP-style extra arguments (Fix
   )
 })
 
-test_that("quantify(segs, character_name) fallback honours from/index instead of always taking the first element (Fix 2 / C2)", {
-  skip_if_not_installed("superassp")
-
-  # superassp::trk_formant_forest is a real, resolvable (get() from its own
-  # namespace) DSP function that returns a named list (`F[Hz]`, `B[Hz]`) with
-  # sampleRate/startTime attributes on the returned object itself -- exactly
-  # what the fallback-to-compute branch needs, and it lets us prove the
-  # fix without inventing a fixture that .quantify_segment_list_by_name()
-  # could not actually resolve via generator$package/generator$function
-  # (a locally-defined fake function has no namespace to `get()` it from).
+test_that("quantify(segs, character_name) honours from/index", {
+  skip_if_no_superassp()
   ae <- create_isolated_ae_corpus()
-  quantify(ae, name = "B", from = "B[Hz]", index = 1L, file_extension = "nonexistent_ext",
-           generator = list(`function` = "trk_formant_forest", package = "superassp"))
+  quantify(ae, name = "B", from = "bw", index = 1L, file_extension = "fms")
 
   segs <- query(ae, "Phonetic == n", lazy = FALSE)
   segs@db_path <- ae@basePath
-  seg <- as.data.frame(segs)[1, ]
-
-  result <- quantify(segs, "B", .at = 0.5, .verbose = FALSE)
+  result <- quantify(segs, "B", .at = 0.5)
   expect_true("B" %in% names(result))
 
-  # Independently recompute the same frame both ways and confirm the
-  # returned column matches the B[Hz] (bandwidth) element, not the F[Hz]
-  # (frequency) element that the pre-fix code would have taken (mat <-
-  # computed[[1]]) regardless of `from`.
-  wav <- list.files(file.path(ae@basePath, paste0(seg$session, "_ses"),
-                              paste0(seg$bundle, "_bndl")),
-                    pattern = "\\.wav$", full.names = TRUE)
-  computed <- superassp::trk_formant_forest(wav, toFile = FALSE, verbose = FALSE)
-  sr <- attr(computed, "sampleRate"); st <- attr(computed, "startTime")
-  t_abs <- (seg$start + 0.5 * (seg$end - seg$start)) / 1000
-  frame_idx <- max(1L, min(nrow(computed[[1]]), round((t_abs - st) * sr) + 1L))
-  expected_B <- computed[["B[Hz]"]][frame_idx, 1]
-  expected_F <- computed[["F[Hz]"]][frame_idx, 1]
-
-  got <- result$B[result$session == seg$session & result$bundle == seg$bundle &
-                     result$start == seg$start][1]
-  expect_equal(got, expected_B)
-  expect_false(isTRUE(all.equal(got, expected_F)))
+  # The column is the first bandwidth of the .fms file, at the selected frame.
+  seg <- as.data.frame(result)[1, ]
+  fms <- file.path(ae@basePath, paste0(seg$session, "_ses"), paste0(seg$bundle, "_bndl"),
+                   paste0(seg$bundle, ".fms"))
+  bw <- superassp::read_track(fms, zero_to_na = FALSE, tracks = "bw")
+  k <- round((seg$frame_time - attr(bw, "startTime")) * attr(bw, "sampleRate")) + 1
+  expect_equal(as.numeric(seg$B), as.numeric(bw[[1]][k, 1]))
 })
 
-test_that("quantify(segs, character_name) fallback aborts when the recomputed result has no sampleRate attribute (Fix 2 / C2)", {
-  ae <- create_isolated_ae_corpus()
-  # base::list(...) is a real, resolvable, `...`-taking function that
-  # returns a plain (attribute-less) list when called the way the
-  # fallback branch calls a DSP function -- a minimal stand-in for "a DSP
-  # routine whose recomputed result carries no sampleRate attribute",
-  # without inventing an unresolvable local fixture (see the sibling test
-  # above for why a local closure won't do for this branch).
-  quantify(ae, name = "NoRate", file_extension = "nonexistent_ext2",
-           generator = list(`function` = "list", package = "base"))
-
-  segs <- query(ae, "Phonetic == n", lazy = FALSE)
-  segs@db_path <- ae@basePath
-
-  # This cli_abort() (like its "no resolvable generator$package" and
-  # "cannot resolve pkg::fn" neighbours in the same fallback block) is
-  # deliberately unclassed in the brief's snippet -- match on message,
-  # not class.
-  expect_error(
-    quantify(segs, "NoRate", .at = 0.5, .verbose = FALSE),
-    "sampleRate"
-  )
-})
-
-test_that("quantify(segs, character_name) warns when some segment/time-point combinations produce no measurement (Fix 6B / I4)", {
-  ae <- create_isolated_ae_corpus()
-  quantify(ae, name = "FallbackWarn", file_extension = "nonexistent_ext3",
-           generator = list(`function` = "rmsana", package = "wrassp",
-                            version = as.character(utils::packageVersion("wrassp"))))
-
-  segs <- query(ae, "Phonetic == n", lazy = FALSE)
-  segs@db_path <- ae@basePath
-
-  # Graft in one synthetic segment whose bundle doesn't exist on disk, so
-  # its generator-fallback recompute can never find a signal file --
-  # a deterministic, environment-independent way to force a dropped
-  # (segment, time-point) combination without depending on any DSP's
-  # toFile=TRUE write actually landing on disk in this environment.
-  seg_df <- as.data.frame(segs)[1:3, ]
-  fake_row <- seg_df[1, ]
-  fake_row$bundle <- "nosuchbundle999"
-  fake_row$session <- "nosuchsession999"
-  seg_df <- rbind(seg_df, fake_row)
-  segs2 <- segment_list(seg_df, db_uuid = segs@db_uuid, db_path = segs@db_path)
-
-  # cli::cli_alert_warning() surfaces as a "message" condition under
-  # testthat (it calls message() internally), not a base "warning" --
-  # confirmed empirically; expect_warning() does not catch it.
-  expect_message(
-    result <- quantify(segs2, "FallbackWarn", .at = 0.5, .verbose = FALSE),
-    "segment/time-point combination"
-  )
-  expect_equal(nrow(result), 3L)
-})
