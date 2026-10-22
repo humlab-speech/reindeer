@@ -157,3 +157,26 @@ test_that("import_media() imports many files, checks them first, applies metadat
   expect_error(import_media(corp, a, session = "9999"), class = "reindeer_import_error")
   expect_error(import_media(corp, a, session = "S", annotations = "x.TextGrid"), "not supported")
 })
+
+test_that("corpus(create = TRUE) builds a full cache, and a stale cache is replaced", {
+  root <- tempfile("create_"); dir.create(root)
+  path <- file.path(root, "pilot_emuDB")
+  corp <- corpus(path, create = TRUE)
+  want <- reindeer:::load_DBconfig(corp)$UUID
+  cache <- file.path(path, "pilot_emuDBcache.sqlite")
+  cached_uuid <- function() {
+    con <- DBI::dbConnect(RSQLite::SQLite(), cache)
+    on.exit(DBI::dbDisconnect(con))
+    DBI::dbGetQuery(con, "SELECT uuid FROM emu_db")$uuid
+  }
+  expect_identical(cached_uuid(), want)
+
+  # A cache without emu_db (what 3.1.1 wrote on create) is rebuilt; on Windows
+  # this failed with "table session already exists".
+  unlink(cache)
+  con <- DBI::dbConnect(RSQLite::SQLite(), cache)
+  DBI::dbExecute(con, "CREATE TABLE session (db_uuid TEXT, name TEXT)")
+  DBI::dbDisconnect(con)
+  corpus(path)
+  expect_identical(cached_uuid(), want)
+})

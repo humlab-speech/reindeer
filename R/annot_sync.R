@@ -108,11 +108,11 @@ sync_emuDB_cache <- function(database_dir, verbose = FALSE) {
 
   fresh <- !file.exists(cache_path)
   if (!fresh) {
-    probe <- tryCatch({
-      c0 <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
-      on.exit(DBI::dbDisconnect(c0), add = TRUE)
-      DBI::dbGetQuery(c0, "SELECT uuid FROM emu_db")$uuid
-    }, error = function(e) character())
+    # Close before unlink(): Windows cannot delete a file that is still open.
+    c0 <- DBI::dbConnect(RSQLite::SQLite(), cache_path)
+    probe <- tryCatch(DBI::dbGetQuery(c0, "SELECT uuid FROM emu_db")$uuid,
+                      error = function(e) character(),
+                      finally = DBI::dbDisconnect(c0))
     if (!identical(probe, uuid)) {   # corrupt, or a cache of another database
       unlink(cache_path)
       fresh <- TRUE
