@@ -1,3 +1,11 @@
+# reindeer 3.1.2
+
+- Fixed: `corpus(path, create = TRUE)` failed on Windows with "table session
+  already exists". The new corpus got a partial cache that the next step could
+  not delete while its own probe connection was still open. Creation no longer
+  writes a cache (`corpus()` builds the full one), and the probe connection is
+  closed before a stale cache is removed.
+
 # reindeer 3.1.1
 
 - Fixed: `quantify(.at =)` took frame `round(.at * n_frames)` of the segment
