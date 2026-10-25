@@ -173,7 +173,9 @@ test_that("corpus(create = TRUE) builds a full cache, and a stale cache is repla
 
   # A cache without emu_db (what 3.1.1 wrote on create) is rebuilt; on Windows
   # this failed with "table session already exists".
-  unlink(cache)
+  # corp keeps the cache open; Windows cannot delete an open file.
+  DBI::dbDisconnect(reindeer:::get_corpus_connection(corp))
+  expect_true(file.remove(cache))
   con <- DBI::dbConnect(RSQLite::SQLite(), cache)
   DBI::dbExecute(con, "CREATE TABLE session (db_uuid TEXT, name TEXT)")
   DBI::dbDisconnect(con)
